@@ -7,6 +7,7 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
+import { Box, Image, Link, Spinner, Table, Text } from '@chakra-ui/react';
 import { useListings, type Listing } from '../api/client';
 
 const columnHelper = createColumnHelper<Listing>();
@@ -23,14 +24,9 @@ const columns = [
     cell: (info) => {
       const src = info.getValue();
       return src ? (
-        <img
-          src={src}
-          alt=""
-          className="h-12 w-12 rounded object-cover"
-          loading="lazy"
-        />
+        <Image src={src} alt="" boxSize={12} rounded="md" objectFit="cover" loading="lazy" />
       ) : (
-        <div className="h-12 w-12 rounded bg-gray-100" />
+        <Box boxSize={12} rounded="md" bg="bg.muted" />
       );
     },
   }),
@@ -40,14 +36,9 @@ const columns = [
       const url = info.row.original.url;
       const title = info.getValue() ?? '—';
       return url ? (
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className="text-blue-600 hover:underline"
-        >
+        <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
           {title}
-        </a>
+        </Link>
       ) : (
         title
       );
@@ -88,60 +79,60 @@ export function ListingsTable({ searchId }: Props) {
 
   if (searchId == null) {
     return (
-      <div className="p-8 text-gray-500">Обери пошук зліва, щоб побачити оголошення.</div>
+      <Text p={8} color="fg.muted">
+        Обери пошук зліва, щоб побачити оголошення.
+      </Text>
     );
   }
 
   if (isLoading) {
-    return <div className="p-8 text-gray-500">Завантаження…</div>;
+    return (
+      <Box p={8}>
+        <Spinner color="blue.500" />
+      </Box>
+    );
   }
 
   if (rows.length === 0) {
     return (
-      <div className="p-8 text-gray-500">
+      <Text p={8} color="fg.muted">
         Оголошень немає. Натисни «Scan» для цього пошуку.
-      </div>
+      </Text>
     );
   }
 
   return (
-    <div className="flex-1 overflow-auto p-4">
-      <table className="w-full border-collapse text-sm">
-        <thead>
+    <Box flex="1" overflow="auto" p={4}>
+      <Table.Root size="sm" interactive>
+        <Table.Header>
           {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id} className="border-b border-gray-200 text-left">
+            <Table.Row key={hg.id}>
               {hg.headers.map((header) => (
-                <th
+                <Table.ColumnHeader
                   key={header.id}
                   onClick={header.column.getToggleSortingHandler()}
-                  className={`px-3 py-2 font-medium ${
-                    header.column.getCanSort() ? 'cursor-pointer select-none' : ''
-                  }`}
+                  cursor={header.column.getCanSort() ? 'pointer' : undefined}
+                  userSelect="none"
                 >
-                  {flexRender(
-                    header.column.columnDef.header,
-                    header.getContext(),
-                  )}
-                  {{ asc: ' ↑', desc: ' ↓' }[
-                    header.column.getIsSorted() as string
-                  ] ?? ''}
-                </th>
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
+                </Table.ColumnHeader>
               ))}
-            </tr>
+            </Table.Row>
           ))}
-        </thead>
-        <tbody>
+        </Table.Header>
+        <Table.Body>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+            <Table.Row key={row.id}>
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-3 py-2 align-middle">
+                <Table.Cell key={cell.id} verticalAlign="middle">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
+                </Table.Cell>
               ))}
-            </tr>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Table.Body>
+      </Table.Root>
+    </Box>
   );
 }
