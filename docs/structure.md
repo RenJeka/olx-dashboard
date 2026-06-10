@@ -17,6 +17,7 @@ olx-dashboard/
 ├── docs/
 │   ├── olx-monitor-spec.md           # канонічна специфікація (вимоги, схема, етапи)
 │   ├── architecture.md               # технічна архітектура (цей рівень опису)
+│   ├── olx-api.md                    # деталі запитів до OLX (URL/параметри/селектори)
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
 │   └── plans/
