@@ -18,6 +18,7 @@ olx-dashboard/
 │   ├── olx-monitor-spec.md           # канонічна специфікація (вимоги, схема, етапи)
 │   ├── architecture.md               # технічна архітектура (цей рівень опису)
 │   ├── olx-api.md                    # API OLX: GraphQL (основний) + HTML fallback
+│   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
 │   └── plans/
@@ -47,19 +48,33 @@ olx-dashboard/
 │           └── listings.ts   # GET /api/searches/:id/listings
 │
 └── web/                      # workspace "web" (React + Vite), type: module
-    ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table
+    ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
+    │                          #   @chakra-ui/react, next-themes, react-icons
     ├── tsconfig.json         # module: ESNext, moduleResolution: Bundler, jsx
-    ├── vite.config.ts        # react + tailwind plugin, proxy /api → :3001
+    ├── vite.config.ts        # react plugin, proxy /api → :3001
     ├── index.html            # точка входу Vite
     └── src/
-        ├── main.tsx          # ReactDOM + QueryClientProvider
-        ├── App.tsx           # композиція: Searches (sidebar) + ListingsTable
-        ├── index.css         # @import "tailwindcss"
+        ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
+        ├── App.tsx           # шапка (лого + SettingsDrawer) + Searches (sidebar) + ListingsTable;
+        │                      #   стан columnVisibility + persist у localStorage
         ├── api/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки + DTO-типи
+        ├── components/
+        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark) +
+        │   │                       #   видимість колонок таблиці (TOGGLEABLE_COLUMNS)
+        │   └── ui/                # Chakra UI v3 snippets (npx @chakra-ui/cli snippet add)
+        │       ├── provider.tsx     # ChakraProvider + next-themes ThemeProvider
+        │       ├── color-mode.tsx   # useColorMode/useColorModeValue/ColorModeButton
+        │       ├── toaster.tsx
+        │       ├── tooltip.tsx
+        │       ├── drawer.tsx
+        │       ├── switch.tsx
+        │       ├── checkbox.tsx
+        │       └── close-button.tsx
         └── pages/
             ├── Searches.tsx      # список пошуків, форма створення, кнопка Scan
-            └── ListingsTable.tsx # TanStack Table з сортуванням
+            └── ListingsTable.tsx # TanStack Table: сортування, columnSizing, columnVisibility;
+                                   #   localStorage 'olx-listings-table-v1'
 ```
 
 ## Орієнтири «куди дивитись»
@@ -76,6 +91,7 @@ olx-dashboard/
 | Доменні типи | `server/src/types.ts` |
 | Запити з фронту | `web/src/api/client.ts` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
+| Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx`, `web/src/App.tsx` (стан + localStorage), `TOGGLEABLE_COLUMNS` у `web/src/pages/ListingsTable.tsx` |
 | Скрипти/воркспейси | кореневий `package.json` |
 
 ## Команди

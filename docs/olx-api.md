@@ -8,7 +8,8 @@
 > Верифіковано живими запитами: **2026-06-10**.
 >
 > Повʼязане: [`architecture.md`](./architecture.md), [`olx-monitor-spec.md`](./olx-monitor-spec.md) §4,
-> план міграції: [`plans/graphql-migration.md`](./plans/graphql-migration.md).
+> план міграції: [`plans/graphql-migration.md`](./plans/graphql-migration.md),
+> повний довідник полів відповіді: [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
 
 ---
 
@@ -39,6 +40,12 @@ Content-Type: application/json
 ```
 
 Інфраструктура: CloudFront. Відповідь: `application/json`.
+
+> ⚠️ **Introspection вимкнено** (перевірено живим запитом 2026-06-10): `__schema { ... }`
+> повертає `200 OK`, але кожне introspection-поле дає помилку `GRAPHQL_VALIDATION_FAILED`
+> ("GraphQL introspection has been disabled..."). Офіційну схему через `__schema`/`__type`
+> отримати не можна — не витрачати на це час повторно. Каталог реально доступних полів
+> (зібраний з live-дампів) — [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
 
 ### 2.2 Що НЕ потрібно (підтверджено живим тестом 2026-06-10)
 
@@ -192,7 +199,9 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 }
 ```
 
-Інші корисні поля повної схеми (бачили в дампі, можна дотягнути за потреби):
+Повний каталог усіх полів, які OLX фактично повертає (включно з тими, що наш query
+не запитує) — категоризовано в [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
+Коротко, найкорисніші додаткові поля (можна дотягнути за потреби):
 `description` (повний опис у списковій видачі!), `user{name created is_online}`,
 `promotion{top_ad highlighted}`, `delivery`, `map{lat lon}`, `metadata.promoted`
 (індекси промо-оголошень у видачі), `links{next{href}}` (REST-дзеркало `api/v1/offers`),
@@ -325,3 +334,4 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | --- | --- | --- |
 | 2026-06-10 | Заголовок HTML-картки `h6` → `h4` | селектор `h6, h4` у `selectors.ts` |
 | 2026-06-10 | Відкрито GraphQL `/apigateway/graphql` (дамп + live-тест без кукі/auth: OK; `filter_float_price` працює). Підтверджено існування REST `api/v1/offers` для olx.ua | міграція: GraphQL — основний метод, HTML — fallback №1 (див. `plans/graphql-migration.md`) |
+| 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |

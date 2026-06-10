@@ -21,7 +21,7 @@
 | --- | --- |
 | Monorepo | npm workspaces (`server/` + `web/`) |
 | Backend | Node.js 20+, TypeScript (strict), Fastify 5, better-sqlite3 (синхронний), cheerio |
-| Frontend | React 18, Vite 6, TanStack Query v5, TanStack Table v8, Tailwind v4 |
+| Frontend | React 18, Vite 6, TanStack Query v5, TanStack Table v8, Chakra UI v3 (+ next-themes) |
 | Збір даних | GraphQL `POST /apigateway/graphql` (основний); `fetch` + cheerio HTML-парсинг (fallback). БЕЗ браузера/Playwright |
 
 ## 3. Архітектура та потік даних
@@ -120,7 +120,16 @@ flowchart LR
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки (`useSearches`, `useCreateSearch`,
   `useScan`, `useListings`). Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`.
 - `pages/Searches.tsx` — список пошуків, форма створення, кнопка Scan.
-- `pages/ListingsTable.tsx` — TanStack Table (фото, назва-лінк, ціна, місто, дата) з сортуванням.
+- `pages/ListingsTable.tsx` — TanStack Table (фото, назва-лінк, ціна, місто, дата) із сортуванням,
+  `columnSizing` і `columnVisibility` (стан видимості піднятий у `App.tsx`); експортує
+  `TOGGLEABLE_COLUMNS` для UI налаштувань. Persist `sorting`/`columnSizing` — localStorage
+  `olx-listings-table-v1`.
+- `components/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`):
+  розділ «Візуальний вигляд» — перемикач теми light/dark (`useColorMode` з `next-themes`,
+  персист — стандартний для `next-themes`) і чекбокси видимості колонок таблиці. Видимість
+  колонок персистить `App.tsx` у localStorage `olx-ui-settings-v1`.
+- `components/ui/` — Chakra UI v3 snippets, додані через `npx @chakra-ui/cli snippet add`
+  (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`, `switch`, `checkbox`, `close-button`).
 - Vite proxy `/api → http://localhost:3001` (див. `web/vite.config.ts`).
 
 ## 8. Обробка помилок збору
