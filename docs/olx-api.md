@@ -229,6 +229,16 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - Стоп: повернулось менше `limit` елементів або 0.
 - `metadata.total_elements` обрізається до 1000 — реальна кількість у `visible_total_count`.
 
+> ⚠️ **Не плутати з `/api/searches/:id/listings`.** Ліміт «≤3 запити» вище — це
+> ввічливість стосовно **OLX.ua** під час *збору* (`GraphqlOlxFetcher`/`HtmlOlxFetcher`,
+> ≤120 сирих оголошень за скан). Наш власний `GET /api/searches/:id/listings`
+> (`server/src/routes/listings.ts`) — **окрема річ**: SQL без `LIMIT/OFFSET`, повертає
+> **всі** рядки `listings` для пошуку з нашої SQLite одним запитом/однією відповіддю,
+> незалежно від їх кількості; query-параметри `limit`/`page` НЕ підтримуються (читаються
+> лише `sort`/`order`). Перевірено живим запитом 2026-06-10: search із 173 рядками →
+> 173 елементи, 82 КБ, в одній відповіді. Тобто кількість рядків у таблиці зростає з
+> кожним сканом (накопичення в БД), а не з пагінацією видачі OLX.
+
 ---
 
 ## 3. HTML-сторінка пошуку (fallback №1)

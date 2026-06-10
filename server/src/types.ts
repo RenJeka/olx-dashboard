@@ -30,6 +30,21 @@ export interface RawListing {
   photoUrl?: string;
   /** Сирий текст блоку дата/локація, напр. "Київ - Сьогодні о 12:00". */
   locationDate?: string;
+
+  // Структуровані поля з GraphQL (HTML-фетчер їх не заповнює; normalizer
+  // віддає їм пріоритет, якщо присутні — див. server/src/scraper/normalizer.ts).
+  /** Ціна числом; null — якщо OLX не показує ціну (напр. "Договірна"). */
+  price?: number | null;
+  currency?: string;
+  /** ISO дата створення оголошення. */
+  createdAt?: string;
+  /** ISO дата останнього оновлення оголошення. */
+  lastRefreshAt?: string;
+  city?: string;
+  district?: string;
+  sellerType?: 'private' | 'business';
+  /** Плаский обʼєкт характеристик (без ціни): { key: label }. */
+  params?: Record<string, string>;
 }
 
 /** Нормалізована ціна. */

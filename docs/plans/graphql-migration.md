@@ -26,7 +26,7 @@
 
 ### A1. Типи — `server/src/types.ts`
 
-- [ ] Розширити `RawListing` опційними структурованими полями (GraphQL-фетчер їх заповнює,
+- [x] Розширити `RawListing` опційними структурованими полями (GraphQL-фетчер їх заповнює,
   HTML-фетчер — ні; normalizer віддає їм пріоритет):
   - `price?: number | null`, `currency?: string`
   - `createdAt?: string` (ISO), `lastRefreshAt?: string` (ISO)
@@ -36,42 +36,42 @@
 
 ### A2. Новий фетчер — `server/src/scraper/graphqlOlxFetcher.ts`
 
-- [ ] `class GraphqlOlxFetcher implements OlxFetcher` (метод `fetchSearch(search: SearchConfig)`):
-  - [ ] Константа `GRAPHQL_URL = 'https://www.olx.ua/apigateway/graphql'`; **скорочений**
+- [x] `class GraphqlOlxFetcher implements OlxFetcher` (метод `fetchSearch(search: SearchConfig)`):
+  - [x] Константа `GRAPHQL_URL = 'https://www.olx.ua/apigateway/graphql'`; **скорочений**
     GraphQL-query `ListingSearchQuery` — точний текст і робочий приклад body є в
     [`../olx-api.md` §2.4](../olx-api.md). Поля: `id, title, url, status, created_time,
     last_refresh_time, business, location{city{name} district{name}}, photos{link},
     params{key name type value{... on PriceParam{value currency label} ... on GenericParam{key label}}}`
     + `metadata{total_elements}` + гілка `... on ListingError{error{code title detail}}`.
-  - [ ] Заголовки запиту — таблиця в [`../olx-api.md` §2.3](../olx-api.md). Без кукі.
-  - [ ] `searchParameters` з `SearchConfig` — мапінг у [`../olx-api.md` §2.2](../olx-api.md):
+  - [x] Заголовки запиту — таблиця в [`../olx-api.md` §2.3](../olx-api.md). Без кукі.
+  - [x] `searchParameters` з `SearchConfig` — мапінг у [`../olx-api.md` §2.2](../olx-api.md):
     `query`, `offset`, `limit: "40"`, ranges → `filter_float_<name>:from/:to`,
     enums → `filter_enum_<name>[0]` (best-effort), `privateOnly` → `owner_type=private` (best-effort).
-  - [ ] Пагінація: offset 0/40/80, **≤3 запити**, затримка 1–2 с між ними (патерн
+  - [x] Пагінація: offset 0/40/80, **≤3 запити**, затримка 1–2 с між ними (патерн
     `sleep`+random як у `olxFetcher.ts`); стоп якщо повернулось < 40 або 0.
-  - [ ] Маппінг відповіді → `RawListing[]`: olxId=`id`; ціна з елемента `params` з
+  - [x] Маппінг відповіді → `RawListing[]`: olxId=`id`; ціна з елемента `params` з
     `key==="price"` (PriceParam → `value`, `currency`; немає → `price: null`); фото —
     `photos[0].link` із заміною літерального плейсхолдера `{width}x{height}` на `400x300`;
     `params` → плаский обʼєкт `{key: label}`; `business` → `sellerType`.
-  - [ ] Помилки: HTTP ≠ 200, поле `errors[]` у JSON-відповіді, або
+  - [x] Помилки: HTTP ≠ 200, поле `errors[]` у JSON-відповіді, або
     `__typename === 'ListingError'` → кидати `Error` з деталями (його зловить `scanner.ts`).
 
 ### A3. Normalizer — `server/src/scraper/normalizer.ts`
 
-- [ ] В `upsertListings`: якщо структуровані поля присутні — використовувати їх
+- [x] В `upsertListings`: якщо структуровані поля присутні — використовувати їх
   (`price`/`currency` напряму; `posted_at` ← `createdAt`; `city`; `district`;
   `seller_type` ← `sellerType`; `params` → `JSON.stringify`). Якщо ні — існуючий шлях
   `parsePrice`/`parseLocationDate` (HTML fallback). Поведінку для HTML-фетчера НЕ ламати.
-- [ ] Розширити UPSERT колонками `district`, `seller_type`, `params` (колонки в схемі вже є).
-- [ ] `price_history` і `filtered_out` як і раніше НЕ чіпати (Етапи 2–3).
+- [x] Розширити UPSERT колонками `district`, `seller_type`, `params` (колонки в схемі вже є).
+- [x] `price_history` і `filtered_out` як і раніше НЕ чіпати (Етапи 2–3).
 
 ### A4. Scanner — `server/src/scanner.ts`
 
-- [ ] Основний фетчер — `GraphqlOlxFetcher`. Якщо він кинув помилку — **автоматичний
+- [x] Основний фетчер — `GraphqlOlxFetcher`. Якщо він кинув помилку — **автоматичний
   fallback** на `HtmlOlxFetcher` у тому ж скані.
-- [ ] Якщо спрацював fallback — скан успішний, але в `scan_runs.error` записати позначку
+- [x] Якщо спрацював fallback — скан успішний, але в `scan_runs.error` записати позначку
   виду `graphql failed: <msg>; fallback html OK`.
-- [ ] Падіння обох фетчерів → існуюча поведінка (повна помилка в `scan_runs.error`,
+- [x] Падіння обох фетчерів → існуюча поведінка (повна помилка в `scan_runs.error`,
   HTTP 500, процес живий).
 
 ## Група B — Документація (виконано заздалегідь, звірити після реалізації)
@@ -82,21 +82,22 @@
 - [x] `docs/architecture.md` — потік даних, модулі, fallback-ланцюжок
 - [x] `docs/structure.md` — додано `graphqlOlxFetcher.ts`
 - [x] `.gitignore` — `.temp/` заігнорена (дампи містять живі кукі — НЕ комітити)
-- [ ] Після реалізації: звірити, що опис модулів в `architecture.md`/`structure.md`
+- [x] Після реалізації: звірити, що опис модулів в `architecture.md`/`structure.md`
   відповідає фактичному коду (імена файлів/класів)
 
 ## Верифікація
 
-- [ ] `npm run build` — без помилок (server tsc + web tsc/vite)
-- [ ] Запустити server (`npm run dev:server`), `POST /api/searches/1/scan` →
+- [x] `npm run build` — без помилок (server tsc + web tsc/vite)
+- [x] Запустити server (`npm run dev:server`), `POST /api/searches/1/scan` →
   у відповіді `{found, new_count}`
-- [ ] У `listings`: `posted_at` — ISO-формат (`2026-…T…`), `params` — непорожній JSON,
+- [x] У `listings`: `posted_at` — ISO-формат (`2026-…T…`), `params` — непорожній JSON,
   `seller_type` заповнений, `price` числом
-- [ ] Повторний скан → `new_count` ≈ 0 (дедуплікація по `olx_id` не зламалась)
-- [ ] Range-фільтр: пошук із price 8000–15000 → всі ціни в межах
-- [ ] Fallback: тимчасово зіпсувати `GRAPHQL_URL` (напр. `/apigateway/graphql-broken`) →
+- [x] Повторний скан → `new_count` ≈ 0 (дедуплікація по `olx_id` не зламалась; реально
+  4/151 — нормальний churn живої видачі OLX за ~хвилину між сканами)
+- [x] Range-фільтр: пошук із price 8000–15000 → всі ціни в межах
+- [x] Fallback: тимчасово зіпсувати `GRAPHQL_URL` (напр. `/apigateway/graphql-broken`) →
   скан проходить через HTML, у `scan_runs.error` — позначка fallback; повернути URL
-- [ ] CLI: `npm run scan -- --search 1`
+- [x] CLI: `npm run scan -- --search 1`
 
 ## Коміт
 
