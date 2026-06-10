@@ -10,13 +10,16 @@ import {
   type SortingState,
   type VisibilityState,
 } from '@tanstack/react-table';
-import { Box, HStack, Image, Link, Spinner, Table, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Image, Link, Spinner, Table, Text } from '@chakra-ui/react';
 import {
   LuCalendar,
+  LuCircleCheck,
   LuExternalLink,
+  LuFileText,
   LuImage,
   LuMapPin,
   LuTag,
+  LuUser,
 } from 'react-icons/lu';
 import { useListings, type Listing } from '../api/client';
 
@@ -53,6 +56,25 @@ function formatDate(value: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+/**
+ * Конвертує HTML-опис OLX (з <br /> тегами) у plain text для безпечного рендеру.
+ * <br>/<br/> → перенос рядка; решта тегів видаляється; основні HTML-ентіті декодуються.
+ * Результат рендериться як текстовий вузол React (НЕ dangerouslySetInnerHTML) — XSS неможливий.
+ */
+function stripDescriptionHtml(html: string | null): string {
+  if (!html) return '';
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
 }
 
 function HeaderLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
@@ -99,6 +121,22 @@ const columns = [
       );
     },
   }),
+  columnHelper.accessor('description', {
+    header: () => <HeaderLabel icon={<LuFileText />}>Опис</HeaderLabel>,
+    size: 320,
+    minSize: 160,
+    maxSize: 600,
+    enableSorting: false,
+    cell: (info) => {
+      const text = stripDescriptionHtml(info.getValue());
+      if (!text) return '—';
+      return (
+        <Text whiteSpace="pre-line" lineClamp={3}>
+          {text}
+        </Text>
+      );
+    },
+  }),
   columnHelper.accessor('price', {
     header: () => <HeaderLabel icon={<LuTag />}>Ціна</HeaderLabel>,
     size: 120,
@@ -120,14 +158,38 @@ const columns = [
     maxSize: 260,
     cell: (info) => formatDate(info.getValue()),
   }),
+  columnHelper.accessor((row) => row.contact_name ?? row.seller_name ?? null, {
+    id: 'seller',
+    header: () => <HeaderLabel icon={<LuUser />}>Продавець</HeaderLabel>,
+    size: 160,
+    minSize: 100,
+    maxSize: 280,
+    enableSorting: false,
+    cell: (info) => info.getValue() ?? '—',
+  }),
+  columnHelper.accessor('olx_status', {
+    header: () => <HeaderLabel icon={<LuCircleCheck />}>Статус OLX</HeaderLabel>,
+    size: 110,
+    minSize: 90,
+    maxSize: 160,
+    enableSorting: false,
+    cell: (info) => {
+      const value = info.getValue();
+      if (!value) return '—';
+      return <Badge colorPalette={value === 'active' ? 'green' : 'gray'}>{value}</Badge>;
+    },
+  }),
 ];
 
 export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'photo_url', label: 'Фото' },
   { id: 'title', label: 'Назва' },
+  { id: 'description', label: 'Опис' },
   { id: 'price', label: 'Ціна' },
   { id: 'city', label: 'Місто' },
   { id: 'posted_at', label: 'Дата' },
+  { id: 'seller', label: 'Продавець' },
+  { id: 'olx_status', label: 'Статус OLX' },
 ];
 
 interface Props {
@@ -235,15 +297,15 @@ export function ListingsTable({ searchId, columnVisibility, onColumnVisibilityCh
           {table.getRowModel().rows.map((row) => (
             <Table.Row key={row.id}>
               {row.getVisibleCells().map((cell) => {
-                const isTitle = cell.column.id === 'title';
+                const isWideText = cell.column.id === 'title' || cell.column.id === 'description';
                 return (
                   <Table.Cell
                     key={cell.id}
                     verticalAlign="middle"
                     style={{ width: cell.column.getSize() }}
-                    whiteSpace={isTitle ? 'normal' : 'nowrap'}
-                    overflow={isTitle ? undefined : 'hidden'}
-                    textOverflow={isTitle ? undefined : 'ellipsis'}
+                    whiteSpace={isWideText ? 'normal' : 'nowrap'}
+                    overflow={isWideText ? undefined : 'hidden'}
+                    textOverflow={isWideText ? undefined : 'ellipsis'}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </Table.Cell>

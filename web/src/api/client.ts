@@ -10,6 +10,7 @@ export interface Search {
   name: string;
   query: string;
   api_filters: string;
+  visible_total_count: number | null;
   created_at: string;
 }
 
@@ -23,6 +24,10 @@ export interface Listing {
   currency: string;
   city: string | null;
   photo_url: string | null;
+  description: string | null;
+  seller_name: string | null;
+  contact_name: string | null;
+  olx_status: string | null;
   status: string;
   posted_at: string | null;
   first_seen_at: string;

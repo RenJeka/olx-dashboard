@@ -44,18 +44,19 @@ function loadSearch(id: number): SearchConfig | null {
  */
 async function fetchWithFallback(
   search: SearchConfig,
-): Promise<{ raw: RawListing[]; fallbackNote: string | null }> {
+): Promise<{ raw: RawListing[]; visibleTotalCount: number | null; fallbackNote: string | null }> {
   try {
-    const raw = await graphqlFetcher.fetchSearch(search);
-    return { raw, fallbackNote: null };
+    const result = await graphqlFetcher.fetchSearch(search);
+    return { raw: result.listings, visibleTotalCount: result.visibleTotalCount, fallbackNote: null };
   } catch (graphqlErr) {
     const graphqlMessage =
       graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
 
     try {
-      const raw = await htmlFetcher.fetchSearch(search);
+      const result = await htmlFetcher.fetchSearch(search);
       return {
-        raw,
+        raw: result.listings,
+        visibleTotalCount: result.visibleTotalCount,
         fallbackNote: `graphql failed: ${graphqlMessage}; fallback html OK`,
       };
     } catch (htmlErr) {
@@ -85,8 +86,15 @@ export async function runScan(searchId: number): Promise<ScanResult> {
   );
 
   try {
-    const { raw, fallbackNote } = await fetchWithFallback(search);
+    const { raw, visibleTotalCount, fallbackNote } = await fetchWithFallback(search);
     const result = upsertListings(searchId, raw);
+
+    if (visibleTotalCount != null) {
+      db.prepare('UPDATE searches SET visible_total_count = ? WHERE id = ?').run(
+        visibleTotalCount,
+        searchId,
+      );
+    }
 
     db.prepare(
       'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, error = ? WHERE id = ?',

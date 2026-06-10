@@ -1,4 +1,4 @@
-import type { OlxFetcher, SearchConfig, RawListing } from '../types.js';
+import type { OlxFetcher, SearchConfig, RawListing, FetchSearchResult } from '../types.js';
 
 const GRAPHQL_URL = 'https://www.olx.ua/apigateway/graphql';
 const PAGE_LIMIT = 40;
@@ -37,6 +37,9 @@ const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters: [Searc
             ... on GenericParam { key label }
           }
         }
+        description
+        user { name }
+        contact { name }
       }
       metadata { total_elements visible_total_count }
     }
@@ -96,6 +99,9 @@ interface GraphqlListing {
   } | null;
   photos?: Array<{ link: string }>;
   params?: GraphqlParam[];
+  description?: string | null;
+  user?: { name?: string | null } | null;
+  contact?: { name?: string | null } | null;
 }
 
 interface ListingSuccess {
@@ -157,10 +163,11 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     return params;
   }
 
-  async fetchSearch(search: SearchConfig): Promise<RawListing[]> {
+  async fetchSearch(search: SearchConfig): Promise<FetchSearchResult> {
     const all: RawListing[] = [];
     const seen = new Set<number>();
     const referer = `https://www.olx.ua/uk/list/q-${slugify(search.query)}/`;
+    let visibleTotalCount: number | null = null;
 
     for (let i = 0; i < MAX_REQUESTS; i++) {
       const offset = i * PAGE_LIMIT;
@@ -209,6 +216,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         );
       }
 
+      if (i === 0) {
+        visibleTotalCount = result.metadata?.visible_total_count ?? null;
+      }
+
       const items = result.data;
 
       for (const item of items) {
@@ -226,7 +237,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
     }
 
-    return all;
+    return { listings: all, visibleTotalCount };
   }
 
   /** Мапить GraphQL-оголошення у RawListing (мапінг полів — docs/olx-api.md §2.7). */
@@ -265,6 +276,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       district: item.location?.district?.name,
       sellerType: item.business ? 'business' : 'private',
       params,
+      description: item.description ?? undefined,
+      sellerName: item.user?.name ?? undefined,
+      contactName: item.contact?.name ?? undefined,
+      olxStatus: item.status,
     };
   }
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Box, Flex, Heading, HStack } from '@chakra-ui/react';
+import { Box, Flex, Heading, HStack, Text } from '@chakra-ui/react';
 import type { VisibilityState } from '@tanstack/react-table';
 import { LuSearch } from 'react-icons/lu';
+import { useSearches } from './api/client';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { Toaster } from './components/ui/toaster';
 import { Searches } from './pages/Searches';
@@ -25,6 +26,8 @@ export function App() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
     loadColumnVisibility(),
   );
+  const { data: searches } = useSearches();
+  const selectedSearch = searches?.find((s) => s.id === selectedId);
 
   useEffect(() => {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ columnVisibility }));
@@ -38,10 +41,17 @@ export function App() {
             <LuSearch />
             <Heading size="lg">OLX Monitor</Heading>
           </HStack>
-          <SettingsDrawer
-            columnVisibility={columnVisibility}
-            onColumnVisibilityChange={setColumnVisibility}
-          />
+          <HStack gap={4}>
+            {selectedSearch?.visible_total_count != null && (
+              <Text color="fg.muted" fontSize="sm">
+                Результатів: {selectedSearch.visible_total_count.toLocaleString('uk-UA')}
+              </Text>
+            )}
+            <SettingsDrawer
+              columnVisibility={columnVisibility}
+              onColumnVisibilityChange={setColumnVisibility}
+            />
+          </HStack>
         </HStack>
       </Box>
       <Flex flex="1" overflow="hidden">

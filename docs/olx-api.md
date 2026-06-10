@@ -108,6 +108,9 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
             ... on GenericParam { key label }
           }
         }
+        description
+        user { name }
+        contact { name }
       }
       metadata { total_elements visible_total_count }
     }
@@ -220,6 +223,11 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `photos[0].link` | `photo_url` | замінити `{width}x{height}` → конкретний розмір, напр. `400x300` |
 | `business` | `seller_type` | `true`→`business`, `false`→`private` |
 | `params[]` (без price) | `params` | плаский JSON `{key: label}` |
+| `description` | `description` | HTML з `<br />`; на фронті рендериться як plain text |
+| `user.name` | `seller_name` | |
+| `contact.name` | `contact_name` | пріоритет над `seller_name` на фронті (колонка «Продавець») |
+| `status` | `olx_status` | статус оголошення на OLX (напр. `"active"`); НЕ плутати з внутрішнім `listings.status` |
+| `metadata.visible_total_count` | `searches.visible_total_count` | реальна кількість результатів пошуку, оновлюється при кожному скані |
 
 ### 2.8 Помилки
 
@@ -335,3 +343,4 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | 2026-06-10 | Заголовок HTML-картки `h6` → `h4` | селектор `h6, h4` у `selectors.ts` |
 | 2026-06-10 | Відкрито GraphQL `/apigateway/graphql` (дамп + live-тест без кукі/auth: OK; `filter_float_price` працює). Підтверджено існування REST `api/v1/offers` для olx.ua | міграція: GraphQL — основний метод, HTML — fallback №1 (див. `plans/graphql-migration.md`) |
 | 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |
+| 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |

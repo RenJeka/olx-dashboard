@@ -45,6 +45,14 @@ export interface RawListing {
   sellerType?: 'private' | 'business';
   /** Плаский обʼєкт характеристик (без ціни): { key: label }. */
   params?: Record<string, string>;
+  /** Повний HTML-опис з <br /> тегами (GraphQL: data[].description). */
+  description?: string;
+  /** Імʼя/назва продавця (GraphQL: data[].user.name). */
+  sellerName?: string;
+  /** Імʼя контактної особи (GraphQL: data[].contact.name). */
+  contactName?: string;
+  /** Статус оголошення на OLX, напр. "active" (GraphQL: data[].status). НЕ плутати з listings.status. */
+  olxStatus?: string;
 }
 
 /** Нормалізована ціна. */
@@ -71,10 +79,21 @@ export interface ListingRow {
   city: string | null;
   district: string | null;
   photo_url: string | null;
+  description: string | null;
+  seller_name: string | null;
+  contact_name: string | null;
+  olx_status: string | null;
   status: string;
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+}
+
+/** Результат fetchSearch: список оголошень + метадані видачі (якщо доступні). */
+export interface FetchSearchResult {
+  listings: RawListing[];
+  /** metadata.visible_total_count з GraphQL; null — якщо недоступне (HTML-фетчер або відсутнє у відповіді). */
+  visibleTotalCount: number | null;
 }
 
 /**
@@ -82,5 +101,5 @@ export interface ListingRow {
  * від решти системи.
  */
 export interface OlxFetcher {
-  fetchSearch(search: SearchConfig): Promise<RawListing[]>;
+  fetchSearch(search: SearchConfig): Promise<FetchSearchResult>;
 }

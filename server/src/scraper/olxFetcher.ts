@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import type { OlxFetcher, SearchConfig, RawListing } from '../types.js';
+import type { OlxFetcher, SearchConfig, RawListing, FetchSearchResult } from '../types.js';
 import { SELECTORS, OLX_BASE_URL, REQUEST_HEADERS } from './selectors.js';
 
 const MAX_PAGES = 3;
@@ -70,7 +70,7 @@ export class HtmlOlxFetcher implements OlxFetcher {
     return `${base}?${parts.join('&')}`;
   }
 
-  async fetchSearch(search: SearchConfig): Promise<RawListing[]> {
+  async fetchSearch(search: SearchConfig): Promise<FetchSearchResult> {
     const all: RawListing[] = [];
     const seen = new Set<number>();
 
@@ -115,7 +115,8 @@ export class HtmlOlxFetcher implements OlxFetcher {
       }
     }
 
-    return all;
+    // HTML-сторінка пошуку не дає metadata.visible_total_count — лише GraphQL.
+    return { listings: all, visibleTotalCount: null };
   }
 
   /**
