@@ -22,7 +22,7 @@
 - URL пошуку: `https://www.olx.ua/d/uk/list/q-<query-slug>/?currency=UAH&search[order]=created_at:desc&view=list`
 - Range-фільтри йдуть **у URL**: `search[filter_float_<name>:from]=`, `:to]=`; enum: `search[filter_enum_<name>][0]=`; `search[private_business]=private`.
 - Селектори (підтверджені, тримати в одному файлі `server/src/scraper/selectors.ts`):
-  - картка `[data-cy="l-card"]`, назва `h6`, ціна `[data-testid="ad-price"]`, лінк `a[href]` (відносний → префікс `https://www.olx.ua`), дата/локація `[data-testid="location-date"]`, порожньо `[data-cy="empty-state"]`.
+  - картка `[data-cy="l-card"]`, назва `h6, h4` (OLX мігрував заголовок з `h6` на `h4` — тримати обидва), ціна `[data-testid="ad-price"]`, лінк `a[href]` (відносний → префікс `https://www.olx.ua`), дата/локація `[data-testid="location-date"]`, порожньо `[data-cy="empty-state"]`.
   - detail: характеристики `[data-cy="ad-params"] li`, опис `[data-testid="ad_description"]`, бізнес `[data-testid="trader-title"]`.
 - Ввічливість: 1–2 с затримка між сторінками, **≤3 сторінки** на пошук.
 - Scraper за інтерфейсом `OlxFetcher` — щоб міняти стратегію (HTML → `__NEXT_DATA__` → Playwright) не чіпаючи решту.
@@ -64,10 +64,19 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - Помилки скрейпінгу не валять процес: лог у `scan_runs.error`, скан позначається failed, попередні дані лишаються.
 - Секрети (`NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID`) — лише в `.env`, ніколи в код/git. `server/data/*.db` — gitignored.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
+- Після реалізації змін пропонувати текст git commit повідомлення (тільки текст).
+
+## Документація
+
+- `docs/architecture.md` — технічна архітектура, потік даних, модулі, стан API.
+- `docs/structure.md` — дерево файлів/папок і орієнтири «куди дивитись».
+- `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
+- `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
+- Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 
-1. **MVP:** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + сира React-таблиця.
+1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + сира React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI).
 2. Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри.
 3. price_history + спарклайни + MD-експорт для аналізу в Claude.
 4. Notion-експорт + node-cron + журнал scan_runs.
