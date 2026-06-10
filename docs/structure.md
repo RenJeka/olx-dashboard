@@ -17,11 +17,12 @@ olx-dashboard/
 ├── docs/
 │   ├── olx-monitor-spec.md           # канонічна специфікація (вимоги, схема, етапи)
 │   ├── architecture.md               # технічна архітектура (цей рівень опису)
-│   ├── olx-api.md                    # деталі запитів до OLX (URL/параметри/селектори)
+│   ├── olx-api.md                    # API OLX: GraphQL (основний) + HTML fallback
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
 │   └── plans/
-│       └── initial-mvp.md            # план Етапу 1 із чекбоксами прогресу
+│       ├── initial-mvp.md            # план Етапу 1 із чекбоксами прогресу
+│       └── graphql-migration.md      # план міграції збору на GraphQL (інструкція виконавцю)
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
 │   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio
@@ -37,9 +38,10 @@ olx-dashboard/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
 │       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql
 │       ├── scraper/
-│       │   ├── selectors.ts  # усі OLX-селектори + заголовки запиту
-│       │   ├── olxFetcher.ts # HtmlOlxFetcher: URL-білдер, fetch, cheerio-парсинг
-│       │   └── normalizer.ts # parsePrice, розбір локації, upsert по olx_id
+│       │   ├── graphqlOlxFetcher.ts # GraphqlOlxFetcher: GraphQL API (основний метод)
+│       │   ├── selectors.ts  # OLX-селектори + заголовки HTML-запиту (fallback)
+│       │   ├── olxFetcher.ts # HtmlOlxFetcher: URL-білдер, fetch, cheerio (fallback)
+│       │   └── normalizer.ts # upsert по olx_id; parsePrice/локація для HTML-шляху
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches + POST /scan
 │           └── listings.ts   # GET /api/searches/:id/listings
@@ -64,9 +66,11 @@ olx-dashboard/
 
 | Завдання | Файли |
 | --- | --- |
-| Змінити OLX-селектори/заголовки | `server/src/scraper/selectors.ts` |
-| Логіка побудови URL / парсингу списку | `server/src/scraper/olxFetcher.ts` |
+| GraphQL-запит до OLX (основний збір) | `server/src/scraper/graphqlOlxFetcher.ts` + `docs/olx-api.md` §2 |
+| Змінити OLX-селектори/заголовки (HTML fallback) | `server/src/scraper/selectors.ts` |
+| Логіка побудови URL / парсингу HTML-списку | `server/src/scraper/olxFetcher.ts` |
 | Нормалізація/дедуплікація | `server/src/scraper/normalizer.ts` |
+| Порядок стратегій збору / fallback | `server/src/scanner.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
 | Доменні типи | `server/src/types.ts` |
