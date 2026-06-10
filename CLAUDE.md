@@ -10,23 +10,17 @@
 - **Notion:** `@notionhq/client`.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
-## Метод збору даних (КРИТИЧНО — підтверджено робочим кодом)
+## Метод збору даних (КРИТИЧНО — підтверджено живими запитами 2026-06-10)
 
-- Основний: **звичайний `fetch` на URL пошуку OLX → парсинг server-rendered HTML через cheerio.** БЕЗ браузера/Playwright.
-- Заголовки запиту обовʼязкові:
-  ```
-  User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0
-  Referer: <той самий url>
-  X-Client: DESKTOP
-  ```
-- URL пошуку: `https://www.olx.ua/d/uk/list/q-<query-slug>/?currency=UAH&search[order]=created_at:desc&view=list`
-- Range-фільтри йдуть **у URL**: `search[filter_float_<name>:from]=`, `:to]=`; enum: `search[filter_enum_<name>][0]=`; `search[private_business]=private`.
-- Селектори (підтверджені, тримати в одному файлі `server/src/scraper/selectors.ts`):
+- **Основний: GraphQL** — `POST https://www.olx.ua/apigateway/graphql`, query `ListingSearchQuery` → `clientCompatibleListings(searchParameters)`. Працює **без кукі, без auth, без токенів**. Дає ціну числом, ISO-дати, `params`, `business`. Усі деталі (заголовки, body, ключі `searchParameters`, приклади, маппінг полів у БД) — у `docs/olx-api.md` §2; реалізація — `server/src/scraper/graphqlOlxFetcher.ts`.
+- Range-фільтри GraphQL: `searchParameters` елемент `{key: "filter_float_<name>:from|:to", value: "<число-рядком>"}` (верифіковано для `price`).
+- **Fallback №1: HTML** — `fetch` на URL пошуку `https://www.olx.ua/d/uk/list/q-<slug>/?...` → парсинг server-rendered HTML через cheerio (`server/src/scraper/olxFetcher.ts`). Scanner вмикає його автоматично при падінні GraphQL. БЕЗ браузера/Playwright. Деталі URL/заголовків — `docs/olx-api.md` §3.
+- Селектори HTML-fallback (тримати в одному файлі `server/src/scraper/selectors.ts`):
   - картка `[data-cy="l-card"]`, назва `h6, h4` (OLX мігрував заголовок з `h6` на `h4` — тримати обидва), ціна `[data-testid="ad-price"]`, лінк `a[href]` (відносний → префікс `https://www.olx.ua`), дата/локація `[data-testid="location-date"]`, порожньо `[data-cy="empty-state"]`.
   - detail: характеристики `[data-cy="ad-params"] li`, опис `[data-testid="ad_description"]`, бізнес `[data-testid="trader-title"]`.
-- Ввічливість: 1–2 с затримка між сторінками, **≤3 сторінки** на пошук.
-- Scraper за інтерфейсом `OlxFetcher` — щоб міняти стратегію (HTML → `__NEXT_DATA__` → Playwright) не чіпаючи решту.
-- НЕ використовувати `api/v1/offers/` — для olx.ua не підтверджено.
+- Ввічливість (обидва методи): 1–2 с затримка між запитами/сторінками, **≤3 запити** на скан.
+- Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`); подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
+- REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
 
 ## Схема БД
 
@@ -73,16 +67,17 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/structure.md` — дерево файлів/папок і орієнтири «куди дивитись».
 - `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
 - `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
+- `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 
-1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + сира React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI).
+1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + сира React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/graphql-migration.md`.
 2. Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри.
 3. price_history + спарклайни + MD-експорт для аналізу в Claude.
 4. Notion-експорт + node-cron + журнал scan_runs.
 
 ## Що питати перед дією
 
-- Якщо OLX-розмітка не парситься — НЕ переходити одразу на Playwright; спершу перевірити `__NEXT_DATA__` і показати мені зразок HTML.
+- Якщо GraphQL почав падати — діагностика за чеклістом `docs/olx-api.md` §5 (HTML-fallback вмикається автоматично); НЕ переходити одразу на Playwright; спершу перевірити `__NEXT_DATA__` і показати мені зразок HTML.
 - Зміни стеку/схеми/інваріантів вище — лише після підтвердження.

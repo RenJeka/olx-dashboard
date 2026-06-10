@@ -47,7 +47,7 @@ flowchart LR
 | --- | --- | --- |
 | Backend | Node.js 20+, Fastify | Твій основний стек; Fastify легший за Express, вбудована схема-валідація |
 | БД | SQLite (`better-sqlite3`) | Локально, 0 конфігурації, синхронний API, файл легко бекапити |
-| Збір даних | `fetch` + `cheerio` (static HTML parse) | Підтверджено робочим кодом lerdem; без Playwright; легко на Orange Pi |
+| Збір даних | GraphQL `POST /apigateway/graphql` (основний); `fetch` + `cheerio` static HTML (fallback) | GraphQL верифіковано живим тестом 2026-06-10 (без кукі/auth); HTML підтверджено кодом lerdem; без Playwright; легко на Orange Pi |
 | Frontend | React 18 + Vite + TanStack Table + Tailwind | TanStack Table = сортування/фільтри/інлайн-едіт з коробки |
 | Стан | TanStack Query | Кеш + рефетч після сканування |
 | Планувальник | `node-cron` (опційно, off за замовчуванням) | "Перш за все вручну" |
@@ -57,11 +57,31 @@ flowchart LR
 
 ## 4. Збір даних (Scraper module)
 
-> ✅ Метод підтверджено аналізом робочого коду `lerdem/olx-parser` (UA, Python) та `l-margiela/olx-mcp` (UA, TS) — обидва на станом на 2026 рік.
+> ✅ Обидва методи підтверджені: GraphQL — живим тестом 2026-06-10 (повний дамп + мінімальний
+> запит без кукі), HTML — аналізом робочого коду `lerdem/olx-parser` (UA, Python) та
+> `l-margiela/olx-mcp` (UA, TS) і власним сканом.
 
-### 4.1 Основний шлях — static HTML fetch + parse
+### 4.1 Основний шлях — GraphQL API
 
-`lerdem/olx-parser` тягне дані звичайним `requests.get()` (UA реального браузера) і парсить **server-rendered HTML** через lxml — без браузера, без JS-рендерингу. Це підтверджує: проста GET-сторінка пошуку вже містить картки оголошень. Найлегший варіант, добре йде на Orange Pi.
+Фронтенд OLX тягне видачу через `POST https://www.olx.ua/apigateway/graphql`
+(query `ListingSearchQuery` → `clientCompatibleListings(searchParameters)`).
+Підтверджено: працює **без кукі, без Authorization, без токенів**; range-фільтри
+(`{key: "filter_float_price:from", value: "8000"}`) працюють; пагінація `offset`/`limit`.
+
+Переваги над HTML: ціна числом + валюта, дати в ISO (`created_time` → сортовний `posted_at`),
+`params` (характеристики) і `description` вже у списковій видачі, ознака `business`,
+жодних CSS-селекторів (нема класу поломок «OLX поміняв розмітку»).
+
+**Усі деталі запиту/відповіді, таблиця ключів `searchParameters`, маппінг полів у БД —
+[`olx-api.md`](./olx-api.md) §2 (канон для реалізації).** Реалізація:
+`server/src/scraper/graphqlOlxFetcher.ts`.
+
+Існує також REST-дзеркало `https://www.olx.ua/api/v1/offers?offset=&limit=&query=...`
+(видно в `links` GraphQL-відповіді) — підтверджено для olx.ua; використовуємо GraphQL-варіант.
+
+### 4.1-bis Fallback №1 — static HTML fetch + parse
+
+`lerdem/olx-parser` тягне дані звичайним `requests.get()` (UA реального браузера) і парсить **server-rendered HTML** через lxml — без браузера, без JS-рендерингу. Це підтверджує: проста GET-сторінка пошуку вже містить картки оголошень. Найлегший варіант, добре йде на Orange Pi. Scanner вмикає цей шлях автоматично, якщо GraphQL-запит упав.
 
 ```
 GET https://www.olx.ua/d/uk/list/q-macbook-air/
@@ -106,18 +126,21 @@ interface OlxFetcher {
 }
 ```
 
-### 4.2 Fallback (якщо static HTML почне віддавати порожнечу)
+### 4.2 Подальші fallback (якщо і GraphQL, і static HTML віддають порожнечу)
 
 1. Перевірити `__PRERENDERED_STATE__` / `__NEXT_DATA__` у `<script>` сторінки (JSON всередині, без рендерингу JS).
 2. Крайній випадок — Playwright з **видимим** Chromium (досвід `sekondly` + `olx-mcp`: headless блокується). Тільки локально на потужнішій машині, не на Pi.
 
+Порядок стратегій: GraphQL → HTML+cheerio (автоматично) → `__NEXT_DATA__` → Playwright headed
+(останні два — рішення людини). Зміна стратегії = нова реалізація інтерфейсу `OlxFetcher`.
+
 ### 4.3 Діапазони характеристик (range-фільтри)
 
-Два рівні (URL-формат підтверджено живим прикладом у коді lerdem):
-- **Серверні фільтри OLX** — у самому URL: `search[filter_float_<name>:from]=` / `:to]=` для числових, `search[filter_enum_<name>][0]=` для категорійних, `search[private_business]=private`. Зменшує трафік ще до парсингу.
+Два рівні (обидва серверні формати підтверджені живими запитами):
+- **Серверні фільтри OLX:**
+  - GraphQL (основний): елементи `searchParameters` — `{key: "filter_float_<name>:from", value: "<число>"}` / `:to`; enum: `filter_enum_<name>[0]`; значення завжди рядками. ✅ Верифіковано для `price`.
+  - HTML-URL (fallback): `search[filter_float_<name>:from]=` / `:to]=` для числових, `search[filter_enum_<name>][0]=` для категорійних, `search[private_business]=private`.
 - **Локальні range-правила** — `searches.local_filters` (JSON), застосовуються Normalizer'ом до розпарсених `params`. Приклад: `{"ram_gb": {"min": 8, "max": 16}, "exclude_keywords": ["на запчастини", "розбитий"]}`. Поза діапазоном → `filtered_out=1` (зберігається, але приховане).
-
-⚠️ Прихований JSON `api/v1/offers/` НЕ використовується (припущення зі звіту стосувалося olx.in, не olx.ua). Прибрано.
 
 ---
 
@@ -276,7 +299,7 @@ olx-monitor/
 
 | Ризик | Мітигація |
 | --- | --- |
-| OLX змінить HTML-розмітку / селектори | Інтерфейс `OlxFetcher` ізолює парсинг; селектори в одному місці; fallback на `__NEXT_DATA__`, далі Playwright headed |
+| OLX змінить GraphQL-схему / HTML-розмітку | Інтерфейс `OlxFetcher` ізолює стратегію; автоматичний fallback GraphQL→HTML у scanner; селектори в одному місці; далі `__NEXT_DATA__`, Playwright headed; діагностика — чекліст `olx-api.md` §5 |
 | Rate-limit / бан IP | Затримки 1–2 с, ≤3 стор./пошук, реалістичний UA; сканування рідке |
 | Зміна структури `params` між категоріями | `params` зберігається сирим JSON; колонки таблиці — динамічні |
 | Хибний auto-disable (збій одного скану) | Буфер 2 послідовні скани + auto-reactivate |

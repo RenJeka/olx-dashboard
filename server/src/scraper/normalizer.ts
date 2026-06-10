@@ -43,15 +43,20 @@ function parseLocationDate(raw?: string): {
 
 const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
 
+// district/seller_type/params: COALESCE на оновленні — якщо новий скан (HTML-fallback)
+// не приносить ці поля (null), не затираємо вже зібрані GraphQL-дані.
 const upsertStmt = db.prepare(`
-  INSERT INTO listings (olx_id, search_id, title, url, price, currency, city, photo_url, posted_at, last_seen_at)
-  VALUES (@olx_id, @search_id, @title, @url, @price, @currency, @city, @photo_url, @posted_at, datetime('now'))
+  INSERT INTO listings (olx_id, search_id, title, url, price, currency, city, district, seller_type, params, photo_url, posted_at, last_seen_at)
+  VALUES (@olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type, COALESCE(@params, '{}'), @photo_url, @posted_at, datetime('now'))
   ON CONFLICT(olx_id) DO UPDATE SET
     title       = excluded.title,
     url         = excluded.url,
     price       = excluded.price,
     currency    = excluded.currency,
     city        = excluded.city,
+    district    = COALESCE(excluded.district, district),
+    seller_type = COALESCE(excluded.seller_type, seller_type),
+    params      = COALESCE(@params, params, '{}'),
     photo_url   = excluded.photo_url,
     posted_at   = excluded.posted_at,
     last_seen_at = datetime('now')
@@ -73,8 +78,35 @@ export function upsertListings(
       const isNew = existsStmt.get(item.olxId) === undefined;
       if (isNew) newCount++;
 
-      const { price, currency } = parsePrice(item.rawPrice);
-      const { city, postedAt } = parseLocationDate(item.locationDate);
+      // Структуровані поля присутні (GraphQL-фетчер) — пріоритет їм.
+      // HTML-фетчер createdAt не заповнює, тому це надійний дискримінатор.
+      const hasStructuredData = item.createdAt !== undefined;
+
+      let price: number | null;
+      let currency: string;
+      let city: string | null;
+      let postedAt: string | null;
+      let district: string | null = null;
+      let sellerType: string | null = null;
+      let params: string | null = null;
+
+      if (hasStructuredData) {
+        price = item.price ?? null;
+        currency = item.currency ?? 'UAH';
+        city = item.city ?? null;
+        district = item.district ?? null;
+        postedAt = item.createdAt ?? null;
+        sellerType = item.sellerType ?? null;
+        params = item.params ? JSON.stringify(item.params) : null;
+      } else {
+        const parsedPrice = parsePrice(item.rawPrice);
+        price = parsedPrice.price;
+        currency = parsedPrice.currency;
+
+        const parsedLocation = parseLocationDate(item.locationDate);
+        city = parsedLocation.city;
+        postedAt = parsedLocation.postedAt;
+      }
 
       upsertStmt.run({
         olx_id: item.olxId,
@@ -84,6 +116,9 @@ export function upsertListings(
         price,
         currency,
         city,
+        district,
+        seller_type: sellerType,
+        params,
         photo_url: item.photoUrl ?? null,
         posted_at: postedAt,
       });

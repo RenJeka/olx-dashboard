@@ -1,9 +1,11 @@
 import { db } from './db/db.js';
+import { GraphqlOlxFetcher } from './scraper/graphqlOlxFetcher.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings } from './scraper/normalizer.js';
-import type { SearchConfig, ScanResult, ApiFilters } from './types.js';
+import type { SearchConfig, ScanResult, ApiFilters, RawListing } from './types.js';
 
-const fetcher = new HtmlOlxFetcher();
+const graphqlFetcher = new GraphqlOlxFetcher();
+const htmlFetcher = new HtmlOlxFetcher();
 
 interface SearchRow {
   id: number;
@@ -37,7 +39,36 @@ function loadSearch(id: number): SearchConfig | null {
 }
 
 /**
- * Запускає сканування пошуку: fetcher → normalizer → запис scan_run.
+ * Викликає GraphqlOlxFetcher; якщо він кидає помилку — fallback на HtmlOlxFetcher.
+ * Якщо впав і fallback — кидає об'єднану помилку (обидва методи недоступні).
+ */
+async function fetchWithFallback(
+  search: SearchConfig,
+): Promise<{ raw: RawListing[]; fallbackNote: string | null }> {
+  try {
+    const raw = await graphqlFetcher.fetchSearch(search);
+    return { raw, fallbackNote: null };
+  } catch (graphqlErr) {
+    const graphqlMessage =
+      graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
+
+    try {
+      const raw = await htmlFetcher.fetchSearch(search);
+      return {
+        raw,
+        fallbackNote: `graphql failed: ${graphqlMessage}; fallback html OK`,
+      };
+    } catch (htmlErr) {
+      const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
+      throw new Error(
+        `graphql failed: ${graphqlMessage}; html fallback failed: ${htmlMessage}`,
+      );
+    }
+  }
+}
+
+/**
+ * Запускає сканування пошуку: fetcher (GraphQL → HTML fallback) → normalizer → запис scan_run.
  * Помилки скрейпінгу пишуться у scan_runs.error і прокидаються нагору
  * (роут мапить на 500), процес НЕ валиться.
  */
@@ -54,12 +85,12 @@ export async function runScan(searchId: number): Promise<ScanResult> {
   );
 
   try {
-    const raw = await fetcher.fetchSearch(search);
+    const { raw, fallbackNote } = await fetchWithFallback(search);
     const result = upsertListings(searchId, raw);
 
     db.prepare(
-      'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ? WHERE id = ?',
-    ).run(new Date().toISOString(), result.found, result.new_count, runId);
+      'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, error = ? WHERE id = ?',
+    ).run(new Date().toISOString(), result.found, result.new_count, fallbackNote, runId);
 
     return result;
   } catch (err) {
