@@ -6,7 +6,8 @@
 
 - **Monorepo:** npm workspaces — `server/` + `web/`.
 - **Backend:** Node.js 20+, TypeScript, **Fastify**, **better-sqlite3** (синхронний), **cheerio** (парсинг), **node-cron** (опц.).
-- **Frontend:** React 18 + **Vite** + **TanStack Table v8** + **TanStack Query v5** + **Tailwind**.
+- **Frontend:** React 18 + **Vite** + **TanStack Table v8** + **TanStack Query v5** + **Chakra UI v3** (`@chakra-ui/react`, провайдер/тостер/тултіп — сніпети у `web/src/components/ui/`).
+- **Іконки:** `react-icons/lu` (набір Lucide) — стандартний вибір для Chakra UI v3.
 - **Notion:** `@notionhq/client`.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
@@ -58,7 +59,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - Помилки скрейпінгу не валять процес: лог у `scan_runs.error`, скан позначається failed, попередні дані лишаються.
 - Секрети (`NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID`) — лише в `.env`, ніколи в код/git. `server/data/*.db` — gitignored.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
-- Після реалізації змін пропонувати текст git commit повідомлення (тільки текст).
+- Після реалізації змін пропонувати текст git commit повідомлення ангійською мовою (тільки текст).
 
 ## Документація
 

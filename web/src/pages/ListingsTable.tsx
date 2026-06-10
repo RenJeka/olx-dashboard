@@ -7,7 +7,14 @@ import {
   useReactTable,
   type SortingState,
 } from '@tanstack/react-table';
-import { Box, Image, Link, Spinner, Table, Text } from '@chakra-ui/react';
+import { Box, HStack, Image, Link, Spinner, Table, Text } from '@chakra-ui/react';
+import {
+  LuCalendar,
+  LuExternalLink,
+  LuImage,
+  LuMapPin,
+  LuTag,
+} from 'react-icons/lu';
 import { useListings, type Listing } from '../api/client';
 
 const columnHelper = createColumnHelper<Listing>();
@@ -17,9 +24,18 @@ function formatPrice(l: Listing): string {
   return `${l.price.toLocaleString('uk-UA')} ${l.currency}`;
 }
 
+function HeaderLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <HStack gap={1}>
+      {icon}
+      <Text>{children}</Text>
+    </HStack>
+  );
+}
+
 const columns = [
   columnHelper.accessor('photo_url', {
-    header: 'Фото',
+    header: () => <HeaderLabel icon={<LuImage />}>Фото</HeaderLabel>,
     enableSorting: false,
     cell: (info) => {
       const src = info.getValue();
@@ -37,7 +53,10 @@ const columns = [
       const title = info.getValue() ?? '—';
       return url ? (
         <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
-          {title}
+          <HStack gap={1}>
+            <Text>{title}</Text>
+            <LuExternalLink />
+          </HStack>
         </Link>
       ) : (
         title
@@ -45,15 +64,15 @@ const columns = [
     },
   }),
   columnHelper.accessor('price', {
-    header: 'Ціна',
+    header: () => <HeaderLabel icon={<LuTag />}>Ціна</HeaderLabel>,
     cell: (info) => formatPrice(info.row.original),
   }),
   columnHelper.accessor('city', {
-    header: 'Місто',
+    header: () => <HeaderLabel icon={<LuMapPin />}>Місто</HeaderLabel>,
     cell: (info) => info.getValue() ?? '—',
   }),
   columnHelper.accessor('posted_at', {
-    header: 'Дата',
+    header: () => <HeaderLabel icon={<LuCalendar />}>Дата</HeaderLabel>,
     cell: (info) => info.getValue() ?? '—',
   }),
 ];

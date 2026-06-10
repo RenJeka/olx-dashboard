@@ -3,13 +3,17 @@ import {
   Box,
   Button,
   Field,
+  Flex,
   Heading,
   HStack,
+  IconButton,
   Input,
   Stack,
   Text,
 } from '@chakra-ui/react';
+import { LuListChecks, LuPlus, LuRefreshCw } from 'react-icons/lu';
 import { toaster } from '../components/ui/toaster';
+import { Tooltip } from '../components/ui/tooltip';
 import { useSearches, useCreateSearch, useScan } from '../api/client';
 
 interface Props {
@@ -26,6 +30,7 @@ export function Searches({ selectedId, onSelect }: Props) {
   const [query, setQuery] = useState('');
   const [priceFrom, setPriceFrom] = useState('');
   const [priceTo, setPriceTo] = useState('');
+  const [scanningId, setScanningId] = useState<number | null>(null);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +54,7 @@ export function Searches({ selectedId, onSelect }: Props) {
   }
 
   function runScan(id: number) {
+    setScanningId(id);
     scan.mutate(id, {
       onSuccess: (r) =>
         toaster.create({
@@ -62,68 +68,84 @@ export function Searches({ selectedId, onSelect }: Props) {
           title: 'Помилка скану',
           description: err instanceof Error ? err.message : String(err),
         }),
+      onSettled: () => setScanningId(null),
     });
   }
 
   return (
-    <Stack
+    <Flex
       as="aside"
+      direction="column"
       w="80"
       flexShrink={0}
+      h="full"
+      overflow="hidden"
       borderRightWidth="1px"
       borderColor="border.subtle"
-      p={4}
-      gap={6}
-      overflowY="auto"
     >
-      <Box>
-        <Heading size="md" mb={3}>
-          Пошуки
-        </Heading>
+      <Heading size="md" px={4} pt={4} pb={2} display="flex" alignItems="center" gap={2}>
+        <LuListChecks /> Пошуки
+      </Heading>
+
+      <Box maxH="40vh" overflowY="auto" px={2} pb={2}>
         {isLoading && (
-          <Text textStyle="sm" color="fg.muted">
+          <Text textStyle="sm" color="fg.muted" px={2}>
             Завантаження…
           </Text>
         )}
-        <Stack gap={1}>
+        <Stack gap="0.5">
           {searches?.map((s) => (
-            <Box key={s.id}>
-              <Button
-                onClick={() => onSelect(s.id)}
-                variant={selectedId === s.id ? 'subtle' : 'ghost'}
-                colorPalette={selectedId === s.id ? 'blue' : 'gray'}
-                w="full"
-                h="auto"
-                py={2}
-                justifyContent="flex-start"
-              >
-                <Stack gap={0} align="flex-start">
-                  <Text textStyle="sm" fontWeight="medium">
-                    {s.name}
-                  </Text>
-                  <Text textStyle="xs" color="fg.muted" fontWeight="normal">
-                    {s.query}
-                  </Text>
-                </Stack>
-              </Button>
-              <Button
-                onClick={() => runScan(s.id)}
-                loading={scan.isPending}
-                loadingText="Сканування…"
-                size="xs"
-                variant="plain"
-                colorPalette="blue"
-                ml={3}
-              >
-                Scan
-              </Button>
-            </Box>
+            <HStack
+              key={s.id}
+              colorPalette="blue"
+              justify="space-between"
+              gap={1}
+              px={2}
+              py={1}
+              rounded="md"
+              cursor="pointer"
+              bg={selectedId === s.id ? 'colorPalette.subtle' : undefined}
+              _hover={{ bg: selectedId === s.id ? 'colorPalette.subtle' : 'bg.muted' }}
+              onClick={() => onSelect(s.id)}
+            >
+              <Box overflow="hidden" flex="1" minW={0}>
+                <Text textStyle="sm" fontWeight="medium" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+                  {s.name}
+                </Text>
+                <Text textStyle="xs" color="fg.muted" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
+                  {s.query}
+                </Text>
+              </Box>
+              <Tooltip content="Сканувати">
+                <IconButton
+                  aria-label="Сканувати"
+                  size="2xs"
+                  variant="ghost"
+                  loading={scanningId === s.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runScan(s.id);
+                  }}
+                >
+                  <LuRefreshCw />
+                </IconButton>
+              </Tooltip>
+            </HStack>
           ))}
         </Stack>
       </Box>
 
-      <Stack as="form" onSubmit={submit} gap={3}>
-        <Heading size="sm">Новий пошук</Heading>
+      <Stack
+        as="form"
+        onSubmit={submit}
+        gap={3}
+        p={4}
+        borderTopWidth="1px"
+        borderColor="border.subtle"
+      >
+        <Heading size="sm" display="flex" alignItems="center" gap={2}>
+          <LuPlus /> Новий пошук
+        </Heading>
         <Field.Root required>
           <Field.Label>
             Назва <Field.RequiredIndicator />
@@ -166,13 +188,8 @@ export function Searches({ selectedId, onSelect }: Props) {
             />
           </Field.Root>
         </HStack>
-        <Button
-          type="submit"
-          loading={createSearch.isPending}
-          colorPalette="blue"
-          size="sm"
-        >
-          Створити
+        <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
+          <LuPlus /> Створити
         </Button>
         {createSearch.isError && (
           <Text textStyle="xs" color="fg.error">
@@ -182,6 +199,6 @@ export function Searches({ selectedId, onSelect }: Props) {
           </Text>
         )}
       </Stack>
-    </Stack>
+    </Flex>
   );
 }
