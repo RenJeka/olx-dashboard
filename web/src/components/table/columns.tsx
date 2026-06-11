@@ -1,0 +1,134 @@
+import { createColumnHelper } from '@tanstack/react-table';
+import { Badge, Box, HStack, Image, Link, Text } from '@chakra-ui/react';
+import { Tooltip } from '../ui/tooltip';
+import {
+  LuCalendar,
+  LuCircleCheck,
+  LuExternalLink,
+  LuFileText,
+  LuImage,
+  LuMapPin,
+  LuTag,
+  LuUser,
+} from 'react-icons/lu';
+import type { Listing } from '../../types';
+import { HeaderLabel } from './HeaderLabel';
+import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
+
+const columnHelper = createColumnHelper<Listing>();
+
+export const columns = [
+  columnHelper.accessor('photo_url', {
+    header: () => <HeaderLabel icon={<LuImage />}>Фото</HeaderLabel>,
+    enableSorting: false,
+    size: 72,
+    minSize: 56,
+    maxSize: 200,
+    cell: (info) => {
+      const src = info.getValue();
+      return src ? (
+        <Image src={src} alt="" boxSize={12} rounded="md" objectFit="cover" loading="lazy" />
+      ) : (
+        <Box boxSize={12} rounded="md" bg="bg.muted" />
+      );
+    },
+  }),
+  columnHelper.accessor('title', {
+    header: 'Назва',
+    size: 480,
+    minSize: 180,
+    cell: (info) => {
+      const url = info.row.original.url;
+      const title = info.getValue() ?? '—';
+      return url ? (
+        <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
+          <HStack gap={1}>
+            <Text>{title}</Text>
+            <LuExternalLink />
+          </HStack>
+        </Link>
+      ) : (
+        title
+      );
+    },
+  }),
+  columnHelper.accessor('description', {
+    header: () => <HeaderLabel icon={<LuFileText />}>Опис</HeaderLabel>,
+    size: 320,
+    minSize: 160,
+    maxSize: 600,
+    enableSorting: false,
+    cell: (info) => {
+      const text = stripDescriptionHtml(info.getValue());
+      if (!text) return '—';
+      return (
+        <Text whiteSpace="pre-line" lineClamp={3}>
+          {text}
+        </Text>
+      );
+    },
+  }),
+  columnHelper.accessor('price', {
+    header: () => <HeaderLabel icon={<LuTag />}>Ціна</HeaderLabel>,
+    size: 120,
+    minSize: 80,
+    maxSize: 240,
+    cell: (info) => formatPrice(info.row.original),
+  }),
+  columnHelper.accessor('city', {
+    header: () => <HeaderLabel icon={<LuMapPin />}>Місто</HeaderLabel>,
+    size: 130,
+    minSize: 80,
+    maxSize: 280,
+    cell: (info) => info.getValue() ?? '—',
+  }),
+  columnHelper.accessor('posted_at', {
+    header: () => <HeaderLabel icon={<LuCalendar />}>Дата</HeaderLabel>,
+    size: 150,
+    minSize: 100,
+    maxSize: 260,
+    cell: (info) => {
+      const d = formatDate(info.getValue());
+      if (!d) return '—';
+      return (
+        <Tooltip content={d.full} openDelay={200} closeDelay={100}>
+          <Text as="span" cursor="default">
+            {d.short}
+          </Text>
+        </Tooltip>
+      );
+    },
+  }),
+  columnHelper.accessor((row) => row.contact_name ?? row.seller_name ?? null, {
+    id: 'seller',
+    header: () => <HeaderLabel icon={<LuUser />}>Продавець</HeaderLabel>,
+    size: 160,
+    minSize: 100,
+    maxSize: 280,
+    enableSorting: false,
+    cell: (info) => info.getValue() ?? '—',
+  }),
+  columnHelper.accessor('olx_status', {
+    header: () => <HeaderLabel icon={<LuCircleCheck />}>Статус OLX</HeaderLabel>,
+    size: 110,
+    minSize: 90,
+    maxSize: 160,
+    enableSorting: false,
+    cell: (info) => {
+      const value = info.getValue();
+      if (!value) return '—';
+      return <Badge colorPalette={value === 'active' ? 'green' : 'gray'}>{value}</Badge>;
+    },
+  }),
+];
+
+export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
+  { id: 'photo_url', label: 'Фото' },
+  { id: 'title', label: 'Назва' },
+  { id: 'description', label: 'Опис' },
+  { id: 'price', label: 'Ціна' },
+  { id: 'city', label: 'Місто' },
+  { id: 'posted_at', label: 'Дата' },
+  { id: 'seller', label: 'Продавець' },
+  { id: 'olx_status', label: 'Статус OLX' },
+];
