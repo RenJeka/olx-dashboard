@@ -1,5 +1,6 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import { Badge, Box, HStack, Image, Link, Text } from '@chakra-ui/react';
+import { Tooltip } from '../ui/tooltip';
 import {
   LuCalendar,
   LuCircleCheck,
@@ -86,7 +87,17 @@ export const columns = [
     size: 150,
     minSize: 100,
     maxSize: 260,
-    cell: (info) => formatDate(info.getValue()),
+    cell: (info) => {
+      const d = formatDate(info.getValue());
+      if (!d) return '—';
+      return (
+        <Tooltip content={d.full} openDelay={200} closeDelay={100}>
+          <Text as="span" cursor="default">
+            {d.short}
+          </Text>
+        </Tooltip>
+      );
+    },
   }),
   columnHelper.accessor((row) => row.contact_name ?? row.seller_name ?? null, {
     id: 'seller',

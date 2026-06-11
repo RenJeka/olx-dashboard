@@ -8,7 +8,7 @@ interface ListingsTableHeaderProps {
 
 export function ListingsTableHeader({ table }: ListingsTableHeaderProps) {
   return (
-    <Table.Header>
+    <Table.Header position="sticky" top={0} zIndex={1}>
       {table.getHeaderGroups().map((hg) => (
         <Table.Row key={hg.id}>
           {hg.headers.map((header) => (
@@ -22,6 +22,7 @@ export function ListingsTableHeader({ table }: ListingsTableHeaderProps) {
               whiteSpace="nowrap"
               overflow="hidden"
               textOverflow="ellipsis"
+              bg="bg"
             >
               <HStack gap={1}>
                 {flexRender(header.column.columnDef.header, header.getContext())}
