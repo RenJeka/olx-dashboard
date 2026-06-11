@@ -70,7 +70,7 @@ export function ListingsTable({ searchId, columnVisibility, onColumnVisibilityCh
 
   return (
     <Flex direction="column" flex="1" overflow="hidden">
-      <Box flex="1" overflow="auto" p={4}>
+      <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <ListingsTableHeader table={table} />
           <ListingsTableBody table={table} />

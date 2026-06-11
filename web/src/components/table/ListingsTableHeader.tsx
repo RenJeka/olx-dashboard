@@ -8,13 +8,16 @@ interface ListingsTableHeaderProps {
 
 export function ListingsTableHeader({ table }: ListingsTableHeaderProps) {
   return (
-    <Table.Header position="sticky" top={0} zIndex={1}>
+    <Table.Header>
       {table.getHeaderGroups().map((hg) => (
         <Table.Row key={hg.id}>
           {hg.headers.map((header) => (
             <Table.ColumnHeader
               key={header.id}
-              position="relative"
+              position="sticky"
+              top={0}
+              zIndex={1}
+              boxShadow="0 1px 0 var(--chakra-colors-border)"
               style={{ width: header.getSize() }}
               onClick={header.column.getToggleSortingHandler()}
               cursor={header.column.getCanSort() ? 'pointer' : undefined}

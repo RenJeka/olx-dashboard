@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import {
+  Accordion,
+  Badge,
   Box,
   Button,
   Field,
   Flex,
-  Heading,
   HStack,
   IconButton,
   Input,
@@ -92,45 +93,64 @@ export function Searches({ selectedId, onSelect }: Props) {
       w="80"
       flexShrink={0}
       h="full"
-      overflow="hidden"
       borderRightWidth="1px"
       borderColor="border.subtle"
+      bg="bg.subtle"
+      overflowY="auto"
     >
-      <Heading size="md" px={4} pt={4} pb={2} display="flex" alignItems="center" gap={2}>
-        <LuListChecks /> Пошуки
-      </Heading>
+      <Accordion.Root multiple defaultValue={['searches']} variant="plain">
+        <Accordion.Item value="searches" borderBottomWidth="1px" borderColor="border.subtle">
+          <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
+            <HStack flex="1" gap={2} fontWeight="semibold">
+              <LuListChecks />
+              <Text>Пошуки</Text>
+              {searches && searches.length > 0 && (
+                <Badge colorPalette="blue" variant="subtle" rounded="full">
+                  {searches.length}
+                </Badge>
+              )}
+            </HStack>
+            <Accordion.ItemIndicator />
+          </Accordion.ItemTrigger>
+          <Accordion.ItemContent>
+            <Accordion.ItemBody px={2} pt={0} pb={2}>
+              {isLoading && (
+                <Text textStyle="sm" color="fg.muted" px={2}>
+                  Завантаження…
+                </Text>
+              )}
+              {!isLoading && (!searches || searches.length === 0) && (
+                <Text textStyle="sm" color="fg.muted" px={2}>
+                  Поки що порожньо — додай перший пошук нижче.
+                </Text>
+              )}
+              <Stack gap="0.5">
+                {searches?.map((s) => (
+                  <SearchRow
+                    key={s.id}
+                    search={s}
+                    selected={selectedId === s.id}
+                    scanState={scanState}
+                    onSelect={() => onSelect(s.id)}
+                    onScan={(deep) => runScan(s.id, deep)}
+                  />
+                ))}
+              </Stack>
+            </Accordion.ItemBody>
+          </Accordion.ItemContent>
+        </Accordion.Item>
 
-      <Box maxH="40vh" overflowY="auto" px={2} pb={2}>
-        {isLoading && (
-          <Text textStyle="sm" color="fg.muted" px={2}>
-            Завантаження…
-          </Text>
-        )}
-        <Stack gap="0.5">
-          {searches?.map((s) => (
-            <SearchRow
-              key={s.id}
-              search={s}
-              selected={selectedId === s.id}
-              scanState={scanState}
-              onSelect={() => onSelect(s.id)}
-              onScan={(deep) => runScan(s.id, deep)}
-            />
-          ))}
-        </Stack>
-      </Box>
-
-      <Stack
-        as="form"
-        onSubmit={submit}
-        gap={3}
-        p={4}
-        borderTopWidth="1px"
-        borderColor="border.subtle"
-      >
-        <Heading size="sm" display="flex" alignItems="center" gap={2}>
-          <LuPlus /> Новий пошук
-        </Heading>
+        <Accordion.Item value="new" borderBottomWidth="1px" borderColor="border.subtle">
+          <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
+            <HStack flex="1" gap={2} fontWeight="semibold">
+              <LuPlus />
+              <Text>Новий пошук</Text>
+            </HStack>
+            <Accordion.ItemIndicator />
+          </Accordion.ItemTrigger>
+          <Accordion.ItemContent>
+            <Accordion.ItemBody pt={0}>
+              <Stack as="form" onSubmit={submit} gap={3} px={2}>
         <Field.Root required>
           <Field.Label>
             Назва <Field.RequiredIndicator />
@@ -176,14 +196,18 @@ export function Searches({ selectedId, onSelect }: Props) {
         <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
           <LuPlus /> Створити
         </Button>
-        {createSearch.isError && (
-          <Text textStyle="xs" color="fg.error">
-            {createSearch.error instanceof Error
-              ? createSearch.error.message
-              : 'Помилка створення'}
-          </Text>
-        )}
-      </Stack>
+                {createSearch.isError && (
+                  <Text textStyle="xs" color="fg.error">
+                    {createSearch.error instanceof Error
+                      ? createSearch.error.message
+                      : 'Помилка створення'}
+                  </Text>
+                )}
+              </Stack>
+            </Accordion.ItemBody>
+          </Accordion.ItemContent>
+        </Accordion.Item>
+      </Accordion.Root>
     </Flex>
   );
 }
