@@ -3,6 +3,7 @@ import type { StoredTableState } from '../types';
 
 export const SETTINGS_STORAGE_KEY = 'olx-ui-settings-v1';
 export const TABLE_STORAGE_KEY = 'olx-listings-table-v1';
+export const DEFAULT_PAGE_SIZE = 50;
 
 export function loadColumnVisibility(): VisibilityState {
   try {
@@ -26,14 +27,15 @@ export function saveColumnVisibility(columnVisibility: VisibilityState): void {
 export function loadTableState(): StoredTableState {
   try {
     const raw = localStorage.getItem(TABLE_STORAGE_KEY);
-    if (!raw) return { columnSizing: {}, sorting: [] };
+    if (!raw) return { columnSizing: {}, sorting: [], pageSize: DEFAULT_PAGE_SIZE };
     const parsed = JSON.parse(raw) as Partial<StoredTableState>;
     return {
       columnSizing: parsed.columnSizing ?? {},
       sorting: parsed.sorting ?? [],
+      pageSize: parsed.pageSize ?? DEFAULT_PAGE_SIZE,
     };
   } catch {
-    return { columnSizing: {}, sorting: [] };
+    return { columnSizing: {}, sorting: [], pageSize: DEFAULT_PAGE_SIZE };
   }
 }
 

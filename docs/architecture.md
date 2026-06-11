@@ -129,18 +129,19 @@ flowchart LR
   `{searchId, deep?}`; `useScanStatus(searchId, enabled)` поллить `GET .../scan-status`
   раз на ~1.5с, поки `enabled`.
 - `types/index.ts` — централізований файл з усіма фронтенд-типами (`Listing`, `Search`, `NewSearchInput`, `StoredTableState` тощо).
-- `utils/storage.ts` — хелпери для взаємодії з `localStorage` (збереження стану сортування/розмірів колонок таблиці `TABLE_STORAGE_KEY` та загальних налаштувань видимості колонок `SETTINGS_STORAGE_KEY`).
+- `utils/storage.ts` — хелпери для взаємодії з `localStorage` (збереження стану сортування/розмірів колонок/`pageSize` таблиці `TABLE_STORAGE_KEY`, дефолт `DEFAULT_PAGE_SIZE = 50`, та загальних налаштувань видимості колонок `SETTINGS_STORAGE_KEY`).
 - `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати (`formatDate`) та чистки HTML-опису (`stripDescriptionHtml`).
-- `hooks/useListingsTableState.ts` — кастомний React-хук для збереження та завантаження стану сортування й розмірів колонок таблиці.
+- `hooks/useListingsTableState.ts` — кастомний React-хук для збереження та завантаження стану сортування, розмірів колонок та пагінації (`pageSize` персиститься, `pageIndex` — ні) таблиці.
 - `components/table/` — ізольовані компоненти таблиці оголошень:
   - `HeaderLabel.tsx` — заголовок колонки з відповідною Lucide-іконкою.
   - `columns.tsx` — визначення колонок для TanStack Table та список `TOGGLEABLE_COLUMNS`.
-  - `ListingsTableHeader.tsx` — заголовок таблиці `<thead>` із підтримкою сортування та ресайзу колонок.
-  - `ListingsTableBody.tsx` — тіло таблиці `<tbody>` з адаптивними клітинками та обмеженням висоти описів.
+  - `ListingsTableHeader.tsx` — заголовок таблиці `<thead>` із підтримкою сортування та ресайзу колонок (`columnResizeMode: 'onEnd'`).
+  - `ListingsTableBody.tsx` — тіло таблиці `<tbody>`; рядок винесено в окремий компонент, обгорнутий `React.memo`, для зменшення ре-рендерів при ресайзі/пагінації.
+  - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
 - `pages/Searches.tsx` — список пошуків, форма створення, кнопки «Сканувати» (`LuRefreshCw`) і
   «Глибокий скан» (`LuLayers`, `SearchRow`-підкомпонент). Під час глибокого скану — прогрес-бар
   (`Progress.Root`, поллінг через `useScanStatus`) із текстом «Запит X/Y» та оцінкою часу.
-- `pages/ListingsTable.tsx` — відображення списку оголошень, що збирає разом хук `useListingsTableState`, колонки та компоненти `ListingsTableHeader` / `ListingsTableBody`. Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
+- `pages/ListingsTable.tsx` — відображення списку оголошень, що збирає разом хук `useListingsTableState`, колонки та компоненти `ListingsTableHeader` / `ListingsTableBody` / `TablePagination`. Клієнтська пагінація через `getPaginationRowModel()` (TanStack Table v8) тримає DOM обмеженим розміром сторінки навіть для ~2000 оголошень (фікс зависання UI після глибокого скану — `docs/plans/listings-pagination.md`). Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
 - `App.tsx` показує в шапці «Результатів на OLX: X · У базі: N» — `searches.visible_total_count`
   обраного пошуку (з останнього GraphQL-скану) і фактична кількість рядків `listings` у БД;
   якщо GraphQL-скану ще не було — лише «У базі: N».

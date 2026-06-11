@@ -57,4 +57,5 @@ export interface NewSearchInput {
 export interface StoredTableState {
   columnSizing: ColumnSizingState;
   sorting: SortingState;
+  pageSize: number;
 }

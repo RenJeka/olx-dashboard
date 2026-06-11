@@ -65,8 +65,9 @@ olx-dashboard/
         │   ├── table/             # компоненти таблиці оголошень
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
         │   │   ├── columns.tsx     # опис колонок (TanStack Table) та TOGGLEABLE_COLUMNS
-        │   │   ├── ListingsTableHeader.tsx # заголовок таблиці з ресайзером
-        │   │   └── ListingsTableBody.tsx # тіло таблиці (відображення рядків)
+        │   │   ├── ListingsTableHeader.tsx # заголовок таблиці з ресайзером (onEnd)
+        │   │   ├── ListingsTableBody.tsx # тіло таблиці (рядок — React.memo)
+        │   │   └── TablePagination.tsx # панель пагінації (Chakra Pagination + вибір pageSize)
         │   └── ui/                # Chakra UI v3 snippets
         │       ├── provider.tsx
         │       ├── color-mode.tsx
