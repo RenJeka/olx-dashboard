@@ -82,7 +82,7 @@ const upsertStmt = db.prepare(`
 export function upsertListings(
   searchId: number,
   raw: RawListing[],
-): ScanResult {
+): Omit<ScanResult, 'requestsUsed'> {
   let newCount = 0;
 
   const run = db.transaction((items: RawListing[]) => {

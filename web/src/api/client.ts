@@ -3,7 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { Search, Listing, ScanResult, NewSearchInput } from '../types';
+import type { Search, Listing, ScanResult, ScanStatus, NewSearchInput } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.
@@ -47,10 +47,22 @@ export function useCreateSearch() {
 export function useScan() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (searchId: number) =>
-      api<ScanResult>(`/api/searches/${searchId}/scan`, { method: 'POST' }),
-    onSuccess: (_data, searchId) =>
+    mutationFn: ({ searchId, deep }: { searchId: number; deep?: boolean }) =>
+      api<ScanResult>(`/api/searches/${searchId}/scan${deep ? '?deep=true' : ''}`, {
+        method: 'POST',
+      }),
+    onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+  });
+}
+
+/** Поллінг прогресу глибокого скану (раз на ~1.5с, поки enabled). */
+export function useScanStatus(searchId: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['scan-status', searchId],
+    queryFn: () => api<ScanStatus>(`/api/searches/${searchId}/scan-status`),
+    enabled: enabled && searchId != null,
+    refetchInterval: 1500,
   });
 }
 

@@ -19,8 +19,16 @@
 - Селектори HTML-fallback (тримати в одному файлі `server/src/scraper/selectors.ts`):
   - картка `[data-cy="l-card"]`, назва `h6, h4` (OLX мігрував заголовок з `h6` на `h4` — тримати обидва), ціна `[data-testid="ad-price"]`, лінк `a[href]` (відносний → префікс `https://www.olx.ua`), дата/локація `[data-testid="location-date"]`, порожньо `[data-cy="empty-state"]`.
   - detail: характеристики `[data-cy="ad-params"] li`, опис `[data-testid="ad_description"]`, бізнес `[data-testid="trader-title"]`.
-- Ввічливість (обидва методи): 1–2 с затримка між запитами/сторінками, **≤3 запити** на скан.
-- Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`); подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
+- Ввічливість (обидва методи, **звичайний скан**): 1–2 с затримка між запитами/сторінками, **≤3 запити** на скан.
+- **Глибокий скан** (ручна кнопка «Глибокий скан» в UI поруч зі «Сканувати», або CLI `--deep`) —
+  одноразовий поглиблений прохід для нарощування покриття БД: батчі по 3 запити (як звичайний
+  скан), пауза **3–6 с** між батчами, ціль `min(50, ceil(visible_total_count / 40))` запитів
+  (`50` — абсолютний запобіжник). Рання зупинка, якщо сторінка повернула `< 40`/порожньо —
+  як і в звичайному скані. Прогрес (`requests_done`/`requests_total` у `scan_runs`) пишеться
+  через `FetchOptions.onProgress` і віддається `GET /api/searches/:id/scan-status` для
+  поллінгу фронтендом. Деталі — `docs/olx-api.md` §2.9.
+- Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`, `fetchSearch(search, options?: FetchOptions)`);
+  подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
 - Dataflow фронтенду OLX (знято live 2026-06-11, деталі — `docs/olx-api.md` §2.10): перше завантаження сторінки пошуку — SSR (оголошення вже в HTML/`__NEXT_DATA__`, GraphQL НЕ викликається); GraphQL спрацьовує лише при клієнтських діях (фільтр/сортування/пагінація). «Підготовчих» запитів GraphQL не потребує — супутні `friendly-links`/`offers/metadata` це косметика UI сайту.
 

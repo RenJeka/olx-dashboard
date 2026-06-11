@@ -42,3 +42,5 @@ addColumnIfMissing('listings', 'seller_name', 'TEXT');
 addColumnIfMissing('listings', 'contact_name', 'TEXT');
 addColumnIfMissing('listings', 'olx_status', 'TEXT');
 addColumnIfMissing('searches', 'visible_total_count', 'INTEGER');
+addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
+addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');

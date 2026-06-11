@@ -123,19 +123,36 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Сканування
-  app.post<{ Params: { id: string } }>(
+  // Сканування. ?deep=true — глибокий скан (батчі з паузами, до ~50 запитів).
+  app.post<{ Params: { id: string }; Querystring: { deep?: string } }>(
     '/api/searches/:id/scan',
     async (req, reply) => {
       const id = Number(req.params.id);
+      const deep = req.query.deep === 'true';
       try {
-        const result = await runScan(id);
+        const result = await runScan(id, { deep });
         return result;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         app.log.error({ err }, 'Помилка сканування');
         return reply.code(500).send({ error: message });
       }
+    },
+  );
+
+  // Статус останнього скану — для поллінгу прогресу глибокого скану.
+  app.get<{ Params: { id: string } }>(
+    '/api/searches/:id/scan-status',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const row = db
+        .prepare(
+          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total
+           FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
+        )
+        .get(id);
+      if (!row) return reply.code(404).send({ error: 'Сканів ще не було' });
+      return row;
     },
   );
 }

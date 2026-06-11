@@ -32,6 +32,19 @@ export interface Listing {
 export interface ScanResult {
   found: number;
   new_count: number;
+  requestsUsed: number;
+}
+
+/** Останній запис scan_runs для пошуку — для прогрес-бару глибокого скану. */
+export interface ScanStatus {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  found: number | null;
+  new_count: number | null;
+  error: string | null;
+  requests_done: number | null;
+  requests_total: number | null;
 }
 
 export interface NewSearchInput {

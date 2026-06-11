@@ -56,5 +56,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   found INTEGER,
   new_count INTEGER,
   disabled_count INTEGER,
-  error TEXT
+  error TEXT,
+  requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
+  requests_total INTEGER             -- прогрес глибокого скану: ціль (NULL поки невідома)
 );

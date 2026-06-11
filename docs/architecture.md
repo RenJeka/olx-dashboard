@@ -62,10 +62,14 @@ flowchart LR
 
 1. `scanner.runScan(searchId)` читає рядок `searches`, парсить `api_filters` (JSON) у `SearchConfig`.
 2. Створює запис у `scan_runs` (`started_at`).
-3. `GraphqlOlxFetcher.fetchSearch()` шле ≤3 POST-запити (offset 0/40/80, затримка 1–2 с,
-   заголовки з [`olx-api.md` §2.3](./olx-api.md)) → структуровані `RawListing[]` (ціна числом,
-   ISO-дати, `params`). Якщо GraphQL упав — scanner автоматично повторює скан через
-   `HtmlOlxFetcher` (cheerio-парсинг сторінки пошуку) і фіксує позначку fallback у `scan_runs.error`.
+3. `GraphqlOlxFetcher.fetchSearch(search, options?)` шле ≤3 POST-запити (offset 0/40/80,
+   затримка 1–2 с, заголовки з [`olx-api.md` §2.3](./olx-api.md)) → структуровані
+   `RawListing[]` (ціна числом, ISO-дати, `params`). Якщо GraphQL упав — scanner автоматично
+   повторює скан через `HtmlOlxFetcher` (cheerio-парсинг сторінки пошуку) і фіксує позначку
+   fallback у `scan_runs.error`. При `options.deep` — батчі по 3 запити з паузою 3–6 с,
+   ціль `min(50, ceil(visible_total_count/40))` (деталі — `olx-api.md` §2.9). Після кожного
+   запиту/сторінки викликається `options.onProgress(done, total)`, який scanner записує у
+   `scan_runs.requests_done`/`requests_total`.
 4. `normalizer.upsertListings()` використовує структуровані поля (GraphQL) або парсить сирі
    рядки (HTML), робить upsert по `olx_id` у транзакції, рахує `new_count`.
 5. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`); падіння обох стратегій →
@@ -78,13 +82,13 @@ flowchart LR
 | --- | --- |
 | `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті. Експортує singleton `db`. |
 | `db/schema.sql` | Канонічна схема (4 таблиці). Єдине джерело визначень — не дублювати в коді. |
-| `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, інтерфейс `OlxFetcher`). Без `any`. |
-| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний): POST на GraphQL-ендпойнт, `searchParameters` з `SearchConfig`, маппінг відповіді → структуровані `RawListing[]`. Деталі — `olx-api.md` §2. |
+| `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`). Без `any`. |
+| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний): POST на GraphQL-ендпойнт, `searchParameters` з `SearchConfig`, маппінг відповіді → структуровані `RawListing[]`. Підтримує `options.deep` (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`) і `options.onProgress`. Деталі — `olx-api.md` §2. |
 | `scraper/selectors.ts` | Усі OLX-селектори + заголовки HTML-запиту в одному місці (для fallback). |
-| `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. |
+| `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. Той самий `FetchOptions`/глибокий режим (без уточнення цілі за `visible_total_count` — одразу `DEEP_SAFETY_CAP`). |
 | `scraper/normalizer.ts` | `upsertListings` (upsert по `olx_id`): пріоритет структурованим полям (GraphQL); для HTML — `parsePrice`, розбір локації/дати. |
-| `scanner.ts` | `runScan(searchId)` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; веде `scan_runs`. |
-| `routes/searches.ts` | CRUD `/api/searches[/:id]` + `POST /api/searches/:id/scan`. |
+| `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`). |
+| `routes/searches.ts` | CRUD `/api/searches[/:id]` + `POST /api/searches/:id/scan` (`?deep=true`) + `GET /api/searches/:id/scan-status` (поллінг прогресу глибокого скану). |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування. |
 | `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, слухає `:3001`. |
 | `scan.ts` | CLI-обгортка над `runScan` (`npm run scan -- --search <id>`). |
@@ -108,7 +112,8 @@ flowchart LR
 | Метод | Шлях | Стан |
 | --- | --- | --- |
 | `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1 |
-| `POST` | `/api/searches/:id/scan` | ✅ Етап 1 — повертає `{found, new_count}` |
+| `POST` | `/api/searches/:id/scan?deep=true` | ✅ Етап 1 — повертає `{found, new_count, requestsUsed}`; `deep=true` — глибокий скан (§2.9 `olx-api.md`) |
+| `GET` | `/api/searches/:id/scan-status` | ✅ Етап 1 — останній рядок `scan_runs` (для поллінгу прогресу глибокого скану) |
 | `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 |
 | `GET` | `/health` | ✅ |
 | `PATCH` | `/api/listings/:id` | ⏳ Етап 2 |
@@ -119,7 +124,10 @@ flowchart LR
 ## 7. Frontend
 
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки (`useSearches`, `useCreateSearch`,
-  `useScan`, `useListings`). Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`.
+  `useScan`, `useScanStatus`, `useListings`). Всі типи DTO імпортуються з `types/index.ts`.
+  Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`. `useScan` приймає
+  `{searchId, deep?}`; `useScanStatus(searchId, enabled)` поллить `GET .../scan-status`
+  раз на ~1.5с, поки `enabled`.
 - `types/index.ts` — централізований файл з усіма фронтенд-типами (`Listing`, `Search`, `NewSearchInput`, `StoredTableState` тощо).
 - `utils/storage.ts` — хелпери для взаємодії з `localStorage` (збереження стану сортування/розмірів колонок таблиці `TABLE_STORAGE_KEY` та загальних налаштувань видимості колонок `SETTINGS_STORAGE_KEY`).
 - `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати (`formatDate`) та чистки HTML-опису (`stripDescriptionHtml`).
@@ -129,10 +137,13 @@ flowchart LR
   - `columns.tsx` — визначення колонок для TanStack Table та список `TOGGLEABLE_COLUMNS`.
   - `ListingsTableHeader.tsx` — заголовок таблиці `<thead>` із підтримкою сортування та ресайзу колонок.
   - `ListingsTableBody.tsx` — тіло таблиці `<tbody>` з адаптивними клітинками та обмеженням висоти описів.
-- `pages/Searches.tsx` — список пошуків, форма створення, кнопка Scan.
+- `pages/Searches.tsx` — список пошуків, форма створення, кнопки «Сканувати» (`LuRefreshCw`) і
+  «Глибокий скан» (`LuLayers`, `SearchRow`-підкомпонент). Під час глибокого скану — прогрес-бар
+  (`Progress.Root`, поллінг через `useScanStatus`) із текстом «Запит X/Y» та оцінкою часу.
 - `pages/ListingsTable.tsx` — відображення списку оголошень, що збирає разом хук `useListingsTableState`, колонки та компоненти `ListingsTableHeader` / `ListingsTableBody`. Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
-- `App.tsx` показує в шапці «Результатів: N» — `searches.visible_total_count` обраного пошуку
-  (реальна кількість результатів на OLX, оновлюється при кожному скані).
+- `App.tsx` показує в шапці «Результатів на OLX: X · У базі: N» — `searches.visible_total_count`
+  обраного пошуку (з останнього GraphQL-скану) і фактична кількість рядків `listings` у БД;
+  якщо GraphQL-скану ще не було — лише «У базі: N».
 - `components/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`):
   розділ «Візуальний вигляд» — перемикач теми light/dark (`useColorMode` з `next-themes`,
   персист — стандартний для `next-themes`) і чекбокси видимості колонок таблиці. Видимість
