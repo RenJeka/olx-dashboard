@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS searches (
   local_filters TEXT DEFAULT '{}',   -- JSON: range-правила + стоп-слова
   cron_enabled INTEGER DEFAULT 0,
   visible_total_count INTEGER,       -- metadata.visible_total_count з останнього успішного скану (GraphQL)
+  sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
   created_at TEXT DEFAULT (datetime('now'))
 );
 

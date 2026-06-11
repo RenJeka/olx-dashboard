@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   getCoreRowModel,
   getPaginationRowModel,
@@ -14,6 +14,8 @@ import { columns } from '../components/table/columns';
 import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
 import { ListingsTableBody } from '../components/table/ListingsTableBody';
 import { TablePagination } from '../components/table/TablePagination';
+import { DescriptionDialog } from '../components/DescriptionDialog';
+import type { Listing } from '../types';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
 
@@ -21,12 +23,19 @@ interface Props {
   searchId: number | null;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  descriptionExpandEnabled: boolean;
 }
 
-export function ListingsTable({ searchId, columnVisibility, onColumnVisibilityChange }: Props) {
+export function ListingsTable({
+  searchId,
+  columnVisibility,
+  onColumnVisibilityChange,
+  descriptionExpandEnabled,
+}: Props) {
   const { data, isLoading } = useListings(searchId);
   const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
     useListingsTableState();
+  const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
 
   const rows = useMemo(() => data ?? [], [data]);
 
@@ -73,10 +82,15 @@ export function ListingsTable({ searchId, columnVisibility, onColumnVisibilityCh
       <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <ListingsTableHeader table={table} />
-          <ListingsTableBody table={table} />
+          <ListingsTableBody
+            table={table}
+            descriptionExpandEnabled={descriptionExpandEnabled}
+            onOpenDescription={setDescriptionListing}
+          />
         </Table.Root>
       </Box>
       <TablePagination table={table} />
+      <DescriptionDialog listing={descriptionListing} onClose={() => setDescriptionListing(null)} />
     </Flex>
   );
 }

@@ -103,6 +103,9 @@ flowchart LR
 - `listings.olx_id` UNIQUE — ключ дедуплікації (upsert).
 - `status` ∈ `new|interested|contacted|disabled`; `status_source` ∈ `auto|manual`.
 - `params` зберігається сирим JSON.
+- `searches.sort_order` — ручний порядок у списку (менше → вище); бекфіл існуючих рядків
+  (`0..N-1` за `created_at DESC`) виконує `db.ts` при старті, нові пошуки отримують
+  `MIN(sort_order) - 1` (з'являються згори).
 
 > На Етапі 1 використовуються лише поля, потрібні для збору й показу. `price_history`,
 > `filtered_out`, статус-логіка створені у схемі, але кодом ще не наповнюються (Етапи 2–3).
@@ -111,7 +114,8 @@ flowchart LR
 
 | Метод | Шлях | Стан |
 | --- | --- | --- |
-| `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1 |
+| `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1 — `GET` сортує за `sort_order ASC, created_at DESC, id DESC`; `DELETE` каскадний (`price_history` → `scan_runs` → `listings` → `searches`, у транзакції) |
+| `POST` | `/api/searches/:id/move` | ✅ — `{direction: 'up'\|'down'}`, міняє `sort_order` із сусідом за поточним порядком (для кнопок ↑/↓ у sidebar) |
 | `POST` | `/api/searches/:id/scan?deep=true` | ✅ Етап 1 — повертає `{found, new_count, requestsUsed}`; `deep=true` — глибокий скан (§2.9 `olx-api.md`) |
 | `GET` | `/api/searches/:id/scan-status` | ✅ Етап 1 — останній рядок `scan_runs` (для поллінгу прогресу глибокого скану) |
 | `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 |
@@ -124,33 +128,55 @@ flowchart LR
 ## 7. Frontend
 
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки (`useSearches`, `useCreateSearch`,
-  `useScan`, `useScanStatus`, `useListings`). Всі типи DTO імпортуються з `types/index.ts`.
-  Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`. `useScan` приймає
-  `{searchId, deep?}`; `useScanStatus(searchId, enabled)` поллить `GET .../scan-status`
-  раз на ~1.5с, поки `enabled`.
-- `types/index.ts` — централізований файл з усіма фронтенд-типами (`Listing`, `Search`, `NewSearchInput`, `StoredTableState` тощо).
-- `utils/storage.ts` — хелпери для взаємодії з `localStorage` (збереження стану сортування/розмірів колонок/`pageSize` таблиці `TABLE_STORAGE_KEY`, дефолт `DEFAULT_PAGE_SIZE = 50`, та загальних налаштувань видимості колонок `SETTINGS_STORAGE_KEY`).
+  `useDeleteSearch`, `useReorderSearches`, `useScan`, `useScanStatus`, `useListings`). Всі типи
+  DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
+  `api_filters.ranges.price`. `useScan` приймає `{searchId, deep?}`; `useScanStatus(searchId,
+  enabled)` поллить `GET .../scan-status` раз на ~1.5с, поки `enabled`. `useDeleteSearch`
+  інвалідовує `['searches']` і прибирає кеш `['listings', id]`; `useReorderSearches` шле
+  `POST /api/searches/:id/move` і інвалідовує `['searches']`.
+- `types/index.ts` — централізований файл з усіма фронтенд-типами (`Listing`, `Search` (включно з `sort_order`), `NewSearchInput`, `StoredTableState` тощо).
+- `utils/storage.ts` — хелпери для взаємодії з `localStorage`: загальні `loadSettings`/`saveSettings`
+  над одним обʼєктом `SETTINGS_STORAGE_KEY` (поля `columnVisibility`, `descriptionExpandEnabled`,
+  дефолт `true`) + окремо стан таблиці `TABLE_STORAGE_KEY` (сортування/розміри колонок/`pageSize`,
+  дефолт `DEFAULT_PAGE_SIZE = 50`).
 - `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати (`formatDate`) та чистки HTML-опису (`stripDescriptionHtml`).
 - `hooks/useListingsTableState.ts` — кастомний React-хук для збереження та завантаження стану сортування, розмірів колонок та пагінації (`pageSize` персиститься, `pageIndex` — ні) таблиці.
 - `components/table/` — ізольовані компоненти таблиці оголошень:
   - `HeaderLabel.tsx` — заголовок колонки з відповідною Lucide-іконкою.
   - `columns.tsx` — визначення колонок для TanStack Table та список `TOGGLEABLE_COLUMNS`.
   - `ListingsTableHeader.tsx` — заголовок таблиці `<thead>` із підтримкою сортування та ресайзу колонок (`columnResizeMode: 'onEnd'`).
-  - `ListingsTableBody.tsx` — тіло таблиці `<tbody>`; рядок винесено в окремий компонент, обгорнутий `React.memo`, для зменшення ре-рендерів при ресайзі/пагінації.
+  - `ListingsTableBody.tsx` — тіло таблиці `<tbody>`, яке рендерить рядки.
+  - `ListingsTableRow.tsx` — рядок таблиці (обгорнутий у `React.memo` для уникнення ре-рендерів при ресайзі чи пагінації).
+  - `DescriptionTooltip.tsx` — інтерактивний тултіп з прокруткою для попереднього перегляду тексту опису. Клік по вмісту відкриває `DescriptionDialog`.
   - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
-- `pages/Searches.tsx` — список пошуків, форма створення, кнопки «Сканувати» (`LuRefreshCw`) і
-  «Глибокий скан» (`LuLayers`, `SearchRow`-підкомпонент). Під час глибокого скану — прогрес-бар
-  (`Progress.Root`, поллінг через `useScanStatus`) із текстом «Запит X/Y» та оцінкою часу.
-- `pages/ListingsTable.tsx` — відображення списку оголошень, що збирає разом хук `useListingsTableState`, колонки та компоненти `ListingsTableHeader` / `ListingsTableBody` / `TablePagination`. Клієнтська пагінація через `getPaginationRowModel()` (TanStack Table v8) тримає DOM обмеженим розміром сторінки навіть для ~2000 оголошень (фікс зависання UI після глибокого скану — `docs/plans/listings-pagination.md`). Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
+- `components/DescriptionDialog.tsx` — модальне вікно повного опису оголошення (`DialogRoot
+  size="lg" placement="center" scrollBehavior="inside"`): фото/назва/ціна/місто в хедері,
+  повний текст опису (скрол) у тілі, «Відкрити на OLX» + «Закрити» у футері. Відкривається
+  кліком по комірці «Опис» (`ListingsTable.tsx` тримає `descriptionListing` стан).
+- `pages/Searches.tsx` — список пошуків, форма створення. Кожен `SearchRow`:
+  - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
+    disabled на краях списку;
+  - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Сканувати» (`LuRefreshCw`),
+    «Глибокий скан» (`LuLayers`), розділювач, «Видалити» (`LuTrash2`, `color="fg.error"`,
+    відкриває `DialogRoot role="alertdialog"` із підтвердженням і каскадно видаляє пошук
+    через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).
+  Під час глибокого скану — прогрес-бар (`Progress.Root`, поллінг через `useScanStatus`) із
+  текстом «Запит X/Y» та оцінкою часу.
+- `pages/ListingsTable.tsx` — відображення списку оголошень, що збирає разом хук `useListingsTableState`, колонки та компоненти `ListingsTableHeader` / `ListingsTableBody` / `TablePagination` / `DescriptionDialog`. Клієнтська пагінація через `getPaginationRowModel()` (TanStack Table v8) тримає DOM обмеженим розміром сторінки навіть для ~2000 оголошень (фікс зависання UI після глибокого скану — `docs/plans/listings-pagination.md`). Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
 - `App.tsx` показує в шапці «Результатів на OLX: X · У базі: N» — `searches.visible_total_count`
   обраного пошуку (з останнього GraphQL-скану) і фактична кількість рядків `listings` у БД;
-  якщо GraphQL-скану ще не було — лише «У базі: N».
+  якщо GraphQL-скану ще не було — лише «У базі: N». `selectedId` може стати `null` (видалення
+  активного пошуку) — тоді показується заглушка «Обери пошук зліва».
 - `components/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`):
   розділ «Візуальний вигляд» — перемикач теми light/dark (`useColorMode` з `next-themes`,
-  персист — стандартний для `next-themes`) і чекбокси видимості колонок таблиці. Видимість
+  персист — стандартний для `next-themes`), чекбокси видимості колонок таблиці та перемикач
+  «Розширений перегляд опису (тултіп + модалка)» (`descriptionExpandEnabled`). Видимість
   колонок персиститься за допомогою `saveColumnVisibility` у `localStorage`.
-- `components/ui/` — Chakra UI v3 snippets, додані через `npx @chakra-ui/cli snippet add`
-  (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`, `switch`, `checkbox`, `close-button`).
+- `components/ui/` — Chakra UI v3 snippets, здебільшого додані через
+  `npx @chakra-ui/cli snippet add` (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`,
+  `switch`, `checkbox`, `close-button`); `dialog.tsx` написаний вручну за тим самим патерном
+  (`DialogRoot`/`DialogContent`/`DialogHeader`/`DialogBody`/`DialogFooter`/`DialogCloseTrigger`/
+  `DialogBackdrop`) — використовується `DescriptionDialog` і діалогом підтвердження видалення.
 - Vite proxy `/api → http://localhost:3001` (див. `web/vite.config.ts`).
 
 ## 8. Обробка помилок збору

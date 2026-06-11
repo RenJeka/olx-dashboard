@@ -1,6 +1,6 @@
 import { Heading, HStack, IconButton, Stack, Text } from '@chakra-ui/react';
 import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
-import { LuMoon, LuSettings, LuSun } from 'react-icons/lu';
+import { LuFileText, LuMoon, LuSettings, LuSun } from 'react-icons/lu';
 import { TOGGLEABLE_COLUMNS } from '../pages/ListingsTable';
 import { Checkbox } from './ui/checkbox';
 import { useColorMode } from './ui/color-mode';
@@ -20,9 +20,16 @@ import { Tooltip } from './ui/tooltip';
 interface Props {
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  descriptionExpandEnabled: boolean;
+  onDescriptionExpandEnabledChange: (value: boolean) => void;
 }
 
-export function SettingsDrawer({ columnVisibility, onColumnVisibilityChange }: Props) {
+export function SettingsDrawer({
+  columnVisibility,
+  onColumnVisibilityChange,
+  descriptionExpandEnabled,
+  onDescriptionExpandEnabledChange,
+}: Props) {
   const { colorMode, toggleColorMode } = useColorMode();
 
   return (
@@ -48,6 +55,15 @@ export function SettingsDrawer({ columnVisibility, onColumnVisibilityChange }: P
                 <HStack gap={1}>
                   {colorMode === 'dark' ? <LuMoon /> : <LuSun />}
                   <Text>Темна тема</Text>
+                </HStack>
+              </Switch>
+              <Switch
+                checked={descriptionExpandEnabled}
+                onCheckedChange={(details) => onDescriptionExpandEnabledChange(details.checked)}
+              >
+                <HStack gap={1}>
+                  <LuFileText />
+                  <Text>Розширений перегляд опису (тултіп + модалка)</Text>
                 </HStack>
               </Switch>
             </Stack>

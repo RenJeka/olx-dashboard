@@ -21,7 +21,9 @@ function toJsonText(value: unknown, fallback = '{}'): string {
 export async function searchesRoutes(app: FastifyInstance): Promise<void> {
   // Список пошуків
   app.get('/api/searches', async () => {
-    return db.prepare('SELECT * FROM searches ORDER BY created_at DESC').all();
+    return db
+      .prepare('SELECT * FROM searches ORDER BY sort_order ASC, created_at DESC, id DESC')
+      .all();
   });
 
   // Один пошук
@@ -40,10 +42,16 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Поля name і query обовʼязкові' });
     }
 
+    // Новий пошук з'являється згори списку.
+    const { min } = db.prepare('SELECT MIN(sort_order) AS min FROM searches').get() as {
+      min: number | null;
+    };
+    const sortOrder = (min ?? 0) - 1;
+
     const info = db
       .prepare(
-        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -52,6 +60,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         toJsonText(req.body.api_filters),
         toJsonText(req.body.local_filters),
         req.body.cron_enabled ?? 0,
+        sortOrder,
       );
 
     return reply
@@ -110,16 +119,67 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Видалення
+  // Видалення (каскадне: price_history → scan_runs → listings → searches)
   app.delete<{ Params: { id: string } }>(
     '/api/searches/:id',
     async (req, reply) => {
       const id = Number(req.params.id);
-      const info = db.prepare('DELETE FROM searches WHERE id = ?').run(id);
-      if (info.changes === 0) {
+      const existing = db.prepare('SELECT id FROM searches WHERE id = ?').get(id);
+      if (!existing) {
         return reply.code(404).send({ error: 'Пошук не знайдено' });
       }
+
+      const deleteCascade = db.transaction((searchId: number) => {
+        db.prepare(
+          `DELETE FROM price_history WHERE listing_id IN (SELECT id FROM listings WHERE search_id = ?)`,
+        ).run(searchId);
+        db.prepare('DELETE FROM scan_runs WHERE search_id = ?').run(searchId);
+        db.prepare('DELETE FROM listings WHERE search_id = ?').run(searchId);
+        db.prepare('DELETE FROM searches WHERE id = ?').run(searchId);
+      });
+      deleteCascade(id);
+
       return { deleted: true };
+    },
+  );
+
+  // Ручне сортування (стрілки ↑/↓): міняє sort_order із сусідом за поточним порядком.
+  app.post<{ Params: { id: string }; Body: { direction?: 'up' | 'down' } }>(
+    '/api/searches/:id/move',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const direction = req.body.direction;
+      if (direction !== 'up' && direction !== 'down') {
+        return reply.code(400).send({ error: 'direction має бути "up" або "down"' });
+      }
+
+      const current = db.prepare('SELECT id, sort_order FROM searches WHERE id = ?').get(id) as
+        | { id: number; sort_order: number }
+        | undefined;
+      if (!current) return reply.code(404).send({ error: 'Пошук не знайдено' });
+
+      const neighbor = (
+        direction === 'up'
+          ? db.prepare(
+              'SELECT id, sort_order FROM searches WHERE sort_order < ? ORDER BY sort_order DESC LIMIT 1',
+            )
+          : db.prepare(
+              'SELECT id, sort_order FROM searches WHERE sort_order > ? ORDER BY sort_order ASC LIMIT 1',
+            )
+      ).get(current.sort_order) as { id: number; sort_order: number } | undefined;
+
+      if (neighbor) {
+        const swap = db.transaction(
+          (a: { id: number; sort_order: number }, b: { id: number; sort_order: number }) => {
+            const update = db.prepare('UPDATE searches SET sort_order = ? WHERE id = ?');
+            update.run(b.sort_order, a.id);
+            update.run(a.sort_order, b.id);
+          },
+        );
+        swap(current, neighbor);
+      }
+
+      return db.prepare('SELECT * FROM searches WHERE id = ?').get(id);
     },
   );
 

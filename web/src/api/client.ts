@@ -44,6 +44,30 @@ export function useCreateSearch() {
   });
 }
 
+export function useDeleteSearch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (searchId: number) =>
+      api<{ deleted: boolean }>(`/api/searches/${searchId}`, { method: 'DELETE' }),
+    onSuccess: (_data, searchId) => {
+      qc.invalidateQueries({ queryKey: ['searches'] });
+      qc.removeQueries({ queryKey: ['listings', searchId] });
+    },
+  });
+}
+
+export function useReorderSearches() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, direction }: { searchId: number; direction: 'up' | 'down' }) =>
+      api<Search>(`/api/searches/${searchId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ direction }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
+  });
+}
+
 export function useScan() {
   const qc = useQueryClient();
   return useMutation({

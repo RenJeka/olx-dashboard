@@ -42,5 +42,25 @@ addColumnIfMissing('listings', 'seller_name', 'TEXT');
 addColumnIfMissing('listings', 'contact_name', 'TEXT');
 addColumnIfMissing('listings', 'olx_status', 'TEXT');
 addColumnIfMissing('searches', 'visible_total_count', 'INTEGER');
+addColumnIfMissing('searches', 'sort_order', 'INTEGER');
 addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
+
+/**
+ * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).
+ * Зберігає поточний видимий порядок (найновіші згори) як 0..N-1.
+ */
+function backfillSortOrder(): void {
+  const pending = db
+    .prepare('SELECT id FROM searches WHERE sort_order IS NULL ORDER BY created_at DESC, id DESC')
+    .all() as { id: number }[];
+  if (pending.length === 0) return;
+
+  const update = db.prepare('UPDATE searches SET sort_order = ? WHERE id = ?');
+  const run = db.transaction((rows: { id: number }[]) => {
+    rows.forEach((row, index) => update.run(index, row.id));
+  });
+  run(pending);
+}
+
+backfillSortOrder();

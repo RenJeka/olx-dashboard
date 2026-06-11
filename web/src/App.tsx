@@ -7,12 +7,20 @@ import { SettingsDrawer } from './components/SettingsDrawer';
 import { Toaster } from './components/ui/toaster';
 import { Searches } from './pages/Searches';
 import { ListingsTable } from './pages/ListingsTable';
-import { loadColumnVisibility, saveColumnVisibility } from './utils/storage';
+import {
+  loadColumnVisibility,
+  saveColumnVisibility,
+  loadDescriptionExpandEnabled,
+  saveDescriptionExpandEnabled,
+} from './utils/storage';
 
 export function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
     loadColumnVisibility(),
+  );
+  const [descriptionExpandEnabled, setDescriptionExpandEnabled] = useState<boolean>(() =>
+    loadDescriptionExpandEnabled(),
   );
   const { data: searches } = useSearches();
   const { data: listings } = useListings(selectedId);
@@ -21,6 +29,10 @@ export function App() {
   useEffect(() => {
     saveColumnVisibility(columnVisibility);
   }, [columnVisibility]);
+
+  useEffect(() => {
+    saveDescriptionExpandEnabled(descriptionExpandEnabled);
+  }, [descriptionExpandEnabled]);
 
   return (
     <Flex direction="column" h="100vh">
@@ -41,6 +53,8 @@ export function App() {
             <SettingsDrawer
               columnVisibility={columnVisibility}
               onColumnVisibilityChange={setColumnVisibility}
+              descriptionExpandEnabled={descriptionExpandEnabled}
+              onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
             />
           </HStack>
         </HStack>
@@ -51,6 +65,7 @@ export function App() {
           searchId={selectedId}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={setColumnVisibility}
+          descriptionExpandEnabled={descriptionExpandEnabled}
         />
       </Flex>
       <Toaster />

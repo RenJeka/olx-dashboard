@@ -6,6 +6,7 @@ export interface Search {
   query: string;
   api_filters: string;
   visible_total_count: number | null;
+  sort_order: number;
   created_at: string;
 }
 

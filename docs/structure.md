@@ -45,7 +45,7 @@ olx-dashboard/
 │       │   ├── olxFetcher.ts # HtmlOlxFetcher: URL-білдер, fetch, cheerio (fallback)
 │       │   └── normalizer.ts # upsert по olx_id; parsePrice/локація для HTML-шляху
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches + POST /scan
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan + POST /move
 │           └── listings.ts   # GET /api/searches/:id/listings
 │
 └── web/                      # workspace "web" (React + Vite), type: module
@@ -61,12 +61,15 @@ olx-dashboard/
         ├── api/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки (DTO-типи імпортуються з web/src/types)
         ├── components/
-        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark) + видимість колонок
+        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark), видимість колонок, перемикач опису
+        │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── table/             # компоненти таблиці оголошень
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
         │   │   ├── columns.tsx     # опис колонок (TanStack Table) та TOGGLEABLE_COLUMNS
         │   │   ├── ListingsTableHeader.tsx # заголовок таблиці з ресайзером (onEnd)
-        │   │   ├── ListingsTableBody.tsx # тіло таблиці (рядок — React.memo)
+        │   │   ├── ListingsTableBody.tsx # тіло таблиці (відображення рядків)
+        │   │   ├── ListingsTableRow.tsx # рядок таблиці (React.memo)
+        │   │   ├── DescriptionTooltip.tsx # тултіп для попереднього перегляду опису
         │   │   └── TablePagination.tsx # панель пагінації (Chakra Pagination + вибір pageSize)
         │   └── ui/                # Chakra UI v3 snippets
         │       ├── provider.tsx
@@ -74,14 +77,15 @@ olx-dashboard/
         │       ├── toaster.tsx
         │       ├── tooltip.tsx
         │       ├── drawer.tsx
+        │       ├── dialog.tsx
         │       ├── switch.tsx
         │       ├── checkbox.tsx
         │       └── close-button.tsx
         ├── hooks/
         │   └── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         ├── pages/
-        │   ├── Searches.tsx      # список пошуків, форма створення, кнопка Scan
-        │   └── ListingsTable.tsx # відображення таблиці оголошень (компонування)
+        │   ├── Searches.tsx      # список пошуків, форма створення, сортування ↑/↓, 3-dot меню (скан/видалення)
+        │   └── ListingsTable.tsx # відображення таблиці оголошень (компонування) + DescriptionDialog
         ├── types/
         │   └── index.ts          # спільні типи фронтенду (Listing, Search, StoredTableState тощо)
         └── utils/
