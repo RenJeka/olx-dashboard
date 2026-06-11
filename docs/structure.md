@@ -57,25 +57,35 @@ olx-dashboard/
     └── src/
         ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
         ├── App.tsx           # шапка (лого + SettingsDrawer) + Searches (sidebar) + ListingsTable;
-        │                      #   стан columnVisibility + persist у localStorage
+        │                      #   стан columnVisibility
         ├── api/
-        │   └── client.ts     # fetch-обгортка + TanStack Query хуки + DTO-типи
+        │   └── client.ts     # fetch-обгортка + TanStack Query хуки (DTO-типи імпортуються з web/src/types)
         ├── components/
-        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark) +
-        │   │                       #   видимість колонок таблиці (TOGGLEABLE_COLUMNS)
-        │   └── ui/                # Chakra UI v3 snippets (npx @chakra-ui/cli snippet add)
-        │       ├── provider.tsx     # ChakraProvider + next-themes ThemeProvider
-        │       ├── color-mode.tsx   # useColorMode/useColorModeValue/ColorModeButton
+        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark) + видимість колонок
+        │   ├── table/             # компоненти таблиці оголошень
+        │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
+        │   │   ├── columns.tsx     # опис колонок (TanStack Table) та TOGGLEABLE_COLUMNS
+        │   │   ├── ListingsTableHeader.tsx # заголовок таблиці з ресайзером
+        │   │   └── ListingsTableBody.tsx # тіло таблиці (відображення рядків)
+        │   └── ui/                # Chakra UI v3 snippets
+        │       ├── provider.tsx
+        │       ├── color-mode.tsx
         │       ├── toaster.tsx
         │       ├── tooltip.tsx
         │       ├── drawer.tsx
         │       ├── switch.tsx
         │       ├── checkbox.tsx
         │       └── close-button.tsx
-        └── pages/
-            ├── Searches.tsx      # список пошуків, форма створення, кнопка Scan
-            └── ListingsTable.tsx # TanStack Table: сортування, columnSizing, columnVisibility;
-                                   #   localStorage 'olx-listings-table-v1'
+        ├── hooks/
+        │   └── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
+        ├── pages/
+        │   ├── Searches.tsx      # список пошуків, форма створення, кнопка Scan
+        │   └── ListingsTable.tsx # відображення таблиці оголошень (компонування)
+        ├── types/
+        │   └── index.ts          # спільні типи фронтенду (Listing, Search, StoredTableState тощо)
+        └── utils/
+            ├── format.ts         # хелпери форматування (ціна, дата, чистка HTML-опису)
+            └── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState) у localStorage
 ```
 
 ## Орієнтири «куди дивитись»
@@ -89,19 +99,8 @@ olx-dashboard/
 | Порядок стратегій збору / fallback | `server/src/scanner.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
-| Доменні типи | `server/src/types.ts` |
+| Доменні типи | `server/src/types.ts` (бек), `web/src/types/index.ts` (фронт) |
 | Запити з фронту | `web/src/api/client.ts` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
-| Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx`, `web/src/App.tsx` (стан + localStorage), `TOGGLEABLE_COLUMNS` у `web/src/pages/ListingsTable.tsx` |
+| Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx`, `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Скрипти/воркспейси | кореневий `package.json` |
-
-## Команди
-
-```bash
-npm install                     # встановити залежності обох воркспейсів
-npm run dev                     # server (:3001) + web (:5173) паралельно
-npm run dev:server              # лише backend
-npm run dev:web                 # лише frontend
-npm run build                   # tsc (server) + tsc/vite (web)
-npm run scan -- --search <id>   # CLI-скан без UI
-```

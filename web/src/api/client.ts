@@ -3,48 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-// Типи DTO (дублюємо мінімально, без build-зчеплень із server).
-export interface Search {
-  id: number;
-  name: string;
-  query: string;
-  api_filters: string;
-  visible_total_count: number | null;
-  created_at: string;
-}
-
-export interface Listing {
-  id: number;
-  olx_id: number;
-  search_id: number;
-  title: string | null;
-  url: string | null;
-  price: number | null;
-  currency: string;
-  city: string | null;
-  photo_url: string | null;
-  description: string | null;
-  seller_name: string | null;
-  contact_name: string | null;
-  olx_status: string | null;
-  status: string;
-  posted_at: string | null;
-  first_seen_at: string;
-  last_seen_at: string | null;
-}
-
-export interface ScanResult {
-  found: number;
-  new_count: number;
-}
-
-export interface NewSearchInput {
-  name: string;
-  query: string;
-  priceFrom?: number;
-  priceTo?: number;
-}
+import type { Search, Listing, ScanResult, NewSearchInput } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.

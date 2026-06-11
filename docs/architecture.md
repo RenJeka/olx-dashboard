@@ -119,19 +119,24 @@ flowchart LR
 ## 7. Frontend
 
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки (`useSearches`, `useCreateSearch`,
-  `useScan`, `useListings`). Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`.
+  `useScan`, `useListings`). Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`.
+- `types/index.ts` — централізований файл з усіма фронтенд-типами (`Listing`, `Search`, `NewSearchInput`, `StoredTableState` тощо).
+- `utils/storage.ts` — хелпери для взаємодії з `localStorage` (збереження стану сортування/розмірів колонок таблиці `TABLE_STORAGE_KEY` та загальних налаштувань видимості колонок `SETTINGS_STORAGE_KEY`).
+- `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати (`formatDate`) та чистки HTML-опису (`stripDescriptionHtml`).
+- `hooks/useListingsTableState.ts` — кастомний React-хук для збереження та завантаження стану сортування й розмірів колонок таблиці.
+- `components/table/` — ізольовані компоненти таблиці оголошень:
+  - `HeaderLabel.tsx` — заголовок колонки з відповідною Lucide-іконкою.
+  - `columns.tsx` — визначення колонок для TanStack Table та список `TOGGLEABLE_COLUMNS`.
+  - `ListingsTableHeader.tsx` — заголовок таблиці `<thead>` із підтримкою сортування та ресайзу колонок.
+  - `ListingsTableBody.tsx` — тіло таблиці `<tbody>` з адаптивними клітинками та обмеженням висоти описів.
 - `pages/Searches.tsx` — список пошуків, форма створення, кнопка Scan.
-- `pages/ListingsTable.tsx` — TanStack Table (фото, назва-лінк, ціна, місто, дата, опис,
-  продавець (`contact_name` ?? `seller_name`), статус OLX) із сортуванням,
-  `columnSizing` і `columnVisibility` (стан видимості піднятий у `App.tsx`); експортує
-  `TOGGLEABLE_COLUMNS` для UI налаштувань. Persist `sorting`/`columnSizing` — localStorage
-  `olx-listings-table-v1`.
+- `pages/ListingsTable.tsx` — відображення списку оголошень, що збирає разом хук `useListingsTableState`, колонки та компоненти `ListingsTableHeader` / `ListingsTableBody`. Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
 - `App.tsx` показує в шапці «Результатів: N» — `searches.visible_total_count` обраного пошуку
   (реальна кількість результатів на OLX, оновлюється при кожному скані).
 - `components/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`):
   розділ «Візуальний вигляд» — перемикач теми light/dark (`useColorMode` з `next-themes`,
   персист — стандартний для `next-themes`) і чекбокси видимості колонок таблиці. Видимість
-  колонок персистить `App.tsx` у localStorage `olx-ui-settings-v1`.
+  колонок персиститься за допомогою `saveColumnVisibility` у `localStorage`.
 - `components/ui/` — Chakra UI v3 snippets, додані через `npx @chakra-ui/cli snippet add`
   (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`, `switch`, `checkbox`, `close-button`).
 - Vite proxy `/api → http://localhost:3001` (див. `web/vite.config.ts`).

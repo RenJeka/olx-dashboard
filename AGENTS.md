@@ -56,7 +56,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 ## Конвенції
 
 - TypeScript strict. Без `any` у доменних типах (scraper/db/logic).
-- Доменні типи — `server/src/types.ts`, типи фронтенду — `web/src/types/index.ts`. Шарити між беком і фронтом через дублювання DTO (без складних build-зчеплень).
+- Доменні типи — `server/src/types.ts`, шарити з web через простий import чи дублювання DTO (без складних build-зчеплень).
 - Помилки скрейпінгу не валять процес: лог у `scan_runs.error`, скан позначається failed, попередні дані лишаються.
 - Секрети (`NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID`) — лише в `.env`, ніколи в код/git. `server/data/*.db` — gitignored.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.

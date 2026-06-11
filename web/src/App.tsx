@@ -7,19 +7,7 @@ import { SettingsDrawer } from './components/SettingsDrawer';
 import { Toaster } from './components/ui/toaster';
 import { Searches } from './pages/Searches';
 import { ListingsTable } from './pages/ListingsTable';
-
-const SETTINGS_STORAGE_KEY = 'olx-ui-settings-v1';
-
-function loadColumnVisibility(): VisibilityState {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as { columnVisibility?: VisibilityState };
-    return parsed.columnVisibility ?? {};
-  } catch {
-    return {};
-  }
-}
+import { loadColumnVisibility, saveColumnVisibility } from './utils/storage';
 
 export function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -30,7 +18,7 @@ export function App() {
   const selectedSearch = searches?.find((s) => s.id === selectedId);
 
   useEffect(() => {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ columnVisibility }));
+    saveColumnVisibility(columnVisibility);
   }, [columnVisibility]);
 
   return (
