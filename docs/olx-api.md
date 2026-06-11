@@ -5,7 +5,7 @@
 > сам фронтенд сайту (основний метод), і server-rendered HTML-сторінку пошуку (fallback).
 > Якщо OLX щось поміняє — цей файл є базовою лінією «що було і працювало».
 >
-> Верифіковано живими запитами: **2026-06-10**.
+> Верифіковано живими запитами: **2026-06-10**; dataflow фронтенду OLX — **2026-06-11** (§2.10).
 >
 > Повʼязане: [`architecture.md`](./architecture.md), [`olx-monitor-spec.md`](./olx-monitor-spec.md) §4,
 > план міграції: [`plans/graphql-migration.md`](./plans/graphql-migration.md),
@@ -256,6 +256,48 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 > 173 елементи, 82 КБ, в одній відповіді. Тобто кількість рядків у таблиці зростає з
 > кожним сканом (накопичення в БД), а не з пагінацією видачі OLX.
 
+### 2.10 Як сам фронтенд OLX використовує ці запити (dataflow, спостережено live 2026-06-11)
+
+Знято через Chrome DevTools на `https://www.olx.ua/uk/list/q-ipad-9/` (повний перегляд
+Network: ~220 запитів, з них до даних оголошень стосуються лічені одиниці — решта
+реклама/аналітика/A-B-тести).
+
+**Сценарій А — перше завантаження сторінки пошуку:**
+
+```
+Браузер ──GET──> /uk/list/q-ipad-9/
+                 └─> Next.js SSR: оголошення ВЖЕ в HTML (+ копія у <script id="__NEXT_DATA__">)
+GraphQL НЕ викликається взагалі.
+Далі — лише «шум»: prebid/doubleclick (реклама), GA/Hotjar/New Relic (аналітика),
+laquesis (A/B-тести olxcdn.com).
+```
+
+Саме тому HTML-fallback (§3) працює без браузера — дані вже в server-rendered HTML.
+
+**Сценарій Б — клієнтська дія (зміна фільтра/сортування/пагінація без перезавантаження):**
+
+```
+1. GET /api/v1/friendly-links/create-url/?query=...&limit=40[&фільтри]
+2. GET /api/v1/friendly-links/query-params/q-<slug>/?search[...]=...
+      └─> лише косметика: «гарний» URL для адресного рядка + <title> (SEO).
+          Даних оголошень НЕ несуть.
+3. POST /apigateway/graphql  ★ єдине джерело даних оголошень ★
+      └─> ListingSearchQuery, searchParameters: offset/limit/query/фільтри
+          + suggest_filters="true" + sl="<laquesis-токен>"
+4. GET /api/v1/offers/metadata/search/?...&facets=[{"field":"region",...}]
+5. GET /api/v1/offers/metadata/search-categories/?...
+      └─> лічильники для сайдбару фільтрів (скільки оголошень у регіонах/категоріях).
+```
+
+**Висновки для нашого фетчера (підтверджують §2.2):**
+
+- GraphQL **не потребує жодних «підготовчих» запитів** — `friendly-links` і
+  `offers/metadata` незалежні від нього й потрібні лише UI сайту.
+- Live-браузерний запит відрізняється від нашого тільки параметрами
+  `suggest_filters="true"` та `sl` — обидва опціональні (§2.5).
+- `filter_float_price:from` у живому запиті фронтенду — у тому самому форматі,
+  що ми шлемо (значення рядком). Повторно верифіковано.
+
 ---
 
 ## 3. HTML-сторінка пошуку (fallback №1)
@@ -344,3 +386,4 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | 2026-06-10 | Відкрито GraphQL `/apigateway/graphql` (дамп + live-тест без кукі/auth: OK; `filter_float_price` працює). Підтверджено існування REST `api/v1/offers` для olx.ua | міграція: GraphQL — основний метод, HTML — fallback №1 (див. `plans/graphql-migration.md`) |
 | 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |
 | 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
+| 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |

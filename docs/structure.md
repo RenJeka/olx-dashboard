@@ -23,7 +23,8 @@ olx-dashboard/
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
 │   └── plans/
 │       ├── initial-mvp.md            # план Етапу 1 із чекбоксами прогресу
-│       └── graphql-migration.md      # план міграції збору на GraphQL (інструкція виконавцю)
+│       ├── graphql-migration.md      # план міграції збору на GraphQL (інструкція виконавцю)
+│       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
 │   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio

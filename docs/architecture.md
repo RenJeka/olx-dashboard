@@ -11,8 +11,9 @@
 (fallback — HTML) → SQLite → React-таблиця. Локальний запуск, без зовнішніх сервісів
 (Notion/cron — пізніші етапи).
 
-Поточний стан: **реалізовано Етап 1 (MVP)**; триває міграція збору на GraphQL —
-див. [`plans/graphql-migration.md`](./plans/graphql-migration.md). Етапи 2–4 — у
+Поточний стан: **реалізовано Етап 1 (MVP)**, включно з міграцією збору на GraphQL
+(основний метод; HTML — fallback, [`plans/graphql-migration.md`](./plans/graphql-migration.md))
+і міграцією фронтенду на Chakra UI v3. Етапи 2–4 — у
 [`olx-monitor-spec.md` §12](./olx-monitor-spec.md).
 
 ## 2. Стек
@@ -120,10 +121,13 @@ flowchart LR
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки (`useSearches`, `useCreateSearch`,
   `useScan`, `useListings`). Форма пошуку маппить «ціна від/до» у `api_filters.ranges.price`.
 - `pages/Searches.tsx` — список пошуків, форма створення, кнопка Scan.
-- `pages/ListingsTable.tsx` — TanStack Table (фото, назва-лінк, ціна, місто, дата) із сортуванням,
+- `pages/ListingsTable.tsx` — TanStack Table (фото, назва-лінк, ціна, місто, дата, опис,
+  продавець (`contact_name` ?? `seller_name`), статус OLX) із сортуванням,
   `columnSizing` і `columnVisibility` (стан видимості піднятий у `App.tsx`); експортує
   `TOGGLEABLE_COLUMNS` для UI налаштувань. Persist `sorting`/`columnSizing` — localStorage
   `olx-listings-table-v1`.
+- `App.tsx` показує в шапці «Результатів: N» — `searches.visible_total_count` обраного пошуку
+  (реальна кількість результатів на OLX, оновлюється при кожному скані).
 - `components/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`):
   розділ «Візуальний вигляд» — перемикач теми light/dark (`useColorMode` з `next-themes`,
   персист — стандартний для `next-themes`) і чекбокси видимості колонок таблиці. Видимість

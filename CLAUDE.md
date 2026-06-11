@@ -22,6 +22,7 @@
 - Ввічливість (обидва методи): 1–2 с затримка між запитами/сторінками, **≤3 запити** на скан.
 - Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`); подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
+- Dataflow фронтенду OLX (знято live 2026-06-11, деталі — `docs/olx-api.md` §2.10): перше завантаження сторінки пошуку — SSR (оголошення вже в HTML/`__NEXT_DATA__`, GraphQL НЕ викликається); GraphQL спрацьовує лише при клієнтських діях (фільтр/сортування/пагінація). «Підготовчих» запитів GraphQL не потребує — супутні `friendly-links`/`offers/metadata` це косметика UI сайту.
 
 ## Схема БД
 
@@ -73,7 +74,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 
-1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + сира React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/graphql-migration.md`.
+1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/graphql-migration.md`; міграція UI на Chakra UI v3 + Drawer налаштувань (тема, видимість колонок) + колонки «Опис»/«Продавець»/«Статус OLX» і лічильник «Результатів: N».
 2. Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри.
 3. price_history + спарклайни + MD-експорт для аналізу в Claude.
 4. Notion-експорт + node-cron + журнал scan_runs.
