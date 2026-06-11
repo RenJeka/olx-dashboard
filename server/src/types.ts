@@ -45,6 +45,14 @@ export interface RawListing {
   sellerType?: 'private' | 'business';
   /** Плаский обʼєкт характеристик (без ціни): { key: label }. */
   params?: Record<string, string>;
+  /** Повний HTML-опис з <br /> тегами (GraphQL: data[].description). */
+  description?: string;
+  /** Імʼя/назва продавця (GraphQL: data[].user.name). */
+  sellerName?: string;
+  /** Імʼя контактної особи (GraphQL: data[].contact.name). */
+  contactName?: string;
+  /** Статус оголошення на OLX, напр. "active" (GraphQL: data[].status). НЕ плутати з listings.status. */
+  olxStatus?: string;
 }
 
 /** Нормалізована ціна. */
@@ -57,6 +65,20 @@ export interface NormalizedPrice {
 export interface ScanResult {
   found: number;
   new_count: number;
+  /** Скільки HTTP-запитів реально зроблено (звичайний скан: ≤3, глибокий: до DEEP_SAFETY_CAP). */
+  requestsUsed: number;
+}
+
+/** Останній запис scan_runs для пошуку — для ендпойнту прогресу глибокого скану. */
+export interface ScanStatus {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  found: number | null;
+  new_count: number | null;
+  error: string | null;
+  requests_done: number | null;
+  requests_total: number | null;
 }
 
 /** Рядок listings для віддачі у API/UI. */
@@ -71,10 +93,35 @@ export interface ListingRow {
   city: string | null;
   district: string | null;
   photo_url: string | null;
+  description: string | null;
+  seller_name: string | null;
+  contact_name: string | null;
+  olx_status: string | null;
   status: string;
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+}
+
+/** Результат fetchSearch: список оголошень + метадані видачі (якщо доступні). */
+export interface FetchSearchResult {
+  listings: RawListing[];
+  /** metadata.visible_total_count з GraphQL; null — якщо недоступне (HTML-фетчер або відсутнє у відповіді). */
+  visibleTotalCount: number | null;
+  /** Скільки запитів/сторінок реально оброблено. */
+  requestsUsed: number;
+}
+
+/** Опції одного скану. */
+export interface FetchOptions {
+  /**
+   * Глибокий скан: батчі по BATCH_SIZE запитів з паузою BATCH_PAUSE_MIN_MS..BATCH_PAUSE_MAX_MS
+   * між батчами, ціль — min(DEEP_SAFETY_CAP, ceil(visible_total_count / PAGE_LIMIT)) запитів.
+   * За замовчуванням (false/відсутнє) — звичайний скан, ≤BATCH_SIZE запитів.
+   */
+  deep?: boolean;
+  /** Викликається після кожного запиту/сторінки: (done, total). */
+  onProgress?: (done: number, total: number) => void;
 }
 
 /**
@@ -82,5 +129,5 @@ export interface ListingRow {
  * від решти системи.
  */
 export interface OlxFetcher {
-  fetchSearch(search: SearchConfig): Promise<RawListing[]>;
+  fetchSearch(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult>;
 }

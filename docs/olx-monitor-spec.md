@@ -115,7 +115,13 @@ X-Client: DESKTOP
 | Тип продавця | `[data-testid="trader-title"]` (бізнес) |
 | Фото CDN | `ireland.apollo.olxcdn.com/v1/files/{id}/image;s=WxH` |
 
-**Правила ввічливості:** затримка 1–2 с між сторінками, ≤3 сторінки на пошук.
+**Правила ввічливості:**
+- Звичайний скан: затримка 1–2 с між сторінками, ≤3 сторінки на пошук.
+- Глибокий скан (ручна кнопка/CLI `--deep`, `?deep=true`): батчі по 3 запити
+  (`BATCH_SIZE`) з паузою 3–6 с між батчами, ціль `min(50, ceil(visible_total_count/40))`
+  запитів, рання зупинка при сторінці `<40` елементів. Прогрес пишеться у
+  `scan_runs.requests_done`/`requests_total` і віддається через
+  `GET /api/searches/:id/scan-status` (деталі — `olx-api.md` §2.9).
 
 Scraper — окремий модуль за інтерфейсом, щоб міняти стратегію без зачіпання решти:
 
@@ -190,7 +196,9 @@ CREATE TABLE scan_runs (
   search_id INTEGER REFERENCES searches(id),
   started_at TEXT, finished_at TEXT,
   found INTEGER, new_count INTEGER, disabled_count INTEGER,
-  error TEXT
+  error TEXT,
+  requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
+  requests_total INTEGER             -- прогрес глибокого скану: ціль (NULL поки невідома)
 );
 ```
 
@@ -300,6 +308,6 @@ olx-monitor/
 | Ризик | Мітигація |
 | --- | --- |
 | OLX змінить GraphQL-схему / HTML-розмітку | Інтерфейс `OlxFetcher` ізолює стратегію; автоматичний fallback GraphQL→HTML у scanner; селектори в одному місці; далі `__NEXT_DATA__`, Playwright headed; діагностика — чекліст `olx-api.md` §5 |
-| Rate-limit / бан IP | Затримки 1–2 с, ≤3 стор./пошук, реалістичний UA; сканування рідке |
+| Rate-limit / бан IP | Звичайний скан: затримки 1–2 с, ≤3 стор./пошук, реалістичний UA, сканування рідке. Глибокий скан (ручний): батчі по 3 з паузою 3–6 с, абсолютний ліміт 50 запитів |
 | Зміна структури `params` між категоріями | `params` зберігається сирим JSON; колонки таблиці — динамічні |
 | Хибний auto-disable (збій одного скану) | Буфер 2 послідовні скани + auto-reactivate |

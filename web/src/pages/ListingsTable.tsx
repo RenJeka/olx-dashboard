@@ -1,80 +1,56 @@
 import { useMemo, useState } from 'react';
 import {
-  createColumnHelper,
-  flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type SortingState,
+  type OnChangeFn,
+  type VisibilityState,
 } from '@tanstack/react-table';
-import { Box, Image, Link, Spinner, Table, Text } from '@chakra-ui/react';
-import { useListings, type Listing } from '../api/client';
+import { Box, Flex, Spinner, Table, Text } from '@chakra-ui/react';
+import { useListings } from '../api/client';
+import { useListingsTableState } from '../hooks/useListingsTableState';
+import { columns } from '../components/table/columns';
+import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
+import { ListingsTableBody } from '../components/table/ListingsTableBody';
+import { TablePagination } from '../components/table/TablePagination';
+import { DescriptionDialog } from '../components/DescriptionDialog';
+import type { Listing } from '../types';
 
-const columnHelper = createColumnHelper<Listing>();
-
-function formatPrice(l: Listing): string {
-  if (l.price == null) return '—';
-  return `${l.price.toLocaleString('uk-UA')} ${l.currency}`;
-}
-
-const columns = [
-  columnHelper.accessor('photo_url', {
-    header: 'Фото',
-    enableSorting: false,
-    cell: (info) => {
-      const src = info.getValue();
-      return src ? (
-        <Image src={src} alt="" boxSize={12} rounded="md" objectFit="cover" loading="lazy" />
-      ) : (
-        <Box boxSize={12} rounded="md" bg="bg.muted" />
-      );
-    },
-  }),
-  columnHelper.accessor('title', {
-    header: 'Назва',
-    cell: (info) => {
-      const url = info.row.original.url;
-      const title = info.getValue() ?? '—';
-      return url ? (
-        <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
-          {title}
-        </Link>
-      ) : (
-        title
-      );
-    },
-  }),
-  columnHelper.accessor('price', {
-    header: 'Ціна',
-    cell: (info) => formatPrice(info.row.original),
-  }),
-  columnHelper.accessor('city', {
-    header: 'Місто',
-    cell: (info) => info.getValue() ?? '—',
-  }),
-  columnHelper.accessor('posted_at', {
-    header: 'Дата',
-    cell: (info) => info.getValue() ?? '—',
-  }),
-];
+export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
 
 interface Props {
   searchId: number | null;
+  columnVisibility: VisibilityState;
+  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  descriptionExpandEnabled: boolean;
 }
 
-export function ListingsTable({ searchId }: Props) {
+export function ListingsTable({
+  searchId,
+  columnVisibility,
+  onColumnVisibilityChange,
+  descriptionExpandEnabled,
+}: Props) {
   const { data, isLoading } = useListings(searchId);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
+    useListingsTableState();
+  const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
 
   const rows = useMemo(() => data ?? [], [data]);
 
   const table = useReactTable({
     data: rows,
     columns,
-    state: { sorting },
+    state: { sorting, columnSizing, columnVisibility, pagination },
     onSortingChange: setSorting,
+    onColumnSizingChange: setColumnSizing,
+    onColumnVisibilityChange: onColumnVisibilityChange,
+    onPaginationChange: setPagination,
+    columnResizeMode: 'onEnd',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   if (searchId == null) {
@@ -102,37 +78,19 @@ export function ListingsTable({ searchId }: Props) {
   }
 
   return (
-    <Box flex="1" overflow="auto" p={4}>
-      <Table.Root size="sm" interactive>
-        <Table.Header>
-          {table.getHeaderGroups().map((hg) => (
-            <Table.Row key={hg.id}>
-              {hg.headers.map((header) => (
-                <Table.ColumnHeader
-                  key={header.id}
-                  onClick={header.column.getToggleSortingHandler()}
-                  cursor={header.column.getCanSort() ? 'pointer' : undefined}
-                  userSelect="none"
-                >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
-                </Table.ColumnHeader>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Header>
-        <Table.Body>
-          {table.getRowModel().rows.map((row) => (
-            <Table.Row key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <Table.Cell key={cell.id} verticalAlign="middle">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </Table.Cell>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Box>
+    <Flex direction="column" flex="1" overflow="hidden">
+      <Box flex="1" overflow="auto" px={4} pb={4}>
+        <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
+          <ListingsTableHeader table={table} />
+          <ListingsTableBody
+            table={table}
+            descriptionExpandEnabled={descriptionExpandEnabled}
+            onOpenDescription={setDescriptionListing}
+          />
+        </Table.Root>
+      </Box>
+      <TablePagination table={table} />
+      <DescriptionDialog listing={descriptionListing} onClose={() => setDescriptionListing(null)} />
+    </Flex>
   );
 }

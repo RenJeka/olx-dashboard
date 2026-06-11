@@ -1,10 +1,22 @@
 import * as cheerio from 'cheerio';
-import type { OlxFetcher, SearchConfig, RawListing } from '../types.js';
+import type {
+  OlxFetcher,
+  SearchConfig,
+  RawListing,
+  FetchSearchResult,
+  FetchOptions,
+} from '../types.js';
 import { SELECTORS, OLX_BASE_URL, REQUEST_HEADERS } from './selectors.js';
 
-const MAX_PAGES = 3;
+/** Розмір батчу сторінок — ліміт звичайного скану і крок паузи у глибокому. */
+const BATCH_SIZE = 3;
+/** Абсолютний запобіжник для глибокого скану (HTML не дає visible_total_count). */
+const DEEP_SAFETY_CAP = 50;
 const MIN_DELAY_MS = 1000;
 const MAX_DELAY_MS = 2000;
+/** Пауза між батчами у глибокому скані — щоб не «DDoS»-ити OLX. */
+const BATCH_PAUSE_MIN_MS = 3000;
+const BATCH_PAUSE_MAX_MS = 6000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,6 +24,10 @@ function sleep(ms: number): Promise<void> {
 
 function randomDelay(): number {
   return MIN_DELAY_MS + Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS));
+}
+
+function batchPauseDelay(): number {
+  return BATCH_PAUSE_MIN_MS + Math.floor(Math.random() * (BATCH_PAUSE_MAX_MS - BATCH_PAUSE_MIN_MS));
 }
 
 /** Слаг для сегмента q-<...> у шляху пошуку. */
@@ -70,11 +86,15 @@ export class HtmlOlxFetcher implements OlxFetcher {
     return `${base}?${parts.join('&')}`;
   }
 
-  async fetchSearch(search: SearchConfig): Promise<RawListing[]> {
+  async fetchSearch(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult> {
     const all: RawListing[] = [];
     const seen = new Set<number>();
+    const deep = options?.deep ?? false;
+    // HTML не дає visible_total_count — для глибокого ціль одразу DEEP_SAFETY_CAP.
+    const target = deep ? DEEP_SAFETY_CAP : BATCH_SIZE;
+    let requestsUsed = 0;
 
-    for (let page = 1; page <= MAX_PAGES; page++) {
+    for (let page = 1; page <= target; page++) {
       const url = this.buildUrl(search, page);
 
       const res = await fetch(url, {
@@ -86,6 +106,9 @@ export class HtmlOlxFetcher implements OlxFetcher {
       }
 
       const html = await res.text();
+      requestsUsed = page;
+      options?.onProgress?.(requestsUsed, target);
+
       const listings = this.parseList(html);
 
       // Порожня видача — далі сторінок немає.
@@ -110,12 +133,17 @@ export class HtmlOlxFetcher implements OlxFetcher {
         break;
       }
 
-      if (page < MAX_PAGES) {
-        await sleep(randomDelay());
+      if (page < target) {
+        if (deep && page % BATCH_SIZE === 0) {
+          await sleep(batchPauseDelay());
+        } else {
+          await sleep(randomDelay());
+        }
       }
     }
 
-    return all;
+    // HTML-сторінка пошуку не дає metadata.visible_total_count — лише GraphQL.
+    return { listings: all, visibleTotalCount: null, requestsUsed };
   }
 
   /**

@@ -26,7 +26,8 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
     return db
       .prepare(
         `SELECT id, olx_id, search_id, title, url, price, currency, city, district,
-                photo_url, status, posted_at, first_seen_at, last_seen_at
+                photo_url, description, seller_name, contact_name, olx_status,
+                status, posted_at, first_seen_at, last_seen_at
          FROM listings
          WHERE search_id = ?
          ORDER BY ${sort} ${order}`,

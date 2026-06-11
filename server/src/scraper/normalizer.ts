@@ -43,23 +43,35 @@ function parseLocationDate(raw?: string): {
 
 const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
 
-// district/seller_type/params: COALESCE на оновленні — якщо новий скан (HTML-fallback)
-// не приносить ці поля (null), не затираємо вже зібрані GraphQL-дані.
+// district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
+// на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
+// вже зібрані GraphQL-дані.
 const upsertStmt = db.prepare(`
-  INSERT INTO listings (olx_id, search_id, title, url, price, currency, city, district, seller_type, params, photo_url, posted_at, last_seen_at)
-  VALUES (@olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type, COALESCE(@params, '{}'), @photo_url, @posted_at, datetime('now'))
+  INSERT INTO listings (
+    olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
+    photo_url, description, seller_name, contact_name, olx_status, posted_at, last_seen_at
+  )
+  VALUES (
+    @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
+    COALESCE(@params, '{}'), @photo_url, @description, @seller_name, @contact_name, @olx_status,
+    @posted_at, datetime('now')
+  )
   ON CONFLICT(olx_id) DO UPDATE SET
-    title       = excluded.title,
-    url         = excluded.url,
-    price       = excluded.price,
-    currency    = excluded.currency,
-    city        = excluded.city,
-    district    = COALESCE(excluded.district, district),
-    seller_type = COALESCE(excluded.seller_type, seller_type),
-    params      = COALESCE(@params, params, '{}'),
-    photo_url   = excluded.photo_url,
-    posted_at   = excluded.posted_at,
-    last_seen_at = datetime('now')
+    title         = excluded.title,
+    url           = excluded.url,
+    price         = excluded.price,
+    currency      = excluded.currency,
+    city          = excluded.city,
+    district      = COALESCE(excluded.district, district),
+    seller_type   = COALESCE(excluded.seller_type, seller_type),
+    params        = COALESCE(@params, params, '{}'),
+    photo_url     = excluded.photo_url,
+    description   = COALESCE(excluded.description, description),
+    seller_name   = COALESCE(excluded.seller_name, seller_name),
+    contact_name  = COALESCE(excluded.contact_name, contact_name),
+    olx_status    = COALESCE(excluded.olx_status, olx_status),
+    posted_at     = excluded.posted_at,
+    last_seen_at  = datetime('now')
 `);
 
 /**
@@ -70,7 +82,7 @@ const upsertStmt = db.prepare(`
 export function upsertListings(
   searchId: number,
   raw: RawListing[],
-): ScanResult {
+): Omit<ScanResult, 'requestsUsed'> {
   let newCount = 0;
 
   const run = db.transaction((items: RawListing[]) => {
@@ -89,6 +101,10 @@ export function upsertListings(
       let district: string | null = null;
       let sellerType: string | null = null;
       let params: string | null = null;
+      let description: string | null = null;
+      let sellerName: string | null = null;
+      let contactName: string | null = null;
+      let olxStatus: string | null = null;
 
       if (hasStructuredData) {
         price = item.price ?? null;
@@ -98,6 +114,10 @@ export function upsertListings(
         postedAt = item.createdAt ?? null;
         sellerType = item.sellerType ?? null;
         params = item.params ? JSON.stringify(item.params) : null;
+        description = item.description ?? null;
+        sellerName = item.sellerName ?? null;
+        contactName = item.contactName ?? null;
+        olxStatus = item.olxStatus ?? null;
       } else {
         const parsedPrice = parsePrice(item.rawPrice);
         price = parsedPrice.price;
@@ -120,6 +140,10 @@ export function upsertListings(
         seller_type: sellerType,
         params,
         photo_url: item.photoUrl ?? null,
+        description,
+        seller_name: sellerName,
+        contact_name: contactName,
+        olx_status: olxStatus,
         posted_at: postedAt,
       });
     }

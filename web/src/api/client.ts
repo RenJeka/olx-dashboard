@@ -3,43 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-
-// Типи DTO (дублюємо мінімально, без build-зчеплень із server).
-export interface Search {
-  id: number;
-  name: string;
-  query: string;
-  api_filters: string;
-  created_at: string;
-}
-
-export interface Listing {
-  id: number;
-  olx_id: number;
-  search_id: number;
-  title: string | null;
-  url: string | null;
-  price: number | null;
-  currency: string;
-  city: string | null;
-  photo_url: string | null;
-  status: string;
-  posted_at: string | null;
-  first_seen_at: string;
-  last_seen_at: string | null;
-}
-
-export interface ScanResult {
-  found: number;
-  new_count: number;
-}
-
-export interface NewSearchInput {
-  name: string;
-  query: string;
-  priceFrom?: number;
-  priceTo?: number;
-}
+import type { Search, Listing, ScanResult, ScanStatus, NewSearchInput } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.
@@ -80,13 +44,49 @@ export function useCreateSearch() {
   });
 }
 
-export function useScan() {
+export function useDeleteSearch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (searchId: number) =>
-      api<ScanResult>(`/api/searches/${searchId}/scan`, { method: 'POST' }),
-    onSuccess: (_data, searchId) =>
+      api<{ deleted: boolean }>(`/api/searches/${searchId}`, { method: 'DELETE' }),
+    onSuccess: (_data, searchId) => {
+      qc.invalidateQueries({ queryKey: ['searches'] });
+      qc.removeQueries({ queryKey: ['listings', searchId] });
+    },
+  });
+}
+
+export function useReorderSearches() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, direction }: { searchId: number; direction: 'up' | 'down' }) =>
+      api<Search>(`/api/searches/${searchId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ direction }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
+  });
+}
+
+export function useScan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, deep }: { searchId: number; deep?: boolean }) =>
+      api<ScanResult>(`/api/searches/${searchId}/scan${deep ? '?deep=true' : ''}`, {
+        method: 'POST',
+      }),
+    onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+  });
+}
+
+/** Поллінг прогресу глибокого скану (раз на ~1.5с, поки enabled). */
+export function useScanStatus(searchId: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['scan-status', searchId],
+    queryFn: () => api<ScanStatus>(`/api/searches/${searchId}/scan-status`),
+    enabled: enabled && searchId != null,
+    refetchInterval: 1500,
   });
 }
 

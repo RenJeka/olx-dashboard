@@ -8,7 +8,7 @@
 
 - **Monorepo:** npm workspaces — `server/` + `web/`
 - **Backend:** Node.js 20+, TypeScript, Fastify 5, better-sqlite3, cheerio
-- **Frontend:** React 18, Vite 6, TanStack Query/Table, Tailwind v4
+- **Frontend:** React 18, Vite 6, TanStack Query/Table, Chakra UI v3 (+ next-themes, react-icons/lu)
 - **Збір даних:** GraphQL `POST /apigateway/graphql` (основний) + `fetch`/cheerio HTML-fallback (без браузера/Playwright)
 
 ## Швидкий старт
@@ -32,14 +32,17 @@ npm run scan -- --search <id>
 
 ## Стан
 
-Реалізовано **Етап 1 (MVP)**: scraper + SQLite + REST (CRUD пошуків, scan, listings) + сира
-React-таблиця. Наступні етапи (статуси, нотатки, історія цін, Notion, cron) — у документації нижче.
+Реалізовано **Етап 1 (MVP)**: scraper (GraphQL — основний, HTML — fallback) + SQLite + REST
+(CRUD пошуків, scan, listings) + React-таблиця на Chakra UI v3 (сортування, видимість колонок,
+темна/світла тема через Drawer налаштувань; колонки «Опис»/«Продавець»/«Статус OLX», лічильник
+«Результатів: N»). Наступні етапи (статуси, нотатки, історія цін, Notion, cron) — у документації нижче.
 
 ## Документація
 
 - [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) — канонічна специфікація (вимоги, схема БД, етапи, ризики)
 - [`docs/architecture.md`](docs/architecture.md) — технічна архітектура та потік даних
-- [`docs/olx-api.md`](docs/olx-api.md) — API OLX: GraphQL (основний метод) + HTML fallback (параметри, заголовки, приклади)
+- [`docs/olx-api.md`](docs/olx-api.md) — API OLX: GraphQL (основний метод) + HTML fallback (параметри, заголовки, приклади, dataflow фронтенду OLX)
+- [`docs/olx-graphql-fields-reference.md`](docs/olx-graphql-fields-reference.md) — довідник усіх полів GraphQL-відповіді OLX
 - [`docs/structure.md`](docs/structure.md) — структура файлів і папок
 - [`docs/plans/initial-mvp.md`](docs/plans/initial-mvp.md) — план Етапу 1 із прогресом
 - [`docs/plans/graphql-migration.md`](docs/plans/graphql-migration.md) — план міграції збору на GraphQL

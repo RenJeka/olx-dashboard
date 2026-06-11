@@ -1,4 +1,4 @@
-// CLI-скан без UI: npm run scan -- --search <id>
+// CLI-скан без UI: npm run scan -- --search <id> [--deep]
 import { runScan } from './scanner.js';
 
 function parseSearchId(argv: string[]): number | null {
@@ -8,17 +8,19 @@ function parseSearchId(argv: string[]): number | null {
   return Number.isFinite(id) ? id : null;
 }
 
-const searchId = parseSearchId(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const searchId = parseSearchId(argv);
+const deep = argv.includes('--deep');
 
 if (searchId === null) {
-  console.error('Вкажи пошук: npm run scan -- --search <id>');
+  console.error('Вкажи пошук: npm run scan -- --search <id> [--deep]');
   process.exit(1);
 }
 
 try {
-  const result = await runScan(searchId);
+  const result = await runScan(searchId, { deep });
   console.log(
-    `Скан #${searchId} завершено: знайдено ${result.found}, нових ${result.new_count}`,
+    `Скан #${searchId} завершено: знайдено ${result.found}, нових ${result.new_count}, запитів ${result.requestsUsed}`,
   );
   process.exit(0);
 } catch (err) {

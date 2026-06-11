@@ -5,10 +5,11 @@
 > сам фронтенд сайту (основний метод), і server-rendered HTML-сторінку пошуку (fallback).
 > Якщо OLX щось поміняє — цей файл є базовою лінією «що було і працювало».
 >
-> Верифіковано живими запитами: **2026-06-10**.
+> Верифіковано живими запитами: **2026-06-10**; dataflow фронтенду OLX — **2026-06-11** (§2.10).
 >
 > Повʼязане: [`architecture.md`](./architecture.md), [`olx-monitor-spec.md`](./olx-monitor-spec.md) §4,
-> план міграції: [`plans/graphql-migration.md`](./plans/graphql-migration.md).
+> план міграції: [`plans/graphql-migration.md`](./plans/graphql-migration.md),
+> повний довідник полів відповіді: [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
 
 ---
 
@@ -39,6 +40,12 @@ Content-Type: application/json
 ```
 
 Інфраструктура: CloudFront. Відповідь: `application/json`.
+
+> ⚠️ **Introspection вимкнено** (перевірено живим запитом 2026-06-10): `__schema { ... }`
+> повертає `200 OK`, але кожне introspection-поле дає помилку `GRAPHQL_VALIDATION_FAILED`
+> ("GraphQL introspection has been disabled..."). Офіційну схему через `__schema`/`__type`
+> отримати не можна — не витрачати на це час повторно. Каталог реально доступних полів
+> (зібраний з live-дампів) — [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
 
 ### 2.2 Що НЕ потрібно (підтверджено живим тестом 2026-06-10)
 
@@ -101,6 +108,9 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
             ... on GenericParam { key label }
           }
         }
+        description
+        user { name }
+        contact { name }
       }
       metadata { total_elements visible_total_count }
     }
@@ -192,7 +202,9 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 }
 ```
 
-Інші корисні поля повної схеми (бачили в дампі, можна дотягнути за потреби):
+Повний каталог усіх полів, які OLX фактично повертає (включно з тими, що наш query
+не запитує) — категоризовано в [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
+Коротко, найкорисніші додаткові поля (можна дотягнути за потреби):
 `description` (повний опис у списковій видачі!), `user{name created is_online}`,
 `promotion{top_ad highlighted}`, `delivery`, `map{lat lon}`, `metadata.promoted`
 (індекси промо-оголошень у видачі), `links{next{href}}` (REST-дзеркало `api/v1/offers`),
@@ -211,6 +223,11 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `photos[0].link` | `photo_url` | замінити `{width}x{height}` → конкретний розмір, напр. `400x300` |
 | `business` | `seller_type` | `true`→`business`, `false`→`private` |
 | `params[]` (без price) | `params` | плаский JSON `{key: label}` |
+| `description` | `description` | HTML з `<br />`; на фронті рендериться як plain text |
+| `user.name` | `seller_name` | |
+| `contact.name` | `contact_name` | пріоритет над `seller_name` на фронті (колонка «Продавець») |
+| `status` | `olx_status` | статус оголошення на OLX (напр. `"active"`); НЕ плутати з внутрішнім `listings.status` |
+| `metadata.visible_total_count` | `searches.visible_total_count` | реальна кількість результатів пошуку, оновлюється при кожному скані |
 
 ### 2.8 Помилки
 
@@ -224,10 +241,34 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 
 ### 2.9 Пагінація і ввічливість
 
-- `offset`/`limit`: сторінки 0/40/80. Ліміт у нас — **≤3 запити** на скан.
+- `offset`/`limit`: сторінки 0/40/80. Ліміт у **звичайному скані** — **≤3 запити**.
 - Затримка **1–2 с** (рандомізована) між запитами.
 - Стоп: повернулось менше `limit` елементів або 0.
 - `metadata.total_elements` обрізається до 1000 — реальна кількість у `visible_total_count`.
+
+#### Глибокий скан (вручну)
+
+Окремий, ручний режим (кнопка «Глибокий скан» в UI або `?deep=true` на роуті
+`POST /api/searches/:id/scan`, CLI `--deep`) — для одноразового нарощування покриття
+вже існуючого пошуку. Не змінює поведінку звичайного скану.
+
+- **Батчі по 3 запити** (`BATCH_SIZE`, той самий розмір, що й ліміт звичайного скану),
+  з паузою **3–6 с** (`BATCH_PAUSE_MIN_MS`/`BATCH_PAUSE_MAX_MS`) між батчами; усередині
+  батчу — звичайна затримка 1–2 с.
+- **Ціль**: спочатку `DEEP_SAFETY_CAP = 50` запитів (абсолютний запобіжник). Після
+  **першого** запиту, якщо `metadata.visible_total_count` присутній — ціль уточнюється
+  до `min(50, ceil(visible_total_count / 40))`. Для «ipad 9» (`visible_total_count = 1258`):
+  `ceil(1258/40) = 32` запити ≈ 11 батчів ≈ 1.5–2 хв.
+- **Рання зупинка**: сторінка повернула `< 40` елементів (offset 0/40/80/...) — видача
+  вичерпана раніше цілі, як і в звичайному скані.
+- **HTML-fallback** (`HtmlOlxFetcher`) не має `visible_total_count` — для глибокого
+  одразу `target = DEEP_SAFETY_CAP = 50`, без уточнення; той самий батч-патерн пауз.
+- **Прогрес**: після кожного запиту/сторінки `FetchOptions.onProgress(done, total)` пише
+  `scan_runs.requests_done`/`requests_total`; `GET /api/searches/:id/scan-status`
+  (повертає останній рядок `scan_runs` для пошуку) — фронтенд поллить його раз на ~1.5 с,
+  поки триває глибокий скан.
+- Результат скану (`ScanResult`/CLI-вивід) додатково містить `requestsUsed` —
+  фактичну кількість виконаних запитів/сторінок.
 
 > ⚠️ **Не плутати з `/api/searches/:id/listings`.** Ліміт «≤3 запити» вище — це
 > ввічливість стосовно **OLX.ua** під час *збору* (`GraphqlOlxFetcher`/`HtmlOlxFetcher`,
@@ -238,6 +279,48 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 > лише `sort`/`order`). Перевірено живим запитом 2026-06-10: search із 173 рядками →
 > 173 елементи, 82 КБ, в одній відповіді. Тобто кількість рядків у таблиці зростає з
 > кожним сканом (накопичення в БД), а не з пагінацією видачі OLX.
+
+### 2.10 Як сам фронтенд OLX використовує ці запити (dataflow, спостережено live 2026-06-11)
+
+Знято через Chrome DevTools на `https://www.olx.ua/uk/list/q-ipad-9/` (повний перегляд
+Network: ~220 запитів, з них до даних оголошень стосуються лічені одиниці — решта
+реклама/аналітика/A-B-тести).
+
+**Сценарій А — перше завантаження сторінки пошуку:**
+
+```
+Браузер ──GET──> /uk/list/q-ipad-9/
+                 └─> Next.js SSR: оголошення ВЖЕ в HTML (+ копія у <script id="__NEXT_DATA__">)
+GraphQL НЕ викликається взагалі.
+Далі — лише «шум»: prebid/doubleclick (реклама), GA/Hotjar/New Relic (аналітика),
+laquesis (A/B-тести olxcdn.com).
+```
+
+Саме тому HTML-fallback (§3) працює без браузера — дані вже в server-rendered HTML.
+
+**Сценарій Б — клієнтська дія (зміна фільтра/сортування/пагінація без перезавантаження):**
+
+```
+1. GET /api/v1/friendly-links/create-url/?query=...&limit=40[&фільтри]
+2. GET /api/v1/friendly-links/query-params/q-<slug>/?search[...]=...
+      └─> лише косметика: «гарний» URL для адресного рядка + <title> (SEO).
+          Даних оголошень НЕ несуть.
+3. POST /apigateway/graphql  ★ єдине джерело даних оголошень ★
+      └─> ListingSearchQuery, searchParameters: offset/limit/query/фільтри
+          + suggest_filters="true" + sl="<laquesis-токен>"
+4. GET /api/v1/offers/metadata/search/?...&facets=[{"field":"region",...}]
+5. GET /api/v1/offers/metadata/search-categories/?...
+      └─> лічильники для сайдбару фільтрів (скільки оголошень у регіонах/категоріях).
+```
+
+**Висновки для нашого фетчера (підтверджують §2.2):**
+
+- GraphQL **не потребує жодних «підготовчих» запитів** — `friendly-links` і
+  `offers/metadata` незалежні від нього й потрібні лише UI сайту.
+- Live-браузерний запит відрізняється від нашого тільки параметрами
+  `suggest_filters="true"` та `sl` — обидва опціональні (§2.5).
+- `filter_float_price:from` у живому запиті фронтенду — у тому самому форматі,
+  що ми шлемо (значення рядком). Повторно верифіковано.
 
 ---
 
@@ -325,3 +408,6 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | --- | --- | --- |
 | 2026-06-10 | Заголовок HTML-картки `h6` → `h4` | селектор `h6, h4` у `selectors.ts` |
 | 2026-06-10 | Відкрито GraphQL `/apigateway/graphql` (дамп + live-тест без кукі/auth: OK; `filter_float_price` працює). Підтверджено існування REST `api/v1/offers` для olx.ua | міграція: GraphQL — основний метод, HTML — fallback №1 (див. `plans/graphql-migration.md`) |
+| 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |
+| 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
+| 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |

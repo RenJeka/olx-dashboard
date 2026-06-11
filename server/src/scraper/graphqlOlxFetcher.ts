@@ -1,10 +1,22 @@
-import type { OlxFetcher, SearchConfig, RawListing } from '../types.js';
+import type {
+  OlxFetcher,
+  SearchConfig,
+  RawListing,
+  FetchSearchResult,
+  FetchOptions,
+} from '../types.js';
 
 const GRAPHQL_URL = 'https://www.olx.ua/apigateway/graphql';
 const PAGE_LIMIT = 40;
-const MAX_REQUESTS = 3;
+/** Розмір батчу запитів — ліміт звичайного скану і крок паузи у глибокому. */
+const BATCH_SIZE = 3;
+/** Абсолютний запобіжник для глибокого скану (на випадок аномального visible_total_count). */
+const DEEP_SAFETY_CAP = 50;
 const MIN_DELAY_MS = 1000;
 const MAX_DELAY_MS = 2000;
+/** Пауза між батчами у глибокому скані — щоб не «DDoS»-ити OLX. */
+const BATCH_PAUSE_MIN_MS = 3000;
+const BATCH_PAUSE_MAX_MS = 6000;
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36';
@@ -37,6 +49,9 @@ const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters: [Searc
             ... on GenericParam { key label }
           }
         }
+        description
+        user { name }
+        contact { name }
       }
       metadata { total_elements visible_total_count }
     }
@@ -52,6 +67,10 @@ function sleep(ms: number): Promise<void> {
 
 function randomDelay(): number {
   return MIN_DELAY_MS + Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS));
+}
+
+function batchPauseDelay(): number {
+  return BATCH_PAUSE_MIN_MS + Math.floor(Math.random() * (BATCH_PAUSE_MAX_MS - BATCH_PAUSE_MIN_MS));
 }
 
 /** Слаг для Referer (формат `q-<...>`, як у HtmlOlxFetcher). */
@@ -96,6 +115,9 @@ interface GraphqlListing {
   } | null;
   photos?: Array<{ link: string }>;
   params?: GraphqlParam[];
+  description?: string | null;
+  user?: { name?: string | null } | null;
+  contact?: { name?: string | null } | null;
 }
 
 interface ListingSuccess {
@@ -157,12 +179,17 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     return params;
   }
 
-  async fetchSearch(search: SearchConfig): Promise<RawListing[]> {
+  async fetchSearch(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult> {
     const all: RawListing[] = [];
     const seen = new Set<number>();
     const referer = `https://www.olx.ua/uk/list/q-${slugify(search.query)}/`;
+    let visibleTotalCount: number | null = null;
+    const deep = options?.deep ?? false;
+    // Глибокий: ціль уточнюється після 1-го запиту за visible_total_count (або лишається DEEP_SAFETY_CAP).
+    let target = deep ? DEEP_SAFETY_CAP : BATCH_SIZE;
+    let requestsUsed = 0;
 
-    for (let i = 0; i < MAX_REQUESTS; i++) {
+    for (let i = 0; i < target; i++) {
       const offset = i * PAGE_LIMIT;
       const searchParameters = this.buildSearchParameters(search, offset);
 
@@ -209,6 +236,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         );
       }
 
+      if (i === 0) {
+        visibleTotalCount = result.metadata?.visible_total_count ?? null;
+        if (deep && visibleTotalCount != null) {
+          target = Math.min(DEEP_SAFETY_CAP, Math.ceil(visibleTotalCount / PAGE_LIMIT));
+        }
+      }
+
       const items = result.data;
 
       for (const item of items) {
@@ -217,16 +251,23 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         all.push(this.mapListing(item));
       }
 
+      requestsUsed = i + 1;
+      options?.onProgress?.(requestsUsed, target);
+
       if (items.length < PAGE_LIMIT) {
         break;
       }
 
-      if (i < MAX_REQUESTS - 1) {
-        await sleep(randomDelay());
+      if (i < target - 1) {
+        if (deep && requestsUsed % BATCH_SIZE === 0) {
+          await sleep(batchPauseDelay());
+        } else {
+          await sleep(randomDelay());
+        }
       }
     }
 
-    return all;
+    return { listings: all, visibleTotalCount, requestsUsed };
   }
 
   /** Мапить GraphQL-оголошення у RawListing (мапінг полів — docs/olx-api.md §2.7). */
@@ -265,6 +306,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       district: item.location?.district?.name,
       sellerType: item.business ? 'business' : 'private',
       params,
+      description: item.description ?? undefined,
+      sellerName: item.user?.name ?? undefined,
+      contactName: item.contact?.name ?? undefined,
+      olxStatus: item.status,
     };
   }
 }
