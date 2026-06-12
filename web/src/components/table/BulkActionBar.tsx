@@ -33,13 +33,8 @@ export function BulkActionBar({ searchId, selectedIds, onClear }: Props) {
 
   return (
     <HStack
-      gap={3}
-      px={4}
-      py={2}
-      bg="colorPalette.subtle"
+      gap={5}
       colorPalette="blue"
-      borderBottomWidth="1px"
-      borderColor="border.subtle"
     >
       <Text textStyle="sm" fontWeight="medium">
         Вибрано: {selectedIds.length}

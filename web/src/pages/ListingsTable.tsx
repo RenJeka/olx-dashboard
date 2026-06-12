@@ -16,7 +16,7 @@ import { columns } from '../components/table/columns';
 import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
 import { ListingsTableBody } from '../components/table/ListingsTableBody';
 import { ListingsFilterBar } from '../components/table/ListingsFilterBar';
-import { BulkActionBar } from '../components/table/BulkActionBar';
+
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
@@ -136,14 +136,10 @@ export function ListingsTable({
         onShowFilteredOutChange={setShowFilteredOut}
         searchText={globalFilter}
         onSearchTextChange={setGlobalFilter}
+        searchId={searchId ?? undefined}
+        selectedIds={selectedIds}
+        onClearSelection={() => setRowSelection({})}
       />
-      {selectedIds.length > 0 && (
-        <BulkActionBar
-          searchId={searchId}
-          selectedIds={selectedIds}
-          onClear={() => setRowSelection({})}
-        />
-      )}
       <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <ListingsTableHeader table={table} />
