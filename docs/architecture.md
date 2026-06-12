@@ -239,7 +239,7 @@ flowchart LR
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
   для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `pages/Searches.tsx` — акордеон («Пошуки» / «Новий пошук»), форма створення. Кожен `SearchRow`:
+- `components/Searches.tsx` — акордеон («Пошуки» / «Новий пошук»), форма створення. Кожен `SearchRow`:
   - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
     disabled на краях списку;
   - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Фільтри» (`LuFilter`, відкриває

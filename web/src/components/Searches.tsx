@@ -23,7 +23,7 @@ import {
   LuPlus,
   LuTrash2,
 } from 'react-icons/lu';
-import { SearchFiltersDrawer } from '../components/SearchFiltersDrawer';
+import { SearchFiltersDrawer } from './SearchFiltersDrawer';
 import {
   DialogBackdrop,
   DialogBody,
@@ -33,18 +33,19 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from '../components/ui/dialog';
-import { toaster } from '../components/ui/toaster';
-import { Tooltip } from '../components/ui/tooltip';
+} from './ui/dialog';
+import { toaster } from './ui/toaster';
+import { Tooltip } from './ui/tooltip';
 import { useSearches, useCreateSearch, useDeleteSearch, useReorderSearches } from '../api/client';
 import type { Search } from '../types';
 
 interface Props {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
+  visible?: boolean;
 }
 
-export function Searches({ selectedId, onSelect }: Props) {
+export function Searches({ selectedId, onSelect, visible = true }: Props) {
   const { data: searches, isLoading } = useSearches();
   const createSearch = useCreateSearch();
 
@@ -85,6 +86,7 @@ export function Searches({ selectedId, onSelect }: Props) {
       borderColor="border.subtle"
       bg="bg.subtle"
       overflowY="auto"
+      display={visible ? 'flex' : 'none'}
     >
       <Accordion.Root multiple defaultValue={['searches']} variant="plain">
         <Accordion.Item value="searches" borderBottomWidth="1px" borderColor="border.subtle">
@@ -142,51 +144,51 @@ export function Searches({ selectedId, onSelect }: Props) {
           <Accordion.ItemContent>
             <Accordion.ItemBody pt={0}>
               <Stack as="form" onSubmit={submit} gap={3} px={2}>
-        <Field.Root required>
-          <Field.Label>
-            Назва <Field.RequiredIndicator />
-          </Field.Label>
-          <Input
-            size="sm"
-            placeholder="напр. iPhone 13 Київ"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field.Root>
-        <Field.Root required>
-          <Field.Label>
-            Запит <Field.RequiredIndicator />
-          </Field.Label>
-          <Input
-            size="sm"
-            placeholder="напр. iphone 13"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </Field.Root>
-        <HStack gap={2}>
-          <Field.Root>
-            <Field.Label>Ціна від</Field.Label>
-            <Input
-              size="sm"
-              inputMode="numeric"
-              value={priceFrom}
-              onChange={(e) => setPriceFrom(e.target.value)}
-            />
-          </Field.Root>
-          <Field.Root>
-            <Field.Label>Ціна до</Field.Label>
-            <Input
-              size="sm"
-              inputMode="numeric"
-              value={priceTo}
-              onChange={(e) => setPriceTo(e.target.value)}
-            />
-          </Field.Root>
-        </HStack>
-        <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
-          <LuPlus /> Створити
-        </Button>
+                <Field.Root required>
+                  <Field.Label>
+                    Назва <Field.RequiredIndicator />
+                  </Field.Label>
+                  <Input
+                    size="sm"
+                    placeholder="напр. iPhone 13 Київ"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </Field.Root>
+                <Field.Root required>
+                  <Field.Label>
+                    Запит <Field.RequiredIndicator />
+                  </Field.Label>
+                  <Input
+                    size="sm"
+                    placeholder="напр. iphone 13"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </Field.Root>
+                <HStack gap={2}>
+                  <Field.Root>
+                    <Field.Label>Ціна від</Field.Label>
+                    <Input
+                      size="sm"
+                      inputMode="numeric"
+                      value={priceFrom}
+                      onChange={(e) => setPriceFrom(e.target.value)}
+                    />
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Ціна до</Field.Label>
+                    <Input
+                      size="sm"
+                      inputMode="numeric"
+                      value={priceTo}
+                      onChange={(e) => setPriceTo(e.target.value)}
+                    />
+                  </Field.Root>
+                </HStack>
+                <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
+                  <LuPlus /> Створити
+                </Button>
                 {createSearch.isError && (
                   <Text textStyle="xs" color="fg.error">
                     {createSearch.error instanceof Error

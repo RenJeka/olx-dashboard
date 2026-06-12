@@ -11,6 +11,7 @@ interface StoredSettings {
   autoRefreshEnabled?: boolean;
   autoRefreshIntervalMin?: number;
   skipDeepScanConfirm?: boolean;
+  searchesVisible?: boolean;
 }
 
 export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
@@ -72,6 +73,14 @@ export function loadSkipDeepScanConfirm(): boolean {
 
 export function saveSkipDeepScanConfirm(skipDeepScanConfirm: boolean): void {
   saveSettings({ skipDeepScanConfirm });
+}
+
+export function loadSearchesVisible(): boolean {
+  return loadSettings().searchesVisible ?? true;
+}
+
+export function saveSearchesVisible(searchesVisible: boolean): void {
+  saveSettings({ searchesVisible });
 }
 
 export function loadTableState(): StoredTableState {

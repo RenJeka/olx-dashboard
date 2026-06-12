@@ -64,6 +64,7 @@ olx-dashboard/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/scan-status, статуси/нотатки/масові
         │                      #   дії, filters/param-keys/stats; DTO-типи з web/src/types)
         ├── components/
+        │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark), видимість колонок, перемикач опису, автооновлення
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── SearchActionPanel.tsx # панель дій активного пошуку: скан/глибокий скан, прогрес, лічильники
@@ -96,7 +97,6 @@ olx-dashboard/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         │   └── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
         ├── pages/
-        │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
         ├── types/
         │   └── index.ts          # спільні типи фронтенду (Listing, ListingStatus, Search, StoredTableState тощо)
