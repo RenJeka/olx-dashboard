@@ -7,6 +7,7 @@ export const DEFAULT_PAGE_SIZE = 50;
 
 interface StoredSettings {
   columnVisibility?: VisibilityState;
+  columnOrder?: string[];
   descriptionExpandEnabled?: boolean;
   autoRefreshEnabled?: boolean;
   autoRefreshIntervalMin?: number;
@@ -41,6 +42,14 @@ export function loadColumnVisibility(): VisibilityState {
 
 export function saveColumnVisibility(columnVisibility: VisibilityState): void {
   saveSettings({ columnVisibility });
+}
+
+export function loadColumnOrder(): string[] {
+  return loadSettings().columnOrder ?? [];
+}
+
+export function saveColumnOrder(columnOrder: string[]): void {
+  saveSettings({ columnOrder });
 }
 
 export function loadDescriptionExpandEnabled(): boolean {

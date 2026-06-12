@@ -10,6 +10,8 @@ import { ListingsTable } from './pages/ListingsTable';
 import {
   loadColumnVisibility,
   saveColumnVisibility,
+  loadColumnOrder,
+  saveColumnOrder,
   loadDescriptionExpandEnabled,
   saveDescriptionExpandEnabled,
   loadAutoRefreshEnabled,
@@ -25,6 +27,7 @@ export function App() {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() =>
     loadColumnVisibility(),
   );
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => loadColumnOrder());
   const [descriptionExpandEnabled, setDescriptionExpandEnabled] = useState<boolean>(() =>
     loadDescriptionExpandEnabled(),
   );
@@ -45,6 +48,10 @@ export function App() {
   useEffect(() => {
     saveColumnVisibility(columnVisibility);
   }, [columnVisibility]);
+
+  useEffect(() => {
+    saveColumnOrder(columnOrder);
+  }, [columnOrder]);
 
   useEffect(() => {
     saveDescriptionExpandEnabled(descriptionExpandEnabled);
@@ -74,6 +81,8 @@ export function App() {
         onAutoRefreshIntervalMinChange={setAutoRefreshIntervalMin}
         columnVisibility={columnVisibility}
         onColumnVisibilityChange={setColumnVisibility}
+        columnOrder={columnOrder}
+        onColumnOrderChange={setColumnOrder}
         descriptionExpandEnabled={descriptionExpandEnabled}
         onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
       />
@@ -87,6 +96,8 @@ export function App() {
           searchId={selectedId}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={setColumnVisibility}
+          columnOrder={columnOrder}
+          onColumnOrderChange={setColumnOrder}
           descriptionExpandEnabled={descriptionExpandEnabled}
         />
       </Flex>

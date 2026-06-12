@@ -19,6 +19,8 @@ import { ColumnsSection } from './sections/ColumnsSection';
 interface Props {
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  columnOrder: string[];
+  onColumnOrderChange: (order: string[]) => void;
   descriptionExpandEnabled: boolean;
   onDescriptionExpandEnabledChange: (value: boolean) => void;
   autoRefreshEnabled: boolean;
@@ -30,6 +32,8 @@ interface Props {
 export function SettingsDrawer({
   columnVisibility,
   onColumnVisibilityChange,
+  columnOrder,
+  onColumnOrderChange,
   descriptionExpandEnabled,
   onDescriptionExpandEnabledChange,
   autoRefreshEnabled,
@@ -71,6 +75,8 @@ export function SettingsDrawer({
             <ColumnsSection
               columnVisibility={columnVisibility}
               onColumnVisibilityChange={onColumnVisibilityChange}
+              columnOrder={columnOrder}
+              onColumnOrderChange={onColumnOrderChange}
             />
           </Stack>
         </DrawerBody>

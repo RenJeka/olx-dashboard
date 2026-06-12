@@ -17,6 +17,8 @@ interface HeaderProps {
   onAutoRefreshIntervalMinChange: (interval: number) => void;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  columnOrder: string[];
+  onColumnOrderChange: (order: string[]) => void;
   descriptionExpandEnabled: boolean;
   onDescriptionExpandEnabledChange: (enabled: boolean) => void;
 }
@@ -31,6 +33,8 @@ export function Header({
   onAutoRefreshIntervalMinChange,
   columnVisibility,
   onColumnVisibilityChange,
+  columnOrder,
+  onColumnOrderChange,
   descriptionExpandEnabled,
   onDescriptionExpandEnabledChange,
 }: HeaderProps) {
@@ -81,6 +85,8 @@ export function Header({
           <SettingsDrawer
             columnVisibility={columnVisibility}
             onColumnVisibilityChange={onColumnVisibilityChange}
+            columnOrder={columnOrder}
+            onColumnOrderChange={onColumnOrderChange}
             descriptionExpandEnabled={descriptionExpandEnabled}
             onDescriptionExpandEnabledChange={onDescriptionExpandEnabledChange}
             autoRefreshEnabled={autoRefreshEnabled}

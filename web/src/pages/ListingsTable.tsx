@@ -28,6 +28,8 @@ interface Props {
   searchId: number | null;
   columnVisibility: VisibilityState;
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
+  columnOrder: string[];
+  onColumnOrderChange: (order: string[]) => void;
   descriptionExpandEnabled: boolean;
 }
 
@@ -35,6 +37,7 @@ export function ListingsTable({
   searchId,
   columnVisibility,
   onColumnVisibilityChange,
+  columnOrder,
   descriptionExpandEnabled,
 }: Props) {
   const { data, isLoading } = useListings(searchId);
@@ -65,7 +68,16 @@ export function ListingsTable({
   const table = useReactTable({
     data: visibleRows,
     columns,
-    state: { sorting, columnSizing, columnVisibility, pagination, globalFilter, rowSelection },
+    state: {
+      sorting,
+      columnSizing,
+      columnVisibility,
+      // 'select' завжди першою; решта — збережений порядок (порожній = дефолт TanStack)
+      columnOrder: columnOrder.length > 0 ? ['select', ...columnOrder] : [],
+      pagination,
+      globalFilter,
+      rowSelection,
+    },
     getRowId: (row) => String(row.id),
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
