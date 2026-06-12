@@ -73,6 +73,7 @@ export interface ScanResult {
   found: number;
   new_count: number;
   requestsUsed: number;
+  disabled_count: number;
 }
 
 /** Останній запис scan_runs для пошуку — для прогрес-бару глибокого скану. */
@@ -85,6 +86,25 @@ export interface ScanStatus {
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
+}
+
+/** Останній скан пошуку — частина відповіді GET /api/searches/:id/stats. */
+export interface LastScanInfo {
+  kind: string;
+  started_at: string;
+  finished_at: string | null;
+  found: number | null;
+  new_count: number | null;
+  disabled_count: number | null;
+  error: string | null;
+}
+
+/** Відповідь GET /api/searches/:id/stats — для панелі дій. */
+export interface SearchStats {
+  in_db: number;
+  /** Кандидати verify: status_source='auto' AND last_seen_at старше 3 днів. */
+  stale_count: number;
+  last_scan: LastScanInfo | null;
 }
 
 export interface NewSearchInput {

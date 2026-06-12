@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Box, Flex, Heading, HStack, Text } from '@chakra-ui/react';
+import { Box, Flex, Heading, HStack } from '@chakra-ui/react';
 import type { VisibilityState } from '@tanstack/react-table';
 import { LuSearch } from 'react-icons/lu';
-import { useSearches, useListings } from './api/client';
+import { useSearches } from './api/client';
+import { SearchActionPanel } from './components/SearchActionPanel';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { Toaster } from './components/ui/toaster';
 import { Searches } from './pages/Searches';
@@ -23,7 +24,6 @@ export function App() {
     loadDescriptionExpandEnabled(),
   );
   const { data: searches } = useSearches();
-  const { data: listings } = useListings(selectedId);
   const selectedSearch = searches?.find((s) => s.id === selectedId);
 
   useEffect(() => {
@@ -42,23 +42,19 @@ export function App() {
             <LuSearch />
             <Heading size="lg">OLX Monitor</Heading>
           </HStack>
-          <HStack gap={4}>
-            {selectedSearch && (
-              <Text color="fg.muted" fontSize="sm">
-                {selectedSearch.visible_total_count != null
-                  ? `Результатів на OLX: ${selectedSearch.visible_total_count.toLocaleString('uk-UA')} · У базі: ${(listings?.length ?? 0).toLocaleString('uk-UA')}`
-                  : `У базі: ${(listings?.length ?? 0).toLocaleString('uk-UA')}`}
-              </Text>
-            )}
-            <SettingsDrawer
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={setColumnVisibility}
-              descriptionExpandEnabled={descriptionExpandEnabled}
-              onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
-            />
-          </HStack>
+          <SettingsDrawer
+            columnVisibility={columnVisibility}
+            onColumnVisibilityChange={setColumnVisibility}
+            descriptionExpandEnabled={descriptionExpandEnabled}
+            onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
+          />
         </HStack>
       </Box>
+      {selectedSearch && (
+        <Box borderBottomWidth="1px" borderColor="border.subtle">
+          <SearchActionPanel search={selectedSearch} />
+        </Box>
+      )}
       <Flex flex="1" overflow="hidden">
         <Searches selectedId={selectedId} onSelect={setSelectedId} />
         <ListingsTable

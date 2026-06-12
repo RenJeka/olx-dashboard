@@ -12,6 +12,7 @@ import type {
   ScanResult,
   ScanStatus,
   SearchPatchResult,
+  SearchStats,
   NewSearchInput,
 } from '../types';
 
@@ -85,8 +86,19 @@ export function useScan() {
       api<ScanResult>(`/api/searches/${searchId}/scan${deep ? '?deep=true' : ''}`, {
         method: 'POST',
       }),
-    onSuccess: (_data, { searchId }) =>
-      qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+    onSuccess: (_data, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+      qc.invalidateQueries({ queryKey: ['search-stats', searchId] });
+    },
+  });
+}
+
+/** Статистика для панелі дій: скільки в базі, скільки "давно не бачених", останній скан. */
+export function useSearchStats(searchId: number | null) {
+  return useQuery({
+    queryKey: ['search-stats', searchId],
+    queryFn: () => api<SearchStats>(`/api/searches/${searchId}/stats`),
+    enabled: searchId != null,
   });
 }
 
