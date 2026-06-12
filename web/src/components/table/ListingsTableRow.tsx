@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { HStack, Table } from '@chakra-ui/react';
 import { flexRender, type Row } from '@tanstack/react-table';
 import { LuFilter } from 'react-icons/lu';
@@ -15,7 +15,7 @@ interface ListingsTableRowProps {
   searchQuery: string;
 }
 
-export const ListingsTableRow = memo(function ListingsTableRow({
+export function ListingsTableRow({
   row,
   isSelected,
   descriptionExpandEnabled,
@@ -76,4 +76,4 @@ export const ListingsTableRow = memo(function ListingsTableRow({
       })}
     </Table.Row>
   );
-});
+}

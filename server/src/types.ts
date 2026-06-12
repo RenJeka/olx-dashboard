@@ -106,6 +106,8 @@ export const LISTING_STATUSES: ListingStatus[] = [
 export interface ListingPatch {
   status?: ListingStatus;
   note?: string;
+  pros?: string;
+  cons?: string;
 }
 
 /** Рядок listings для віддачі у API/UI. */
@@ -127,6 +129,8 @@ export interface ListingRow {
   status: string;
   status_source: string;
   note: string;
+  pros: string;
+  cons: string;
   filtered_out: number;
   miss_count: number;
   posted_at: string | null;

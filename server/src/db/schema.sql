@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS listings (
     CHECK (status IN ('new','interested','contacted','rejected','disabled')),
   status_source TEXT DEFAULT 'auto', -- auto | manual
   note TEXT DEFAULT '',
+  pros TEXT DEFAULT '',   -- TODO: заповнювати через AI (аналіз опису оголошення)
+  cons TEXT DEFAULT '',   -- TODO: заповнювати через AI (аналіз опису оголошення)
   filtered_out INTEGER DEFAULT 0,
   miss_count INTEGER DEFAULT 0,      -- скани поспіль без цього оголошення у вікні покриття (Етап 2)
   first_seen_at TEXT DEFAULT (datetime('now')),

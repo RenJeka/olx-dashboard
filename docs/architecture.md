@@ -196,9 +196,10 @@ flowchart LR
     ресайзу колонок (`columnResizeMode: 'onEnd'`); ресайз-хендл рендериться лише якщо
     `header.column.getCanResize()`.
   - `ListingsTableBody.tsx` — тіло таблиці `<tbody>`, яке рендерить рядки.
-  - `ListingsTableRow.tsx` — рядок таблиці (обгорнутий у `React.memo` для уникнення
-    ре-рендерів при ресайзі чи пагінації); рядки `status='disabled'`/`'rejected'` —
-    приглушені (`isMutedStatus`).
+  - `ListingsTableRow.tsx` — рядок таблиці. **Увага:** не використовуйте `React.memo` для
+    цього компонента, оскільки TanStack Table не перестворює об'єкти `row` при зміні
+    порядку чи видимості колонок. З `memo` зміна `columnOrder` ламає вирівнювання хедерів
+    відносно даних. Рядки `status='disabled'`/`'rejected'` — приглушені (`isMutedStatus`).
   - `StatusCell.tsx` — компактний `NativeSelect` зі статусом у вигляді кольорового
     бейджа (`STATUS_COLORS`); зміна → `useUpdateListing()` (`status_source='manual'`,
     `miss_count=0`).

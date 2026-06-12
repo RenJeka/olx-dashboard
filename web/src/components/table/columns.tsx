@@ -10,6 +10,8 @@ import {
   LuMapPin,
   LuNotebookPen,
   LuTag,
+  LuThumbsDown,
+  LuThumbsUp,
   LuUser,
 } from 'react-icons/lu';
 import type { Listing } from '../../types';
@@ -17,6 +19,7 @@ import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
 import { StatusCell } from './StatusCell';
 import { NoteCell } from './NoteCell';
+import { ProsConsCell } from './ProsConsCell';
 import { HighlightText } from './HighlightText';
 import { Checkbox } from '../ui/checkbox';
 
@@ -175,6 +178,24 @@ export const columns = [
     enableSorting: false,
     cell: (info) => <NoteCell listing={info.row.original} />,
   }),
+  columnHelper.accessor('pros', {
+    id: 'pros',
+    header: () => <HeaderLabel icon={<LuThumbsUp color="green" />}>Плюси</HeaderLabel>,
+    size: 200,
+    minSize: 120,
+    maxSize: 400,
+    enableSorting: false,
+    cell: (info) => <ProsConsCell listing={info.row.original} field="pros" />,
+  }),
+  columnHelper.accessor('cons', {
+    id: 'cons',
+    header: () => <HeaderLabel icon={<LuThumbsDown color="red" />}>Мінуси</HeaderLabel>,
+    size: 200,
+    minSize: 120,
+    maxSize: 400,
+    enableSorting: false,
+    cell: (info) => <ProsConsCell listing={info.row.original} field="cons" />,
+  }),
 ];
 
 export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
@@ -188,4 +209,6 @@ export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'olx_status', label: 'Статус OLX' },
   { id: 'status', label: 'Статус' },
   { id: 'note', label: 'Нотатка' },
+  { id: 'pros', label: 'Плюси' },
+  { id: 'cons', label: 'Мінуси' },
 ];

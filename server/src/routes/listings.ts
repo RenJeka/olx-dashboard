@@ -14,7 +14,7 @@ const SORTABLE = new Set([
 
 const LISTING_COLUMNS = `id, olx_id, search_id, title, url, price, currency, city, district,
                 photo_url, description, seller_name, contact_name, olx_status,
-                status, status_source, note, filtered_out, miss_count,
+                status, status_source, note, pros, cons, filtered_out, miss_count,
                 posted_at, first_seen_at, last_seen_at`;
 
 export async function listingsRoutes(app: FastifyInstance): Promise<void> {
@@ -47,7 +47,7 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       const existing = db.prepare('SELECT id FROM listings WHERE id = ?').get(id);
       if (!existing) return reply.code(404).send({ error: 'Оголошення не знайдено' });
 
-      const { status, note } = req.body;
+      const { status, note, pros, cons } = req.body;
 
       if (status !== undefined && !LISTING_STATUSES.includes(status)) {
         return reply.code(400).send({ error: `Невідомий статус: ${status}` });
@@ -63,6 +63,14 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       if (note !== undefined) {
         fields.push('note = ?');
         values.push(note);
+      }
+      if (pros !== undefined) {
+        fields.push('pros = ?');
+        values.push(pros);
+      }
+      if (cons !== undefined) {
+        fields.push('cons = ?');
+        values.push(cons);
       }
 
       if (fields.length > 0) {

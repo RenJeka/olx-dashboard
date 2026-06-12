@@ -37,7 +37,10 @@ function saveSettings(patch: Partial<StoredSettings>): void {
 }
 
 export function loadColumnVisibility(): VisibilityState {
-  return loadSettings().columnVisibility ?? {};
+  const saved = loadSettings().columnVisibility ?? {};
+  // Нові колонки, яких ще немає у збереженому стані — приховані за замовчуванням
+  const defaults: VisibilityState = { pros: false, cons: false };
+  return { ...defaults, ...saved };
 }
 
 export function saveColumnVisibility(columnVisibility: VisibilityState): void {

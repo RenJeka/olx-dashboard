@@ -46,6 +46,8 @@ addColumnIfMissing('searches', 'sort_order', 'INTEGER');
 addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
 addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
+addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
+addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
@@ -57,7 +59,7 @@ const LISTINGS_SCHEMA_VERSION = 2;
 const LISTINGS_COMMON_COLUMNS = `
   id, olx_id, search_id, title, url, price, currency, city, district, params,
   photo_url, seller_type, description, seller_name, contact_name, olx_status,
-  posted_at, status, status_source, note, filtered_out, first_seen_at, last_seen_at
+  posted_at, status, status_source, note, pros, cons, filtered_out, first_seen_at, last_seen_at
 `;
 
 function migrateListingsTable(): void {
@@ -92,6 +94,8 @@ function migrateListingsTable(): void {
           CHECK (status IN ('new','interested','contacted','rejected','disabled')),
         status_source TEXT DEFAULT 'auto',
         note TEXT DEFAULT '',
+        pros TEXT DEFAULT '',
+        cons TEXT DEFAULT '',
         filtered_out INTEGER DEFAULT 0,
         miss_count INTEGER DEFAULT 0,
         first_seen_at TEXT DEFAULT (datetime('now')),
