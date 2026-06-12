@@ -67,5 +67,6 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   disabled_count INTEGER,
   error TEXT,
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
-  requests_total INTEGER             -- прогрес глибокого скану: ціль (NULL поки невідома)
+  requests_total INTEGER,            -- прогрес глибокого скану: ціль (NULL поки невідома)
+  fetch_method TEXT                  -- GraphQL | HTML
 );

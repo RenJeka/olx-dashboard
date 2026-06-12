@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Badge, Box, Button, HStack, Progress, SimpleGrid, Stack, Text } from '@chakra-ui/react';
-import { LuActivity, LuLayers, LuRefreshCw, LuStethoscope, LuTriangleAlert } from 'react-icons/lu';
+import { Badge, Box, Button, HStack, Progress, SimpleGrid, Stack, Text, IconButton } from '@chakra-ui/react';
+import { LuActivity, LuLayers, LuRefreshCw, LuStethoscope, LuTriangleAlert, LuCopy } from 'react-icons/lu';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import {
   DialogBackdrop,
@@ -178,13 +178,34 @@ export function SearchActionPanel({ search }: Props) {
                     </Text>
                   </Stack>
                   {lastScan.error && (
-                    <Tooltip content={lastScan.error}>
-                      <Badge colorPalette="red" variant="subtle">
-                        <LuTriangleAlert /> Помилка
-                      </Badge>
-                    </Tooltip>
+                    <Badge colorPalette="red" variant="subtle">
+                      <LuTriangleAlert /> Помилка
+                    </Badge>
                   )}
                 </HStack>
+                {lastScan.error && (
+                  <Box mt={3} p={2} bg="red.muted" rounded="md" position="relative">
+                    <HStack justify="space-between" mb={1}>
+                      <Text textStyle="xs" fontWeight="bold" color="red.fg">Деталі помилки:</Text>
+                      <IconButton
+                        size="xs"
+                        variant="ghost"
+                        colorPalette="red"
+                        h={6}
+                        minW={6}
+                        onClick={() => {
+                          navigator.clipboard.writeText(lastScan.error!);
+                          toaster.create({ type: 'success', title: 'Скопійовано' });
+                        }}
+                      >
+                        <LuCopy />
+                      </IconButton>
+                    </HStack>
+                    <Text textStyle="xs" color="red.fg" whiteSpace="pre-wrap" wordBreak="break-word" maxH="150px" overflowY="auto">
+                      {lastScan.error}
+                    </Text>
+                  </Box>
+                )}
               </Box>
             )}
 
@@ -194,6 +215,7 @@ export function SearchActionPanel({ search }: Props) {
                 <HStack justify="space-between">
                   <Text textStyle="xs" fontWeight="semibold" color="blue.fg">
                     Виконується {SCAN_KIND_LABELS[scanKind] ?? scanKind} скан...
+                    {status.fetch_method && ` (${status.fetch_method})`}
                   </Text>
                   <Text textStyle="xs" color="fg.muted">
                     {status.requests_total == null

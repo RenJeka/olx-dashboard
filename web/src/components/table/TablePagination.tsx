@@ -13,7 +13,7 @@ export function TablePagination({ table }: TablePaginationProps) {
   const { pageIndex, pageSize } = table.getState().pagination;
   const totalRows = table.getPrePaginationRowModel().rows.length;
 
-  if (totalRows <= PAGE_SIZE_OPTIONS[0]) return null;
+  if (totalRows === 0) return null;
 
   return (
     <HStack

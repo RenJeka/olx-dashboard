@@ -105,6 +105,7 @@ export interface ScanStatus {
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
+  fetch_method: string | null;
 }
 
 /** Статус оголошення в моніторингу (ручний/auto-цикл, Етап 2). */
@@ -211,8 +212,8 @@ export interface FetchOptions {
    * За замовчуванням (false/відсутнє) — звичайний скан, ≤BATCH_SIZE запитів.
    */
   deep?: boolean;
-  /** Викликається після кожного запиту/сторінки: (done, total). */
-  onProgress?: (done: number, total: number) => void;
+  /** Викликається після кожного запиту/сторінки: (done, total, method). */
+  onProgress?: (done: number, total: number, method?: string) => void;
 }
 
 /**
