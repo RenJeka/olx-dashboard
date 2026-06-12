@@ -2,14 +2,16 @@ import { Box } from '@chakra-ui/react';
 import type { ReactNode } from 'react';
 import { Tooltip } from '../ui/tooltip';
 import { stripDescriptionHtml } from '../../utils/format';
+import { HighlightText } from './HighlightText';
 
 interface DescriptionTooltipProps {
   description: string | null;
+  query: string;
   children: ReactNode;
   onClick: () => void;
 }
 
-export function DescriptionTooltip({ description, children, onClick }: DescriptionTooltipProps) {
+export function DescriptionTooltip({ description, query, children, onClick }: DescriptionTooltipProps) {
   const fullText = stripDescriptionHtml(description);
   if (!fullText) return <>{children}</>;
 
@@ -21,7 +23,7 @@ export function DescriptionTooltip({ description, children, onClick }: Descripti
       closeOnScroll={false}
       content={
         <Box maxH="240px" overflowY="auto" whiteSpace="pre-line" fontSize="sm">
-          {fullText}
+          <HighlightText text={fullText} query={query} />
         </Box>
       }
       contentProps={{ maxW: '380px' }}

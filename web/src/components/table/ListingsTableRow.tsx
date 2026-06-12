@@ -9,12 +9,14 @@ interface ListingsTableRowProps {
   row: Row<Listing>;
   descriptionExpandEnabled: boolean;
   onOpenDescription: (listing: Listing) => void;
+  searchQuery: string;
 }
 
 export const ListingsTableRow = memo(function ListingsTableRow({
   row,
   descriptionExpandEnabled,
   onOpenDescription,
+  searchQuery,
 }: ListingsTableRowProps) {
   return (
     <Table.Row opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}>
@@ -30,6 +32,7 @@ export const ListingsTableRow = memo(function ListingsTableRow({
           content = (
             <DescriptionTooltip
               description={row.original.description}
+              query={searchQuery}
               onClick={() => onOpenDescription(row.original)}
             >
               {rendered}

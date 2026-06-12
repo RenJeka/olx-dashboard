@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   getCoreRowModel,
+  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
@@ -13,9 +14,11 @@ import { useListingsTableState } from '../hooks/useListingsTableState';
 import { columns } from '../components/table/columns';
 import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
 import { ListingsTableBody } from '../components/table/ListingsTableBody';
+import { ListingsFilterBar } from '../components/table/ListingsFilterBar';
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
-import type { Listing } from '../types';
+import { stripDescriptionHtml } from '../utils/format';
+import type { Listing, ListingStatus } from '../types';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
 
@@ -36,21 +39,43 @@ export function ListingsTable({
   const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
     useListingsTableState();
   const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
+  const [showFilteredOut, setShowFilteredOut] = useState(false);
+  const [globalFilter, setGlobalFilter] = useState('');
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  const visibleRows = useMemo(
+    () =>
+      rows.filter(
+        (l) =>
+          (showFilteredOut || l.filtered_out === 0) &&
+          (statusFilter === 'all' || l.status === statusFilter),
+      ),
+    [rows, showFilteredOut, statusFilter],
+  );
+
   const table = useReactTable({
-    data: rows,
+    data: visibleRows,
     columns,
-    state: { sorting, columnSizing, columnVisibility, pagination },
+    state: { sorting, columnSizing, columnVisibility, pagination, globalFilter },
     onSortingChange: setSorting,
     onColumnSizingChange: setColumnSizing,
     onColumnVisibilityChange: onColumnVisibilityChange,
     onPaginationChange: setPagination,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const query = String(filterValue).trim().toLowerCase();
+      if (!query) return true;
+      const title = (row.original.title ?? '').toLowerCase();
+      const description = stripDescriptionHtml(row.original.description).toLowerCase();
+      return title.includes(query) || description.includes(query);
+    },
     columnResizeMode: 'onEnd',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
   });
 
   if (searchId == null) {
@@ -79,6 +104,15 @@ export function ListingsTable({
 
   return (
     <Flex direction="column" flex="1" overflow="hidden">
+      <ListingsFilterBar
+        listings={rows}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        showFilteredOut={showFilteredOut}
+        onShowFilteredOutChange={setShowFilteredOut}
+        searchText={globalFilter}
+        onSearchTextChange={setGlobalFilter}
+      />
       <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <ListingsTableHeader table={table} />
@@ -86,8 +120,14 @@ export function ListingsTable({
             table={table}
             descriptionExpandEnabled={descriptionExpandEnabled}
             onOpenDescription={setDescriptionListing}
+            searchQuery={globalFilter}
           />
         </Table.Root>
+        {table.getRowModel().rows.length === 0 && (
+          <Text p={4} color="fg.muted">
+            Немає оголошень за обраними фільтрами.
+          </Text>
+        )}
       </Box>
       <TablePagination table={table} />
       <DescriptionDialog listing={descriptionListing} onClose={() => setDescriptionListing(null)} />

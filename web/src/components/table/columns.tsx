@@ -17,6 +17,7 @@ import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
 import { StatusCell } from './StatusCell';
 import { NoteCell } from './NoteCell';
+import { HighlightText } from './HighlightText';
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -43,15 +44,17 @@ export const columns = [
     cell: (info) => {
       const url = info.row.original.url;
       const title = info.getValue() ?? '—';
+      const query = String(info.table.getState().globalFilter ?? '');
+      const content = <HighlightText text={title} query={query} />;
       return url ? (
         <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
           <HStack gap={1}>
-            <Text>{title}</Text>
+            <Text>{content}</Text>
             <LuExternalLink />
           </HStack>
         </Link>
       ) : (
-        title
+        content
       );
     },
   }),
@@ -64,9 +67,10 @@ export const columns = [
     cell: (info) => {
       const text = stripDescriptionHtml(info.getValue());
       if (!text) return '—';
+      const query = String(info.table.getState().globalFilter ?? '');
       return (
         <Text whiteSpace="pre-line" lineClamp={3}>
-          {text}
+          <HighlightText text={text} query={query} />
         </Text>
       );
     },

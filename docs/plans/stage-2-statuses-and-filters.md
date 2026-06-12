@@ -214,15 +214,26 @@ stateDiagram-v2
 
 ### B2. Фільтр-панель таблиці
 
-- [ ] Панель над таблицею (`ListingsTable.tsx`): сегмент-фільтр статусів
+- [x] Панель над таблицею (`ListingsTable.tsx`): сегмент-фільтр статусів
   (Всі / new / interested / contacted / rejected / disabled — з лічильниками),
   Switch «показати відфільтровані» (filtered_out), `Input` текстового пошуку.
-- [ ] Фільтрація клієнтська: TanStack `globalFilter` (кастомна fn по title + очищеному
+- [x] Фільтрація клієнтська: TanStack `globalFilter` (кастомна fn по title + очищеному
   description, case-insensitive) + column filter по status + предикат filtered_out.
   `autoResetPageIndex` скине пагінацію сам.
-- [ ] **Підсвітка збігів**: компонент `HighlightText` (split по запиту, збіги —
+- [x] **Підсвітка збігів**: компонент `HighlightText` (split по запиту, збіги —
   `<Mark>`/`<chakra.mark>` з фоном `yellow.subtle`) — застосувати в комірках Title і
   Description (і в тултіпі опису).
+
+  > Реалізовано: `ListingsFilterBar.tsx` (SegmentGroup статусів з лічильниками — рахуються
+  > з урахуванням toggle filtered_out, але без статус-фільтра й текстового пошуку, щоб
+  > давати стабільний огляд; Switch; Input пошуку). Статус-фільтр і filtered_out —
+  > pre-filter масиву `rows` (`useMemo`) перед передачею в `useReactTable`; текстовий
+  > пошук — `globalFilter`/`globalFilterFn`/`getFilteredRowModel`. `HighlightText` —
+  > новий компонент (split за regex, `<Mark bg="yellow.subtle">`), застосований у
+  > колонках Title/Description і в `DescriptionTooltip`. Перевірено: `tsc -b` і
+  > production `vite build` без помилок; dev-сервер (front+back) піднімається без
+  > runtime-помилок у логах. Повна UI-перевірка в браузері — рекомендована
+  > (playwright-tester за запитом).
 
 ### B3. Редактор локальних фільтрів
 
