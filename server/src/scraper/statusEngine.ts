@@ -6,43 +6,57 @@ interface CandidateRow {
   miss_count: number;
   status: string;
   status_source: string;
+  note: string | null;
 }
 
+const COVERAGE_NOTE_MARKER = 'auto-disabled: coverage miss_count=2';
+
 const updateCandidateStmt = db.prepare(
-  'UPDATE listings SET miss_count = ?, status = ? WHERE id = ?',
+  'UPDATE listings SET miss_count = ?, status = ?, note = ? WHERE id = ?',
 );
 
+/** Ідемпотентно дописує маркер у note (патерн olx_status-disable з normalizer.ts). */
+function appendCoverageNote(note: string | null): string {
+  if (note != null && note.includes(COVERAGE_NOTE_MARKER)) return note;
+  if (note == null || note === '') return COVERAGE_NOTE_MARKER;
+  return `${note}\n${COVERAGE_NOTE_MARKER}`;
+}
+
 /**
- * Вікно покриття (CLAUDE.md / план Етапу 2 §«Вікно покриття»). Викликається ПІСЛЯ
- * upsertListings, лише для успішних GraphQL-сканів (не fallback).
+ * Вікно покриття (CLAUDE.md / docs/plans/coverage-window-fix.md). Викликається ПІСЛЯ
+ * upsertListings, лише для ПОВНИХ успішних GraphQL-сканів (не fallback, не часткових).
  *
- * windowFloor = min(posted_at) серед `fetched` — або null, якщо `exhausted`
- * (остання сторінка <40 → видачу вичерпано, вікно = вся видача).
+ * Вісь вікна — `last_refresh_at` (дата підняття): OLX сортує видачу за
+ * last_refresh_time DESC (запити передають sort_by=created_at:desc — verified live
+ * 2026-06-12, docs/olx-api.md §2), тому покритий діапазон — [refresh останнього
+ * отриманого; now]. posted_at (= created_time) для цього НЕпридатний: «підняті» старі
+ * оголошення йдуть угорі видачі і розтягують вікно на роки (інцидент 2026-06-12,
+ * 395 хибних disable).
+ *
+ * windowFloor = lastRefreshAt ОСТАННЬОГО елемента fetched (низ останньої сторінки;
+ * не min() — промо-вкраплення поза порядком розтягнули б вікно) — або null, якщо
+ * `exhausted` (видачу вичерпано, вікно = вся видача). Немає осі (порожній fetched
+ * без exhausted, не-GraphQL дані) → прохід пропускається.
  *
  * Кандидати: рядки цього search зі status != 'disabled', відсутні у `fetched`,
- * і (windowFloor IS NULL OR posted_at >= windowFloor). Їм miss_count += 1; при
- * miss_count >= 2 і (status_source='auto' OR status='rejected') → status='disabled'.
- *
- * `posted_at` гарантовано ISO або NULL (нормалізатор завжди пропускає текстові дати
- * HTML-fallback через `parseOlxDate`, дивись normalizer.ts/dateParser.ts) — лексикографічне
- * порівняння з windowFloor коректне. NULL >= windowFloor у SQLite дає NULL (рядок без дати
- * не потрапляє в кандидати — без дати немає підстав вважати його «в межах вікна»).
+ * і (windowFloor IS NULL OR last_refresh_at >= windowFloor; NULL-refresh — старі рядки
+ * і «хвіст» за вікном пагінації — у кандидати не потрапляють, їх перевіряє verify).
+ * Їм miss_count += 1; при miss_count >= 2 і (status_source='auto' OR
+ * status='rejected') → status='disabled' + маркер у note (прозорість причини).
  */
 export function applyScanStatuses(
   searchId: number,
   fetched: RawListing[],
   exhausted: boolean,
 ): { disabled_count: number } {
-  const postedDates = fetched
-    .map((item) => item.createdAt)
-    .filter((d): d is string => Boolean(d));
+  let windowFloor: string | null = null;
 
-  const windowFloor = exhausted
-    ? null
-    : postedDates.reduce<string | null>(
-        (min, d) => (min === null || d < min ? d : min),
-        null,
-      );
+  if (!exhausted) {
+    const lastItem = fetched[fetched.length - 1];
+    windowFloor = lastItem?.lastRefreshAt ?? null;
+    // Без осі покриття (порожня видача чи дані без refresh-дат) вердикти неможливі.
+    if (windowFloor === null) return { disabled_count: 0 };
+  }
 
   const fetchedIds = fetched.map((item) => item.olxId);
 
@@ -53,12 +67,12 @@ export function applyScanStatuses(
       candidates = (
         windowFloor === null
           ? db.prepare(
-              `SELECT id, miss_count, status, status_source FROM listings
+              `SELECT id, miss_count, status, status_source, note FROM listings
                WHERE search_id = ? AND status != 'disabled'`,
             )
           : db.prepare(
-              `SELECT id, miss_count, status, status_source FROM listings
-               WHERE search_id = ? AND status != 'disabled' AND posted_at >= ?`,
+              `SELECT id, miss_count, status, status_source, note FROM listings
+               WHERE search_id = ? AND status != 'disabled' AND last_refresh_at >= ?`,
             )
       ).all(...(windowFloor === null ? [searchId] : [searchId, windowFloor])) as CandidateRow[];
     } else {
@@ -66,12 +80,12 @@ export function applyScanStatuses(
       candidates = (
         windowFloor === null
           ? db.prepare(
-              `SELECT id, miss_count, status, status_source FROM listings
+              `SELECT id, miss_count, status, status_source, note FROM listings
                WHERE search_id = ? AND status != 'disabled' AND olx_id NOT IN (${placeholders})`,
             )
           : db.prepare(
-              `SELECT id, miss_count, status, status_source FROM listings
-               WHERE search_id = ? AND status != 'disabled' AND olx_id NOT IN (${placeholders}) AND posted_at >= ?`,
+              `SELECT id, miss_count, status, status_source, note FROM listings
+               WHERE search_id = ? AND status != 'disabled' AND olx_id NOT IN (${placeholders}) AND last_refresh_at >= ?`,
             )
       ).all(
         ...(windowFloor === null
@@ -92,6 +106,7 @@ export function applyScanStatuses(
       updateCandidateStmt.run(
         missCount,
         becomesDisabled ? 'disabled' : candidate.status,
+        becomesDisabled ? appendCoverageNote(candidate.note) : candidate.note,
         candidate.id,
       );
     }

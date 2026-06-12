@@ -120,6 +120,9 @@ function migrateListingsTable(): void {
 
 migrateListingsTable();
 
+// Після rebuild-міграції (інакше listings_new без цієї колонки втратив би її на v1-БД).
+addColumnIfMissing('listings', 'last_refresh_at', 'TEXT');
+
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).
  * Зберігає поточний видимий порядок (найновіші згори) як 0..N-1.

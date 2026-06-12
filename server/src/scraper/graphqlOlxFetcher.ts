@@ -156,6 +156,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       { key: 'query', value: search.query },
       { key: 'offset', value: String(offset) },
       { key: 'limit', value: String(PAGE_LIMIT) },
+      // Без цього ключа OLX віддає видачу за релевантністю — вікно покриття statusEngine
+      // втрачає сенс. Фактичний порядок — last_refresh_time DESC з промо-вкрапленнями
+      // зверху (ключ 'order' ігнорується; verified live 2026-06-12, docs/olx-api.md §2).
+      { key: 'sort_by', value: 'created_at:desc' },
     ];
 
     const { ranges, enums, privateOnly } = search.apiFilters;

@@ -81,9 +81,13 @@ flowchart LR
    рядки (HTML), робить upsert по `olx_id` у транзакції, рахує `new_count`, оновлює
    `filtered_out` (`localFilters.evaluateFilteredOut`) і — для GraphQL-даних — застосовує
    миттєвий `olx_status`-disable/reactivate.
-5. Якщо фетчер був GraphQL (не fallback) і скан успішний — `statusEngine.applyScanStatuses(searchId,
+5. Якщо фетчер був GraphQL (не fallback), скан успішний і **повний** (без warning часткового
+   результату — напр. «window cap hit») — `statusEngine.applyScanStatuses(searchId,
    fetched, exhausted)` застосовує вікно покриття (`miss_count`/disable, §6.1
-   [`olx-monitor-spec.md`](./olx-monitor-spec.md)) і повертає `disabled_count`.
+   [`olx-monitor-spec.md`](./olx-monitor-spec.md)) і повертає `disabled_count`. Вісь вікна —
+   `last_refresh_at` (дата підняття; запити збору передають `sort_by=created_at:desc`,
+   фактичний порядок видачі — `last_refresh_time DESC` — `olx-api.md` §2.5,
+   `docs/plans/coverage-window-fix.md`).
 6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`); падіння
    обох стратегій → `scan_runs.error`, виняток прокидається в роут (HTTP 500), **процес не
    падає**.
@@ -114,7 +118,7 @@ flowchart LR
 | `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. Той самий `FetchOptions`/глибокий режим (без уточнення цілі за `visible_total_count` — одразу `DEEP_SAFETY_CAP`); `exhausted` завжди `false`. |
 | `scraper/dateParser.ts` | `parseOlxDate(raw, now?) → string \| null` — текстові дати HTML-fallback («Сьогодні/Вчора о HH:MM», «D <місяць_родовий> YYYY р.») → ISO (`YYYY-MM-DD[THH:MM:00]`), сумісний з ISO-датами GraphQL для коректного порівняння у `statusEngine.ts`. Нерозпізнане → `null`. |
 | `scraper/normalizer.ts` | `upsertListings` (upsert по `olx_id`): пріоритет структурованим полям (GraphQL); для HTML — `parsePrice`, розбір локації/дати + `dateParser.parseOlxDate` для `posted_at` (завжди ISO або `NULL`, ніколи сирий текст). На insert/update — миттєвий `status='disabled'` за `olx_status ≠ 'active'` (для `auto`/`rejected`, з позначкою в `note`) і auto-reactivate; рахує `filtered_out` через `localFilters.evaluateFilteredOut`. |
-| `scraper/statusEngine.ts` | `applyScanStatuses(searchId, fetched, exhausted) → {disabled_count}` (Етап 2, A2) — вікно покриття: `windowFloor = min(posted_at)` отриманих (`null`, якщо `exhausted`), кандидати поза вікном дістають `miss_count += 1`, при `>= 2` (auto/rejected) → `disabled`. Викликається з `scanner.ts` лише для успішних GraphQL-сканів. |
+| `scraper/statusEngine.ts` | `applyScanStatuses(searchId, fetched, exhausted) → {disabled_count}` (Етап 2, A2) — вікно покриття на осі `last_refresh_at`: `windowFloor = lastRefreshAt` останнього отриманого (`null`, якщо `exhausted`; немає осі → прохід пропускається), відсутні у видачі кандидати в межах вікна дістають `miss_count += 1`, при `>= 2` (auto/rejected) → `disabled` + маркер `auto-disabled: coverage miss_count=2` у `note`. Викликається з `scanner.ts` лише для повних успішних GraphQL-сканів (часткові з warning — ні). |
 | `scraper/localFilters.ts` | `evaluateFilteredOut(filters, listing) → boolean` (Етап 2, A4) — стоп-слова (case-insensitive підрядок у title+description) і числові діапазони по `params[key]` (перше число в label). Чиста функція, використовується `normalizer.ts` і `routes/searches.ts` (ретроактивний перерахунок). |
 | `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
 | `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |

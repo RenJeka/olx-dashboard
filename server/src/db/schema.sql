@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS listings (
   contact_name TEXT,                 -- contact.name з GraphQL
   olx_status TEXT,                   -- статус оголошення на OLX (напр. "active"); НЕ плутати з полем status нижче
   posted_at TEXT,
+  last_refresh_at TEXT,              -- ISO-дата останнього підняття (GraphQL last_refresh_time); вісь вікна покриття statusEngine
+
   status TEXT DEFAULT 'new'
     CHECK (status IN ('new','interested','contacted','rejected','disabled')),
   status_source TEXT DEFAULT 'auto', -- auto | manual

@@ -244,42 +244,57 @@ stateDiagram-v2
 
 ### 6.1 Вікно покриття (механіка `miss_count`)
 
-Працює **лише для GraphQL-сканів** (потрібен сортовний ISO `posted_at`; HTML-fallback
-дат не має — fallback-скани цю логіку НЕ запускають, лише оновлюють `last_seen_at`
+Працює **лише для повних GraphQL-сканів** (HTML-fallback і часткові скани з warning —
+напр. вікно пагінації — цю логіку НЕ запускають, лише оновлюють `last_seen_at`
 присутнім). Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner.ts`.
 
-Після успішного скану (normal або deep):
-1. `windowFloor = min(posted_at)` серед отриманих у цьому скані оголошень. Якщо видача
+Вісь вікна — **`last_refresh_at`** (дата підняття): запити збору передають
+`sort_by=created_at:desc`, але OLX фактично сортує видачу за `last_refresh_time DESC`
+(verified live 2026-06-12, `docs/olx-api.md` §2.5). `posted_at` (= `created_time`)
+для вікна НЕпридатний — «підняті» старі оголошення йдуть угорі видачі та розтягують
+вікно на роки (інцидент 2026-06-12: 395 хибних disable —
+`docs/plans/coverage-window-fix.md`).
+
+Після повного успішного скану (normal або deep):
+1. `windowFloor = lastRefreshAt` **останнього** отриманого оголошення (низ останньої
+   сторінки; не `min()` — промо-вкраплення поза порядком розтягнули б вікно). Якщо видача
    вичерпана раніше ліміту запитів (остання сторінка `< 40`) — `windowFloor = NULL`
-   (покрито все: вікно = вся видача).
+   (покрито все: вікно = вся видача). Немає осі (порожня видача) → прохід пропускається.
 2. Кандидати: рядки цього search зі `status != 'disabled'`, які НЕ прийшли в цьому скані,
-   і (`windowFloor IS NULL` АБО `posted_at >= windowFloor`).
+   і (`windowFloor IS NULL` АБО `last_refresh_at >= windowFloor`). Рядки з
+   `last_refresh_at IS NULL` («хвіст» за вікном пагінації, старі дані) — не кандидати
+   ніколи; їх живість перевіряє verify-прохід (§6.3).
 3. Кандидатам `miss_count += 1`; присутнім у видачі — `miss_count = 0`.
 4. `miss_count >= 2` і (`status_source='auto'` АБО `status='rejected'`) →
-   `status='disabled'`, `disabled_count++` у `scan_runs`.
+   `status='disabled'` + позначка `auto-disabled: coverage miss_count=2` у `note`,
+   `disabled_count++` у `scan_runs`.
 
-Промо-оголошення можуть випадати з date-порядку — поодинокі хибні інкременти буфер
+Промо-оголошення можуть випадати з refresh-порядку — поодинокі хибні інкременти буфер
 2 сканів гасить.
 
 ### 6.2 `olx_status` — миттєвий auto-disable
 
 Якщо GraphQL повернув `olx_status ≠ 'active'` для рядка зі `status_source='auto'` АБО
 `status='rejected'` → миттєво `status='disabled'`, у `note` додається позначка
-`auto-disabled: olx_status=<значення>` для подальшої ручної перевірки маркера на сторінці
-OLX (`docs/olx-api.md` §3.4 — заплановано в межах verify, п. 6.3). Auto-reactivate: якщо
+`auto-disabled: olx_status=<значення>` — такі рядки потрапляють у verify-прохід і
+підтверджуються/спростовуються прямою пробою сторінки (`docs/olx-api.md` §3.4,
+п. 6.3). Auto-reactivate: якщо
 auto-disabled рядок знову прийшов з `olx_status='active'` → `status='new'`, `miss_count=0`.
 
-### 6.3 Verify-прохід (заплановано, A3 — ще НЕ реалізовано)
+### 6.3 Verify-прохід (реалізовано, A3 — `docs/plans/verify-pass.md`)
 
 - Тригер: кнопка «Перевірити неактивні (N)» у панелі дій пошуку + CLI `--verify`.
-- Кандидати: `last_seen_at < datetime('now','-3 days')` AND `status_source='auto'`
-  (включно з уже `disabled` — для реактивації), сортувати за `last_seen_at ASC`, ліміт **50**.
-- Для кожного: GET `listing.url` (заголовки HTML-fallback). Детект:
-  - HTTP 404/410 → мертве;
-  - HTTP 200 → маркер неактивності в HTML — **визначити live перед реалізацією** (зразок
-    HTML → нова `docs/olx-api.md` §3.4; до того — СТОП і питання користувачу).
-- Мертве → `status='disabled', status_source='auto'` (миттєво). Живе → `last_seen_at=now`,
-  `miss_count=0`, якщо було `disabled` (і не manual) → `status='new'` (auto-reactivate).
+- Кандидати (разом ≤ **50** за прохід): P1 — `last_seen_at < datetime('now','-3 days')`
+  AND (`status_source='auto'` АБО `status='rejected'`), включно з уже `disabled` — для
+  реактивації, `ORDER BY last_seen_at ASC`; P2 — рядки без `description`, ще не в P1,
+  `ORDER BY posted_at DESC` (дозаповнення «хвоста»).
+- Для кожного: `probeListingPage(url)` (заголовки HTML-fallback, `redirect:'manual'`).
+  Маркер (верифіковано live 2026-06-12, `docs/olx-api.md` §3.4): HTTP 404/410 → `dead`;
+  HTTP 200 + `[data-testid="ad_description"]` → `alive`; інше → `unknown` (без змін).
+- `dead` (auto/rejected) → `status='disabled'` + `auto-disabled: verify http=<код>` у
+  `note`. `alive` → `last_seen_at=now`, `miss_count=0`, якщо було `disabled` (і не
+  manual) → `status='new'` (auto-reactivate); backfill `description`/`seller_name`
+  лише якщо в БД `NULL`.
 - Ввічливість: батч-патерн глибокого скану (батчі по 3, пауза 3–6 с, 1–2 с усередині).
 - Журнал: рядок `scan_runs` з `kind='verify'`; прогрес — існуючі
   `requests_done`/`requests_total` + `GET /api/searches/:id/scan-status`.
@@ -292,11 +307,12 @@ auto-disabled рядок знову прийшов з `olx_status='active'` → 
 | --- | --- | --- |
 | `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | CRUD пошуків. `PATCH` з `local_filters` → синхронний ретроактивний перерахунок `filtered_out` усіх рядків пошуку |
 | `POST` | `/api/searches/:id/move` | `{direction: 'up'\|'down'}` — ручне сортування пошуків |
-| `POST` | `/api/searches/:id/scan?deep=true` | Запустити сканування (звичайне/глибоке, повертає звіт scan_run); `?verify=true` — заплановано (A3) |
+| `POST` | `/api/searches/:id/scan?deep=true` | Запустити сканування (звичайне/глибоке, повертає звіт scan_run) |
+| `POST` | `/api/searches/:id/verify` | Verify-прохід (A3): проба сторінок кандидатів P1+P2, повертає `VerifyResult` |
 | `GET` | `/api/searches/:id/scan-status` | Останній рядок `scan_runs` — поллінг прогресу глибокого скану/verify |
 | `GET` | `/api/searches/:id/listings?sort=&order=` | Таблиця оголошень (усі рядки пошуку, без серверного пейджингу) |
 | `GET` | `/api/searches/:id/param-keys` | Ключі `params` + приклади значень — для конструктора діапазонів локальних фільтрів |
-| `GET` | `/api/searches/:id/stats` | `{in_db, stale_count, last_scan}` — для панелі дій пошуку |
+| `GET` | `/api/searches/:id/stats` | `{in_db, stale_count, verify_candidates, last_scan}` — для панелі дій пошуку |
 | `PATCH` | `/api/listings/:id` | `{status?, note?}` — інлайн-редагування; зміна `status` → `status_source='manual'`, `miss_count=0` |
 | `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 — дані для спарклайну |
 | `POST` | `/api/searches/:id/export/notion` | ⏳ Етап 4 — Експорт/синк у Notion |

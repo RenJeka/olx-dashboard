@@ -132,11 +132,24 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `limit` | `"40"` | так | розмір сторінки (сайт використовує 40) |
 | `filter_float_<name>:from` | `"8000"` | ні | нижня межа числового фільтра (`price` — універсальний) |
 | `filter_float_<name>:to` | `"15000"` | ні | верхня межа ✅ верифіковано live |
+| `sort_by` | `"created_at:desc"` | так (наш збір) | сортування «найновіші» ✅ верифіковано live 2026-06-12 (див. нижче) |
 | `filter_enum_<name>[0]` | `"5"` | ні | enum-фільтр (формат best-effort, НЕ верифіковано) |
 | `owner_type` | `"private"` | ні | тільки приватні (best-effort, НЕ верифіковано) |
 | `region_id` / `city_id` | `"25"` / `"268"` | ні | геофільтр (id з фасетів/URL сайту) |
 | `suggest_filters` | `"true"` | ні | повертати `metadata.filter_suggestions` |
 | `sl` | — | ні | трекінг-токен з кукі `onap`; **не передаємо** |
+
+**Сортування (verified live 2026-06-12, 3 проби):**
+
+- **без ключа сортування** GraphQL віддає видачу за **релевантністю** (дати хаотичні) —
+  для вікна покриття statusEngine непридатно, тому наш збір ЗАВЖДИ передає
+  `sort_by=created_at:desc`;
+- ключ `order` (дзеркало HTML `search[order]`) — **ігнорується** (видача ідентична default);
+- `sort_by=created_at:desc` («Найновіші» на сайті) фактично сортує за
+  **`last_refresh_time` DESC** (дата підняття/оновлення), НЕ за `created_time`: «підняті»
+  старі оголошення йдуть угорі. Перші 2–3 позиції сторінки — промо поза порядком, далі
+  строгий спуск. Тому вісь вікна покриття statusEngine — `last_refresh_at`
+  (`docs/plans/coverage-window-fix.md`).
 
 Приклад повного body (верифікований; збережений у `.temp/graphql-test-body.json`):
 
@@ -463,3 +476,4 @@ DOM-селектори простіші й достатні).
 | 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |
 | 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |
 | 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/verify-pass.md` |
+| 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/coverage-window-fix.md` |

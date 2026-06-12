@@ -85,6 +85,8 @@ async function fetchWithFallback(
   requestsUsed: number;
   exhausted: boolean;
   usedGraphql: boolean;
+  /** Частковий результат (warning фетчера, напр. «window cap hit») — покриття неповне. */
+  partial: boolean;
 }> {
   try {
     const result = await graphqlFetcher.fetchSearch(search, options);
@@ -95,6 +97,7 @@ async function fetchWithFallback(
       requestsUsed: result.requestsUsed,
       exhausted: result.exhausted,
       usedGraphql: true,
+      partial: result.warning != null,
     };
   } catch (graphqlErr) {
     const graphqlMessage =
@@ -111,6 +114,7 @@ async function fetchWithFallback(
         requestsUsed: result.requestsUsed,
         exhausted: result.exhausted,
         usedGraphql: false,
+        partial: result.warning != null,
       };
     } catch (htmlErr) {
       const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
@@ -153,15 +157,16 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   };
 
   try {
-    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql } =
+    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial } =
       await fetchWithFallback(search, {
         deep: options?.deep,
         onProgress,
       });
     const upsertResult = upsertListings(searchId, raw);
 
-    // Вікно покриття (CLAUDE.md): лише для успішних GraphQL-сканів, не fallback.
-    const { disabled_count } = usedGraphql
+    // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів — не fallback
+    // і не часткових (частковий deep із «window cap hit» не дає повної картини покриття).
+    const { disabled_count } = usedGraphql && !partial
       ? applyScanStatuses(searchId, raw, exhausted)
       : { disabled_count: 0 };
 

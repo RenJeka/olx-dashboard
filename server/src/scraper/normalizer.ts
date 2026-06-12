@@ -56,20 +56,21 @@ const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? W
 //
 // Статусна логіка (Етап 2, лише @is_graphql=1, тобто дані з GraphQL):
 // - miss_count скидається в 0 — оголошення присутнє у видачі цього скану;
-// - posted_at оновлюється лише з GraphQL (HTML-fallback дат не дає — не затираємо ISO-дату);
+// - posted_at/last_refresh_at оновлюються лише з GraphQL (HTML-fallback дат не дає —
+//   не затираємо ISO-дати);
 // - olx_status ≠ 'active' → миттєвий disable (auto-рядки і manual 'rejected' — факт
 //   зникнення сильніший за оцінку), з позначкою в note для ручної перевірки (CLAUDE.md);
 // - auto-рядок, що був disabled і знову з'явився живим → auto-reactivate в 'new'.
 const upsertStmt = db.prepare(`
   INSERT INTO listings (
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
-    photo_url, description, seller_name, contact_name, olx_status, posted_at, last_seen_at,
-    status, note
+    photo_url, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
+    last_seen_at, status, note
   )
   VALUES (
     @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
     COALESCE(@params, '{}'), @photo_url, @description, @seller_name, @contact_name, @olx_status,
-    @posted_at, datetime('now'),
+    @posted_at, @last_refresh_at, datetime('now'),
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN 'disabled' ELSE 'new' END,
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END
   )
@@ -88,6 +89,7 @@ const upsertStmt = db.prepare(`
     contact_name  = COALESCE(excluded.contact_name, contact_name),
     olx_status    = COALESCE(excluded.olx_status, olx_status),
     posted_at     = CASE WHEN @is_graphql = 1 THEN excluded.posted_at ELSE posted_at END,
+    last_refresh_at = CASE WHEN @is_graphql = 1 THEN excluded.last_refresh_at ELSE last_refresh_at END,
     last_seen_at  = datetime('now'),
     miss_count    = CASE WHEN @is_graphql = 1 THEN 0 ELSE miss_count END,
     status        = CASE
@@ -193,6 +195,7 @@ export function upsertListings(
         contact_name: contactName,
         olx_status: olxStatus,
         posted_at: postedAt,
+        last_refresh_at: hasStructuredData ? (item.lastRefreshAt ?? null) : null,
         is_graphql: hasStructuredData ? 1 : 0,
         olx_status_inactive: olxStatusInactive ? 1 : 0,
         status_note: olxStatusInactive ? `auto-disabled: olx_status=${olxStatus}` : '',
