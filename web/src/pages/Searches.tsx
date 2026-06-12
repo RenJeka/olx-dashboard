@@ -19,12 +19,14 @@ import {
   LuChevronDown,
   LuChevronUp,
   LuEllipsisVertical,
+  LuFilter,
   LuLayers,
   LuListChecks,
   LuPlus,
   LuRefreshCw,
   LuTrash2,
 } from 'react-icons/lu';
+import { SearchFiltersDrawer } from '../components/SearchFiltersDrawer';
 import {
   DialogBackdrop,
   DialogBody,
@@ -270,6 +272,7 @@ function SearchRow({
   const isDeepRunning = isThisScanning && scanState?.deep === true;
   const { data: status } = useScanStatus(search.id, isDeepRunning);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const deleteSearch = useDeleteSearch();
   const reorderSearch = useReorderSearches();
 
@@ -373,6 +376,11 @@ function SearchRow({
                   </HStack>
                 </Menu.Item>
                 <Menu.Separator />
+                <Menu.Item value="filters" onSelect={() => setFiltersOpen(true)}>
+                  <HStack gap={2}>
+                    <LuFilter /> <Text>Фільтри</Text>
+                  </HStack>
+                </Menu.Item>
                 <Menu.Item value="delete" color="fg.error" onSelect={() => setConfirmOpen(true)}>
                   <HStack gap={2}>
                     <LuTrash2 /> <Text>Видалити</Text>
@@ -408,6 +416,7 @@ function SearchRow({
           </Text>
         </Box>
       )}
+      <SearchFiltersDrawer search={search} open={filtersOpen} onOpenChange={setFiltersOpen} />
       <DialogRoot
         role="alertdialog"
         placement="center"

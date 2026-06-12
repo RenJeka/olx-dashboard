@@ -5,9 +5,27 @@ export interface Search {
   name: string;
   query: string;
   api_filters: string;
+  local_filters: string;
   visible_total_count: number | null;
   sort_order: number;
   created_at: string;
+}
+
+/** Локальні (нерайонні) фільтри пошуку: стоп-слова й числові діапазони по params (Етап 2). */
+export interface LocalFilters {
+  exclude_keywords?: string[];
+  ranges?: Record<string, { min?: number; max?: number }>;
+}
+
+/** Розподіл ключів params цього пошуку (з GET /api/searches/:id/param-keys) — для конструктора діапазонів. */
+export interface ParamKeyInfo {
+  key: string;
+  samples: string[];
+}
+
+/** Відповідь PATCH /api/searches/:id при зміні local_filters — містить лічильник перерахунку. */
+export interface SearchPatchResult extends Search {
+  filtered_out_count?: number;
 }
 
 /** Статус оголошення в моніторингу (ручний/auto-цикл, Етап 2). */

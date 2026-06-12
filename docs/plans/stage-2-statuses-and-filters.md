@@ -237,13 +237,25 @@ stateDiagram-v2
 
 ### B3. Редактор локальних фільтрів
 
-- [ ] `SearchFiltersDrawer.tsx` (3-dot меню пошуку → «Фільтри»):
+- [x] `SearchFiltersDrawer.tsx` (3-dot меню пошуку → «Фільтри»):
   - Стоп-слова: chips/теги (Chakra `Tag` з close-кнопкою) + input «додати слово» (Enter);
   - Діапазони: рядки [дропдаун ключа (з `GET param-keys`) | min | max | видалити] +
     кнопка «додати правило»;
   - Зберегти → `PATCH local_filters` → toast «Перераховано: N приховано».
-- [ ] Рядки `filtered_out=1` за замовчуванням приховані; при ввімкненому Switch —
+- [x] Рядки `filtered_out=1` за замовчуванням приховані; при ввімкненому Switch —
   показані з візуальною позначкою (іконка фільтра в рядку).
+
+  > Реалізовано: `SearchFiltersDrawer.tsx` (DrawerRoot, контрольований з `Menu.Item`
+  > «Фільтри» в `Searches.tsx`) — стоп-слова через `Tag.Root/Label/EndElement/CloseTrigger`
+  > + Input з Enter; діапазони — рядки `NativeSelect` (ключі з `useParamKeys`) + min/max
+  > `Input` + кнопка видалення, і кнопка «Додати правило». Зберегти →
+  > `useUpdateSearchFilters()` (PATCH local_filters) → toast з `filtered_out_count`,
+  > інвалідація `['searches']`/`['listings', searchId]`. Іконка `LuFilter` (orange) у
+  > комірці Title для `filtered_out=1` рядків, видимих при ввімкненому Switch (B2).
+  > Перевірено: `tsc -b`, production `vite build`, live-смоук (`param-keys`, PATCH
+  > `local_filters` з ключовими словами й діапазоном — `filtered_out_count: 3`, reset
+  > до `{}` — `filtered_out_count: 0`). Повна UI-перевірка в браузері — рекомендована
+  > (playwright-tester за запитом).
 
 ### B4. Панель дій пошуку (явні кнопки + фідбек)
 

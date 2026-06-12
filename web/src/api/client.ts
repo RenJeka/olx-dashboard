@@ -3,7 +3,17 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { Search, Listing, ListingPatch, ScanResult, ScanStatus, NewSearchInput } from '../types';
+import type {
+  Search,
+  Listing,
+  ListingPatch,
+  LocalFilters,
+  ParamKeyInfo,
+  ScanResult,
+  ScanStatus,
+  SearchPatchResult,
+  NewSearchInput,
+} from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.
@@ -135,6 +145,31 @@ export function useUpdateListing() {
       if (context) qc.setQueryData(context.queryKey, context.previous);
     },
     onSettled: (_data, _err, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+    },
+  });
+}
+
+/** Розподіл ключів params цього пошуку — для дропдауна конструктора діапазонів. */
+export function useParamKeys(searchId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['param-keys', searchId],
+    queryFn: () => api<ParamKeyInfo[]>(`/api/searches/${searchId}/param-keys`),
+    enabled,
+  });
+}
+
+/** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */
+export function useUpdateSearchFilters() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, local_filters }: { searchId: number; local_filters: LocalFilters }) =>
+      api<SearchPatchResult>(`/api/searches/${searchId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ local_filters }),
+      }),
+    onSuccess: (_data, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['searches'] });
       qc.invalidateQueries({ queryKey: ['listings', searchId] });
     },
   });

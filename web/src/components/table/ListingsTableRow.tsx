@@ -1,8 +1,10 @@
 import { memo, type ReactNode } from 'react';
-import { Table } from '@chakra-ui/react';
+import { HStack, Table } from '@chakra-ui/react';
 import { flexRender, type Row } from '@tanstack/react-table';
+import { LuFilter } from 'react-icons/lu';
 import type { Listing } from '../../types';
 import { DescriptionTooltip } from './DescriptionTooltip';
+import { Tooltip } from '../ui/tooltip';
 import { isMutedStatus } from '../../utils/status';
 
 interface ListingsTableRowProps {
@@ -37,6 +39,19 @@ export const ListingsTableRow = memo(function ListingsTableRow({
             >
               {rendered}
             </DescriptionTooltip>
+          );
+        }
+
+        if (cell.column.id === 'title' && row.original.filtered_out === 1) {
+          content = (
+            <HStack gap={1}>
+              <Tooltip content="Приховано локальним фільтром">
+                <span>
+                  <LuFilter color="var(--chakra-colors-orange-500)" />
+                </span>
+              </Tooltip>
+              {content}
+            </HStack>
           );
         }
 
