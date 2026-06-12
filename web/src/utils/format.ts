@@ -39,6 +39,21 @@ export function formatDate(value: string | null): { short: string; full: string 
 }
 
 /**
+ * Форматує ISO-дату (UTC) у відносний час «X тому» для рядка останнього скану.
+ */
+export function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diffMin < 1) return 'щойно';
+  if (diffMin < 60) return `${diffMin} хв тому`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} год тому`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} дн тому`;
+}
+
+/**
  * Конвертує HTML-опис OLX (з <br /> тегами) у plain text для безпечного рендеру.
  * <br>/<br/> → перенос рядка; решта тегів видаляється; основні HTML-ентіті декодуються.
  * Результат рендериться як текстовий вузол React (НЕ dangerouslySetInnerHTML) — XSS неможливий.

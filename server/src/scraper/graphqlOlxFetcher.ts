@@ -12,6 +12,13 @@ const PAGE_LIMIT = 40;
 const BATCH_SIZE = 3;
 /** Абсолютний запобіжник для глибокого скану (на випадок аномального visible_total_count). */
 const DEEP_SAFETY_CAP = 50;
+/**
+ * Максимальний валідний offset GraphQL OLX (верифіковано живими запитами 2026-06-12:
+ * offset=1000 → OK, offset=1040 → ListingError 400 "Data validation error occurred").
+ */
+const MAX_OFFSET = 1000;
+/** Кількість запитів від offset=0 до offset=MAX_OFFSET включно. */
+const MAX_PAGES = MAX_OFFSET / PAGE_LIMIT + 1;
 const MIN_DELAY_MS = 1000;
 const MAX_DELAY_MS = 2000;
 /** Пауза між батчами у глибокому скані — щоб не «DDoS»-ити OLX. */
@@ -149,6 +156,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       { key: 'query', value: search.query },
       { key: 'offset', value: String(offset) },
       { key: 'limit', value: String(PAGE_LIMIT) },
+      // Без цього ключа OLX віддає видачу за релевантністю — вікно покриття statusEngine
+      // втрачає сенс. Фактичний порядок — last_refresh_time DESC з промо-вкрапленнями
+      // зверху (ключ 'order' ігнорується; verified live 2026-06-12, docs/olx-api.md §2).
+      { key: 'sort_by', value: 'created_at:desc' },
     ];
 
     const { ranges, enums, privateOnly } = search.apiFilters;
@@ -185,9 +196,12 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const referer = `https://www.olx.ua/uk/list/q-${slugify(search.query)}/`;
     let visibleTotalCount: number | null = null;
     const deep = options?.deep ?? false;
-    // Глибокий: ціль уточнюється після 1-го запиту за visible_total_count (або лишається DEEP_SAFETY_CAP).
-    let target = deep ? DEEP_SAFETY_CAP : BATCH_SIZE;
+    // Глибокий: ціль уточнюється після 1-го запиту за visible_total_count (або лишається DEEP_SAFETY_CAP),
+    // але завжди обмежена MAX_PAGES — вікном пагінації GraphQL OLX.
+    let target = deep ? Math.min(DEEP_SAFETY_CAP, MAX_PAGES) : BATCH_SIZE;
     let requestsUsed = 0;
+    let exhausted = false;
+    let warning: string | undefined;
 
     for (let i = 0; i < target; i++) {
       const offset = i * PAGE_LIMIT;
@@ -230,6 +244,14 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
       if (result.__typename === 'ListingError') {
         const { code, title, detail, status } = result.error;
+
+        // Вікно пагінації OLX вичерпано (offset > MAX_OFFSET, верифіковано 2026-06-12) —
+        // зібране лишається валідним частковим результатом, HTML-fallback не потрібен.
+        if (offset > 0 && all.length > 0) {
+          warning = `graphql window cap hit at offset=${offset}`;
+          break;
+        }
+
         throw new Error(
           `OLX GraphQL ListingError: code=${code ?? '?'} status=${status ?? '?'} ` +
             `title="${title ?? ''}" detail="${detail ?? ''}"`,
@@ -239,7 +261,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       if (i === 0) {
         visibleTotalCount = result.metadata?.visible_total_count ?? null;
         if (deep && visibleTotalCount != null) {
-          target = Math.min(DEEP_SAFETY_CAP, Math.ceil(visibleTotalCount / PAGE_LIMIT));
+          target = Math.min(DEEP_SAFETY_CAP, MAX_PAGES, Math.ceil(visibleTotalCount / PAGE_LIMIT));
         }
       }
 
@@ -255,6 +277,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       options?.onProgress?.(requestsUsed, target);
 
       if (items.length < PAGE_LIMIT) {
+        exhausted = true;
         break;
       }
 
@@ -267,7 +290,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
     }
 
-    return { listings: all, visibleTotalCount, requestsUsed };
+    return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning };
   }
 
   /** Мапить GraphQL-оголошення у RawListing (мапінг полів — docs/olx-api.md §2.7). */

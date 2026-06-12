@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
-import { runScan } from '../scanner.js';
+import { runScan, runVerify, countVerifyCandidates } from '../scanner.js';
+import { evaluateFilteredOut } from '../scraper/localFilters.js';
+import type { LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
 
 interface SearchBody {
   name?: string;
@@ -115,7 +117,39 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
-      return db.prepare('SELECT * FROM searches WHERE id = ?').get(id);
+      const search = db.prepare('SELECT * FROM searches WHERE id = ?').get(id);
+
+      // Зміна local_filters → ретроактивний перерахунок filtered_out для всіх рядків пошуку.
+      if (req.body.local_filters === undefined) return search;
+
+      const { local_filters } = db.prepare('SELECT local_filters FROM searches WHERE id = ?').get(id) as {
+        local_filters: string;
+      };
+      let localFilters: LocalFilters = {};
+      try {
+        localFilters = JSON.parse(local_filters || '{}') as LocalFilters;
+      } catch {
+        localFilters = {};
+      }
+
+      const listingRows = db
+        .prepare('SELECT id, title, description, params FROM listings WHERE search_id = ?')
+        .all(id) as { id: number; title: string | null; description: string | null; params: string | null }[];
+
+      const updateFilteredOut = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
+      const recompute = db.transaction((rows: typeof listingRows) => {
+        let count = 0;
+        for (const row of rows) {
+          const filteredOut = evaluateFilteredOut(localFilters, row);
+          if (filteredOut) count++;
+          updateFilteredOut.run(filteredOut ? 1 : 0, row.id);
+        }
+        return count;
+      });
+
+      const filteredOutCount = recompute(listingRows);
+
+      return { ...(search as object), filtered_out_count: filteredOutCount };
     },
   );
 
@@ -200,6 +234,21 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Verify-прохід (A3): перевірка живості давно не бачених + дозаповнення опису/продавця.
+  app.post<{ Params: { id: string } }>('/api/searches/:id/verify', async (req, reply) => {
+    const id = Number(req.params.id);
+    const search = db.prepare('SELECT id FROM searches WHERE id = ?').get(id);
+    if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
+    try {
+      const result = await runVerify(id);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      app.log.error({ err }, 'Помилка verify-проходу');
+      return reply.code(500).send({ error: message });
+    }
+  });
+
   // Статус останнього скану — для поллінгу прогресу глибокого скану.
   app.get<{ Params: { id: string } }>(
     '/api/searches/:id/scan-status',
@@ -215,4 +264,63 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       return row;
     },
   );
+
+  // Розподіл усіх ключів params цього пошуку (для дропдауна конструктора діапазонів).
+  app.get<{ Params: { id: string } }>('/api/searches/:id/param-keys', async (req) => {
+    const id = Number(req.params.id);
+    const rows = db
+      .prepare("SELECT params FROM listings WHERE search_id = ? AND params IS NOT NULL AND params != '{}'")
+      .all(id) as { params: string }[];
+
+    const samplesByKey = new Map<string, string[]>();
+    for (const row of rows) {
+      let params: Record<string, string>;
+      try {
+        params = JSON.parse(row.params) as Record<string, string>;
+      } catch {
+        continue;
+      }
+      for (const [key, value] of Object.entries(params)) {
+        if (!samplesByKey.has(key)) samplesByKey.set(key, []);
+        const samples = samplesByKey.get(key) as string[];
+        if (samples.length < 3 && !samples.includes(value)) samples.push(value);
+      }
+    }
+
+    const result: ParamKeyInfo[] = Array.from(samplesByKey.entries())
+      .map(([key, samples]) => ({ key, samples }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+
+    return result;
+  });
+
+  // Статистика для панелі дій: скільки в базі, скільки "давно не бачених", останній скан.
+  app.get<{ Params: { id: string } }>('/api/searches/:id/stats', async (req, reply) => {
+    const id = Number(req.params.id);
+    const search = db.prepare('SELECT id FROM searches WHERE id = ?').get(id);
+    if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
+
+    const { in_db } = db
+      .prepare('SELECT COUNT(*) AS in_db FROM listings WHERE search_id = ?')
+      .get(id) as { in_db: number };
+
+    const { stale_count } = db
+      .prepare(
+        `SELECT COUNT(*) AS stale_count FROM listings
+         WHERE search_id = ? AND status_source = 'auto' AND last_seen_at < datetime('now', '-3 days')`,
+      )
+      .get(id) as { stale_count: number };
+
+    const lastScan = db
+      .prepare(
+        `SELECT kind, started_at, finished_at, found, new_count, disabled_count, error
+         FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
+      )
+      .get(id) as SearchStats['last_scan'] | undefined;
+
+    const verify_candidates = countVerifyCandidates(id);
+
+    const stats: SearchStats = { in_db, stale_count, verify_candidates, last_scan: lastScan ?? null };
+    return stats;
+  });
 }

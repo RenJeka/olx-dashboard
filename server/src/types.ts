@@ -1,4 +1,4 @@
-// Доменні типи OLX Monitor. Без `any` у доменному ядрі (scraper/db/logic).
+// Доменні типи OLX Dashboard. Без `any` у доменному ядрі (scraper/db/logic).
 
 /** Серверні фільтри OLX, що йдуть у URL пошуку. */
 export interface ApiFilters {
@@ -8,6 +8,14 @@ export interface ApiFilters {
   enums?: Record<string, string[]>;
   /** search[private_business]=private — лише приватні продавці. */
   privateOnly?: boolean;
+}
+
+/** Локальні (нерайонні) фільтри пошуку: стоп-слова й числові діапазони по params (Етап 2). */
+export interface LocalFilters {
+  /** Case-insensitive підрядки — збіг у title+description → filtered_out=1. */
+  exclude_keywords?: string[];
+  /** Числові діапазони по значенню params[key] (перше число в label); ключ відсутній/не парситься → правило не застосовується. */
+  ranges?: Record<string, { min?: number; max?: number }>;
 }
 
 /** Конфіг пошуку (рядок таблиці searches у зручному вигляді). */
@@ -61,12 +69,30 @@ export interface NormalizedPrice {
   currency: string;
 }
 
+/** Результат verify-проходу (повертається з /verify та CLI, Етап 2 A3). */
+export interface VerifyResult {
+  /** Скільки сторінок оголошень перевірено. */
+  checked: number;
+  alive: number;
+  dead: number;
+  /** Невизначений вердикт (JS-only сторінка, мережева помилка, неочікуваний код) — статус не змінено. */
+  unknown: number;
+  /** auto-disabled оголошення, що повернулись у 'new' після підтвердження живості. */
+  reactivated: number;
+  /** Скільки оголошень переведено в disabled (вердикт dead, auto/rejected). */
+  disabled_count: number;
+  /** Скільки рядків отримали description/seller_name, яких раніше не було (NULL → значення). */
+  backfilled: number;
+}
+
 /** Результат сканування (повертається з /scan та CLI). */
 export interface ScanResult {
   found: number;
   new_count: number;
   /** Скільки HTTP-запитів реально зроблено (звичайний скан: ≤3, глибокий: до DEEP_SAFETY_CAP). */
   requestsUsed: number;
+  /** Скільки оголошень переведено в disabled через statusEngine (лише GraphQL-скани). */
+  disabled_count: number;
 }
 
 /** Останній запис scan_runs для пошуку — для ендпойнту прогресу глибокого скану. */
@@ -79,6 +105,25 @@ export interface ScanStatus {
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
+}
+
+/** Статус оголошення в моніторингу (ручний/auto-цикл, Етап 2). */
+export type ListingStatus = 'new' | 'interested' | 'contacted' | 'rejected' | 'disabled';
+
+export const LISTING_STATUSES: ListingStatus[] = [
+  'new',
+  'interested',
+  'contacted',
+  'rejected',
+  'disabled',
+];
+
+/** Тіло PATCH /api/listings/:id. */
+export interface ListingPatch {
+  status?: ListingStatus;
+  note?: string;
+  pros?: string;
+  cons?: string;
 }
 
 /** Рядок listings для віддачі у API/UI. */
@@ -98,9 +143,43 @@ export interface ListingRow {
   contact_name: string | null;
   olx_status: string | null;
   status: string;
+  status_source: string;
+  note: string;
+  pros: string;
+  cons: string;
+  filtered_out: number;
+  miss_count: number;
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+}
+
+/** Елемент відповіді GET /api/searches/:id/param-keys — для конструктора діапазонів локальних фільтрів. */
+export interface ParamKeyInfo {
+  key: string;
+  /** До 3 прикладів значень (label) цього ключа з оголошень пошуку. */
+  samples: string[];
+}
+
+/** Останній рядок scan_runs — частина відповіді GET /api/searches/:id/stats. */
+export interface LastScanInfo {
+  kind: string;
+  started_at: string;
+  finished_at: string | null;
+  found: number | null;
+  new_count: number | null;
+  disabled_count: number | null;
+  error: string | null;
+}
+
+/** Відповідь GET /api/searches/:id/stats — для панелі дій (Етап 2). */
+export interface SearchStats {
+  in_db: number;
+  /** status_source='auto' AND last_seen_at старше 3 днів — для картки «Зниклі/Старі». */
+  stale_count: number;
+  /** Кандидати verify-проходу (A3): давно не бачені (P1) + рядки без опису (P2), без перетину. */
+  verify_candidates: number;
+  last_scan: LastScanInfo | null;
 }
 
 /** Результат fetchSearch: список оголошень + метадані видачі (якщо доступні). */
@@ -110,6 +189,18 @@ export interface FetchSearchResult {
   visibleTotalCount: number | null;
   /** Скільки запитів/сторінок реально оброблено. */
   requestsUsed: number;
+  /**
+   * Остання отримана сторінка мала < PAGE_LIMIT елементів (видачу вичерпано раніше
+   * лімітів скану) → вікно покриття statusEngine = вся видача (windowFloor = null).
+   * Для HtmlOlxFetcher завжди false (statusEngine для fallback-сканів не викликається).
+   */
+  exhausted: boolean;
+  /**
+   * Незначна проблема при успішному скані (напр. GraphqlOlxFetcher вперся у вікно
+   * пагінації OLX і повернув частковий результат) — пишеться у scan_runs.error поряд
+   * з фактичною помилкою/fallback-нотою.
+   */
+  warning?: string;
 }
 
 /** Опції одного скану. */

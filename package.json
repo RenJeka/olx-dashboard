@@ -12,7 +12,8 @@
     "dev:server": "npm -w server run dev",
     "dev:web": "npm -w web run dev",
     "build": "npm -w server run build && npm -w web run build",
-    "scan": "npm -w server run scan --"
+    "scan": "npm -w server run scan --",
+    "migrate:posted-at": "npm -w server run migrate:posted-at"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

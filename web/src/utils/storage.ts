@@ -7,8 +7,15 @@ export const DEFAULT_PAGE_SIZE = 50;
 
 interface StoredSettings {
   columnVisibility?: VisibilityState;
+  columnOrder?: string[];
   descriptionExpandEnabled?: boolean;
+  autoRefreshEnabled?: boolean;
+  autoRefreshIntervalMin?: number;
+  skipDeepScanConfirm?: boolean;
+  searchesVisible?: boolean;
 }
+
+export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
 
 function loadSettings(): StoredSettings {
   try {
@@ -30,11 +37,22 @@ function saveSettings(patch: Partial<StoredSettings>): void {
 }
 
 export function loadColumnVisibility(): VisibilityState {
-  return loadSettings().columnVisibility ?? {};
+  const saved = loadSettings().columnVisibility ?? {};
+  // Нові колонки, яких ще немає у збереженому стані — приховані за замовчуванням
+  const defaults: VisibilityState = { pros: false, cons: false };
+  return { ...defaults, ...saved };
 }
 
 export function saveColumnVisibility(columnVisibility: VisibilityState): void {
   saveSettings({ columnVisibility });
+}
+
+export function loadColumnOrder(): string[] {
+  return loadSettings().columnOrder ?? [];
+}
+
+export function saveColumnOrder(columnOrder: string[]): void {
+  saveSettings({ columnOrder });
 }
 
 export function loadDescriptionExpandEnabled(): boolean {
@@ -43,6 +61,38 @@ export function loadDescriptionExpandEnabled(): boolean {
 
 export function saveDescriptionExpandEnabled(descriptionExpandEnabled: boolean): void {
   saveSettings({ descriptionExpandEnabled });
+}
+
+export function loadAutoRefreshEnabled(): boolean {
+  return loadSettings().autoRefreshEnabled ?? false;
+}
+
+export function saveAutoRefreshEnabled(autoRefreshEnabled: boolean): void {
+  saveSettings({ autoRefreshEnabled });
+}
+
+export function loadAutoRefreshIntervalMin(): number {
+  return loadSettings().autoRefreshIntervalMin ?? DEFAULT_AUTO_REFRESH_INTERVAL_MIN;
+}
+
+export function saveAutoRefreshIntervalMin(autoRefreshIntervalMin: number): void {
+  saveSettings({ autoRefreshIntervalMin });
+}
+
+export function loadSkipDeepScanConfirm(): boolean {
+  return loadSettings().skipDeepScanConfirm ?? false;
+}
+
+export function saveSkipDeepScanConfirm(skipDeepScanConfirm: boolean): void {
+  saveSettings({ skipDeepScanConfirm });
+}
+
+export function loadSearchesVisible(): boolean {
+  return loadSettings().searchesVisible ?? true;
+}
+
+export function saveSearchesVisible(searchesVisible: boolean): void {
+  saveSettings({ searchesVisible });
 }
 
 export function loadTableState(): StoredTableState {

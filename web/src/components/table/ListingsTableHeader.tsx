@@ -35,21 +35,23 @@ export function ListingsTableHeader({ table }: ListingsTableHeaderProps) {
                   </Text>
                 )}
               </HStack>
-              <Box
-                onMouseDown={header.getResizeHandler()}
-                onTouchStart={header.getResizeHandler()}
-                onClick={(e) => e.stopPropagation()}
-                position="absolute"
-                top={0}
-                right={0}
-                h="full"
-                w="4px"
-                cursor="col-resize"
-                userSelect="none"
-                style={{ touchAction: 'none' }}
-                bg={header.column.getIsResizing() ? 'blue.500' : 'transparent'}
-                _hover={{ bg: 'blue.400' }}
-              />
+              {header.column.getCanResize() && (
+                <Box
+                  onMouseDown={header.getResizeHandler()}
+                  onTouchStart={header.getResizeHandler()}
+                  onClick={(e) => e.stopPropagation()}
+                  position="absolute"
+                  top={0}
+                  right={0}
+                  h="full"
+                  w="4px"
+                  cursor="col-resize"
+                  userSelect="none"
+                  style={{ touchAction: 'none' }}
+                  bg={header.column.getIsResizing() ? 'blue.500' : 'transparent'}
+                  _hover={{ bg: 'blue.400' }}
+                />
+              )}
             </Table.ColumnHeader>
           ))}
         </Table.Row>

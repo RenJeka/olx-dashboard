@@ -1,4 +1,4 @@
--- Канонічна схема БД OLX Monitor (див. docs/olx-monitor-spec.md §5).
+-- Канонічна схема БД OLX Dashboard (див. docs/olx-monitor-spec.md §5).
 -- Застосовується при старті через db.ts (CREATE TABLE IF NOT EXISTS).
 -- НЕ дублювати визначення таблиць у коді — джерело істини тут.
 
@@ -33,14 +33,21 @@ CREATE TABLE IF NOT EXISTS listings (
   contact_name TEXT,                 -- contact.name з GraphQL
   olx_status TEXT,                   -- статус оголошення на OLX (напр. "active"); НЕ плутати з полем status нижче
   posted_at TEXT,
+  last_refresh_at TEXT,              -- ISO-дата останнього підняття (GraphQL last_refresh_time); вісь вікна покриття statusEngine
+
   status TEXT DEFAULT 'new'
-    CHECK (status IN ('new','interested','contacted','disabled')),
+    CHECK (status IN ('new','interested','contacted','rejected','disabled')),
   status_source TEXT DEFAULT 'auto', -- auto | manual
   note TEXT DEFAULT '',
+  pros TEXT DEFAULT '',   -- TODO: заповнювати через AI (аналіз опису оголошення)
+  cons TEXT DEFAULT '',   -- TODO: заповнювати через AI (аналіз опису оголошення)
   filtered_out INTEGER DEFAULT 0,
+  miss_count INTEGER DEFAULT 0,      -- скани поспіль без цього оголошення у вікні покриття (Етап 2)
   first_seen_at TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);
 
 CREATE TABLE IF NOT EXISTS price_history (
   id INTEGER PRIMARY KEY,
@@ -52,6 +59,7 @@ CREATE TABLE IF NOT EXISTS price_history (
 CREATE TABLE IF NOT EXISTS scan_runs (
   id INTEGER PRIMARY KEY,
   search_id INTEGER REFERENCES searches(id),
+  kind TEXT DEFAULT 'normal',        -- normal | deep | verify (Етап 2)
   started_at TEXT,
   finished_at TEXT,
   found INTEGER,

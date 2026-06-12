@@ -14,10 +14,18 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
       props
 
     return (
-      <ChakraSwitch.Root ref={rootRef} {...rest}>
+      <ChakraSwitch.Root
+        ref={rootRef}
+        cursor="pointer"
+        css={{
+          cursor: 'pointer',
+          '& *': { cursor: 'pointer !important' },
+        }}
+        {...rest}
+      >
         <ChakraSwitch.HiddenInput ref={ref} {...inputProps} />
-        <ChakraSwitch.Control>
-          <ChakraSwitch.Thumb>
+        <ChakraSwitch.Control cursor="pointer">
+          <ChakraSwitch.Thumb cursor="pointer">
             {thumbLabel && (
               <ChakraSwitch.ThumbIndicator fallback={thumbLabel?.off}>
                 {thumbLabel?.on}
@@ -31,7 +39,7 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
           )}
         </ChakraSwitch.Control>
         {children != null && (
-          <ChakraSwitch.Label>{children}</ChakraSwitch.Label>
+          <ChakraSwitch.Label cursor="pointer">{children}</ChakraSwitch.Label>
         )}
       </ChakraSwitch.Root>
     )

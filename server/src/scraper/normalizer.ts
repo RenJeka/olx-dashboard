@@ -1,5 +1,7 @@
 import { db } from '../db/db.js';
-import type { RawListing, NormalizedPrice, ScanResult } from '../types.js';
+import { evaluateFilteredOut } from './localFilters.js';
+import { parseOlxDate } from './dateParser.js';
+import type { RawListing, NormalizedPrice, ScanResult, LocalFilters } from '../types.js';
 
 /**
  * Нормалізує сирий рядок ціни OLX.
@@ -42,19 +44,35 @@ function parseLocationDate(raw?: string): {
 }
 
 const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
+const searchLocalFiltersStmt = db.prepare('SELECT local_filters FROM searches WHERE id = ?');
+const selectForFilterStmt = db.prepare(
+  'SELECT id, title, description, params FROM listings WHERE olx_id = ?',
+);
+const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
 
 // district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
 // вже зібрані GraphQL-дані.
+//
+// Статусна логіка (Етап 2, лише @is_graphql=1, тобто дані з GraphQL):
+// - miss_count скидається в 0 — оголошення присутнє у видачі цього скану;
+// - posted_at/last_refresh_at оновлюються лише з GraphQL (HTML-fallback дат не дає —
+//   не затираємо ISO-дати);
+// - olx_status ≠ 'active' → миттєвий disable (auto-рядки і manual 'rejected' — факт
+//   зникнення сильніший за оцінку), з позначкою в note для ручної перевірки (CLAUDE.md);
+// - auto-рядок, що був disabled і знову з'явився живим → auto-reactivate в 'new'.
 const upsertStmt = db.prepare(`
   INSERT INTO listings (
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
-    photo_url, description, seller_name, contact_name, olx_status, posted_at, last_seen_at
+    photo_url, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
+    last_seen_at, status, note
   )
   VALUES (
     @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
     COALESCE(@params, '{}'), @photo_url, @description, @seller_name, @contact_name, @olx_status,
-    @posted_at, datetime('now')
+    @posted_at, @last_refresh_at, datetime('now'),
+    CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN 'disabled' ELSE 'new' END,
+    CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END
   )
   ON CONFLICT(olx_id) DO UPDATE SET
     title         = excluded.title,
@@ -70,20 +88,50 @@ const upsertStmt = db.prepare(`
     seller_name   = COALESCE(excluded.seller_name, seller_name),
     contact_name  = COALESCE(excluded.contact_name, contact_name),
     olx_status    = COALESCE(excluded.olx_status, olx_status),
-    posted_at     = excluded.posted_at,
-    last_seen_at  = datetime('now')
+    posted_at     = CASE WHEN @is_graphql = 1 THEN excluded.posted_at ELSE posted_at END,
+    last_refresh_at = CASE WHEN @is_graphql = 1 THEN excluded.last_refresh_at ELSE last_refresh_at END,
+    last_seen_at  = datetime('now'),
+    miss_count    = CASE WHEN @is_graphql = 1 THEN 0 ELSE miss_count END,
+    status        = CASE
+                       WHEN @is_graphql = 1 AND @olx_status_inactive = 1
+                            AND (status_source = 'auto' OR status = 'rejected')
+                         THEN 'disabled'
+                       WHEN @is_graphql = 1 AND @olx_status_inactive = 0
+                            AND status_source = 'auto' AND status = 'disabled'
+                         THEN 'new'
+                       ELSE status
+                     END,
+    note          = CASE
+                       WHEN @is_graphql = 1 AND @olx_status_inactive = 1
+                            AND (status_source = 'auto' OR status = 'rejected')
+                            AND (note IS NULL OR note NOT LIKE '%' || @status_note || '%')
+                         THEN CASE WHEN note IS NULL OR note = '' THEN @status_note
+                                   ELSE note || char(10) || @status_note END
+                       ELSE note
+                     END
 `);
 
 /**
  * Upsert розпарсених оголошень по olx_id.
- * price_history та filtered_out НЕ чіпаємо (Етапи 2–3).
+ * price_history НЕ чіпаємо (Етап 3). filtered_out перераховується через локальні
+ * фільтри пошуку (Етап 2) — після upsert, бо враховує COALESCE'ні description/params.
  * Повертає кількість знайдених і нових.
  */
 export function upsertListings(
   searchId: number,
   raw: RawListing[],
-): Omit<ScanResult, 'requestsUsed'> {
+): Pick<ScanResult, 'found' | 'new_count'> {
   let newCount = 0;
+
+  const localFiltersRow = searchLocalFiltersStmt.get(searchId) as
+    | { local_filters: string }
+    | undefined;
+  let localFilters: LocalFilters = {};
+  try {
+    localFilters = JSON.parse(localFiltersRow?.local_filters || '{}') as LocalFilters;
+  } catch {
+    localFilters = {};
+  }
 
   const run = db.transaction((items: RawListing[]) => {
     for (const item of items) {
@@ -125,8 +173,10 @@ export function upsertListings(
 
         const parsedLocation = parseLocationDate(item.locationDate);
         city = parsedLocation.city;
-        postedAt = parsedLocation.postedAt;
+        postedAt = parseOlxDate(parsedLocation.postedAt);
       }
+
+      const olxStatusInactive = hasStructuredData && olxStatus != null && olxStatus !== 'active';
 
       upsertStmt.run({
         olx_id: item.olxId,
@@ -145,7 +195,19 @@ export function upsertListings(
         contact_name: contactName,
         olx_status: olxStatus,
         posted_at: postedAt,
+        last_refresh_at: hasStructuredData ? (item.lastRefreshAt ?? null) : null,
+        is_graphql: hasStructuredData ? 1 : 0,
+        olx_status_inactive: olxStatusInactive ? 1 : 0,
+        status_note: olxStatusInactive ? `auto-disabled: olx_status=${olxStatus}` : '',
       });
+
+      const persisted = selectForFilterStmt.get(item.olxId) as
+        | { id: number; title: string | null; description: string | null; params: string | null }
+        | undefined;
+      if (persisted) {
+        const filteredOut = evaluateFilteredOut(localFilters, persisted);
+        updateFilteredOutStmt.run(filteredOut ? 1 : 0, persisted.id);
+      }
     }
   });
 

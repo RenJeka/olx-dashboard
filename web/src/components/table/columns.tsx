@@ -8,16 +8,53 @@ import {
   LuFileText,
   LuImage,
   LuMapPin,
+  LuNotebookPen,
   LuTag,
+  LuThumbsDown,
+  LuThumbsUp,
   LuUser,
 } from 'react-icons/lu';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
+import { StatusCell } from './StatusCell';
+import { NoteCell } from './NoteCell';
+import { ProsConsCell } from './ProsConsCell';
+import { HighlightText } from './HighlightText';
+import { Checkbox } from '../ui/checkbox';
 
 const columnHelper = createColumnHelper<Listing>();
 
 export const columns = [
+  columnHelper.display({
+    id: 'select',
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected()
+            ? true
+            : table.getIsSomePageRowsSelected()
+              ? 'indeterminate'
+              : false
+        }
+        onCheckedChange={(details) => table.toggleAllPageRowsSelected(details.checked === true)}
+        aria-label="Вибрати всі на сторінці"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(details) => row.toggleSelected(details.checked === true)}
+        aria-label="Вибрати рядок"
+      />
+    ),
+    enableSorting: false,
+    enableResizing: false,
+    enableHiding: false,
+    size: 36,
+    minSize: 36,
+    maxSize: 36,
+  }),
   columnHelper.accessor('photo_url', {
     header: () => <HeaderLabel icon={<LuImage />}>Фото</HeaderLabel>,
     enableSorting: false,
@@ -40,15 +77,17 @@ export const columns = [
     cell: (info) => {
       const url = info.row.original.url;
       const title = info.getValue() ?? '—';
+      const query = String(info.table.getState().globalFilter ?? '');
+      const content = <HighlightText text={title} query={query} />;
       return url ? (
         <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
           <HStack gap={1}>
-            <Text>{title}</Text>
+            <Text>{content}</Text>
             <LuExternalLink />
           </HStack>
         </Link>
       ) : (
-        title
+        content
       );
     },
   }),
@@ -61,9 +100,10 @@ export const columns = [
     cell: (info) => {
       const text = stripDescriptionHtml(info.getValue());
       if (!text) return '—';
+      const query = String(info.table.getState().globalFilter ?? '');
       return (
         <Text whiteSpace="pre-line" lineClamp={3}>
-          {text}
+          <HighlightText text={text} query={query} />
         </Text>
       );
     },
@@ -120,6 +160,42 @@ export const columns = [
       return <Badge colorPalette={value === 'active' ? 'green' : 'gray'}>{value}</Badge>;
     },
   }),
+  columnHelper.accessor('status', {
+    id: 'status',
+    header: () => <HeaderLabel icon={<LuCircleCheck />}>Статус</HeaderLabel>,
+    size: 130,
+    minSize: 110,
+    maxSize: 160,
+    enableSorting: false,
+    cell: (info) => <StatusCell listing={info.row.original} />,
+  }),
+  columnHelper.accessor('note', {
+    id: 'note',
+    header: () => <HeaderLabel icon={<LuNotebookPen />}>Нотатка</HeaderLabel>,
+    size: 220,
+    minSize: 140,
+    maxSize: 400,
+    enableSorting: false,
+    cell: (info) => <NoteCell listing={info.row.original} />,
+  }),
+  columnHelper.accessor('pros', {
+    id: 'pros',
+    header: () => <HeaderLabel icon={<LuThumbsUp color="green" />}>Плюси</HeaderLabel>,
+    size: 200,
+    minSize: 120,
+    maxSize: 400,
+    enableSorting: false,
+    cell: (info) => <ProsConsCell listing={info.row.original} field="pros" />,
+  }),
+  columnHelper.accessor('cons', {
+    id: 'cons',
+    header: () => <HeaderLabel icon={<LuThumbsDown color="red" />}>Мінуси</HeaderLabel>,
+    size: 200,
+    minSize: 120,
+    maxSize: 400,
+    enableSorting: false,
+    cell: (info) => <ProsConsCell listing={info.row.original} field="cons" />,
+  }),
 ];
 
 export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
@@ -131,4 +207,8 @@ export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'posted_at', label: 'Дата' },
   { id: 'seller', label: 'Продавець' },
   { id: 'olx_status', label: 'Статус OLX' },
+  { id: 'status', label: 'Статус' },
+  { id: 'note', label: 'Нотатка' },
+  { id: 'pros', label: 'Плюси' },
+  { id: 'cons', label: 'Мінуси' },
 ];

@@ -143,7 +143,8 @@ export class HtmlOlxFetcher implements OlxFetcher {
     }
 
     // HTML-сторінка пошуку не дає metadata.visible_total_count — лише GraphQL.
-    return { listings: all, visibleTotalCount: null, requestsUsed };
+    // exhausted: false — statusEngine для fallback-сканів не викликається (CLAUDE.md).
+    return { listings: all, visibleTotalCount: null, requestsUsed, exhausted: false };
   }
 
   /**

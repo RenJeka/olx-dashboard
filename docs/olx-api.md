@@ -132,11 +132,24 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `limit` | `"40"` | так | розмір сторінки (сайт використовує 40) |
 | `filter_float_<name>:from` | `"8000"` | ні | нижня межа числового фільтра (`price` — універсальний) |
 | `filter_float_<name>:to` | `"15000"` | ні | верхня межа ✅ верифіковано live |
+| `sort_by` | `"created_at:desc"` | так (наш збір) | сортування «найновіші» ✅ верифіковано live 2026-06-12 (див. нижче) |
 | `filter_enum_<name>[0]` | `"5"` | ні | enum-фільтр (формат best-effort, НЕ верифіковано) |
 | `owner_type` | `"private"` | ні | тільки приватні (best-effort, НЕ верифіковано) |
 | `region_id` / `city_id` | `"25"` / `"268"` | ні | геофільтр (id з фасетів/URL сайту) |
 | `suggest_filters` | `"true"` | ні | повертати `metadata.filter_suggestions` |
 | `sl` | — | ні | трекінг-токен з кукі `onap`; **не передаємо** |
+
+**Сортування (verified live 2026-06-12, 3 проби):**
+
+- **без ключа сортування** GraphQL віддає видачу за **релевантністю** (дати хаотичні) —
+  для вікна покриття statusEngine непридатно, тому наш збір ЗАВЖДИ передає
+  `sort_by=created_at:desc`;
+- ключ `order` (дзеркало HTML `search[order]`) — **ігнорується** (видача ідентична default);
+- `sort_by=created_at:desc` («Найновіші» на сайті) фактично сортує за
+  **`last_refresh_time` DESC** (дата підняття/оновлення), НЕ за `created_time`: «підняті»
+  старі оголошення йдуть угорі. Перші 2–3 позиції сторінки — промо поза порядком, далі
+  строгий спуск. Тому вісь вікна покриття statusEngine — `last_refresh_at`
+  (`docs/plans/coverage-window-fix.md`).
 
 Приклад повного body (верифікований; збережений у `.temp/graphql-test-body.json`):
 
@@ -245,6 +258,10 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - Затримка **1–2 с** (рандомізована) між запитами.
 - Стоп: повернулось менше `limit` елементів або 0.
 - `metadata.total_elements` обрізається до 1000 — реальна кількість у `visible_total_count`.
+- **Вікно пагінації — `offset ≤ 1000`** (верифіковано живими запитами 2026-06-12, пошук
+  «ipad 9»): `offset=1000` → `ListingSuccess` (40 елементів), `offset=1040` →
+  `ListingError code=400 "Data validation error occurred"`. Тобто GraphQL віддає максимум
+  ~1040 перших оголошень видачі (26 запитів від offset=0 до offset=1000).
 
 #### Глибокий скан (вручну)
 
@@ -255,12 +272,19 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - **Батчі по 3 запити** (`BATCH_SIZE`, той самий розмір, що й ліміт звичайного скану),
   з паузою **3–6 с** (`BATCH_PAUSE_MIN_MS`/`BATCH_PAUSE_MAX_MS`) між батчами; усередині
   батчу — звичайна затримка 1–2 с.
-- **Ціль**: спочатку `DEEP_SAFETY_CAP = 50` запитів (абсолютний запобіжник). Після
-  **першого** запиту, якщо `metadata.visible_total_count` присутній — ціль уточнюється
-  до `min(50, ceil(visible_total_count / 40))`. Для «ipad 9» (`visible_total_count = 1258`):
-  `ceil(1258/40) = 32` запити ≈ 11 батчів ≈ 1.5–2 хв.
+- **Ціль**: спочатку `DEEP_SAFETY_CAP = 50` запитів (стартова оцінка). Після **першого**
+  запиту, якщо `metadata.visible_total_count` присутній — ціль уточнюється до
+  `ceil(visible_total_count / 40)`. У будь-якому разі ціль обмежена `MAX_PAGES = 26`
+  (вікно пагінації `offset ≤ 1000` вище) — підсумкова формула:
+  `min(26, ceil(visible_total_count / 40))`. Для «ipad 9» (`visible_total_count ≈ 1258`):
+  `ceil(1258/40) = 32`, обмежено до `26` запитів ≈ 9 батчів ≈ 1–1.5 хв.
 - **Рання зупинка**: сторінка повернула `< 40` елементів (offset 0/40/80/...) — видача
   вичерпана раніше цілі, як і в звичайному скані.
+- **Частковий успіх при вікні пагінації**: якщо `ListingError` (вікно `offset ≤ 1000`)
+  трапився на `offset > 0` і вже є зібрані оголошення — скан **не** падає і **не** йде
+  у HTML-fallback; повертається частковий результат (`exhausted=false`, `warning:
+  "graphql window cap hit at offset=<N>"`), який `scanner.ts` пише у `scan_runs.error`
+  поряд із фактичною помилкою/fallback-нотою.
 - **HTML-fallback** (`HtmlOlxFetcher`) не має `visible_total_count` — для глибокого
   одразу `target = DEEP_SAFETY_CAP = 50`, без уточнення; той самий батч-патерн пауз.
 - **Прогрес**: після кожного запиту/сторінки `FetchOptions.onProgress(done, total)` пише
@@ -374,6 +398,45 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 Якщо карток немає І немає `empty-state` — фетчер кидає виняток зі зразком перших 600
 символів HTML + ознакою наявності `__NEXT_DATA__`. **НЕ** переходити на браузер автоматично.
 
+### 3.4 Сторінка оголошення: детект неактивності (verify-прохід, A3)
+
+> Верифіковано живими запитами **2026-06-12** (4 проби з паузами 1.5 с, включно з 2
+> реальними зниклими оголошеннями). Реалізація — `server/src/scraper/verifier.ts`
+> (`probeListingPage`), `docs/plans/verify-pass.md`.
+
+**Запит:**
+
+```
+GET <listing.url>
+```
+
+Заголовки — `REQUEST_HEADERS` з `selectors.ts` (ті самі, що для HTML-fallback пошуку),
+`redirect: 'manual'` (НЕ йдемо за 3xx-редіректами — opaque-redirect трактуємо як `unknown`).
+
+**Маркер живості/смерті — ТІЛЬКИ за HTTP-кодом + наявністю опису:**
+
+| Код / умова | Вердикт | Дія |
+| --- | --- | --- |
+| `404` | `dead` | неіснуючий URL |
+| `410 Gone` | `dead` | оголошення знято з продажу (підтверджено на 2 реальних зниклих) |
+| `200` + присутній `[data-testid="ad_description"]` | `alive` | живе; опис/продавець для backfill |
+| `200` без `ad_description`, 3xx, інші коди, мережева помилка | `unknown` | статус НЕ змінюється |
+
+> ⚠️ Текстові маркери (фрази типу «неактивне», «знято з продажу») **НЕнадійні** — такі
+> рядки трапляються навіть у JS-бандлах живої сторінки. Детект ТІЛЬКИ за HTTP-кодом +
+> наявністю `ad_description`.
+
+**Парсинг живої сторінки (cheerio, `selectors.ts`):**
+
+| Поле | Селектор | Примітка |
+| --- | --- | --- |
+| Опис | `[data-testid="ad_description"]` | `.html()` (з `<br>`), як у GraphQL `description` |
+| Продавець (приватний) | `[data-testid="user-profile-user-name"]` | |
+| Продавець (бізнес) | `[data-testid="trader-title"]` | fallback, якщо немає `user-profile-user-name` |
+
+`__NEXT_DATA__`/JSON-LD на detail-сторінках **немає** (є `__PRERENDERED_STATE__`, але
+DOM-селектори простіші й достатні).
+
 ---
 
 ## 4. Подальші fallback (не реалізовано, рішення людини)
@@ -411,3 +474,6 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |
 | 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
 | 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |
+| 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |
+| 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/verify-pass.md` |
+| 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/coverage-window-fix.md` |

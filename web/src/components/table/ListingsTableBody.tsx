@@ -7,12 +7,14 @@ interface ListingsTableBodyProps {
   table: ReactTable<Listing>;
   descriptionExpandEnabled: boolean;
   onOpenDescription: (listing: Listing) => void;
+  searchQuery: string;
 }
 
 export function ListingsTableBody({
   table,
   descriptionExpandEnabled,
   onOpenDescription,
+  searchQuery,
 }: ListingsTableBodyProps) {
   return (
     <Table.Body>
@@ -20,8 +22,10 @@ export function ListingsTableBody({
         <ListingsTableRow
           key={row.id}
           row={row}
+          isSelected={row.getIsSelected()}
           descriptionExpandEnabled={descriptionExpandEnabled}
           onOpenDescription={onOpenDescription}
+          searchQuery={searchQuery}
         />
       ))}
     </Table.Body>

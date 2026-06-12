@@ -11,7 +11,6 @@ import {
   Input,
   Menu,
   Portal,
-  Progress,
   Stack,
   Text,
 } from '@chakra-ui/react';
@@ -19,12 +18,12 @@ import {
   LuChevronDown,
   LuChevronUp,
   LuEllipsisVertical,
-  LuLayers,
+  LuFilter,
   LuListChecks,
   LuPlus,
-  LuRefreshCw,
   LuTrash2,
 } from 'react-icons/lu';
+import { SearchFiltersDrawer } from './SearchFiltersDrawer';
 import {
   DialogBackdrop,
   DialogBody,
@@ -34,40 +33,26 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from '../components/ui/dialog';
-import { toaster } from '../components/ui/toaster';
-import { Tooltip } from '../components/ui/tooltip';
-import {
-  useSearches,
-  useCreateSearch,
-  useScan,
-  useScanStatus,
-  useDeleteSearch,
-  useReorderSearches,
-} from '../api/client';
+} from './ui/dialog';
+import { toaster } from './ui/toaster';
+import { Tooltip } from './ui/tooltip';
+import { useSearches, useCreateSearch, useDeleteSearch, useReorderSearches } from '../api/client';
 import type { Search } from '../types';
 
 interface Props {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
+  visible?: boolean;
 }
 
-type ScanState = { id: number; deep: boolean } | null;
-
-// Орієнтовний час на запит глибокого скану: сам запит (1-2с) + амортизована
-// пауза між батчами (3-6с раз на BATCH_SIZE=3 запити) ≈ 3с/запит у середньому.
-const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
-
-export function Searches({ selectedId, onSelect }: Props) {
+export function Searches({ selectedId, onSelect, visible = true }: Props) {
   const { data: searches, isLoading } = useSearches();
   const createSearch = useCreateSearch();
-  const scan = useScan();
 
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
   const [priceFrom, setPriceFrom] = useState('');
   const [priceTo, setPriceTo] = useState('');
-  const [scanState, setScanState] = useState<ScanState>(null);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,30 +75,6 @@ export function Searches({ selectedId, onSelect }: Props) {
     );
   }
 
-  function runScan(id: number, deep: boolean) {
-    setScanState({ id, deep });
-    scan.mutate(
-      { searchId: id, deep },
-      {
-        onSuccess: (r) =>
-          toaster.create({
-            type: 'success',
-            title: deep ? 'Глибокий скан завершено' : 'Скан завершено',
-            description: deep
-              ? `Глибокий скан: ${r.requestsUsed} запитів, знайдено ${r.found}, нових ${r.new_count}`
-              : `Знайдено ${r.found}, нових ${r.new_count}`,
-          }),
-        onError: (err) =>
-          toaster.create({
-            type: 'error',
-            title: 'Помилка скану',
-            description: err instanceof Error ? err.message : String(err),
-          }),
-        onSettled: () => setScanState(null),
-      },
-    );
-  }
-
   return (
     <Flex
       as="aside"
@@ -125,6 +86,7 @@ export function Searches({ selectedId, onSelect }: Props) {
       borderColor="border.subtle"
       bg="bg.subtle"
       overflowY="auto"
+      display={visible ? 'flex' : 'none'}
     >
       <Accordion.Root multiple defaultValue={['searches']} variant="plain">
         <Accordion.Item value="searches" borderBottomWidth="1px" borderColor="border.subtle">
@@ -158,11 +120,9 @@ export function Searches({ selectedId, onSelect }: Props) {
                     key={s.id}
                     search={s}
                     selected={selectedId === s.id}
-                    scanState={scanState}
                     isFirst={index === 0}
                     isLast={index === searches.length - 1}
                     onSelect={() => onSelect(s.id)}
-                    onScan={(deep) => runScan(s.id, deep)}
                     onDeleted={() => {
                       if (selectedId === s.id) onSelect(null);
                     }}
@@ -184,51 +144,51 @@ export function Searches({ selectedId, onSelect }: Props) {
           <Accordion.ItemContent>
             <Accordion.ItemBody pt={0}>
               <Stack as="form" onSubmit={submit} gap={3} px={2}>
-        <Field.Root required>
-          <Field.Label>
-            Назва <Field.RequiredIndicator />
-          </Field.Label>
-          <Input
-            size="sm"
-            placeholder="напр. iPhone 13 Київ"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field.Root>
-        <Field.Root required>
-          <Field.Label>
-            Запит <Field.RequiredIndicator />
-          </Field.Label>
-          <Input
-            size="sm"
-            placeholder="напр. iphone 13"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </Field.Root>
-        <HStack gap={2}>
-          <Field.Root>
-            <Field.Label>Ціна від</Field.Label>
-            <Input
-              size="sm"
-              inputMode="numeric"
-              value={priceFrom}
-              onChange={(e) => setPriceFrom(e.target.value)}
-            />
-          </Field.Root>
-          <Field.Root>
-            <Field.Label>Ціна до</Field.Label>
-            <Input
-              size="sm"
-              inputMode="numeric"
-              value={priceTo}
-              onChange={(e) => setPriceTo(e.target.value)}
-            />
-          </Field.Root>
-        </HStack>
-        <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
-          <LuPlus /> Створити
-        </Button>
+                <Field.Root required>
+                  <Field.Label>
+                    Назва <Field.RequiredIndicator />
+                  </Field.Label>
+                  <Input
+                    size="sm"
+                    placeholder="напр. iPhone 13 Київ"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </Field.Root>
+                <Field.Root required>
+                  <Field.Label>
+                    Запит <Field.RequiredIndicator />
+                  </Field.Label>
+                  <Input
+                    size="sm"
+                    placeholder="напр. iphone 13"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </Field.Root>
+                <HStack gap={2}>
+                  <Field.Root>
+                    <Field.Label>Ціна від</Field.Label>
+                    <Input
+                      size="sm"
+                      inputMode="numeric"
+                      value={priceFrom}
+                      onChange={(e) => setPriceFrom(e.target.value)}
+                    />
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Ціна до</Field.Label>
+                    <Input
+                      size="sm"
+                      inputMode="numeric"
+                      value={priceTo}
+                      onChange={(e) => setPriceTo(e.target.value)}
+                    />
+                  </Field.Root>
+                </HStack>
+                <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
+                  <LuPlus /> Створити
+                </Button>
                 {createSearch.isError && (
                   <Text textStyle="xs" color="fg.error">
                     {createSearch.error instanceof Error
@@ -248,28 +208,15 @@ export function Searches({ selectedId, onSelect }: Props) {
 interface SearchRowProps {
   search: Search;
   selected: boolean;
-  scanState: ScanState;
   isFirst: boolean;
   isLast: boolean;
   onSelect: () => void;
-  onScan: (deep: boolean) => void;
   onDeleted: () => void;
 }
 
-function SearchRow({
-  search,
-  selected,
-  scanState,
-  isFirst,
-  isLast,
-  onSelect,
-  onScan,
-  onDeleted,
-}: SearchRowProps) {
-  const isThisScanning = scanState?.id === search.id;
-  const isDeepRunning = isThisScanning && scanState?.deep === true;
-  const { data: status } = useScanStatus(search.id, isDeepRunning);
+function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: SearchRowProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const deleteSearch = useDeleteSearch();
   const reorderSearch = useReorderSearches();
 
@@ -349,7 +296,6 @@ function SearchRow({
               aria-label="Дії з пошуком"
               size="2xs"
               variant="ghost"
-              loading={isThisScanning}
               onClick={(e) => e.stopPropagation()}
             >
               <LuEllipsisVertical />
@@ -358,18 +304,9 @@ function SearchRow({
           <Portal>
             <Menu.Positioner>
               <Menu.Content onClick={(e) => e.stopPropagation()}>
-                <Menu.Item value="scan" disabled={isThisScanning} onSelect={() => onScan(false)}>
+                <Menu.Item value="filters" onSelect={() => setFiltersOpen(true)}>
                   <HStack gap={2}>
-                    <LuRefreshCw /> <Text>Сканувати</Text>
-                  </HStack>
-                </Menu.Item>
-                <Menu.Item
-                  value="deep-scan"
-                  disabled={isThisScanning}
-                  onSelect={() => onScan(true)}
-                >
-                  <HStack gap={2}>
-                    <LuLayers /> <Text>Глибокий скан</Text>
+                    <LuFilter /> <Text>Фільтри</Text>
                   </HStack>
                 </Menu.Item>
                 <Menu.Separator />
@@ -383,31 +320,7 @@ function SearchRow({
           </Portal>
         </Menu.Root>
       </HStack>
-      {isDeepRunning && status && (
-        <Box px={2} pb={1}>
-          <Progress.Root
-            size="xs"
-            colorPalette="blue"
-            value={
-              status.requests_total == null
-                ? null
-                : ((status.requests_done ?? 0) / status.requests_total) * 100
-            }
-          >
-            <Progress.Track>
-              <Progress.Range />
-            </Progress.Track>
-          </Progress.Root>
-          <Text textStyle="xs" color="fg.muted" mt={0.5}>
-            {status.requests_total == null
-              ? 'Підготовка…'
-              : `Запит ${status.requests_done ?? 0}/${status.requests_total} · ~${Math.round(
-                  (status.requests_total - (status.requests_done ?? 0)) *
-                    DEEP_SCAN_SECONDS_PER_REQUEST,
-                )} с`}
-          </Text>
-        </Box>
-      )}
+      <SearchFiltersDrawer search={search} open={filtersOpen} onOpenChange={setFiltersOpen} />
       <DialogRoot
         role="alertdialog"
         placement="center"

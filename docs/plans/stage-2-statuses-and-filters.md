@@ -107,16 +107,21 @@ stateDiagram-v2
 
 ## Зміни схеми
 
-- [ ] `listings`: **table rebuild** (нове значення CHECK + нова колонка):
+- [x] `listings`: **table rebuild** (нове значення CHECK + нова колонка):
   - `status` CHECK → `('new','interested','contacted','rejected','disabled')`;
   - нова колонка `miss_count INTEGER DEFAULT 0`.
   - Міграція в `db.ts` через `PRAGMA user_version`: version `<2` → у транзакції
     `CREATE TABLE listings_new (… нова схема …)` → `INSERT INTO listings_new SELECT …,0 FROM listings`
     → `DROP TABLE listings` → `ALTER TABLE listings_new RENAME TO listings` → відтворити
     індекси → `PRAGMA user_version = 2`. (`addColumnIfMissing` НЕ підходить — міняється CHECK.)
-- [ ] `scan_runs`: `kind TEXT DEFAULT 'normal'` (`normal|deep|verify`) — через `addColumnIfMissing`.
-- [ ] Новий індекс: `CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);`
-- [ ] `schema.sql` оновити (канон для нових БД) синхронно з міграцією.
+- [x] `scan_runs`: `kind TEXT DEFAULT 'normal'` (`normal|deep|verify`) — через `addColumnIfMissing`.
+- [x] Новий індекс: `CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);`
+- [x] `schema.sql` оновити (канон для нових БД) синхронно з міграцією.
+
+  > Перевірено: `migrateListingsTable()` (`LISTINGS_SCHEMA_VERSION = 2`) у `db.ts` робить
+  > table rebuild з новим CHECK і `miss_count`; `scan_runs.kind` додано через
+  > `addColumnIfMissing`; `idx_listings_search_status` і `kind TEXT DEFAULT 'normal'`
+  > перенесені в `schema.sql` (канон синхронізовано з міграцією).
 
 Формат `searches.local_filters` (JSON):
 
@@ -135,53 +140,74 @@ stateDiagram-v2
 
 ### A1. Статуси й нотатки
 
-- [ ] `server/src/types.ts`: `ListingStatus = 'new'|'interested'|'contacted'|'rejected'|'disabled'`;
+- [x] `server/src/types.ts`: `ListingStatus = 'new'|'interested'|'contacted'|'rejected'|'disabled'`;
   розширити `ListingRow` (`miss_count`); тип `ListingPatch { status?, note? }`.
-- [ ] Новий роут `server/src/routes/listings.ts`: `PATCH /api/listings/:id`
+- [x] Новий роут `server/src/routes/listings.ts`: `PATCH /api/listings/:id`
   body `{status?, note?}` — валідація статусу по enum; будь-яка зміна статусу →
   `status_source='manual'`, `miss_count=0`. Повертає оновлений рядок.
-- [ ] `GET /api/searches/:id/listings`: додати query `status?` (фільтр) і
+- [x] `GET /api/searches/:id/listings`: додати query `status?` (фільтр) і
   `include_filtered?` (за замовчуванням `filtered_out=0` ховаються — УЗГОДИТИ нижче з B3:
   фільтрація клієнтська, тому простіше повертати все і фільтрувати на фронті; рішення —
   повертати все, серверний `status` лишити нереалізованим).
 
+  > Реалізовано за прийнятим рішенням: `LISTING_STATUSES`/`ListingPatch` у `types.ts`,
+  > `PATCH /api/listings/:id` з валідацією enum + `status_source='manual'`/`miss_count=0`
+  > (`routes/listings.ts`). `GET /api/searches/:id/listings` серверний `status`-фільтр НЕ
+  > додавався (як і вирішено) — повертає всі рядки пошуку, фільтрація (status/filtered_out/
+  > пошук) клієнтська (`ListingsTable.tsx`, B2).
+
 ### A2. statusEngine (вікно покриття)
 
-- [ ] Новий `server/src/scraper/statusEngine.ts`: `applyScanStatuses(searchId, fetched: RawListing[], exhausted: boolean)` —
+- [x] Новий `server/src/scraper/statusEngine.ts`: `applyScanStatuses(searchId, fetched: RawListing[], exhausted: boolean)` —
   логіка «Вікно покриття» вище, в одній транзакції. Повертає `{disabled_count}`.
-- [ ] `scanner.ts`: викликати після upsert ТІЛЬКИ якщо працював GraphQL-фетчер
+- [x] `scanner.ts`: викликати після upsert ТІЛЬКИ якщо працював GraphQL-фетчер
   (не fallback) і скан успішний; писати `disabled_count` у `scan_runs`.
-- [ ] `normalizer.ts`/фетчер: прокинути ознаку `exhausted` (остання сторінка `<40`).
-- [ ] Миттєвий disable по `olx_status`: в upsert — якщо прийшов `status ≠ 'active'` і
+- [x] `normalizer.ts`/фетчер: прокинути ознаку `exhausted` (остання сторінка `<40`).
+- [x] Миттєвий disable по `olx_status`: в upsert — якщо прийшов `status ≠ 'active'` і
   `status_source='auto'` → `status='disabled'` + лог-позначка
   `auto-disabled: olx_status=<x>` (див. ⚠️ перевірку користувача вище).
 
+  > Реалізовано: `applyScanStatuses()` (`statusEngine.ts`) викликається з `scanner.ts`
+  > лише коли `usedGraphql=true`, результат `disabled_count` пишеться у `scan_runs`;
+  > `exhausted` повертає `graphqlOlxFetcher`/`olxFetcher` (HTML — завжди `false`);
+  > миттєвий `olx_status`-disable + `note`-позначка `auto-disabled: olx_status=<x>` —
+  > в upsert-SQL `normalizer.ts`, разом з auto-reactivate при поверненні `olx_status='active'`.
+
 ### A3. Verify-прохід
 
-- [ ] `server/src/scraper/verifier.ts`: вибірка кандидатів (правила вище), GET сторінок
-  батчами (константи з deep scan), детект мертвих (маркер — live при реалізації, СТОП
-  якщо маркер не визначається), застосування статусів. Прогрес через `onProgress`.
-- [ ] `scanner.ts`: `runScan(searchId, { verify: true })` → гілка verifier, `scan_runs.kind='verify'`.
-- [ ] `routes/searches.ts`: `POST /api/searches/:id/scan?verify=true`.
-- [ ] `scan.ts` CLI: прапорець `--verify`.
-- [ ] `olx-api.md`: нова §3.4 «Сторінка оголошення: детект неактивності» (запит, маркери,
-  дата верифікації).
+- [x] `server/src/scraper/verifier.ts`: `probeListingPage(url)` — детект мертвої/живої
+  сторінки за HTTP-кодом + `ad_description` (маркер верифіковано live 2026-06-12,
+  `olx-api.md` §3.4), парсинг опису/продавця для backfill.
+- [x] `scanner.ts`: окрема `runVerify(searchId)` (не гілка `runScan`) — кандидати P1
+  (давно не бачені, ≥3 дні) + P2 (без `description`), разом ≤50, той самий батч-патерн,
+  що deep scan; `scan_runs.kind='verify'`, прогрес через `onProgress`.
+- [x] `routes/searches.ts`: окремий ендпойнт `POST /api/searches/:id/verify` (замість
+  `?verify=true` на `/scan` — чистіше з огляду на повністю іншу логіку й тип результату).
+- [x] `scan.ts` CLI: прапорець `--verify` (взаємовиключний з `--deep`).
+- [x] `olx-api.md` §3.4: маркер неактивності задокументовано (410/404/200+`ad_description`,
+  селектори опису/продавця, дата верифікації 2026-06-12).
+
+  > Реалізовано повністю за `docs/plans/verify-pass.md` (групи A–E). Кандидати: P1
+  > (`last_seen_at` < 3 дні, `status_source='auto'` або `status='rejected'`, включно з
+  > `disabled` для реактивації) + P2 (`description IS NULL`, ще не в P1) — повний обсяг,
+  > рішення користувача 2026-06-12. UI: картка «Перевірити неактивні (N)» в
+  > `SearchActionPanel.tsx` активна, N = `stats.verify_candidates`.
 
 ### A4. Локальні фільтри
 
-- [ ] `server/src/scraper/localFilters.ts`: `evaluate(localFilters, listing) → boolean`
+- [x] `server/src/scraper/localFilters.ts`: `evaluate(localFilters, listing) → boolean`
   (filtered_out чи ні) — одна чиста функція, юніт-перевірена вручну на прикладах.
-- [ ] `normalizer.ts`: при insert/update обчислювати `filtered_out` через `evaluate`.
-- [ ] `routes/searches.ts`: `PATCH /api/searches/:id` приймає `local_filters` →
+- [x] `normalizer.ts`: при insert/update обчислювати `filtered_out` через `evaluate`.
+- [x] `routes/searches.ts`: `PATCH /api/searches/:id` приймає `local_filters` →
   у транзакції зберегти + перерахувати `filtered_out` для ВСІХ рядків пошуку
   (synchronous loop по rows, better-sqlite3 потягне ≤2000 рядків).
-- [ ] Новий `GET /api/searches/:id/param-keys` → `[{key, name, sample}]` — distinct ключі
+- [x] Новий `GET /api/searches/:id/param-keys` → `[{key, name, sample}]` — distinct ключі
   з `listings.params` цього пошуку (для дропдауна конструктора діапазонів). `name` брати
   ніде (в БД лише `{key: label}`) → повертати `key` + 2-3 sample-значення.
 
 ### A5. Stats для панелі дій
 
-- [ ] `routes/searches.ts`: `GET /api/searches/:id/stats` →
+- [x] `routes/searches.ts`: `GET /api/searches/:id/stats` →
   ```json
   {
     "in_db": 167,
@@ -197,37 +223,65 @@ stateDiagram-v2
 
 ### B1. Колонка «Статус» + нотатки
 
-- [ ] `types/index.ts` + `client.ts`: `useUpdateListing()` (PATCH, оптимістичний апдейт
+- [x] `types/index.ts` + `client.ts`: `useUpdateListing()` (PATCH, оптимістичний апдейт
   кешу `['listings', searchId]`), статус-enum, лейбли/кольори:
   `new` (blue) / `interested` (green) / `contacted` (purple) / `rejected` (gray) /
   `disabled` (red, приглушений).
-- [ ] `columns.tsx`: колонка «Статус» — Chakra `Menu` або `NativeSelect` у комірці
+- [x] `columns.tsx`: колонка «Статус» — Chakra `Menu` або `NativeSelect` у комірці
   (компактний Badge-тригер); рядки зі `status='disabled'` або `'rejected'` — `opacity 0.5`.
-- [ ] Колонка «Нотатка»: показ обрізано (`lineClamp 2`); клік → `Popover` з `Textarea`
+- [x] Колонка «Нотатка»: показ обрізано (`lineClamp 2`); клік → `Popover` з `Textarea`
   (autofocus) + кнопка «Зберегти» (PATCH). Якщо Popover у комірці конфліктує з таблицею —
   fallback: поле нотатки в існуючому `DescriptionDialog`.
 
+  > Реалізовано через `Popover.Root`/`Popover.Trigger asChild`/`Portal` + `Popover.Positioner`
+  > (рендериться в `document.body`, не обмежений `overflow:auto` контейнером таблиці) —
+  > конфлікту з таблицею не виявлено при білді/смоук-тесті API; повна перевірка в браузері —
+  > рекомендована (playwright-tester за запитом).
+
 ### B2. Фільтр-панель таблиці
 
-- [ ] Панель над таблицею (`ListingsTable.tsx`): сегмент-фільтр статусів
+- [x] Панель над таблицею (`ListingsTable.tsx`): сегмент-фільтр статусів
   (Всі / new / interested / contacted / rejected / disabled — з лічильниками),
   Switch «показати відфільтровані» (filtered_out), `Input` текстового пошуку.
-- [ ] Фільтрація клієнтська: TanStack `globalFilter` (кастомна fn по title + очищеному
+- [x] Фільтрація клієнтська: TanStack `globalFilter` (кастомна fn по title + очищеному
   description, case-insensitive) + column filter по status + предикат filtered_out.
   `autoResetPageIndex` скине пагінацію сам.
-- [ ] **Підсвітка збігів**: компонент `HighlightText` (split по запиту, збіги —
+- [x] **Підсвітка збігів**: компонент `HighlightText` (split по запиту, збіги —
   `<Mark>`/`<chakra.mark>` з фоном `yellow.subtle`) — застосувати в комірках Title і
   Description (і в тултіпі опису).
 
+  > Реалізовано: `ListingsFilterBar.tsx` (SegmentGroup статусів з лічильниками — рахуються
+  > з урахуванням toggle filtered_out, але без статус-фільтра й текстового пошуку, щоб
+  > давати стабільний огляд; Switch; Input пошуку). Статус-фільтр і filtered_out —
+  > pre-filter масиву `rows` (`useMemo`) перед передачею в `useReactTable`; текстовий
+  > пошук — `globalFilter`/`globalFilterFn`/`getFilteredRowModel`. `HighlightText` —
+  > новий компонент (split за regex, `<Mark bg="yellow.subtle">`), застосований у
+  > колонках Title/Description і в `DescriptionTooltip`. Перевірено: `tsc -b` і
+  > production `vite build` без помилок; dev-сервер (front+back) піднімається без
+  > runtime-помилок у логах. Повна UI-перевірка в браузері — рекомендована
+  > (playwright-tester за запитом).
+
 ### B3. Редактор локальних фільтрів
 
-- [ ] `SearchFiltersDrawer.tsx` (3-dot меню пошуку → «Фільтри»):
+- [x] `SearchFiltersDrawer.tsx` (3-dot меню пошуку → «Фільтри»):
   - Стоп-слова: chips/теги (Chakra `Tag` з close-кнопкою) + input «додати слово» (Enter);
   - Діапазони: рядки [дропдаун ключа (з `GET param-keys`) | min | max | видалити] +
     кнопка «додати правило»;
   - Зберегти → `PATCH local_filters` → toast «Перераховано: N приховано».
-- [ ] Рядки `filtered_out=1` за замовчуванням приховані; при ввімкненому Switch —
+- [x] Рядки `filtered_out=1` за замовчуванням приховані; при ввімкненому Switch —
   показані з візуальною позначкою (іконка фільтра в рядку).
+
+  > Реалізовано: `SearchFiltersDrawer.tsx` (DrawerRoot, контрольований з `Menu.Item`
+  > «Фільтри» в `Searches.tsx`) — стоп-слова через `Tag.Root/Label/EndElement/CloseTrigger`
+  > + Input з Enter; діапазони — рядки `NativeSelect` (ключі з `useParamKeys`) + min/max
+  > `Input` + кнопка видалення, і кнопка «Додати правило». Зберегти →
+  > `useUpdateSearchFilters()` (PATCH local_filters) → toast з `filtered_out_count`,
+  > інвалідація `['searches']`/`['listings', searchId]`. Іконка `LuFilter` (orange) у
+  > комірці Title для `filtered_out=1` рядків, видимих при ввімкненому Switch (B2).
+  > Перевірено: `tsc -b`, production `vite build`, live-смоук (`param-keys`, PATCH
+  > `local_filters` з ключовими словами й діапазоном — `filtered_out_count: 3`, reset
+  > до `{}` — `filtered_out_count: 0`). Повна UI-перевірка в браузері — рекомендована
+  > (playwright-tester за запитом).
 
 ### B4. Панель дій пошуку (явні кнопки + фідбек)
 
@@ -235,76 +289,158 @@ stateDiagram-v2
 (над таблицею, в `App.tsx` поруч із лічильниками; у 3-dot меню лишити тільки
 «Видалити» і «Фільтри»):
 
-- [ ] **Рядок стану** (дані з `GET /api/searches/:id/stats`, рефетч після кожної дії):
+- [x] **Рядок стану** (дані з `GET /api/searches/:id/stats`, рефетч після кожної дії):
   `На OLX: 1 258 · У базі: 167 · Давно не бачених: 42` + другий рядок
   `Останній скан: <відносний час> (<швидкий|глибокий|перевірка>) · +N нових · M вимкнено`
   (якщо `last_scan.error` — іконка ⚠ з tooltip-текстом помилки).
-- [ ] **Три кнопки** (Button з іконкою + текстом, НЕ IconButton; під кожною — дрібний
+- [x] **Три кнопки** (Button з іконкою + текстом, НЕ IconButton; під кожною — дрібний
   підпис-пояснення):
   - `LuRefreshCw` **«Швидкий скан»** — підпис «~10 с · новинки зверху видачі»;
   - `LuLayers` **«Глибокий скан»** — підпис «~1–2 хв · вся видача вглиб»;
   - `LuStethoscope` **«Перевірити неактивні (N)»** — N = `stale_count`; підпис
     «~1 хв · заходить на сторінки старих оголошень»; `disabled` якщо N=0
     (tooltip «Немає оголошень, що потребують перевірки»).
-- [ ] Усі кнопки блокуються, поки триває будь-яка дія цього пошуку.
-- [ ] **Прогрес-бар** «Запит X/Y · ~Z с» — для **всіх трьох** режимів (зараз лише deep;
+- [x] Усі кнопки блокуються, поки триває будь-яка дія цього пошуку.
+- [x] **Прогрес-бар** «Запит X/Y · ~Z с» — для **всіх трьох** режимів (зараз лише deep;
   normal — короткий, але хай теж показує; той самий `useScanStatus`-поллінг).
-- [ ] **Toast після завершення** — різний текст за режимом:
+- [x] **Toast після завершення** — різний текст за режимом:
   - швидкий: «Знайдено 145 · нових 3 · вимкнено 1»;
   - глибокий: «32 запити · знайдено 1 240 · нових 210 · вимкнено 4»;
   - перевірка: «Перевірено 42 · мертвих 5 · реактивовано 1».
   Помилка (включно з fallback-позначкою) → toast type warning з суттю.
-- [ ] Verify повертає `{checked, dead, reactivated}` у `ScanResult` (узгодити з A3).
+- [x] Verify повертає окремий `VerifyResult {checked, alive, dead, unknown, reactivated,
+  disabled_count, backfilled}` — НЕ через `ScanResult` (окремий ендпойнт/тип, A3,
+  `docs/plans/verify-pass.md`).
+
+  > Реалізовано (часткова B4 на момент написання — verify-логіка була за A3, тепер
+  > реалізована повністю, див. нижче): новий `SearchActionPanel.tsx`, рендериться в
+  > `App.tsx` як окрема секція
+  > над `<Searches>`/`<ListingsTable>` для вибраного пошуку (стара лінія
+  > «Результатів на OLX… · У базі…» в хедері видалена разом з її `useListings`).
+  > Рядок стану — `useSearchStats()` (`GET /stats`) + `formatRelativeTime()` для
+  > «Останній скан: X тому»; помилка останнього скану — іконка `LuTriangleAlert`
+  > з tooltip-текстом помилки. «Швидкий скан»/«Глибокий скан» — `useScan()`,
+  > обидві кнопки `disabled` під час будь-якого скану цього пошуку, прогрес —
+  > існуючий `useScanStatus()`-поллінг (як було для deep, тепер і для normal).
+  > Toast після завершення — success з текстом за режимом (включає
+  > `disabled_count` з оновленого `ScanResult`); помилка — toast type error.
+  > «Перевірити неактивні (N)» — після реалізації A3 (`docs/plans/verify-pass.md`)
+  > картка активна: `N = stats.verify_candidates`, onClick → `useVerify()`, прогрес
+  > через `useScanStatus`/`scanKind='verify'`, тост-підсумок «Перевірено N · живих N ·
+  > мертвих N · реактивовано N · вимкнено N · дозаповнено N».
+  > 3-dot меню пошуку (`Searches.tsx`) звужено до «Фільтри»/«Видалити» —
+  > `useScan`/`useScanStatus`/`scanState`/`runScan` та пункти
+  > «Сканувати»/«Глибокий скан» видалені звідти.
+  > Типи: `ScanResult.disabled_count`, `LastScanInfo`, `SearchStats` додані у
+  > `web/src/types/index.ts` (дзеркало серверних A4/A5 типів); `useSearchStats()`
+  > у `client.ts`, `useScan()` тепер інвалідує і `['search-stats', searchId]`.
+  > Перевірено: `tsc -b`, production `vite build` — чисто; dev-сервер +
+  > live-смоук (`GET /stats` на тестовому пошуку, `POST /scan` → `last_scan` з
+  > `kind/started_at/error` коректно повертається і відображається). Повна
+  > UI-перевірка в браузері — рекомендована (playwright-tester за запитом).
 
 ### B5. Автооновлення + пояснювальні діалоги
 
 **Автооновлення (клієнтське):**
 
-- [ ] `SettingsDrawer`: новий розділ «Автооновлення» — Switch (дефолт **вимкнено**) +
+- [x] `SettingsDrawer`: новий розділ «Автооновлення» — Switch (дефолт **вимкнено**) +
   селектор інтервалу `15 / 30 / 60 хв`. Персист у `SETTINGS_STORAGE_KEY`
   (`autoRefreshEnabled`, `autoRefreshIntervalMin`).
-- [ ] Механіка: `setInterval` поки вкладка відкрита (новий хук `useAutoRefresh`):
+- [x] Механіка: `setInterval` поки вкладка відкрита (новий хук `useAutoRefresh`):
   **швидкий скан** для всіх пошуків **послідовно** (не паралельно — ввічливість до OLX),
   пауза 5–10 с між пошуками. Пропустити тік, якщо вкладка прихована
   (`document.visibilityState !== 'visible'`) або вже триває будь-який скан/verify.
-- [ ] Фідбек: toast на старті тіку («Автооновлення: сканую N пошуків…») і підсумковий
+- [x] Фідбек: toast на старті тіку («Автооновлення: сканую N пошуків…») і підсумковий
   («Автооновлення: +X нових across N пошуків»; якщо 0 нових — тихий/короткий toast).
   Рядок стану і таблиця оновлюються через стандартну інвалідацію кешу.
-- [ ] Індикатор у шапці: маленький бейдж «авто: 30 хв» поруч із шестернею, коли ввімкнено.
-- [ ] Глибокий скан і verify автооновлення НІКОЛИ не запускає — лише швидкий.
-- [ ] (Довідка: серверний node-cron з Етапу 4 — окремий headless-механізм, цим пунктом
+- [x] Індикатор у шапці: маленький бейдж «авто: 30 хв» поруч із шестернею, коли ввімкнено.
+- [x] Глибокий скан і verify автооновлення НІКОЛИ не запускає — лише швидкий.
+- [x] (Довідка: серверний node-cron з Етапу 4 — окремий headless-механізм, цим пунктом
   не скасовується; клієнтське автооновлення працює лише з відкритою вкладкою.)
+
+  > Реалізовано: `useAutoRefresh(enabled, intervalMin)` (`web/src/hooks/useAutoRefresh.ts`),
+  > викликається з `App.tsx`. Тік пропускається, якщо вкладка прихована або
+  > `queryClient.isMutating({ mutationKey: ['scan'] }) > 0` (для цього `useScan()` тепер
+  > має `mutationKey: ['scan']` — фіксує і ручні скани, і кроки самого автооновлення).
+  > Послідовний `scan.mutateAsync({deep:false})` по всіх пошуках з паузою 5-10с;
+  > toast на старті й підсумковий (success з `+N нових`, або тихий `info` 3с, якщо 0).
+  > Налаштування — новий розділ «Автооновлення» в `SettingsDrawer` (Switch +
+  > `NativeSelect` 15/30/60 хв), персист через `loadAutoRefreshEnabled/IntervalMin`
+  > у `storage.ts`. Бейдж «авто: N хв» (`LuTimer`) у хедері `App.tsx` поруч із
+  > `SettingsDrawer`, видимий лише коли увімкнено.
 
 **Пояснювальні діалоги перед діями:**
 
-- [ ] Швидкий скан — без підтвердження (легка дія, є toast після).
-- [ ] **Глибокий скан** — `DialogRoot` (патерн діалогу видалення): «Глибокий скан зробить
+- [x] Швидкий скан — без підтвердження (легка дія, є toast після).
+- [x] **Глибокий скан** — `DialogRoot` (патерн діалогу видалення): «Глибокий скан зробить
   до ~{ceil(visible_total_count/40) || 50} запитів до OLX з паузами (~{оцінка} хв) і
   додасть у базу оголошення з глибини видачі. Продовжити?» + Checkbox «Більше не питати»
   (персист `skipDeepScanConfirm` у settings).
 - [ ] **Перевірити неактивні** — аналогічний діалог: «Буде відкрито до {N} сторінок
   давно не бачених оголошень (~{оцінка} хв). Мертві → disabled, живі → оновлення/
   реактивація. Продовжити?» + «Більше не питати» (`skipVerifyConfirm`).
-- [ ] Обидва діалоги переюзають один компонент `ConfirmActionDialog` (title, body,
+  _(Скасовано рішенням `docs/plans/verify-pass.md` D2 — дія без підтвердження, як
+  швидкий скан.)_
+- [x] Обидва діалоги переюзають один компонент `ConfirmActionDialog` (title, body,
   confirmLabel, skipKey).
+
+  > Реалізовано: спільний `ConfirmActionDialog.tsx` (title/description/confirmLabel +
+  > Checkbox «Більше не питати», той самий `DialogRoot`-патерн, що й діалог видалення
+  > пошуку). У `SearchActionPanel` кнопка «Глибокий скан» відкриває цей діалог (текст
+  > з оцінкою `~min(50, ceil(visible_total_count/40))` запитів і часом за
+  > `DEEP_SCAN_SECONDS_PER_REQUEST`), якщо не встановлено `skipDeepScanConfirm`;
+  > підтвердження з «Більше не питати» зберігає прапорець через
+  > `saveSkipDeepScanConfirm()`. Діалог «Перевірити неактивні» — свідомо НЕ
+  > реалізований: за рішенням `docs/plans/verify-pass.md` (D2) дія виконується без
+  > підтвердження (як швидкий скан), `skipVerifyConfirm` не додавався.
+  > Перевірено: `tsc -b`, production `vite build`, dev-сервер boot — чисто. Повна
+  > UI-перевірка (відкриття діалогів, бейдж, перемикач у Settings) — рекомендована
+  > (playwright-tester за запитом).
 
 ### B6. Bulk-дії (опційна група — якщо обсяг етапу розповзається, відкласти ЦЮ групу)
 
-- [ ] TanStack row selection: колонка-чекбокс (header = select all on page).
-- [ ] Панель «N вибрано»: дропдаун «змінити статус на…» → серія PATCH (або loop на
+- [x] TanStack row selection: колонка-чекбокс (header = select all on page).
+  - Display-колонка `select` (першою в `columns.tsx`), чекбокси з `web/src/components/ui/checkbox.tsx`.
+    Header: `table.getIsAllPageRowsSelected()` / `getIsSomePageRowsSelected()` → checked/indeterminate,
+    `table.toggleAllPageRowsSelected()`. Cell: `row.getIsSelected()` / `row.toggleSelected()`.
+    `enableSorting/enableResizing/enableHiding: false`, фіксована ширина 36px (НЕ в `TOGGLEABLE_COLUMNS`).
+  - `ListingsTableHeader.tsx`: ресайз-хендл рендериться лише якщо `header.column.getCanResize()`
+    (інакше зайва смужка на 36px-колонці).
+  - `ListingsTable.tsx`: стейт `rowSelection` (`RowSelectionState`), `getRowId: (row) => String(row.id)`
+    (стабільні id для виділення при зміні фільтрів/сторінок), `enableRowSelection: true`.
+    Виділення скидається при зміні `searchId` (`useEffect`).
+- [x] Панель «N вибрано»: дропдаун «змінити статус на…» → серія PATCH (або loop на
   фронті; окремий bulk-ендпойнт НЕ робити — зайва поверхня).
+  - Новий `web/src/components/table/BulkActionBar.tsx`: рендериться між `ListingsFilterBar` і таблицею,
+    коли є виділені рядки. «Вибрано: N» + `Menu` зі статусами (`LISTING_STATUSES`/`STATUS_LABELS`) +
+    «Скасувати». Вибір статусу → `Promise.allSettled` з `useUpdateListing().mutateAsync()` по кожному
+    `id`, тост з підсумком (успіх / N з M + помилки), скидання виділення.
+
+  > Перевірено: `tsc -b` + `vite build` чисто; dev-сервер піднявся без помилок; через API
+  > створено тестовий пошук і 3 listings, серія `PATCH /api/listings/:id {status: "interested"}`
+  > (аналог дій `BulkActionBar`) повернула `status_source: "manual"` для всіх трьох — підтверджує,
+  > що loop-патч застосовується коректно. Повний UI-прохід (клік чекбоксів, Menu, тост) рекомендується
+  > перевірити вручну в браузері.
 
 ## Група C — Документація
 
-- [ ] `CLAUDE.md` — «Зміни канону» (див. нижче) перенести в секцію інваріантів.
-- [ ] `docs/olx-monitor-spec.md` §6 — нова діаграма статусів + вікно покриття + verify.
-- [ ] `docs/architecture.md` — statusEngine/verifier/localFilters у таблиці модулів,
+- [x] `CLAUDE.md` — «Зміни канону» (див. нижче) перенести в секцію інваріантів.
+- [x] `docs/olx-monitor-spec.md` §6 — нова діаграма статусів + вікно покриття + verify.
+- [x] `docs/architecture.md` — statusEngine/verifier/localFilters у таблиці модулів,
   нові ендпойнти, сценарій verify.
-- [ ] `docs/structure.md` — нові файли.
-- [ ] `docs/olx-api.md` §3.4 — детект неактивної сторінки (після live-зняття маркера).
-- [ ] `docs/plans/TODO` — «Закінчити всі фази» не чіпати; цей план лінкнути.
+- [x] `docs/structure.md` — нові файли.
+- [x] `docs/olx-api.md` §3.4 — детект неактивної сторінки (маркер знято live 2026-06-12).
+- [x] `docs/plans/TODO` — «Закінчити всі фази» не чіпати; цей план лінкнути.
+
+  > §3.4 тепер заповнено фактичним маркером (HTTP 410/404 → `dead`, 200 +
+  > `[data-testid="ad_description"]` → `alive`; верифіковано live 2026-06-12, деталі —
+  > `docs/plans/verify-pass.md`). Решта пунктів — повністю виконано: CLAUDE.md
+  > («Бізнес-логіка» переписана з усіма інваріантами Етапу 2), spec §6/§6.1-6.3/§7,
+  > architecture.md (§3-7), structure.md (дерево + орієнтири).
 
 ## Зміни канону (для перенесення в CLAUDE.md)
+
+> ✅ Перенесено в `CLAUDE.md` (розділи «Схема БД» та «Бізнес-логіка»).
 
 1. Статуси: `new|interested|contacted|rejected|disabled`; `rejected` — лише ручний.
 2. Auto-disable: **вікно покриття** (windowFloor по `posted_at` поточного скану) +

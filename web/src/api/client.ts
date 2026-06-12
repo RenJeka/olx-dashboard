@@ -3,7 +3,19 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { Search, Listing, ScanResult, ScanStatus, NewSearchInput } from '../types';
+import type {
+  Search,
+  Listing,
+  ListingPatch,
+  LocalFilters,
+  ParamKeyInfo,
+  ScanResult,
+  ScanStatus,
+  SearchPatchResult,
+  SearchStats,
+  VerifyResult,
+  NewSearchInput,
+} from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.
@@ -71,12 +83,38 @@ export function useReorderSearches() {
 export function useScan() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: ['scan'],
     mutationFn: ({ searchId, deep }: { searchId: number; deep?: boolean }) =>
       api<ScanResult>(`/api/searches/${searchId}/scan${deep ? '?deep=true' : ''}`, {
         method: 'POST',
       }),
-    onSuccess: (_data, { searchId }) =>
-      qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+    onSuccess: (_data, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+      qc.invalidateQueries({ queryKey: ['search-stats', searchId] });
+    },
+  });
+}
+
+/** Verify-прохід (A3): перевірка живості + дозаповнення опису/продавця для давно не бачених. */
+export function useVerify() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['verify'],
+    mutationFn: (searchId: number) =>
+      api<VerifyResult>(`/api/searches/${searchId}/verify`, { method: 'POST' }),
+    onSuccess: (_data, searchId) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+      qc.invalidateQueries({ queryKey: ['search-stats', searchId] });
+    },
+  });
+}
+
+/** Статистика для панелі дій: скільки в базі, скільки "давно не бачених", останній скан. */
+export function useSearchStats(searchId: number | null) {
+  return useQuery({
+    queryKey: ['search-stats', searchId],
+    queryFn: () => api<SearchStats>(`/api/searches/${searchId}/stats`),
+    enabled: searchId != null,
   });
 }
 
@@ -95,5 +133,72 @@ export function useListings(searchId: number | null) {
     queryKey: ['listings', searchId],
     queryFn: () => api<Listing[]>(`/api/searches/${searchId}/listings`),
     enabled: searchId != null,
+  });
+}
+
+interface UpdateListingVars {
+  id: number;
+  searchId: number;
+  patch: ListingPatch;
+}
+
+/** PATCH /api/listings/:id зі оптимістичним апдейтом кешу ['listings', searchId]. */
+export function useUpdateListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: UpdateListingVars) =>
+      api<Listing>(`/api/listings/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      }),
+    onMutate: async ({ id, searchId, patch }: UpdateListingVars) => {
+      const queryKey = ['listings', searchId];
+      await qc.cancelQueries({ queryKey });
+      const previous = qc.getQueryData<Listing[]>(queryKey);
+      qc.setQueryData<Listing[]>(queryKey, (old) =>
+        old?.map((listing) =>
+          listing.id === id
+            ? {
+                ...listing,
+                ...patch,
+                status_source: patch.status !== undefined ? 'manual' : listing.status_source,
+                miss_count: patch.status !== undefined ? 0 : listing.miss_count,
+              }
+            : listing,
+        ),
+      );
+      return { previous, queryKey };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) qc.setQueryData(context.queryKey, context.previous);
+    },
+    onSettled: (_data, _err, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+    },
+  });
+}
+
+/** Розподіл ключів params цього пошуку — для дропдауна конструктора діапазонів. */
+export function useParamKeys(searchId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['param-keys', searchId],
+    queryFn: () => api<ParamKeyInfo[]>(`/api/searches/${searchId}/param-keys`),
+    enabled,
+  });
+}
+
+/** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */
+export function useUpdateSearchFilters() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, local_filters }: { searchId: number; local_filters: LocalFilters }) =>
+      api<SearchPatchResult>(`/api/searches/${searchId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ local_filters }),
+      }),
+    onSuccess: (_data, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['searches'] });
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+    },
   });
 }
