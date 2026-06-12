@@ -1,6 +1,6 @@
-import { Heading, HStack, IconButton, Stack, Text } from '@chakra-ui/react';
+import { Heading, HStack, IconButton, NativeSelect, Stack, Text } from '@chakra-ui/react';
 import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
-import { LuFileText, LuMoon, LuSettings, LuSun } from 'react-icons/lu';
+import { LuFileText, LuMoon, LuSettings, LuSun, LuTimer } from 'react-icons/lu';
 import { TOGGLEABLE_COLUMNS } from '../pages/ListingsTable';
 import { Checkbox } from './ui/checkbox';
 import { useColorMode } from './ui/color-mode';
@@ -22,6 +22,10 @@ interface Props {
   onColumnVisibilityChange: OnChangeFn<VisibilityState>;
   descriptionExpandEnabled: boolean;
   onDescriptionExpandEnabledChange: (value: boolean) => void;
+  autoRefreshEnabled: boolean;
+  onAutoRefreshEnabledChange: (value: boolean) => void;
+  autoRefreshIntervalMin: number;
+  onAutoRefreshIntervalMinChange: (value: number) => void;
 }
 
 export function SettingsDrawer({
@@ -29,6 +33,10 @@ export function SettingsDrawer({
   onColumnVisibilityChange,
   descriptionExpandEnabled,
   onDescriptionExpandEnabledChange,
+  autoRefreshEnabled,
+  onAutoRefreshEnabledChange,
+  autoRefreshIntervalMin,
+  onAutoRefreshIntervalMinChange,
 }: Props) {
   const { colorMode, toggleColorMode } = useColorMode();
 
@@ -66,6 +74,33 @@ export function SettingsDrawer({
                   <Text>Розширений перегляд опису (тултіп + модалка)</Text>
                 </HStack>
               </Switch>
+            </Stack>
+            <Stack gap={3}>
+              <Heading size="sm">Автооновлення</Heading>
+              <Switch
+                checked={autoRefreshEnabled}
+                onCheckedChange={(details) => onAutoRefreshEnabledChange(details.checked)}
+              >
+                <HStack gap={1}>
+                  <LuTimer />
+                  <Text>Автоматично сканувати всі пошуки</Text>
+                </HStack>
+              </Switch>
+              <NativeSelect.Root size="sm" w="40" disabled={!autoRefreshEnabled}>
+                <NativeSelect.Field
+                  value={String(autoRefreshIntervalMin)}
+                  onChange={(e) => onAutoRefreshIntervalMinChange(Number(e.target.value))}
+                >
+                  <option value="15">Кожні 15 хв</option>
+                  <option value="30">Кожні 30 хв</option>
+                  <option value="60">Кожні 60 хв</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+              <Text textStyle="xs" color="fg.muted">
+                Поки вкладка відкрита — швидкий скан усіх пошуків по черзі, з паузами між
+                ними. Глибокий скан і перевірку автооновлення не запускає.
+              </Text>
             </Stack>
             <Stack gap={3}>
               <Text fontWeight="medium">Колонки таблиці</Text>

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Box, Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
 import { LuLayers, LuRefreshCw, LuStethoscope, LuTriangleAlert } from 'react-icons/lu';
+import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { Tooltip } from './ui/tooltip';
 import { toaster } from './ui/toaster';
 import { useScan, useScanStatus, useSearchStats } from '../api/client';
 import { formatRelativeTime } from '../utils/format';
+import { loadSkipDeepScanConfirm, saveSkipDeepScanConfirm } from '../utils/storage';
 import type { Search } from '../types';
 
 const SCAN_KIND_LABELS: Record<string, string> = {
@@ -14,6 +16,8 @@ const SCAN_KIND_LABELS: Record<string, string> = {
 };
 
 const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+const DEEP_SCAN_PAGE_LIMIT = 40;
+const DEEP_SCAN_SAFETY_CAP = 50;
 
 interface Props {
   search: Search;
@@ -22,12 +26,30 @@ interface Props {
 /** Панель дій вибраного пошуку: статистика + кнопки скану з прогресом (Етап 2, B4). */
 export function SearchActionPanel({ search }: Props) {
   const [scanKind, setScanKind] = useState<'normal' | 'deep' | null>(null);
+  const [confirmDeepOpen, setConfirmDeepOpen] = useState(false);
   const scan = useScan();
   const { data: stats } = useSearchStats(search.id);
   const { data: status } = useScanStatus(search.id, scanKind != null);
 
   const isScanning = scanKind != null;
   const lastScan = stats?.last_scan;
+
+  const deepScanRequests =
+    search.visible_total_count != null
+      ? Math.min(DEEP_SCAN_SAFETY_CAP, Math.ceil(search.visible_total_count / DEEP_SCAN_PAGE_LIMIT))
+      : DEEP_SCAN_SAFETY_CAP;
+  const deepScanMinutes = Math.max(
+    1,
+    Math.round((deepScanRequests * DEEP_SCAN_SECONDS_PER_REQUEST) / 60),
+  );
+
+  function startDeepScan() {
+    if (loadSkipDeepScanConfirm()) {
+      runScan(true);
+    } else {
+      setConfirmDeepOpen(true);
+    }
+  }
 
   function runScan(deep: boolean) {
     const kind = deep ? 'deep' : 'normal';
@@ -104,7 +126,7 @@ export function SearchActionPanel({ search }: Props) {
             variant="outline"
             loading={scanKind === 'deep'}
             disabled={isScanning}
-            onClick={() => runScan(true)}
+            onClick={startDeepScan}
           >
             <LuLayers /> Глибокий скан
           </Button>
@@ -150,6 +172,17 @@ export function SearchActionPanel({ search }: Props) {
           </Text>
         </Box>
       )}
+      <ConfirmActionDialog
+        open={confirmDeepOpen}
+        onOpenChange={setConfirmDeepOpen}
+        title="Запустити глибокий скан?"
+        description={`Глибокий скан зробить до ~${deepScanRequests} запитів до OLX з паузами (~${deepScanMinutes} хв) і додасть у базу оголошення з глибини видачі. Продовжити?`}
+        confirmLabel="Сканувати"
+        onConfirm={(skipNextTime) => {
+          if (skipNextTime) saveSkipDeepScanConfirm(true);
+          runScan(true);
+        }}
+      />
     </Stack>
   );
 }

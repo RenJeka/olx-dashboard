@@ -82,6 +82,7 @@ export function useReorderSearches() {
 export function useScan() {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: ['scan'],
     mutationFn: ({ searchId, deep }: { searchId: number; deep?: boolean }) =>
       api<ScanResult>(`/api/searches/${searchId}/scan${deep ? '?deep=true' : ''}`, {
         method: 'POST',

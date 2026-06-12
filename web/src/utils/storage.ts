@@ -8,7 +8,12 @@ export const DEFAULT_PAGE_SIZE = 50;
 interface StoredSettings {
   columnVisibility?: VisibilityState;
   descriptionExpandEnabled?: boolean;
+  autoRefreshEnabled?: boolean;
+  autoRefreshIntervalMin?: number;
+  skipDeepScanConfirm?: boolean;
 }
+
+export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
 
 function loadSettings(): StoredSettings {
   try {
@@ -43,6 +48,30 @@ export function loadDescriptionExpandEnabled(): boolean {
 
 export function saveDescriptionExpandEnabled(descriptionExpandEnabled: boolean): void {
   saveSettings({ descriptionExpandEnabled });
+}
+
+export function loadAutoRefreshEnabled(): boolean {
+  return loadSettings().autoRefreshEnabled ?? false;
+}
+
+export function saveAutoRefreshEnabled(autoRefreshEnabled: boolean): void {
+  saveSettings({ autoRefreshEnabled });
+}
+
+export function loadAutoRefreshIntervalMin(): number {
+  return loadSettings().autoRefreshIntervalMin ?? DEFAULT_AUTO_REFRESH_INTERVAL_MIN;
+}
+
+export function saveAutoRefreshIntervalMin(autoRefreshIntervalMin: number): void {
+  saveSettings({ autoRefreshIntervalMin });
+}
+
+export function loadSkipDeepScanConfirm(): boolean {
+  return loadSettings().skipDeepScanConfirm ?? false;
+}
+
+export function saveSkipDeepScanConfirm(skipDeepScanConfirm: boolean): void {
+  saveSettings({ skipDeepScanConfirm });
 }
 
 export function loadTableState(): StoredTableState {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Box, Flex, Heading, HStack } from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, HStack } from '@chakra-ui/react';
 import type { VisibilityState } from '@tanstack/react-table';
-import { LuSearch } from 'react-icons/lu';
+import { LuSearch, LuTimer } from 'react-icons/lu';
 import { useSearches } from './api/client';
 import { SearchActionPanel } from './components/SearchActionPanel';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { Toaster } from './components/ui/toaster';
+import { useAutoRefresh } from './hooks/useAutoRefresh';
 import { Searches } from './pages/Searches';
 import { ListingsTable } from './pages/ListingsTable';
 import {
@@ -13,6 +14,10 @@ import {
   saveColumnVisibility,
   loadDescriptionExpandEnabled,
   saveDescriptionExpandEnabled,
+  loadAutoRefreshEnabled,
+  saveAutoRefreshEnabled,
+  loadAutoRefreshIntervalMin,
+  saveAutoRefreshIntervalMin,
 } from './utils/storage';
 
 export function App() {
@@ -23,8 +28,16 @@ export function App() {
   const [descriptionExpandEnabled, setDescriptionExpandEnabled] = useState<boolean>(() =>
     loadDescriptionExpandEnabled(),
   );
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState<boolean>(() =>
+    loadAutoRefreshEnabled(),
+  );
+  const [autoRefreshIntervalMin, setAutoRefreshIntervalMin] = useState<number>(() =>
+    loadAutoRefreshIntervalMin(),
+  );
   const { data: searches } = useSearches();
   const selectedSearch = searches?.find((s) => s.id === selectedId);
+
+  useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin);
 
   useEffect(() => {
     saveColumnVisibility(columnVisibility);
@@ -34,6 +47,14 @@ export function App() {
     saveDescriptionExpandEnabled(descriptionExpandEnabled);
   }, [descriptionExpandEnabled]);
 
+  useEffect(() => {
+    saveAutoRefreshEnabled(autoRefreshEnabled);
+  }, [autoRefreshEnabled]);
+
+  useEffect(() => {
+    saveAutoRefreshIntervalMin(autoRefreshIntervalMin);
+  }, [autoRefreshIntervalMin]);
+
   return (
     <Flex direction="column" h="100vh">
       <Box as="header" borderBottomWidth="1px" borderColor="border.subtle" px={4} py={3}>
@@ -42,12 +63,23 @@ export function App() {
             <LuSearch />
             <Heading size="lg">OLX Monitor</Heading>
           </HStack>
-          <SettingsDrawer
-            columnVisibility={columnVisibility}
-            onColumnVisibilityChange={setColumnVisibility}
-            descriptionExpandEnabled={descriptionExpandEnabled}
-            onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
-          />
+          <HStack gap={2}>
+            {autoRefreshEnabled && (
+              <Badge colorPalette="blue" variant="subtle">
+                <LuTimer /> авто: {autoRefreshIntervalMin} хв
+              </Badge>
+            )}
+            <SettingsDrawer
+              columnVisibility={columnVisibility}
+              onColumnVisibilityChange={setColumnVisibility}
+              descriptionExpandEnabled={descriptionExpandEnabled}
+              onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
+              autoRefreshEnabled={autoRefreshEnabled}
+              onAutoRefreshEnabledChange={setAutoRefreshEnabled}
+              autoRefreshIntervalMin={autoRefreshIntervalMin}
+              onAutoRefreshIntervalMinChange={setAutoRefreshIntervalMin}
+            />
+          </HStack>
         </HStack>
       </Box>
       {selectedSearch && (
