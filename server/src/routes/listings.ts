@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
+import { LISTING_STATUSES, type ListingPatch } from '../types.js';
 
 // Білий список колонок для сортування (захист від SQL-інʼєкцій).
 const SORTABLE = new Set([
@@ -10,6 +11,11 @@ const SORTABLE = new Set([
   'first_seen_at',
   'last_seen_at',
 ]);
+
+const LISTING_COLUMNS = `id, olx_id, search_id, title, url, price, currency, city, district,
+                photo_url, description, seller_name, contact_name, olx_status,
+                status, status_source, note, filtered_out, miss_count,
+                posted_at, first_seen_at, last_seen_at`;
 
 export async function listingsRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
@@ -25,13 +31,46 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
 
     return db
       .prepare(
-        `SELECT id, olx_id, search_id, title, url, price, currency, city, district,
-                photo_url, description, seller_name, contact_name, olx_status,
-                status, posted_at, first_seen_at, last_seen_at
+        `SELECT ${LISTING_COLUMNS}
          FROM listings
          WHERE search_id = ?
          ORDER BY ${sort} ${order}`,
       )
       .all(searchId);
   });
+
+  // Ручна зміна статусу/нотатки. Будь-яка зміна статусу → status_source='manual', miss_count=0.
+  app.patch<{ Params: { id: string }; Body: ListingPatch }>(
+    '/api/listings/:id',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const existing = db.prepare('SELECT id FROM listings WHERE id = ?').get(id);
+      if (!existing) return reply.code(404).send({ error: 'Оголошення не знайдено' });
+
+      const { status, note } = req.body;
+
+      if (status !== undefined && !LISTING_STATUSES.includes(status)) {
+        return reply.code(400).send({ error: `Невідомий статус: ${status}` });
+      }
+
+      const fields: string[] = [];
+      const values: unknown[] = [];
+
+      if (status !== undefined) {
+        fields.push("status = ?", "status_source = 'manual'", 'miss_count = 0');
+        values.push(status);
+      }
+      if (note !== undefined) {
+        fields.push('note = ?');
+        values.push(note);
+      }
+
+      if (fields.length > 0) {
+        values.push(id);
+        db.prepare(`UPDATE listings SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+      }
+
+      return db.prepare(`SELECT ${LISTING_COLUMNS} FROM listings WHERE id = ?`).get(id);
+    },
+  );
 }

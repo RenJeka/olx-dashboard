@@ -34,13 +34,16 @@ CREATE TABLE IF NOT EXISTS listings (
   olx_status TEXT,                   -- статус оголошення на OLX (напр. "active"); НЕ плутати з полем status нижче
   posted_at TEXT,
   status TEXT DEFAULT 'new'
-    CHECK (status IN ('new','interested','contacted','disabled')),
+    CHECK (status IN ('new','interested','contacted','rejected','disabled')),
   status_source TEXT DEFAULT 'auto', -- auto | manual
   note TEXT DEFAULT '',
   filtered_out INTEGER DEFAULT 0,
+  miss_count INTEGER DEFAULT 0,      -- скани поспіль без цього оголошення у вікні покриття (Етап 2)
   first_seen_at TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);
 
 CREATE TABLE IF NOT EXISTS price_history (
   id INTEGER PRIMARY KEY,
