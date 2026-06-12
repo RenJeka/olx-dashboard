@@ -49,7 +49,7 @@ async function fetchWithFallback(
 ): Promise<{
   raw: RawListing[];
   visibleTotalCount: number | null;
-  fallbackNote: string | null;
+  note: string | null;
   requestsUsed: number;
   exhausted: boolean;
   usedGraphql: boolean;
@@ -59,7 +59,7 @@ async function fetchWithFallback(
     return {
       raw: result.listings,
       visibleTotalCount: result.visibleTotalCount,
-      fallbackNote: null,
+      note: result.warning ?? null,
       requestsUsed: result.requestsUsed,
       exhausted: result.exhausted,
       usedGraphql: true,
@@ -70,10 +70,12 @@ async function fetchWithFallback(
 
     try {
       const result = await htmlFetcher.fetchSearch(search, options);
+      const notes = [`graphql failed: ${graphqlMessage}; fallback html OK`];
+      if (result.warning) notes.push(result.warning);
       return {
         raw: result.listings,
         visibleTotalCount: result.visibleTotalCount,
-        fallbackNote: `graphql failed: ${graphqlMessage}; fallback html OK`,
+        note: notes.join('; '),
         requestsUsed: result.requestsUsed,
         exhausted: result.exhausted,
         usedGraphql: false,
@@ -119,7 +121,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   };
 
   try {
-    const { raw, visibleTotalCount, fallbackNote, requestsUsed, exhausted, usedGraphql } =
+    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql } =
       await fetchWithFallback(search, {
         deep: options?.deep,
         onProgress,
@@ -147,7 +149,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       result.found,
       result.new_count,
       result.disabled_count,
-      fallbackNote,
+      note,
       runId,
     );
 

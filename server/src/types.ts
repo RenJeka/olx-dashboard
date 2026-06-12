@@ -177,6 +177,12 @@ export interface FetchSearchResult {
    * Для HtmlOlxFetcher завжди false (statusEngine для fallback-сканів не викликається).
    */
   exhausted: boolean;
+  /**
+   * Незначна проблема при успішному скані (напр. GraphqlOlxFetcher вперся у вікно
+   * пагінації OLX і повернув частковий результат) — пишеться у scan_runs.error поряд
+   * з фактичною помилкою/fallback-нотою.
+   */
+  warning?: string;
 }
 
 /** Опції одного скану. */

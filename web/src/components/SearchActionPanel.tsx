@@ -27,7 +27,8 @@ const SCAN_KIND_LABELS: Record<string, string> = {
 
 const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
 const DEEP_SCAN_PAGE_LIMIT = 40;
-const DEEP_SCAN_SAFETY_CAP = 50;
+/** Межа вікна пагінації GraphQL OLX (offset ≤ 1000) — дзеркалить MAX_PAGES у graphqlOlxFetcher.ts. */
+const DEEP_SCAN_MAX_PAGES = 26;
 
 interface Props {
   search: Search;
@@ -47,8 +48,8 @@ export function SearchActionPanel({ search }: Props) {
 
   const deepScanRequests =
     search.visible_total_count != null
-      ? Math.min(DEEP_SCAN_SAFETY_CAP, Math.ceil(search.visible_total_count / DEEP_SCAN_PAGE_LIMIT))
-      : DEEP_SCAN_SAFETY_CAP;
+      ? Math.min(DEEP_SCAN_MAX_PAGES, Math.ceil(search.visible_total_count / DEEP_SCAN_PAGE_LIMIT))
+      : DEEP_SCAN_MAX_PAGES;
   const deepScanMinutes = Math.max(
     1,
     Math.round((deepScanRequests * DEEP_SCAN_SECONDS_PER_REQUEST) / 60),
@@ -286,7 +287,7 @@ export function SearchActionPanel({ search }: Props) {
                       </Badge>
                     </HStack>
                     <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-                      Проходить всю видачу OLX вглиб (до {DEEP_SCAN_SAFETY_CAP} запитів) для наповнення бази з нуля.
+                      Проходить всю видачу OLX вглиб (до {DEEP_SCAN_MAX_PAGES} запитів) для наповнення бази з нуля.
                     </Text>
                   </Stack>
                 </HStack>

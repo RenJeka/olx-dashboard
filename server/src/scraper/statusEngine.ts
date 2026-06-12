@@ -22,6 +22,11 @@ const updateCandidateStmt = db.prepare(
  * Кандидати: рядки цього search зі status != 'disabled', відсутні у `fetched`,
  * і (windowFloor IS NULL OR posted_at >= windowFloor). Їм miss_count += 1; при
  * miss_count >= 2 і (status_source='auto' OR status='rejected') → status='disabled'.
+ *
+ * `posted_at` гарантовано ISO або NULL (нормалізатор завжди пропускає текстові дати
+ * HTML-fallback через `parseOlxDate`, дивись normalizer.ts/dateParser.ts) — лексикографічне
+ * порівняння з windowFloor коректне. NULL >= windowFloor у SQLite дає NULL (рядок без дати
+ * не потрапляє в кандидати — без дати немає підстав вважати його «в межах вікна»).
  */
 export function applyScanStatuses(
   searchId: number,

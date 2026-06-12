@@ -245,6 +245,10 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - Затримка **1–2 с** (рандомізована) між запитами.
 - Стоп: повернулось менше `limit` елементів або 0.
 - `metadata.total_elements` обрізається до 1000 — реальна кількість у `visible_total_count`.
+- **Вікно пагінації — `offset ≤ 1000`** (верифіковано живими запитами 2026-06-12, пошук
+  «ipad 9»): `offset=1000` → `ListingSuccess` (40 елементів), `offset=1040` →
+  `ListingError code=400 "Data validation error occurred"`. Тобто GraphQL віддає максимум
+  ~1040 перших оголошень видачі (26 запитів від offset=0 до offset=1000).
 
 #### Глибокий скан (вручну)
 
@@ -255,12 +259,19 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - **Батчі по 3 запити** (`BATCH_SIZE`, той самий розмір, що й ліміт звичайного скану),
   з паузою **3–6 с** (`BATCH_PAUSE_MIN_MS`/`BATCH_PAUSE_MAX_MS`) між батчами; усередині
   батчу — звичайна затримка 1–2 с.
-- **Ціль**: спочатку `DEEP_SAFETY_CAP = 50` запитів (абсолютний запобіжник). Після
-  **першого** запиту, якщо `metadata.visible_total_count` присутній — ціль уточнюється
-  до `min(50, ceil(visible_total_count / 40))`. Для «ipad 9» (`visible_total_count = 1258`):
-  `ceil(1258/40) = 32` запити ≈ 11 батчів ≈ 1.5–2 хв.
+- **Ціль**: спочатку `DEEP_SAFETY_CAP = 50` запитів (стартова оцінка). Після **першого**
+  запиту, якщо `metadata.visible_total_count` присутній — ціль уточнюється до
+  `ceil(visible_total_count / 40)`. У будь-якому разі ціль обмежена `MAX_PAGES = 26`
+  (вікно пагінації `offset ≤ 1000` вище) — підсумкова формула:
+  `min(26, ceil(visible_total_count / 40))`. Для «ipad 9» (`visible_total_count ≈ 1258`):
+  `ceil(1258/40) = 32`, обмежено до `26` запитів ≈ 9 батчів ≈ 1–1.5 хв.
 - **Рання зупинка**: сторінка повернула `< 40` елементів (offset 0/40/80/...) — видача
   вичерпана раніше цілі, як і в звичайному скані.
+- **Частковий успіх при вікні пагінації**: якщо `ListingError` (вікно `offset ≤ 1000`)
+  трапився на `offset > 0` і вже є зібрані оголошення — скан **не** падає і **не** йде
+  у HTML-fallback; повертається частковий результат (`exhausted=false`, `warning:
+  "graphql window cap hit at offset=<N>"`), який `scanner.ts` пише у `scan_runs.error`
+  поряд із фактичною помилкою/fallback-нотою.
 - **HTML-fallback** (`HtmlOlxFetcher`) не має `visible_total_count` — для глибокого
   одразу `target = DEEP_SAFETY_CAP = 50`, без уточнення; той самий батч-патерн пауз.
 - **Прогрес**: після кожного запиту/сторінки `FetchOptions.onProgress(done, total)` пише
@@ -425,3 +436,4 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |
 | 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
 | 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |
+| 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |

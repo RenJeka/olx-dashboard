@@ -70,8 +70,12 @@ flowchart LR
    Якщо GraphQL упав — scanner автоматично повторює скан через `HtmlOlxFetcher`
    (cheerio-парсинг сторінки пошуку, `exhausted` завжди `false`) і фіксує позначку fallback
    у `scan_runs.error`. При `options.deep` — батчі по 3 запити з паузою 3–6 с,
-   ціль `min(50, ceil(visible_total_count/40))` (деталі — `olx-api.md` §2.9). Після кожного
-   запиту/сторінки викликається `options.onProgress(done, total)`, який scanner записує у
+   ціль `min(26, ceil(visible_total_count/40))` (26 = межа вікна пагінації GraphQL OLX,
+   `offset ≤ 1000`; деталі — `olx-api.md` §2.9). Якщо GraphQL вперся у це вікно посеред
+   скану (`ListingError` на `offset > 0` з уже зібраними оголошеннями) — скан завершується
+   **частковим успіхом** (`exhausted=false`, `warning` записується у `scan_runs.error`),
+   HTML-fallback не запускається. Після кожного запиту/сторінки викликається
+   `options.onProgress(done, total)`, який scanner записує у
    `scan_runs.requests_done`/`requests_total`.
 4. `normalizer.upsertListings()` використовує структуровані поля (GraphQL) або парсить сирі
    рядки (HTML), робить upsert по `olx_id` у транзакції, рахує `new_count`, оновлює
@@ -97,10 +101,11 @@ flowchart LR
 | `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
 | `db/schema.sql` | Канонічна схема (4 таблиці). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`). Без `any`. |
-| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний): POST на GraphQL-ендпойнт, `searchParameters` з `SearchConfig`, маппінг відповіді → структуровані `RawListing[]` + `exhausted` (остання сторінка `< 40` елементів). Підтримує `options.deep` (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`) і `options.onProgress`. Деталі — `olx-api.md` §2. |
+| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний): POST на GraphQL-ендпойнт, `searchParameters` з `SearchConfig`, маппінг відповіді → структуровані `RawListing[]` + `exhausted` (остання сторінка `< 40` елементів). Підтримує `options.deep` (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`, завжди обмежена `MAX_PAGES=26` — вікно пагінації OLX `offset≤1000`) і `options.onProgress`. `ListingError` на `offset>0` з уже зібраними даними → частковий успіх (`warning` замість виключення). Деталі — `olx-api.md` §2. |
 | `scraper/selectors.ts` | Усі OLX-селектори + заголовки HTML-запиту в одному місці (для fallback). |
 | `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. Той самий `FetchOptions`/глибокий режим (без уточнення цілі за `visible_total_count` — одразу `DEEP_SAFETY_CAP`); `exhausted` завжди `false`. |
-| `scraper/normalizer.ts` | `upsertListings` (upsert по `olx_id`): пріоритет структурованим полям (GraphQL); для HTML — `parsePrice`, розбір локації/дати. На insert/update — миттєвий `status='disabled'` за `olx_status ≠ 'active'` (для `auto`/`rejected`, з позначкою в `note`) і auto-reactivate; рахує `filtered_out` через `localFilters.evaluateFilteredOut`. |
+| `scraper/dateParser.ts` | `parseOlxDate(raw, now?) → string \| null` — текстові дати HTML-fallback («Сьогодні/Вчора о HH:MM», «D <місяць_родовий> YYYY р.») → ISO (`YYYY-MM-DD[THH:MM:00]`), сумісний з ISO-датами GraphQL для коректного порівняння у `statusEngine.ts`. Нерозпізнане → `null`. |
+| `scraper/normalizer.ts` | `upsertListings` (upsert по `olx_id`): пріоритет структурованим полям (GraphQL); для HTML — `parsePrice`, розбір локації/дати + `dateParser.parseOlxDate` для `posted_at` (завжди ISO або `NULL`, ніколи сирий текст). На insert/update — миттєвий `status='disabled'` за `olx_status ≠ 'active'` (для `auto`/`rejected`, з позначкою в `note`) і auto-reactivate; рахує `filtered_out` через `localFilters.evaluateFilteredOut`. |
 | `scraper/statusEngine.ts` | `applyScanStatuses(searchId, fetched, exhausted) → {disabled_count}` (Етап 2, A2) — вікно покриття: `windowFloor = min(posted_at)` отриманих (`null`, якщо `exhausted`), кандидати поза вікном дістають `miss_count += 1`, при `>= 2` (auto/rejected) → `disabled`. Викликається з `scanner.ts` лише для успішних GraphQL-сканів. |
 | `scraper/localFilters.ts` | `evaluateFilteredOut(filters, listing) → boolean` (Етап 2, A4) — стоп-слова (case-insensitive підрядок у title+description) і числові діапазони по `params[key]` (перше число в label). Чиста функція, використовується `normalizer.ts` і `routes/searches.ts` (ретроактивний перерахунок). |
 | `scraper/verifier.ts` | ⏳ Заплановано (A3, не реалізовано) — вибірка `last_seen_at`-кандидатів, GET сторінок оголошень батчами, детект мертвих сторінок (маркер визначити live), застосування disable/reactivate. |
@@ -109,6 +114,7 @@ flowchart LR
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`). |
 | `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, слухає `:3001`. |
 | `scan.ts` | CLI-обгортка над `runScan` (`npm run scan -- --search <id>`). |
+| `migratePostedAt.ts` | Одноразова CLI-міграція (`npm run migrate:posted-at`): конвертує наявні текстові `posted_at` (старий HTML-fallback) через `dateParser.parseOlxDate` в ISO; нерозпізнане → `NULL`. Виводить кількість конвертованих/занулених. |
 
 ## 5. Схема БД
 
@@ -288,6 +294,10 @@ flowchart LR
   пишеться позначка `graphql failed: ...; fallback html OK`.
 - Падіння обох стратегій не валить процес: повна помилка у `scan_runs.error`, скан failed,
   попередні дані лишаються.
+- Частковий успіх GraphQL (вікно пагінації `offset≤1000` вичерпано посеред скану,
+  `docs/plans/graphql-offset-window.md`) — скан вважається успішним, зібрані дані
+  зберігаються, `warning` (`graphql window cap hit at offset=<N>`) пишеться у
+  `scan_runs.error`.
 - Якщо HTML-сторінка не дала карток і немає `empty-state` — `HtmlOlxFetcher` **кидає виняток із
   зразком HTML** і ознакою наявності `__NEXT_DATA__`, а не переходить на браузер автоматично.
 - Діагностика поломок — чекліст [`olx-api.md` §5](./olx-api.md).

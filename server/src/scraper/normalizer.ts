@@ -1,5 +1,6 @@
 import { db } from '../db/db.js';
 import { evaluateFilteredOut } from './localFilters.js';
+import { parseOlxDate } from './dateParser.js';
 import type { RawListing, NormalizedPrice, ScanResult, LocalFilters } from '../types.js';
 
 /**
@@ -170,7 +171,7 @@ export function upsertListings(
 
         const parsedLocation = parseLocationDate(item.locationDate);
         city = parsedLocation.city;
-        postedAt = parsedLocation.postedAt;
+        postedAt = parseOlxDate(parsedLocation.postedAt);
       }
 
       const olxStatusInactive = hasStructuredData && olxStatus != null && olxStatus !== 'active';
