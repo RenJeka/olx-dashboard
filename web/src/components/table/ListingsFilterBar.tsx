@@ -41,8 +41,8 @@ export function ListingsFilterBar({
           value={statusFilter}
           onValueChange={(d) => onStatusFilterChange((d.value as ListingStatus | 'all') ?? 'all')}
         >
-          <SegmentGroup.Indicator />
-          <SegmentGroup.Items items={items} />
+          <SegmentGroup.Indicator cursor="pointer" />
+          <SegmentGroup.Items items={items} cursor="pointer" />
         </SegmentGroup.Root>
         <Switch
           checked={showFilteredOut}

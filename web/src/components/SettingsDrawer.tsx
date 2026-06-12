@@ -92,6 +92,7 @@ export function SettingsDrawer({
                 <NativeSelect.Field
                   value={String(autoRefreshIntervalMin)}
                   onChange={(e) => onAutoRefreshIntervalMinChange(Number(e.target.value))}
+                  cursor={autoRefreshEnabled ? 'pointer' : undefined}
                 >
                   <option value="15">Кожні 15 хв</option>
                   <option value="30">Кожні 30 хв</option>

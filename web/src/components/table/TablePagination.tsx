@@ -34,6 +34,7 @@ export function TablePagination({ table }: TablePaginationProps) {
           <NativeSelect.Field
             value={pageSize}
             onChange={(e) => table.setPageSize(Number(e.target.value))}
+            cursor="pointer"
           >
             {PAGE_SIZE_OPTIONS.map((size) => (
               <option key={size} value={size}>
