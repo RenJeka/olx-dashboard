@@ -14,6 +14,7 @@ import {
   LuThumbsUp,
   LuUser,
 } from 'react-icons/lu';
+import { TbBrandDaysCounter } from 'react-icons/tb';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
@@ -156,7 +157,12 @@ export const columns = [
       );
 
       return bg ? (
-        <Box as="span" px={1.5} py={0.5} rounded="sm" bg={bg} display="inline-block">
+        <Box as="span" px={1.5} py={0.5} rounded="sm" bg={bg} display="inline-block" position="relative">
+          {diffDays === 0 && (
+            <Box position="absolute" top="-1.5" left="-2" color="blue.fg" bg="bg.panel" rounded="full" title="Сьогодні">
+              <TbBrandDaysCounter size={14} />
+            </Box>
+          )}
           {content}
         </Box>
       ) : content;
