@@ -9,6 +9,7 @@ import { isMutedStatus } from '../../utils/status';
 
 interface ListingsTableRowProps {
   row: Row<Listing>;
+  isSelected: boolean;
   descriptionExpandEnabled: boolean;
   onOpenDescription: (listing: Listing) => void;
   searchQuery: string;
@@ -16,12 +17,17 @@ interface ListingsTableRowProps {
 
 export const ListingsTableRow = memo(function ListingsTableRow({
   row,
+  isSelected,
   descriptionExpandEnabled,
   onOpenDescription,
   searchQuery,
 }: ListingsTableRowProps) {
   return (
-    <Table.Row opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}>
+    <Table.Row
+      opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}
+      bg={isSelected ? 'blue.50/60' : undefined}
+      _dark={isSelected ? { bg: 'blue.950/40' } : undefined}
+    >
       {row.getVisibleCells().map((cell) => {
         const isWideText =
           cell.column.id === 'title' ||

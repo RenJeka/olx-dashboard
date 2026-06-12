@@ -22,6 +22,7 @@ export function ListingsTableBody({
         <ListingsTableRow
           key={row.id}
           row={row}
+          isSelected={row.getIsSelected()}
           descriptionExpandEnabled={descriptionExpandEnabled}
           onOpenDescription={onOpenDescription}
           searchQuery={searchQuery}
