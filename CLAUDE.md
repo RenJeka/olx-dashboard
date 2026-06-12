@@ -38,17 +38,20 @@
 
 Ключові інваріанти:
 - `listings.olx_id` UNIQUE — ключ дедуплікації (upsert по ньому).
-- `status` ∈ `new|interested|contacted|disabled` (CHECK у схемі).
+- `status` ∈ `new|interested|contacted|rejected|disabled` (CHECK у схемі); `rejected` — лише ручний статус («не цікаво»).
 - `status_source` ∈ `auto|manual`.
+- `miss_count` — лічильник послідовних сканів без цього оголошення у вікні покриття (механіка — нижче).
 - `params` — сирий JSON (характеристики різняться між категоріями; колонки UI динамічні).
 
 ## Бізнес-логіка (інваріанти, не порушувати)
 
-- **Upsert:** новий `olx_id` → insert (`status='new'`). Існуючий → update полів + `last_seen_at`; якщо ціна змінилась — рядок у `price_history`.
-- **Auto-disable:** після скану listings цього search, відсутні у свіжій видачі **2 скани поспіль** → `status='disabled', status_source='auto'`. Буфер у 2 скани обовʼязковий (захист від збою API).
-- **Ручний override:** якщо `status_source='manual'` — auto-логіка НЕ перетирає статус.
-- **Auto-reactivate:** зникле й знову зʼявлене (якщо не manual-disabled) → назад у `new`.
-- **filtered_out:** локальні range-правила ставлять прапорець, НЕ видаляють рядок.
+- **Upsert:** новий `olx_id` → insert (`status='new'`, окрім миттєвого `olx_status`-disable нижче). Існуючий → update полів + `last_seen_at`; якщо ціна змінилась — рядок у `price_history`.
+- **Auto-disable — вікно покриття (coverage window):** після успішного **GraphQL**-скану (HTML-fallback цю логіку НЕ запускає) — `windowFloor = min(posted_at)` серед оголошень, отриманих у цьому скані (або `NULL`, якщо видача вичерпана раніше лімітів запитів — тоді вікно = вся видача). Кандидати на `miss_count += 1` — рядки цього `search_id` зі `status != 'disabled'`, відсутні в цьому скані, з `posted_at >= windowFloor` (або будь-яка `posted_at`, якщо `windowFloor IS NULL`); присутнім — `miss_count = 0`. При `miss_count >= 2` і (`status_source='auto'` АБО `status='rejected'`) → `status='disabled'`. Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner.ts` лише для GraphQL-сканів.
+- **`olx_status` миттєвий auto-disable:** якщо GraphQL повернув `olx_status ≠ 'active'` для рядка зі `status_source='auto'` АБО `status='rejected'` → миттєво `status='disabled'`, у `note` додається позначка `auto-disabled: olx_status=<значення>` (для подальшої ручної перевірки маркера на сторінці OLX, `docs/olx-api.md` §3.4 — заплановано в межах A3/verify).
+- **Verify-прохід (заплановано, A3, ще НЕ реалізовано):** ручний прохід по оголошеннях зі `status_source='auto'` і `last_seen_at` старше 3 днів (≤50 сторінок, той самий батч-патерн, що й глибокий скан) — мертва сторінка → `status='disabled'`, жива → реактивація/оновлення `last_seen_at`. Маркер «неактивна сторінка» в HTML OLX визначити **live** перед реалізацією — СТОП і питання користувачу зі зразком HTML.
+- **Ручний override:** будь-яка ручна зміна статусу (`PATCH /api/listings/:id`) → `status_source='manual'`, `miss_count=0`. Якщо `status_source='manual'` — auto-логіка (вікно покриття, `olx_status`, verify) НЕ перетирає статус, окрім переходу `rejected → disabled` (зникнення з OLX — факт сильніший за ручну оцінку).
+- **Auto-reactivate:** auto-disabled оголошення знову з'явилося в GraphQL-видачі з `olx_status='active'` (або verify підтвердив живе) → назад у `new`, `miss_count=0`. Manual-disabled НЕ реактивується автоматично.
+- **filtered_out:** `local_filters` (стоп-слова у title+description, числові діапазони по `params`) ставлять прапорець, НЕ видаляють рядок. Зміна `local_filters` (`PATCH /api/searches/:id`) → синхронний ретроактивний перерахунок `filtered_out` для всіх рядків пошуку.
 - **Notion-синк:** one-way (app → Notion), match по `olx_id`. Двосторонній — поза скоупом.
 
 ## Команди
@@ -78,13 +81,17 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
 - `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
 - `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
+- `docs/plans/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
 - Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 
 1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/graphql-migration.md`; міграція UI на Chakra UI v3 + Drawer налаштувань (тема, видимість колонок) + колонки «Опис»/«Продавець»/«Статус OLX» і лічильник «Результатів: N».
-2. Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри.
+2. Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри —
+   **в основному реалізовано** (`docs/plans/stage-2-statuses-and-filters.md`): статуси/нотатки/
+   bulk-дії, вікно покриття, `olx_status`-disable, локальні фільтри, панель дій пошуку,
+   автооновлення. Залишається verify-прохід для давно не бачених оголошень (A3).
 3. price_history + спарклайни + MD-експорт для аналізу в Claude.
 4. Notion-експорт + node-cron + журнал scan_runs.
 

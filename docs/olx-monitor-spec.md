@@ -152,6 +152,9 @@ interface OlxFetcher {
 
 ## 5. Схема БД
 
+> Канон — [`server/src/db/schema.sql`](../server/src/db/schema.sql). Нижче — той самий вміст
+> для довідки; при розбіжності кодом є файл схеми.
+
 ```sql
 CREATE TABLE searches (
   id INTEGER PRIMARY KEY,
@@ -161,6 +164,8 @@ CREATE TABLE searches (
   api_filters TEXT DEFAULT '{}',     -- JSON: серверні фільтри OLX
   local_filters TEXT DEFAULT '{}',   -- JSON: range-правила + стоп-слова
   cron_enabled INTEGER DEFAULT 0,
+  visible_total_count INTEGER,       -- metadata.visible_total_count з останнього успішного скану (GraphQL)
+  sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -174,15 +179,22 @@ CREATE TABLE listings (
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
   photo_url TEXT,
   seller_type TEXT,                  -- private | business
+  description TEXT,                  -- HTML-опис з OLX (з <br /> тегами)
+  seller_name TEXT,                  -- user.name з GraphQL
+  contact_name TEXT,                 -- contact.name з GraphQL
+  olx_status TEXT,                   -- статус оголошення на OLX (напр. "active"); НЕ плутати з полем status нижче
   posted_at TEXT,
   status TEXT DEFAULT 'new'
-    CHECK (status IN ('new','interested','contacted','disabled')),
+    CHECK (status IN ('new','interested','contacted','rejected','disabled')),
   status_source TEXT DEFAULT 'auto', -- auto | manual
   note TEXT DEFAULT '',
   filtered_out INTEGER DEFAULT 0,
+  miss_count INTEGER DEFAULT 0,      -- скани поспіль без цього оголошення у вікні покриття (Етап 2)
   first_seen_at TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );
+
+CREATE INDEX idx_listings_search_status ON listings(search_id, status);
 
 CREATE TABLE price_history (
   id INTEGER PRIMARY KEY,
@@ -194,6 +206,7 @@ CREATE TABLE price_history (
 CREATE TABLE scan_runs (
   id INTEGER PRIMARY KEY,
   search_id INTEGER REFERENCES searches(id),
+  kind TEXT DEFAULT 'normal',        -- normal | deep | verify (Етап 2)
   started_at TEXT, finished_at TEXT,
   found INTEGER, new_count INTEGER, disabled_count INTEGER,
   error TEXT,
@@ -208,18 +221,68 @@ CREATE TABLE scan_runs (
 
 ```mermaid
 stateDiagram-v2
-    [*] --> new : знайдено при скануванні
+    [*] --> new : знайдено при скані
     new --> interested : вручну
+    new --> rejected : вручну («не цікаво»)
     interested --> contacted : вручну
-    new --> disabled : auto (зникло з видачі)
+    interested --> rejected : вручну
+    new --> disabled : auto (miss_count ≥ 2 / olx_status / verify)
     interested --> disabled : auto / вручну
     contacted --> disabled : auto / вручну
-    disabled --> new : auto-reactivate (з'явилося знову)
+    rejected --> disabled : auto (зникло з OLX)
+    disabled --> new : auto-reactivate (verify/скан знайшов живим, якщо не manual)
 ```
 
-**Auto-disable:** після сканування — усі listings цього search, чий `olx_id` відсутній у свіжій видачі І `last_seen_at` старший за 2 послідовні скани → `status='disabled', status_source='auto'`. (Буфер у 2 скани захищає від хибних спрацювань при збоях API.)
+Правила:
+- `rejected` ставиться ТІЛЬКИ вручну (`status_source='manual'`); auto-логіка його не чіпає,
+  крім переходу `rejected → disabled` (оголошення реально зникло — факт сильніший за оцінку).
+- `status_source='manual'` + будь-який статус → auto-логіка (вікно покриття, `olx_status`,
+  verify) не перетирає статус, крім `rejected → disabled`.
+- Будь-яка ручна зміна статусу → `status_source='manual'`, `miss_count=0`.
+- Auto-disable джерела: (1) `miss_count ≥ 2` у вікні покриття; (2) `olx_status ≠ 'active'`
+  у GraphQL-видачі — миттєво; (3) verify-прохід виявив мертву сторінку — миттєво (заплановано, A3).
 
-**Ручний override:** якщо `status_source='manual'` і статус `disabled` — auto-логіка його не реактивує.
+### 6.1 Вікно покриття (механіка `miss_count`)
+
+Працює **лише для GraphQL-сканів** (потрібен сортовний ISO `posted_at`; HTML-fallback
+дат не має — fallback-скани цю логіку НЕ запускають, лише оновлюють `last_seen_at`
+присутнім). Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner.ts`.
+
+Після успішного скану (normal або deep):
+1. `windowFloor = min(posted_at)` серед отриманих у цьому скані оголошень. Якщо видача
+   вичерпана раніше ліміту запитів (остання сторінка `< 40`) — `windowFloor = NULL`
+   (покрито все: вікно = вся видача).
+2. Кандидати: рядки цього search зі `status != 'disabled'`, які НЕ прийшли в цьому скані,
+   і (`windowFloor IS NULL` АБО `posted_at >= windowFloor`).
+3. Кандидатам `miss_count += 1`; присутнім у видачі — `miss_count = 0`.
+4. `miss_count >= 2` і (`status_source='auto'` АБО `status='rejected'`) →
+   `status='disabled'`, `disabled_count++` у `scan_runs`.
+
+Промо-оголошення можуть випадати з date-порядку — поодинокі хибні інкременти буфер
+2 сканів гасить.
+
+### 6.2 `olx_status` — миттєвий auto-disable
+
+Якщо GraphQL повернув `olx_status ≠ 'active'` для рядка зі `status_source='auto'` АБО
+`status='rejected'` → миттєво `status='disabled'`, у `note` додається позначка
+`auto-disabled: olx_status=<значення>` для подальшої ручної перевірки маркера на сторінці
+OLX (`docs/olx-api.md` §3.4 — заплановано в межах verify, п. 6.3). Auto-reactivate: якщо
+auto-disabled рядок знову прийшов з `olx_status='active'` → `status='new'`, `miss_count=0`.
+
+### 6.3 Verify-прохід (заплановано, A3 — ще НЕ реалізовано)
+
+- Тригер: кнопка «Перевірити неактивні (N)» у панелі дій пошуку + CLI `--verify`.
+- Кандидати: `last_seen_at < datetime('now','-3 days')` AND `status_source='auto'`
+  (включно з уже `disabled` — для реактивації), сортувати за `last_seen_at ASC`, ліміт **50**.
+- Для кожного: GET `listing.url` (заголовки HTML-fallback). Детект:
+  - HTTP 404/410 → мертве;
+  - HTTP 200 → маркер неактивності в HTML — **визначити live перед реалізацією** (зразок
+    HTML → нова `docs/olx-api.md` §3.4; до того — СТОП і питання користувачу).
+- Мертве → `status='disabled', status_source='auto'` (миттєво). Живе → `last_seen_at=now`,
+  `miss_count=0`, якщо було `disabled` (і не manual) → `status='new'` (auto-reactivate).
+- Ввічливість: батч-патерн глибокого скану (батчі по 3, пауза 3–6 с, 1–2 с усередині).
+- Журнал: рядок `scan_runs` з `kind='verify'`; прогрес — існуючі
+  `requests_done`/`requests_total` + `GET /api/searches/:id/scan-status`.
 
 ---
 
@@ -227,13 +290,17 @@ stateDiagram-v2
 
 | Метод | Шлях | Дія |
 | --- | --- | --- |
-| `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | CRUD пошуків |
-| `POST` | `/api/searches/:id/scan` | Запустити сканування (повертає звіт scan_run) |
-| `GET` | `/api/searches/:id/listings?status=&sort=` | Таблиця оголошень |
-| `PATCH` | `/api/listings/:id` | `{status?, note?}` — інлайн-редагування |
-| `GET` | `/api/listings/:id/price-history` | Дані для спарклайну |
-| `POST` | `/api/searches/:id/export/notion` | Експорт/синк у Notion |
-| `GET` | `/api/listings/:id/export/markdown` | MD-вивантаження для аналізу в Claude |
+| `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | CRUD пошуків. `PATCH` з `local_filters` → синхронний ретроактивний перерахунок `filtered_out` усіх рядків пошуку |
+| `POST` | `/api/searches/:id/move` | `{direction: 'up'\|'down'}` — ручне сортування пошуків |
+| `POST` | `/api/searches/:id/scan?deep=true` | Запустити сканування (звичайне/глибоке, повертає звіт scan_run); `?verify=true` — заплановано (A3) |
+| `GET` | `/api/searches/:id/scan-status` | Останній рядок `scan_runs` — поллінг прогресу глибокого скану/verify |
+| `GET` | `/api/searches/:id/listings?sort=&order=` | Таблиця оголошень (усі рядки пошуку, без серверного пейджингу) |
+| `GET` | `/api/searches/:id/param-keys` | Ключі `params` + приклади значень — для конструктора діапазонів локальних фільтрів |
+| `GET` | `/api/searches/:id/stats` | `{in_db, stale_count, last_scan}` — для панелі дій пошуку |
+| `PATCH` | `/api/listings/:id` | `{status?, note?}` — інлайн-редагування; зміна `status` → `status_source='manual'`, `miss_count=0` |
+| `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 — дані для спарклайну |
+| `POST` | `/api/searches/:id/export/notion` | ⏳ Етап 4 — Експорт/синк у Notion |
+| `GET` | `/api/listings/:id/export/markdown` | ⏳ Етап 3 — MD-вивантаження для аналізу в Claude |
 
 ---
 

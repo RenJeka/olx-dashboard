@@ -34,19 +34,21 @@ olx-dashboard/
 │   └── src/
 │       ├── index.ts          # Fastify bootstrap, CORS :5173, /health, listen :3001
 │       ├── types.ts          # доменні типи + інтерфейс OlxFetcher
-│       ├── scanner.ts        # runScan(): спільна логіка скану (роут + CLI)
+│       ├── scanner.ts        # runScan(): спільна логіка скану (роут + CLI) + applyScanStatuses, scan_runs.kind
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
-│       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql
+│       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
 │       ├── scraper/
-│       │   ├── graphqlOlxFetcher.ts # GraphqlOlxFetcher: GraphQL API (основний метод)
+│       │   ├── graphqlOlxFetcher.ts # GraphqlOlxFetcher: GraphQL API (основний метод), exhausted-флаг
 │       │   ├── selectors.ts  # OLX-селектори + заголовки HTML-запиту (fallback)
 │       │   ├── olxFetcher.ts # HtmlOlxFetcher: URL-білдер, fetch, cheerio (fallback)
-│       │   └── normalizer.ts # upsert по olx_id; parsePrice/локація для HTML-шляху
+│       │   ├── normalizer.ts # upsert по olx_id; olx_status auto-disable; filtered_out
+│       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
+│       │   └── localFilters.ts # evaluateFilteredOut(): exclude_keywords + range-правила local_filters (Етап 2)
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan + POST /move
-│           └── listings.ts   # GET /api/searches/:id/listings
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep) + scan-status + move + param-keys + stats + PATCH (filters)
+│           └── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
 │
 └── web/                      # workspace "web" (React + Vite), type: module
     ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
@@ -56,19 +58,28 @@ olx-dashboard/
     ├── index.html            # точка входу Vite
     └── src/
         ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
-        ├── App.tsx           # шапка (лого + SettingsDrawer) + Searches (sidebar) + ListingsTable;
-        │                      #   стан columnVisibility
+        ├── App.tsx           # шапка (лого + SettingsDrawer) + Searches (sidebar) + SearchActionPanel + ListingsTable;
+        │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
         ├── api/
-        │   └── client.ts     # fetch-обгортка + TanStack Query хуки (DTO-типи імпортуються з web/src/types)
+        │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/scan-status, статуси/нотатки/масові
+        │                      #   дії, filters/param-keys/stats; DTO-типи з web/src/types)
         ├── components/
-        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark), видимість колонок, перемикач опису
+        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark), видимість колонок, перемикач опису, автооновлення
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
+        │   ├── SearchActionPanel.tsx # панель дій активного пошуку: скан/глибокий скан, прогрес, лічильники
+        │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку": api_filters + local_filters (exclude_keywords, ranges)
+        │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
         │   ├── table/             # компоненти таблиці оголошень
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
-        │   │   ├── columns.tsx     # опис колонок (TanStack Table) та TOGGLEABLE_COLUMNS
+        │   │   ├── columns.tsx     # опис колонок (TanStack Table), колонка select, TOGGLEABLE_COLUMNS
         │   │   ├── ListingsTableHeader.tsx # заголовок таблиці з ресайзером (onEnd)
         │   │   ├── ListingsTableBody.tsx # тіло таблиці (відображення рядків)
-        │   │   ├── ListingsTableRow.tsx # рядок таблиці (React.memo)
+        │   │   ├── ListingsTableRow.tsx # рядок таблиці (React.memo), приглушений стиль для disabled/rejected
+        │   │   ├── StatusCell.tsx # інлайн-едіт статусу (NativeSelect) + status_source
+        │   │   ├── NoteCell.tsx   # інлайн-едіт нотатки (Popover + textarea)
+        │   │   ├── HighlightText.tsx # підсвітка збігів пошукового запиту (Mark)
+        │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup), "показати filtered_out", пошук
+        │   │   ├── BulkActionBar.tsx # панель масових дій над виділеними рядками (зміна статусу)
         │   │   ├── DescriptionTooltip.tsx # тултіп для попереднього перегляду опису
         │   │   └── TablePagination.tsx # панель пагінації (Chakra Pagination + вибір pageSize)
         │   └── ui/                # Chakra UI v3 snippets
@@ -77,20 +88,22 @@ olx-dashboard/
         │       ├── toaster.tsx
         │       ├── tooltip.tsx
         │       ├── drawer.tsx
-        │       ├── dialog.tsx
+        │       ├── dialog.tsx     # також основа для ConfirmActionDialog
         │       ├── switch.tsx
         │       ├── checkbox.tsx
         │       └── close-button.tsx
         ├── hooks/
-        │   └── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
+        │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
+        │   └── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
         ├── pages/
-        │   ├── Searches.tsx      # список пошуків, форма створення, сортування ↑/↓, 3-dot меню (скан/видалення)
-        │   └── ListingsTable.tsx # відображення таблиці оголошень (компонування) + DescriptionDialog
+        │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
+        │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
         ├── types/
-        │   └── index.ts          # спільні типи фронтенду (Listing, Search, StoredTableState тощо)
+        │   └── index.ts          # спільні типи фронтенду (Listing, ListingStatus, Search, StoredTableState тощо)
         └── utils/
-            ├── format.ts         # хелпери форматування (ціна, дата, чистка HTML-опису)
-            └── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState) у localStorage
+            ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
+            ├── status.ts         # STATUS_LABELS/STATUS_COLORS, isMutedStatus()
+            └── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState, автооновлення) у localStorage
 ```
 
 ## Орієнтири «куди дивитись»
@@ -108,4 +121,9 @@ olx-dashboard/
 | Запити з фронту | `web/src/api/client.ts` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx`, `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
+| Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
+| Локальні фільтри (`exclude_keywords`, range-правила, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/SearchFiltersDrawer.tsx` |
+| Інлайн-едіт статусу/нотатки, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
+| Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
+| Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx`, `web/src/utils/storage.ts` |
 | Скрипти/воркспейси | кореневий `package.json` |

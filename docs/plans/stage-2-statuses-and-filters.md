@@ -107,16 +107,21 @@ stateDiagram-v2
 
 ## Зміни схеми
 
-- [ ] `listings`: **table rebuild** (нове значення CHECK + нова колонка):
+- [x] `listings`: **table rebuild** (нове значення CHECK + нова колонка):
   - `status` CHECK → `('new','interested','contacted','rejected','disabled')`;
   - нова колонка `miss_count INTEGER DEFAULT 0`.
   - Міграція в `db.ts` через `PRAGMA user_version`: version `<2` → у транзакції
     `CREATE TABLE listings_new (… нова схема …)` → `INSERT INTO listings_new SELECT …,0 FROM listings`
     → `DROP TABLE listings` → `ALTER TABLE listings_new RENAME TO listings` → відтворити
     індекси → `PRAGMA user_version = 2`. (`addColumnIfMissing` НЕ підходить — міняється CHECK.)
-- [ ] `scan_runs`: `kind TEXT DEFAULT 'normal'` (`normal|deep|verify`) — через `addColumnIfMissing`.
-- [ ] Новий індекс: `CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);`
-- [ ] `schema.sql` оновити (канон для нових БД) синхронно з міграцією.
+- [x] `scan_runs`: `kind TEXT DEFAULT 'normal'` (`normal|deep|verify`) — через `addColumnIfMissing`.
+- [x] Новий індекс: `CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);`
+- [x] `schema.sql` оновити (канон для нових БД) синхронно з міграцією.
+
+  > Перевірено: `migrateListingsTable()` (`LISTINGS_SCHEMA_VERSION = 2`) у `db.ts` робить
+  > table rebuild з новим CHECK і `miss_count`; `scan_runs.kind` додано через
+  > `addColumnIfMissing`; `idx_listings_search_status` і `kind TEXT DEFAULT 'normal'`
+  > перенесені в `schema.sql` (канон синхронізовано з міграцією).
 
 Формат `searches.local_filters` (JSON):
 
@@ -135,26 +140,38 @@ stateDiagram-v2
 
 ### A1. Статуси й нотатки
 
-- [ ] `server/src/types.ts`: `ListingStatus = 'new'|'interested'|'contacted'|'rejected'|'disabled'`;
+- [x] `server/src/types.ts`: `ListingStatus = 'new'|'interested'|'contacted'|'rejected'|'disabled'`;
   розширити `ListingRow` (`miss_count`); тип `ListingPatch { status?, note? }`.
-- [ ] Новий роут `server/src/routes/listings.ts`: `PATCH /api/listings/:id`
+- [x] Новий роут `server/src/routes/listings.ts`: `PATCH /api/listings/:id`
   body `{status?, note?}` — валідація статусу по enum; будь-яка зміна статусу →
   `status_source='manual'`, `miss_count=0`. Повертає оновлений рядок.
-- [ ] `GET /api/searches/:id/listings`: додати query `status?` (фільтр) і
+- [x] `GET /api/searches/:id/listings`: додати query `status?` (фільтр) і
   `include_filtered?` (за замовчуванням `filtered_out=0` ховаються — УЗГОДИТИ нижче з B3:
   фільтрація клієнтська, тому простіше повертати все і фільтрувати на фронті; рішення —
   повертати все, серверний `status` лишити нереалізованим).
 
+  > Реалізовано за прийнятим рішенням: `LISTING_STATUSES`/`ListingPatch` у `types.ts`,
+  > `PATCH /api/listings/:id` з валідацією enum + `status_source='manual'`/`miss_count=0`
+  > (`routes/listings.ts`). `GET /api/searches/:id/listings` серверний `status`-фільтр НЕ
+  > додавався (як і вирішено) — повертає всі рядки пошуку, фільтрація (status/filtered_out/
+  > пошук) клієнтська (`ListingsTable.tsx`, B2).
+
 ### A2. statusEngine (вікно покриття)
 
-- [ ] Новий `server/src/scraper/statusEngine.ts`: `applyScanStatuses(searchId, fetched: RawListing[], exhausted: boolean)` —
+- [x] Новий `server/src/scraper/statusEngine.ts`: `applyScanStatuses(searchId, fetched: RawListing[], exhausted: boolean)` —
   логіка «Вікно покриття» вище, в одній транзакції. Повертає `{disabled_count}`.
-- [ ] `scanner.ts`: викликати після upsert ТІЛЬКИ якщо працював GraphQL-фетчер
+- [x] `scanner.ts`: викликати після upsert ТІЛЬКИ якщо працював GraphQL-фетчер
   (не fallback) і скан успішний; писати `disabled_count` у `scan_runs`.
-- [ ] `normalizer.ts`/фетчер: прокинути ознаку `exhausted` (остання сторінка `<40`).
-- [ ] Миттєвий disable по `olx_status`: в upsert — якщо прийшов `status ≠ 'active'` і
+- [x] `normalizer.ts`/фетчер: прокинути ознаку `exhausted` (остання сторінка `<40`).
+- [x] Миттєвий disable по `olx_status`: в upsert — якщо прийшов `status ≠ 'active'` і
   `status_source='auto'` → `status='disabled'` + лог-позначка
   `auto-disabled: olx_status=<x>` (див. ⚠️ перевірку користувача вище).
+
+  > Реалізовано: `applyScanStatuses()` (`statusEngine.ts`) викликається з `scanner.ts`
+  > лише коли `usedGraphql=true`, результат `disabled_count` пишеться у `scan_runs`;
+  > `exhausted` повертає `graphqlOlxFetcher`/`olxFetcher` (HTML — завжди `false`);
+  > миттєвий `olx_status`-disable + `note`-позначка `auto-disabled: olx_status=<x>` —
+  > в upsert-SQL `normalizer.ts`, разом з auto-reactivate при поверненні `olx_status='active'`.
 
 ### A3. Verify-прохід
 
@@ -392,15 +409,23 @@ stateDiagram-v2
 
 ## Група C — Документація
 
-- [ ] `CLAUDE.md` — «Зміни канону» (див. нижче) перенести в секцію інваріантів.
-- [ ] `docs/olx-monitor-spec.md` §6 — нова діаграма статусів + вікно покриття + verify.
-- [ ] `docs/architecture.md` — statusEngine/verifier/localFilters у таблиці модулів,
+- [x] `CLAUDE.md` — «Зміни канону» (див. нижче) перенести в секцію інваріантів.
+- [x] `docs/olx-monitor-spec.md` §6 — нова діаграма статусів + вікно покриття + verify.
+- [x] `docs/architecture.md` — statusEngine/verifier/localFilters у таблиці модулів,
   нові ендпойнти, сценарій verify.
-- [ ] `docs/structure.md` — нові файли.
+- [x] `docs/structure.md` — нові файли.
 - [ ] `docs/olx-api.md` §3.4 — детект неактивної сторінки (після live-зняття маркера).
-- [ ] `docs/plans/TODO` — «Закінчити всі фази» не чіпати; цей план лінкнути.
+- [x] `docs/plans/TODO` — «Закінчити всі фази» не чіпати; цей план лінкнути.
+
+  > §3.4 додано як плейсхолдер/TODO (опис кроку live-зняття маркера, посилання на
+  > CLAUDE.md «Що питати перед дією» та §6.3 spec) — без фактичного маркера, бо live HTML
+  > знятого оголошення ще не знімався. Решта пунктів — повністю виконано: CLAUDE.md
+  > («Бізнес-логіка» переписана з усіма інваріантами Етапу 2), spec §6/§6.1-6.3/§7,
+  > architecture.md (§3-7), structure.md (дерево + орієнтири).
 
 ## Зміни канону (для перенесення в CLAUDE.md)
+
+> ✅ Перенесено в `CLAUDE.md` (розділи «Схема БД» та «Бізнес-логіка»).
 
 1. Статуси: `new|interested|contacted|rejected|disabled`; `rejected` — лише ручний.
 2. Auto-disable: **вікно покриття** (windowFloor по `posted_at` поточного скану) +
