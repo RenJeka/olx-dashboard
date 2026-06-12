@@ -67,6 +67,8 @@ export interface ScanResult {
   new_count: number;
   /** Скільки HTTP-запитів реально зроблено (звичайний скан: ≤3, глибокий: до DEEP_SAFETY_CAP). */
   requestsUsed: number;
+  /** Скільки оголошень переведено в disabled через statusEngine (лише GraphQL-скани). */
+  disabled_count: number;
 }
 
 /** Останній запис scan_runs для пошуку — для ендпойнту прогресу глибокого скану. */
@@ -131,6 +133,12 @@ export interface FetchSearchResult {
   visibleTotalCount: number | null;
   /** Скільки запитів/сторінок реально оброблено. */
   requestsUsed: number;
+  /**
+   * Остання отримана сторінка мала < PAGE_LIMIT елементів (видачу вичерпано раніше
+   * лімітів скану) → вікно покриття statusEngine = вся видача (windowFloor = null).
+   * Для HtmlOlxFetcher завжди false (statusEngine для fallback-сканів не викликається).
+   */
+  exhausted: boolean;
 }
 
 /** Опції одного скану. */

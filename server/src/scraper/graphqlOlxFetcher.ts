@@ -188,6 +188,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     // Глибокий: ціль уточнюється після 1-го запиту за visible_total_count (або лишається DEEP_SAFETY_CAP).
     let target = deep ? DEEP_SAFETY_CAP : BATCH_SIZE;
     let requestsUsed = 0;
+    let exhausted = false;
 
     for (let i = 0; i < target; i++) {
       const offset = i * PAGE_LIMIT;
@@ -255,6 +256,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       options?.onProgress?.(requestsUsed, target);
 
       if (items.length < PAGE_LIMIT) {
+        exhausted = true;
         break;
       }
 
@@ -267,7 +269,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
     }
 
-    return { listings: all, visibleTotalCount, requestsUsed };
+    return { listings: all, visibleTotalCount, requestsUsed, exhausted };
   }
 
   /** Мапить GraphQL-оголошення у RawListing (мапінг полів — docs/olx-api.md §2.7). */

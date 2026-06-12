@@ -2,6 +2,7 @@ import { db } from './db/db.js';
 import { GraphqlOlxFetcher } from './scraper/graphqlOlxFetcher.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings } from './scraper/normalizer.js';
+import { applyScanStatuses } from './scraper/statusEngine.js';
 import type { SearchConfig, ScanResult, ApiFilters, RawListing, FetchOptions } from './types.js';
 
 const graphqlFetcher = new GraphqlOlxFetcher();
@@ -50,6 +51,8 @@ async function fetchWithFallback(
   visibleTotalCount: number | null;
   fallbackNote: string | null;
   requestsUsed: number;
+  exhausted: boolean;
+  usedGraphql: boolean;
 }> {
   try {
     const result = await graphqlFetcher.fetchSearch(search, options);
@@ -58,6 +61,8 @@ async function fetchWithFallback(
       visibleTotalCount: result.visibleTotalCount,
       fallbackNote: null,
       requestsUsed: result.requestsUsed,
+      exhausted: result.exhausted,
+      usedGraphql: true,
     };
   } catch (graphqlErr) {
     const graphqlMessage =
@@ -70,6 +75,8 @@ async function fetchWithFallback(
         visibleTotalCount: result.visibleTotalCount,
         fallbackNote: `graphql failed: ${graphqlMessage}; fallback html OK`,
         requestsUsed: result.requestsUsed,
+        exhausted: result.exhausted,
+        usedGraphql: false,
       };
     } catch (htmlErr) {
       const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
@@ -95,10 +102,12 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
     throw new Error(`Search ${searchId} не знайдено`);
   }
 
+  const kind = options?.deep ? 'deep' : 'normal';
+
   const runId = Number(
     db
-      .prepare('INSERT INTO scan_runs (search_id, started_at) VALUES (?, ?)')
-      .run(searchId, new Date().toISOString()).lastInsertRowid,
+      .prepare('INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)')
+      .run(searchId, new Date().toISOString(), kind).lastInsertRowid,
   );
 
   const onProgress = (done: number, total: number): void => {
@@ -110,12 +119,19 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   };
 
   try {
-    const { raw, visibleTotalCount, fallbackNote, requestsUsed } = await fetchWithFallback(search, {
-      deep: options?.deep,
-      onProgress,
-    });
+    const { raw, visibleTotalCount, fallbackNote, requestsUsed, exhausted, usedGraphql } =
+      await fetchWithFallback(search, {
+        deep: options?.deep,
+        onProgress,
+      });
     const upsertResult = upsertListings(searchId, raw);
-    const result: ScanResult = { ...upsertResult, requestsUsed };
+
+    // Вікно покриття (CLAUDE.md): лише для успішних GraphQL-сканів, не fallback.
+    const { disabled_count } = usedGraphql
+      ? applyScanStatuses(searchId, raw, exhausted)
+      : { disabled_count: 0 };
+
+    const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count };
 
     if (visibleTotalCount != null) {
       db.prepare('UPDATE searches SET visible_total_count = ? WHERE id = ?').run(
@@ -125,8 +141,15 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
     }
 
     db.prepare(
-      'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, error = ? WHERE id = ?',
-    ).run(new Date().toISOString(), result.found, result.new_count, fallbackNote, runId);
+      'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ? WHERE id = ?',
+    ).run(
+      new Date().toISOString(),
+      result.found,
+      result.new_count,
+      result.disabled_count,
+      fallbackNote,
+      runId,
+    );
 
     return result;
   } catch (err) {

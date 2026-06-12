@@ -45,6 +45,7 @@ addColumnIfMissing('searches', 'visible_total_count', 'INTEGER');
 addColumnIfMissing('searches', 'sort_order', 'INTEGER');
 addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
+addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
 
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка

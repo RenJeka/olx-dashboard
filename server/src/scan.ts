@@ -20,7 +20,8 @@ if (searchId === null) {
 try {
   const result = await runScan(searchId, { deep });
   console.log(
-    `Скан #${searchId} завершено: знайдено ${result.found}, нових ${result.new_count}, запитів ${result.requestsUsed}`,
+    `Скан #${searchId} завершено: знайдено ${result.found}, нових ${result.new_count}, ` +
+      `вимкнено ${result.disabled_count}, запитів ${result.requestsUsed}`,
   );
   process.exit(0);
 } catch (err) {
