@@ -10,6 +10,14 @@ export interface ApiFilters {
   privateOnly?: boolean;
 }
 
+/** Локальні (нерайонні) фільтри пошуку: стоп-слова й числові діапазони по params (Етап 2). */
+export interface LocalFilters {
+  /** Case-insensitive підрядки — збіг у title+description → filtered_out=1. */
+  exclude_keywords?: string[];
+  /** Числові діапазони по значенню params[key] (перше число в label); ключ відсутній/не парситься → правило не застосовується. */
+  ranges?: Record<string, { min?: number; max?: number }>;
+}
+
 /** Конфіг пошуку (рядок таблиці searches у зручному вигляді). */
 export interface SearchConfig {
   id: number;
@@ -124,6 +132,32 @@ export interface ListingRow {
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+}
+
+/** Елемент відповіді GET /api/searches/:id/param-keys — для конструктора діапазонів локальних фільтрів. */
+export interface ParamKeyInfo {
+  key: string;
+  /** До 3 прикладів значень (label) цього ключа з оголошень пошуку. */
+  samples: string[];
+}
+
+/** Останній рядок scan_runs — частина відповіді GET /api/searches/:id/stats. */
+export interface LastScanInfo {
+  kind: string;
+  started_at: string;
+  finished_at: string | null;
+  found: number | null;
+  new_count: number | null;
+  disabled_count: number | null;
+  error: string | null;
+}
+
+/** Відповідь GET /api/searches/:id/stats — для панелі дій (Етап 2). */
+export interface SearchStats {
+  in_db: number;
+  /** Кандидати verify: status_source='auto' AND last_seen_at старше 3 днів. */
+  stale_count: number;
+  last_scan: LastScanInfo | null;
 }
 
 /** Результат fetchSearch: список оголошень + метадані видачі (якщо доступні). */

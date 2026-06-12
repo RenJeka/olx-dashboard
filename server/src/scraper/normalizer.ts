@@ -1,5 +1,6 @@
 import { db } from '../db/db.js';
-import type { RawListing, NormalizedPrice, ScanResult } from '../types.js';
+import { evaluateFilteredOut } from './localFilters.js';
+import type { RawListing, NormalizedPrice, ScanResult, LocalFilters } from '../types.js';
 
 /**
  * Нормалізує сирий рядок ціни OLX.
@@ -42,6 +43,11 @@ function parseLocationDate(raw?: string): {
 }
 
 const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
+const searchLocalFiltersStmt = db.prepare('SELECT local_filters FROM searches WHERE id = ?');
+const selectForFilterStmt = db.prepare(
+  'SELECT id, title, description, params FROM listings WHERE olx_id = ?',
+);
+const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
 
 // district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
@@ -104,7 +110,8 @@ const upsertStmt = db.prepare(`
 
 /**
  * Upsert розпарсених оголошень по olx_id.
- * price_history та filtered_out НЕ чіпаємо (Етапи 2–3).
+ * price_history НЕ чіпаємо (Етап 3). filtered_out перераховується через локальні
+ * фільтри пошуку (Етап 2) — після upsert, бо враховує COALESCE'ні description/params.
  * Повертає кількість знайдених і нових.
  */
 export function upsertListings(
@@ -112,6 +119,16 @@ export function upsertListings(
   raw: RawListing[],
 ): Pick<ScanResult, 'found' | 'new_count'> {
   let newCount = 0;
+
+  const localFiltersRow = searchLocalFiltersStmt.get(searchId) as
+    | { local_filters: string }
+    | undefined;
+  let localFilters: LocalFilters = {};
+  try {
+    localFilters = JSON.parse(localFiltersRow?.local_filters || '{}') as LocalFilters;
+  } catch {
+    localFilters = {};
+  }
 
   const run = db.transaction((items: RawListing[]) => {
     for (const item of items) {
@@ -179,6 +196,14 @@ export function upsertListings(
         olx_status_inactive: olxStatusInactive ? 1 : 0,
         status_note: olxStatusInactive ? `auto-disabled: olx_status=${olxStatus}` : '',
       });
+
+      const persisted = selectForFilterStmt.get(item.olxId) as
+        | { id: number; title: string | null; description: string | null; params: string | null }
+        | undefined;
+      if (persisted) {
+        const filteredOut = evaluateFilteredOut(localFilters, persisted);
+        updateFilteredOutStmt.run(filteredOut ? 1 : 0, persisted.id);
+      }
     }
   });
 

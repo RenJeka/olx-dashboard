@@ -169,19 +169,19 @@ stateDiagram-v2
 
 ### A4. Локальні фільтри
 
-- [ ] `server/src/scraper/localFilters.ts`: `evaluate(localFilters, listing) → boolean`
+- [x] `server/src/scraper/localFilters.ts`: `evaluate(localFilters, listing) → boolean`
   (filtered_out чи ні) — одна чиста функція, юніт-перевірена вручну на прикладах.
-- [ ] `normalizer.ts`: при insert/update обчислювати `filtered_out` через `evaluate`.
-- [ ] `routes/searches.ts`: `PATCH /api/searches/:id` приймає `local_filters` →
+- [x] `normalizer.ts`: при insert/update обчислювати `filtered_out` через `evaluate`.
+- [x] `routes/searches.ts`: `PATCH /api/searches/:id` приймає `local_filters` →
   у транзакції зберегти + перерахувати `filtered_out` для ВСІХ рядків пошуку
   (synchronous loop по rows, better-sqlite3 потягне ≤2000 рядків).
-- [ ] Новий `GET /api/searches/:id/param-keys` → `[{key, name, sample}]` — distinct ключі
+- [x] Новий `GET /api/searches/:id/param-keys` → `[{key, name, sample}]` — distinct ключі
   з `listings.params` цього пошуку (для дропдауна конструктора діапазонів). `name` брати
   ніде (в БД лише `{key: label}`) → повертати `key` + 2-3 sample-значення.
 
 ### A5. Stats для панелі дій
 
-- [ ] `routes/searches.ts`: `GET /api/searches/:id/stats` →
+- [x] `routes/searches.ts`: `GET /api/searches/:id/stats` →
   ```json
   {
     "in_db": 167,
