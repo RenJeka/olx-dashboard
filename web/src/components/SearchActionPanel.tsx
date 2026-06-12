@@ -1,7 +1,17 @@
 import { useState } from 'react';
-import { Box, Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
-import { LuLayers, LuRefreshCw, LuStethoscope, LuTriangleAlert } from 'react-icons/lu';
+import { Badge, Box, Button, HStack, Progress, SimpleGrid, Stack, Text } from '@chakra-ui/react';
+import { LuActivity, LuLayers, LuRefreshCw, LuStethoscope, LuTriangleAlert } from 'react-icons/lu';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
+import {
+  DialogBackdrop,
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog';
 import { Tooltip } from './ui/tooltip';
 import { toaster } from './ui/toaster';
 import { useScan, useScanStatus, useSearchStats } from '../api/client';
@@ -23,10 +33,11 @@ interface Props {
   search: Search;
 }
 
-/** Панель дій вибраного пошуку: статистика + кнопки скану з прогресом (Етап 2, B4). */
+/** Панель дій вибраного пошуку у вигляді модального вікна: статистика + картки запуску сканування. */
 export function SearchActionPanel({ search }: Props) {
   const [scanKind, setScanKind] = useState<'normal' | 'deep' | null>(null);
   const [confirmDeepOpen, setConfirmDeepOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const scan = useScan();
   const { data: stats } = useSearchStats(search.id);
   const { data: status } = useScanStatus(search.id, scanKind != null);
@@ -79,99 +90,245 @@ export function SearchActionPanel({ search }: Props) {
   }
 
   return (
-    <Stack gap={2} px={4} py={3}>
-      <Stack gap={0.5}>
-        <Text textStyle="sm" color="fg.muted">
-          {search.visible_total_count != null
-            ? `На OLX: ${search.visible_total_count.toLocaleString('uk-UA')} · `
-            : ''}
-          У базі: {(stats?.in_db ?? 0).toLocaleString('uk-UA')} · Давно не бачених:{' '}
-          {(stats?.stale_count ?? 0).toLocaleString('uk-UA')}
-        </Text>
-        {lastScan && (
-          <HStack gap={1}>
-            <Text textStyle="xs" color="fg.muted">
-              Останній скан: {formatRelativeTime(lastScan.started_at)} (
-              {SCAN_KIND_LABELS[lastScan.kind] ?? lastScan.kind}) · +{lastScan.new_count ?? 0}{' '}
-              нових · {lastScan.disabled_count ?? 0} вимкнено
-            </Text>
-            {lastScan.error && (
-              <Tooltip content={lastScan.error}>
-                <Box as="span" color="orange.500" display="inline-flex">
-                  <LuTriangleAlert />
+    <DialogRoot
+      open={dialogOpen}
+      onOpenChange={(details) => setDialogOpen(details.open)}
+      size="md"
+      placement="center"
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" colorPalette="blue">
+          <Box as={LuRefreshCw} animation={isScanning ? 'spin 2s linear infinite' : undefined} />
+          Сканувати
+        </Button>
+      </DialogTrigger>
+      <DialogBackdrop />
+      <DialogContent>
+        <DialogCloseTrigger />
+        <DialogHeader>
+          <DialogTitle>Сканування та статистика</DialogTitle>
+          <Text textStyle="xs" color="fg.muted" mt={1}>
+            Пошук: <strong>{search.name}</strong>
+          </Text>
+        </DialogHeader>
+
+        <DialogBody pb={6}>
+          <Stack gap={5}>
+            {/* Карточки статистики */}
+            <SimpleGrid columns={3} gap={3}>
+              <Box p={3} bg="bg.muted" rounded="lg" borderWidth="1px" borderColor="border.subtle" textAlign="center">
+                <Text textStyle="xs" color="fg.muted" fontWeight="semibold">На OLX</Text>
+                <Text textStyle="xl" fontWeight="bold" mt={1}>
+                  {search.visible_total_count != null ? search.visible_total_count.toLocaleString('uk-UA') : '—'}
+                </Text>
+              </Box>
+              <Box p={3} bg="bg.muted" rounded="lg" borderWidth="1px" borderColor="border.subtle" textAlign="center">
+                <Text textStyle="xs" color="fg.muted" fontWeight="semibold">У базі</Text>
+                <Text textStyle="xl" fontWeight="bold" mt={1} color="blue.fg">
+                  {(stats?.in_db ?? 0).toLocaleString('uk-UA')}
+                </Text>
+              </Box>
+              <Box p={3} bg="bg.muted" rounded="lg" borderWidth="1px" borderColor="border.subtle" textAlign="center">
+                <Text textStyle="xs" color="fg.muted" fontWeight="semibold">Зниклі/Старі</Text>
+                <Text textStyle="xl" fontWeight="bold" mt={1} color="orange.fg">
+                  {(stats?.stale_count ?? 0).toLocaleString('uk-UA')}
+                </Text>
+              </Box>
+            </SimpleGrid>
+
+            {/* Останній скан */}
+            {lastScan && (
+              <Box
+                p={3}
+                rounded="lg"
+                borderWidth="1px"
+                borderColor={lastScan.error ? 'red.subtle' : 'border.subtle'}
+                bg={lastScan.error ? 'red.subtle/10' : 'bg.subtle'}
+              >
+                <HStack justify="space-between" align="start">
+                  <Stack gap={0.5}>
+                    <Text textStyle="xs" color="fg.muted" fontWeight="medium">
+                      Останній скан: {formatRelativeTime(lastScan.started_at)}
+                    </Text>
+                    <Text textStyle="xs" color="fg.default">
+                      Тип: {SCAN_KIND_LABELS[lastScan.kind] ?? lastScan.kind} • Знайдено: +{lastScan.new_count ?? 0} нових • Вимкнено: {lastScan.disabled_count ?? 0}
+                    </Text>
+                  </Stack>
+                  {lastScan.error && (
+                    <Tooltip content={lastScan.error}>
+                      <Badge colorPalette="red" variant="subtle">
+                        <LuTriangleAlert /> Помилка
+                      </Badge>
+                    </Tooltip>
+                  )}
+                </HStack>
+              </Box>
+            )}
+
+            {/* Рядок прогресу сканування */}
+            {isScanning && status && (
+              <Stack gap={1.5} p={3} rounded="lg" bg="blue.subtle/10" borderWidth="1px" borderColor="blue.subtle">
+                <HStack justify="space-between">
+                  <Text textStyle="xs" fontWeight="semibold" color="blue.fg">
+                    Виконується {SCAN_KIND_LABELS[scanKind] ?? scanKind} скан...
+                  </Text>
+                  <Text textStyle="xs" color="fg.muted">
+                    {status.requests_total == null
+                      ? 'Підготовка…'
+                      : `Запит ${status.requests_done ?? 0}/${status.requests_total}`}
+                  </Text>
+                </HStack>
+                <Progress.Root
+                  size="xs"
+                  colorPalette="blue"
+                  value={
+                    status.requests_total == null
+                      ? null
+                      : ((status.requests_done ?? 0) / status.requests_total) * 100
+                  }
+                >
+                  <Progress.Track>
+                    <Progress.Range />
+                  </Progress.Track>
+                </Progress.Root>
+                {status.requests_total != null && (
+                  <Text textStyle="2xs" color="fg.muted" textAlign="right">
+                    Залишилось: ~{Math.round(
+                      (status.requests_total - (status.requests_done ?? 0)) *
+                        DEEP_SCAN_SECONDS_PER_REQUEST,
+                    )} с
+                  </Text>
+                )}
+              </Stack>
+            )}
+
+            {/* Дії */}
+            <Stack gap={3}>
+              <Text textStyle="xs" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
+                Доступні дії
+              </Text>
+
+              {/* Швидкий скан */}
+              <Button
+                variant="ghost"
+                onClick={() => !isScanning && runScan(false)}
+                disabled={isScanning}
+                p={4}
+                rounded="xl"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                bg="bg.panel"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                height="auto"
+                whiteSpace="normal"
+                w="full"
+                fontWeight="normal"
+                _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'blue.muted', transform: 'translateY(-1px)' } : undefined}
+                _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
+                cursor={isScanning ? 'not-allowed' : 'pointer'}
+                opacity={isScanning && scanKind !== 'normal' ? 0.5 : 1}
+                transition="all 0.2s"
+              >
+                <HStack gap={4} align="start" w="full">
+                  <Box p={2.5} rounded="lg" bg="blue.subtle" color="blue.fg" flexShrink={0}>
+                    <Box as={LuRefreshCw} animation={isScanning && scanKind === 'normal' ? 'spin 2s linear infinite' : undefined} />
+                  </Box>
+                  <Stack gap={1} flex="1" textAlign="left">
+                    <HStack justify="space-between" align="center" w="full">
+                      <Text textStyle="sm" fontWeight="bold" color="fg.default">
+                        Швидкий скан
+                      </Text>
+                      <Badge size="sm" colorPalette="blue" variant="subtle">
+                        ~10 с
+                      </Badge>
+                    </HStack>
+                    <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
+                      Перевіряє лише першу сторінку видачі для швидкого пошуку останніх оголошень.
+                    </Text>
+                  </Stack>
+                </HStack>
+              </Button>
+
+              {/* Глибокий скан */}
+              <Button
+                variant="ghost"
+                onClick={() => !isScanning && startDeepScan()}
+                disabled={isScanning}
+                p={4}
+                rounded="xl"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                bg="bg.panel"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                height="auto"
+                whiteSpace="normal"
+                w="full"
+                fontWeight="normal"
+                _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'purple.muted', transform: 'translateY(-1px)' } : undefined}
+                _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
+                cursor={isScanning ? 'not-allowed' : 'pointer'}
+                opacity={isScanning && scanKind !== 'deep' ? 0.5 : 1}
+                transition="all 0.2s"
+              >
+                <HStack gap={4} align="start" w="full">
+                  <Box p={2.5} rounded="lg" bg="purple.subtle" color="purple.fg" flexShrink={0}>
+                    <Box as={LuLayers} animation={isScanning && scanKind === 'deep' ? 'pulse 2s infinite' : undefined} />
+                  </Box>
+                  <Stack gap={1} flex="1" textAlign="left">
+                    <HStack justify="space-between" align="center" w="full">
+                      <Text textStyle="sm" fontWeight="bold" color="fg.default">
+                        Глибокий скан
+                      </Text>
+                      <Badge size="sm" colorPalette="purple" variant="subtle">
+                        ~1–2 хв
+                      </Badge>
+                    </HStack>
+                    <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
+                      Проходить всю видачу OLX вглиб (до {DEEP_SCAN_SAFETY_CAP} запитів) для наповнення бази з нуля.
+                    </Text>
+                  </Stack>
+                </HStack>
+              </Button>
+
+              {/* Перевірити неактивні */}
+              <Tooltip content="Перевірка статусу старих оголошень — залежить від детектора неактивних сторінок (ще не реалізовано)">
+                <Box
+                  p={4}
+                  rounded="xl"
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  bg="bg.panel"
+                  textAlign="left"
+                  opacity={0.5}
+                  cursor="not-allowed"
+                >
+                  <HStack gap={4} align="start">
+                    <Box p={2.5} rounded="lg" bg="gray.subtle" color="fg.muted">
+                      <LuStethoscope />
+                    </Box>
+                    <Stack gap={1} flex="1">
+                      <HStack justify="space-between" align="center">
+                        <Text textStyle="sm" fontWeight="bold" color="fg.muted">
+                          Перевірити неактивні
+                        </Text>
+                        <Badge size="sm" colorPalette="gray" variant="subtle">
+                          ~1 хв
+                        </Badge>
+                      </HStack>
+                      <Text textStyle="xs" color="fg.muted">
+                        Заходить на сторінки застарілих оголошень ({stats?.stale_count ?? 0}), щоб оновити їх статус на OLX.
+                      </Text>
+                    </Stack>
+                  </HStack>
                 </Box>
               </Tooltip>
-            )}
-          </HStack>
-        )}
-      </Stack>
-      <HStack gap={3} wrap="wrap" align="flex-start">
-        <Stack gap={0.5}>
-          <Button
-            size="sm"
-            colorPalette="blue"
-            loading={scanKind === 'normal'}
-            disabled={isScanning}
-            onClick={() => runScan(false)}
-          >
-            <LuRefreshCw /> Швидкий скан
-          </Button>
-          <Text textStyle="xs" color="fg.muted">
-            ~10 с · новинки зверху видачі
-          </Text>
-        </Stack>
-        <Stack gap={0.5}>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={scanKind === 'deep'}
-            disabled={isScanning}
-            onClick={startDeepScan}
-          >
-            <LuLayers /> Глибокий скан
-          </Button>
-          <Text textStyle="xs" color="fg.muted">
-            ~1–2 хв · вся видача вглиб
-          </Text>
-        </Stack>
-        <Stack gap={0.5}>
-          <Tooltip content="Перевірка статусу старих оголошень — залежить від детектора неактивних сторінок (ще не реалізовано)">
-            <Box as="span" display="inline-block">
-              <Button size="sm" variant="outline" disabled>
-                <LuStethoscope /> Перевірити неактивні ({stats?.stale_count ?? 0})
-              </Button>
-            </Box>
-          </Tooltip>
-          <Text textStyle="xs" color="fg.muted">
-            ~1 хв · заходить на сторінки старих оголошень
-          </Text>
-        </Stack>
-      </HStack>
-      {isScanning && status && (
-        <Box>
-          <Progress.Root
-            size="xs"
-            colorPalette="blue"
-            value={
-              status.requests_total == null
-                ? null
-                : ((status.requests_done ?? 0) / status.requests_total) * 100
-            }
-          >
-            <Progress.Track>
-              <Progress.Range />
-            </Progress.Track>
-          </Progress.Root>
-          <Text textStyle="xs" color="fg.muted" mt={0.5}>
-            {status.requests_total == null
-              ? 'Підготовка…'
-              : `Запит ${status.requests_done ?? 0}/${status.requests_total} · ~${Math.round(
-                  (status.requests_total - (status.requests_done ?? 0)) *
-                    DEEP_SCAN_SECONDS_PER_REQUEST,
-                )} с`}
-          </Text>
-        </Box>
-      )}
+            </Stack>
+          </Stack>
+        </DialogBody>
+      </DialogContent>
+
       <ConfirmActionDialog
         open={confirmDeepOpen}
         onOpenChange={setConfirmDeepOpen}
@@ -183,6 +340,7 @@ export function SearchActionPanel({ search }: Props) {
           runScan(true);
         }}
       />
-    </Stack>
+    </DialogRoot>
   );
 }
+

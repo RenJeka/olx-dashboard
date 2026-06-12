@@ -69,6 +69,9 @@ export function App() {
                 <LuTimer /> авто: {autoRefreshIntervalMin} хв
               </Badge>
             )}
+            {selectedSearch && (
+              <SearchActionPanel search={selectedSearch} />
+            )}
             <SettingsDrawer
               columnVisibility={columnVisibility}
               onColumnVisibilityChange={setColumnVisibility}
@@ -82,11 +85,6 @@ export function App() {
           </HStack>
         </HStack>
       </Box>
-      {selectedSearch && (
-        <Box borderBottomWidth="1px" borderColor="border.subtle">
-          <SearchActionPanel search={selectedSearch} />
-        </Box>
-      )}
       <Flex flex="1" overflow="hidden">
         <Searches selectedId={selectedId} onSelect={setSelectedId} />
         <ListingsTable
