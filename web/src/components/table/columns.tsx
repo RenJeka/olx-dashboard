@@ -18,10 +18,40 @@ import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/forma
 import { StatusCell } from './StatusCell';
 import { NoteCell } from './NoteCell';
 import { HighlightText } from './HighlightText';
+import { Checkbox } from '../ui/checkbox';
 
 const columnHelper = createColumnHelper<Listing>();
 
 export const columns = [
+  columnHelper.display({
+    id: 'select',
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected()
+            ? true
+            : table.getIsSomePageRowsSelected()
+              ? 'indeterminate'
+              : false
+        }
+        onCheckedChange={(details) => table.toggleAllPageRowsSelected(details.checked === true)}
+        aria-label="Вибрати всі на сторінці"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(details) => row.toggleSelected(details.checked === true)}
+        aria-label="Вибрати рядок"
+      />
+    ),
+    enableSorting: false,
+    enableResizing: false,
+    enableHiding: false,
+    size: 36,
+    minSize: 36,
+    maxSize: 36,
+  }),
   columnHelper.accessor('photo_url', {
     header: () => <HeaderLabel icon={<LuImage />}>Фото</HeaderLabel>,
     enableSorting: false,

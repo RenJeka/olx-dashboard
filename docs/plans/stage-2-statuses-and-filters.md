@@ -367,9 +367,28 @@ stateDiagram-v2
 
 ### B6. Bulk-дії (опційна група — якщо обсяг етапу розповзається, відкласти ЦЮ групу)
 
-- [ ] TanStack row selection: колонка-чекбокс (header = select all on page).
-- [ ] Панель «N вибрано»: дропдаун «змінити статус на…» → серія PATCH (або loop на
+- [x] TanStack row selection: колонка-чекбокс (header = select all on page).
+  - Display-колонка `select` (першою в `columns.tsx`), чекбокси з `web/src/components/ui/checkbox.tsx`.
+    Header: `table.getIsAllPageRowsSelected()` / `getIsSomePageRowsSelected()` → checked/indeterminate,
+    `table.toggleAllPageRowsSelected()`. Cell: `row.getIsSelected()` / `row.toggleSelected()`.
+    `enableSorting/enableResizing/enableHiding: false`, фіксована ширина 36px (НЕ в `TOGGLEABLE_COLUMNS`).
+  - `ListingsTableHeader.tsx`: ресайз-хендл рендериться лише якщо `header.column.getCanResize()`
+    (інакше зайва смужка на 36px-колонці).
+  - `ListingsTable.tsx`: стейт `rowSelection` (`RowSelectionState`), `getRowId: (row) => String(row.id)`
+    (стабільні id для виділення при зміні фільтрів/сторінок), `enableRowSelection: true`.
+    Виділення скидається при зміні `searchId` (`useEffect`).
+- [x] Панель «N вибрано»: дропдаун «змінити статус на…» → серія PATCH (або loop на
   фронті; окремий bulk-ендпойнт НЕ робити — зайва поверхня).
+  - Новий `web/src/components/table/BulkActionBar.tsx`: рендериться між `ListingsFilterBar` і таблицею,
+    коли є виділені рядки. «Вибрано: N» + `Menu` зі статусами (`LISTING_STATUSES`/`STATUS_LABELS`) +
+    «Скасувати». Вибір статусу → `Promise.allSettled` з `useUpdateListing().mutateAsync()` по кожному
+    `id`, тост з підсумком (успіх / N з M + помилки), скидання виділення.
+
+  > Перевірено: `tsc -b` + `vite build` чисто; dev-сервер піднявся без помилок; через API
+  > створено тестовий пошук і 3 listings, серія `PATCH /api/listings/:id {status: "interested"}`
+  > (аналог дій `BulkActionBar`) повернула `status_source: "manual"` для всіх трьох — підтверджує,
+  > що loop-патч застосовується коректно. Повний UI-прохід (клік чекбоксів, Menu, тост) рекомендується
+  > перевірити вручну в браузері.
 
 ## Група C — Документація
 
