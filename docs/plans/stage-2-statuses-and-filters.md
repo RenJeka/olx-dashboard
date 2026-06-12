@@ -175,14 +175,23 @@ stateDiagram-v2
 
 ### A3. Verify-прохід
 
-- [ ] `server/src/scraper/verifier.ts`: вибірка кандидатів (правила вище), GET сторінок
-  батчами (константи з deep scan), детект мертвих (маркер — live при реалізації, СТОП
-  якщо маркер не визначається), застосування статусів. Прогрес через `onProgress`.
-- [ ] `scanner.ts`: `runScan(searchId, { verify: true })` → гілка verifier, `scan_runs.kind='verify'`.
-- [ ] `routes/searches.ts`: `POST /api/searches/:id/scan?verify=true`.
-- [ ] `scan.ts` CLI: прапорець `--verify`.
-- [ ] `olx-api.md`: нова §3.4 «Сторінка оголошення: детект неактивності» (запит, маркери,
-  дата верифікації).
+- [x] `server/src/scraper/verifier.ts`: `probeListingPage(url)` — детект мертвої/живої
+  сторінки за HTTP-кодом + `ad_description` (маркер верифіковано live 2026-06-12,
+  `olx-api.md` §3.4), парсинг опису/продавця для backfill.
+- [x] `scanner.ts`: окрема `runVerify(searchId)` (не гілка `runScan`) — кандидати P1
+  (давно не бачені, ≥3 дні) + P2 (без `description`), разом ≤50, той самий батч-патерн,
+  що deep scan; `scan_runs.kind='verify'`, прогрес через `onProgress`.
+- [x] `routes/searches.ts`: окремий ендпойнт `POST /api/searches/:id/verify` (замість
+  `?verify=true` на `/scan` — чистіше з огляду на повністю іншу логіку й тип результату).
+- [x] `scan.ts` CLI: прапорець `--verify` (взаємовиключний з `--deep`).
+- [x] `olx-api.md` §3.4: маркер неактивності задокументовано (410/404/200+`ad_description`,
+  селектори опису/продавця, дата верифікації 2026-06-12).
+
+  > Реалізовано повністю за `docs/plans/verify-pass.md` (групи A–E). Кандидати: P1
+  > (`last_seen_at` < 3 дні, `status_source='auto'` або `status='rejected'`, включно з
+  > `disabled` для реактивації) + P2 (`description IS NULL`, ще не в P1) — повний обсяг,
+  > рішення користувача 2026-06-12. UI: картка «Перевірити неактивні (N)» в
+  > `SearchActionPanel.tsx` активна, N = `stats.verify_candidates`.
 
 ### A4. Локальні фільтри
 
@@ -299,10 +308,13 @@ stateDiagram-v2
   - глибокий: «32 запити · знайдено 1 240 · нових 210 · вимкнено 4»;
   - перевірка: «Перевірено 42 · мертвих 5 · реактивовано 1».
   Помилка (включно з fallback-позначкою) → toast type warning з суттю.
-- [ ] Verify повертає `{checked, dead, reactivated}` у `ScanResult` (узгодити з A3).
+- [x] Verify повертає окремий `VerifyResult {checked, alive, dead, unknown, reactivated,
+  disabled_count, backfilled}` — НЕ через `ScanResult` (окремий ендпойнт/тип, A3,
+  `docs/plans/verify-pass.md`).
 
-  > Реалізовано (часткова B4, узгоджено з користувачем — verify-логіка лишається
-  > за A3): новий `SearchActionPanel.tsx`, рендериться в `App.tsx` як окрема секція
+  > Реалізовано (часткова B4 на момент написання — verify-логіка була за A3, тепер
+  > реалізована повністю, див. нижче): новий `SearchActionPanel.tsx`, рендериться в
+  > `App.tsx` як окрема секція
   > над `<Searches>`/`<ListingsTable>` для вибраного пошуку (стара лінія
   > «Результатів на OLX… · У базі…» в хедері видалена разом з її `useListings`).
   > Рядок стану — `useSearchStats()` (`GET /stats`) + `formatRelativeTime()` для
@@ -312,9 +324,10 @@ stateDiagram-v2
   > існуючий `useScanStatus()`-поллінг (як було для deep, тепер і для normal).
   > Toast після завершення — success з текстом за режимом (включає
   > `disabled_count` з оновленого `ScanResult`); помилка — toast type error.
-  > «Перевірити неактивні (N)» — UI-заглушка: завжди `disabled`, показує
-  > `N = stale_count`, tooltip пояснює залежність від детектора мертвих сторінок
-  > (A3, ще не реалізовано); backend-виклик і toast-текст «перевірка» — після A3.
+  > «Перевірити неактивні (N)» — після реалізації A3 (`docs/plans/verify-pass.md`)
+  > картка активна: `N = stats.verify_candidates`, onClick → `useVerify()`, прогрес
+  > через `useScanStatus`/`scanKind='verify'`, тост-підсумок «Перевірено N · живих N ·
+  > мертвих N · реактивовано N · вимкнено N · дозаповнено N».
   > 3-dot меню пошуку (`Searches.tsx`) звужено до «Фільтри»/«Видалити» —
   > `useScan`/`useScanStatus`/`scanState`/`runScan` та пункти
   > «Сканувати»/«Глибокий скан» видалені звідти.
@@ -366,6 +379,8 @@ stateDiagram-v2
 - [ ] **Перевірити неактивні** — аналогічний діалог: «Буде відкрито до {N} сторінок
   давно не бачених оголошень (~{оцінка} хв). Мертві → disabled, живі → оновлення/
   реактивація. Продовжити?» + «Більше не питати» (`skipVerifyConfirm`).
+  _(Скасовано рішенням `docs/plans/verify-pass.md` D2 — дія без підтвердження, як
+  швидкий скан.)_
 - [x] Обидва діалоги переюзають один компонент `ConfirmActionDialog` (title, body,
   confirmLabel, skipKey).
 
@@ -375,9 +390,9 @@ stateDiagram-v2
   > з оцінкою `~min(50, ceil(visible_total_count/40))` запитів і часом за
   > `DEEP_SCAN_SECONDS_PER_REQUEST`), якщо не встановлено `skipDeepScanConfirm`;
   > підтвердження з «Більше не питати» зберігає прапорець через
-  > `saveSkipDeepScanConfirm()`. Діалог «Перевірити неактивні» — НЕ реалізований:
-  > сама дія лишається disabled-заглушкою до A3, окремий `skipVerifyConfirm` поки
-  > не додавався (буде разом з A3, щоб не лишати непідключений код).
+  > `saveSkipDeepScanConfirm()`. Діалог «Перевірити неактивні» — свідомо НЕ
+  > реалізований: за рішенням `docs/plans/verify-pass.md` (D2) дія виконується без
+  > підтвердження (як швидкий скан), `skipVerifyConfirm` не додавався.
   > Перевірено: `tsc -b`, production `vite build`, dev-сервер boot — чисто. Повна
   > UI-перевірка (відкриття діалогів, бейдж, перемикач у Settings) — рекомендована
   > (playwright-tester за запитом).
@@ -414,12 +429,12 @@ stateDiagram-v2
 - [x] `docs/architecture.md` — statusEngine/verifier/localFilters у таблиці модулів,
   нові ендпойнти, сценарій verify.
 - [x] `docs/structure.md` — нові файли.
-- [ ] `docs/olx-api.md` §3.4 — детект неактивної сторінки (після live-зняття маркера).
+- [x] `docs/olx-api.md` §3.4 — детект неактивної сторінки (маркер знято live 2026-06-12).
 - [x] `docs/plans/TODO` — «Закінчити всі фази» не чіпати; цей план лінкнути.
 
-  > §3.4 додано як плейсхолдер/TODO (опис кроку live-зняття маркера, посилання на
-  > CLAUDE.md «Що питати перед дією» та §6.3 spec) — без фактичного маркера, бо live HTML
-  > знятого оголошення ще не знімався. Решта пунктів — повністю виконано: CLAUDE.md
+  > §3.4 тепер заповнено фактичним маркером (HTTP 410/404 → `dead`, 200 +
+  > `[data-testid="ad_description"]` → `alive`; верифіковано live 2026-06-12, деталі —
+  > `docs/plans/verify-pass.md`). Решта пунктів — повністю виконано: CLAUDE.md
   > («Бізнес-логіка» переписана з усіма інваріантами Етапу 2), spec §6/§6.1-6.3/§7,
   > architecture.md (§3-7), structure.md (дерево + орієнтири).
 

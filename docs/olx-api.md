@@ -385,19 +385,44 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 Якщо карток немає І немає `empty-state` — фетчер кидає виняток зі зразком перших 600
 символів HTML + ознакою наявності `__NEXT_DATA__`. **НЕ** переходити на браузер автоматично.
 
-### 3.4 Сторінка оголошення: детект неактивності (заплановано, A3 — verify-прохід)
+### 3.4 Сторінка оголошення: детект неактивності (verify-прохід, A3)
 
-> ⏳ **Ще не реалізовано.** Перед реалізацією A3 (`docs/olx-monitor-spec.md` §6.3,
-> `server/src/scraper/verifier.ts`) потрібно зняти live зразок сторінки знятого з
-> продажу/проданого оголошення (`listing.url`, через DevTools або `fetch`) і визначити
-> фактичний маркер неактивності — код відповіді (404/410?), редирект, чи
-> текстовий/атрибутний маркер у HTML (напр. "Цього оголошення більше не існує",
-> якийсь `[data-cy=...]`/`[data-testid=...]`). **Без цього кроку verify-прохід не
-> реалізовувати** — див. CLAUDE.md «Що питати перед дією» (стоп і питання користувачу
-> зі зразком HTML).
->
-> Після live-зняття — замінити цей плейсхолдер на: запит (URL/заголовки), точний
-> маркер мертвої/живої сторінки, приклад HTML, дату верифікації (за зразком §3.1-3.3).
+> Верифіковано живими запитами **2026-06-12** (4 проби з паузами 1.5 с, включно з 2
+> реальними зниклими оголошеннями). Реалізація — `server/src/scraper/verifier.ts`
+> (`probeListingPage`), `docs/plans/verify-pass.md`.
+
+**Запит:**
+
+```
+GET <listing.url>
+```
+
+Заголовки — `REQUEST_HEADERS` з `selectors.ts` (ті самі, що для HTML-fallback пошуку),
+`redirect: 'manual'` (НЕ йдемо за 3xx-редіректами — opaque-redirect трактуємо як `unknown`).
+
+**Маркер живості/смерті — ТІЛЬКИ за HTTP-кодом + наявністю опису:**
+
+| Код / умова | Вердикт | Дія |
+| --- | --- | --- |
+| `404` | `dead` | неіснуючий URL |
+| `410 Gone` | `dead` | оголошення знято з продажу (підтверджено на 2 реальних зниклих) |
+| `200` + присутній `[data-testid="ad_description"]` | `alive` | живе; опис/продавець для backfill |
+| `200` без `ad_description`, 3xx, інші коди, мережева помилка | `unknown` | статус НЕ змінюється |
+
+> ⚠️ Текстові маркери (фрази типу «неактивне», «знято з продажу») **НЕнадійні** — такі
+> рядки трапляються навіть у JS-бандлах живої сторінки. Детект ТІЛЬКИ за HTTP-кодом +
+> наявністю `ad_description`.
+
+**Парсинг живої сторінки (cheerio, `selectors.ts`):**
+
+| Поле | Селектор | Примітка |
+| --- | --- | --- |
+| Опис | `[data-testid="ad_description"]` | `.html()` (з `<br>`), як у GraphQL `description` |
+| Продавець (приватний) | `[data-testid="user-profile-user-name"]` | |
+| Продавець (бізнес) | `[data-testid="trader-title"]` | fallback, якщо немає `user-profile-user-name` |
+
+`__NEXT_DATA__`/JSON-LD на detail-сторінках **немає** (є `__PRERENDERED_STATE__`, але
+DOM-селектори простіші й достатні).
 
 ---
 
@@ -437,3 +462,4 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 | 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
 | 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |
 | 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |
+| 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/verify-pass.md` |

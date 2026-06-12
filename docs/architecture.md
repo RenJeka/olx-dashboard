@@ -89,10 +89,18 @@ flowchart LR
    падає**.
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
-> **Verify-сценарій (заплановано, A3):** окремий `kind='verify'` прохід без фетчера видачі —
-> бере кандидатів за `last_seen_at`/`status_source='auto'`, відкриває сторінки оголошень
-> напряму (`fetch`, батч-патерн deep scan) і застосовує disable/reactivate за детектом
-> мертвої сторінки. Деталі — [`olx-monitor-spec.md` §6.3](./olx-monitor-spec.md).
+> **Verify-сценарій (реалізовано, A3):** `runVerify(searchId)` — окремий `kind='verify'`
+> прохід без фетчера видачі. Кандидати (≤`VERIFY_PAGE_CAP=50`): P1 — `last_seen_at` старше
+> 3 днів і (`status_source='auto'` АБО `status='rejected'`), включно з `disabled` для
+> реактивації, `ORDER BY last_seen_at ASC`; P2 — рядки без `description`, ще не в P1,
+> `ORDER BY posted_at DESC`. Для кожного — `probeListingPage(url)` (батч-патерн deep scan:
+> 3 запити, пауза 1–2с усередині, 3–6с між батчами). `dead` (`410`/`404`) →
+> `status='disabled'` + позначка `auto-disabled: verify http=<код>` у `note` (лише
+> auto/rejected); `alive` → `last_seen_at`/`miss_count=0`, auto-reactivate `disabled→new`
+> (якщо `status_source='auto'`), backfill `description`/`seller_name` лише якщо `NULL`;
+> `unknown` → без змін. Прогрес і підсумок — той самий механізм `scan_runs`
+> (`requests_done/requests_total`, `found=checked`, `new_count=reactivated`,
+> `disabled_count`). Деталі — `docs/plans/verify-pass.md`, маркер — `olx-api.md` §3.4.
 
 ## 4. Модулі бекенду
 
@@ -108,8 +116,8 @@ flowchart LR
 | `scraper/normalizer.ts` | `upsertListings` (upsert по `olx_id`): пріоритет структурованим полям (GraphQL); для HTML — `parsePrice`, розбір локації/дати + `dateParser.parseOlxDate` для `posted_at` (завжди ISO або `NULL`, ніколи сирий текст). На insert/update — миттєвий `status='disabled'` за `olx_status ≠ 'active'` (для `auto`/`rejected`, з позначкою в `note`) і auto-reactivate; рахує `filtered_out` через `localFilters.evaluateFilteredOut`. |
 | `scraper/statusEngine.ts` | `applyScanStatuses(searchId, fetched, exhausted) → {disabled_count}` (Етап 2, A2) — вікно покриття: `windowFloor = min(posted_at)` отриманих (`null`, якщо `exhausted`), кандидати поза вікном дістають `miss_count += 1`, при `>= 2` (auto/rejected) → `disabled`. Викликається з `scanner.ts` лише для успішних GraphQL-сканів. |
 | `scraper/localFilters.ts` | `evaluateFilteredOut(filters, listing) → boolean` (Етап 2, A4) — стоп-слова (case-insensitive підрядок у title+description) і числові діапазони по `params[key]` (перше число в label). Чиста функція, використовується `normalizer.ts` і `routes/searches.ts` (ретроактивний перерахунок). |
-| `scraper/verifier.ts` | ⏳ Заплановано (A3, не реалізовано) — вибірка `last_seen_at`-кандидатів, GET сторінок оголошень батчами, детект мертвих сторінок (маркер визначити live), застосування disable/reactivate. |
-| `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). |
+| `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
+| `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
 | `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/stats`. |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`). |
 | `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, слухає `:3001`. |
@@ -141,11 +149,11 @@ flowchart LR
 | `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1/2 — `GET` сортує за `sort_order ASC, created_at DESC, id DESC`; `DELETE` каскадний (`price_history` → `scan_runs` → `listings` → `searches`, у транзакції); `PATCH` з `local_filters` (Етап 2) → зберігає + синхронно перераховує `filtered_out` для всіх рядків пошуку, повертає `filtered_out_count` |
 | `POST` | `/api/searches/:id/move` | ✅ — `{direction: 'up'\|'down'}`, міняє `sort_order` із сусідом за поточним порядком (для кнопок ↑/↓ у sidebar) |
 | `POST` | `/api/searches/:id/scan?deep=true` | ✅ Етап 1/2 — повертає `{found, new_count, requestsUsed, disabled_count}`; `deep=true` — глибокий скан (§2.9 `olx-api.md`); `disabled_count` — результат `statusEngine` (Етап 2, лише GraphQL-скани) |
-| `POST` | `/api/searches/:id/scan?verify=true` | ⏳ Етап 2 (A3) — verify-прохід для давно не бачених оголошень, заплановано |
+| `POST` | `/api/searches/:id/verify` | ✅ Етап 2 (A3) — verify-прохід (кандидати P1+P2, ≤50 сторінок); повертає `VerifyResult {checked, alive, dead, unknown, reactivated, disabled_count, backfilled}` |
 | `GET` | `/api/searches/:id/scan-status` | ✅ Етап 1/2 — останній рядок `scan_runs` (для поллінгу прогресу глибокого скану/verify) |
 | `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 |
 | `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів |
-| `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, last_scan}` для панелі дій пошуку |
+| `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку (`verify_candidates` = P1+P2, лічильник кнопки «Перевірити неактивні») |
 | `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?}`; зміна `status` → `status_source='manual'`, `miss_count=0` |
 | `GET` | `/health` | ✅ |
 | `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 |
@@ -155,14 +163,15 @@ flowchart LR
 ## 7. Frontend
 
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки: `useSearches`, `useCreateSearch`,
-  `useDeleteSearch`, `useReorderSearches`, `useScan`, `useScanStatus`, `useSearchStats`,
-  `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`. Всі типи DTO
-  імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
+  `useDeleteSearch`, `useReorderSearches`, `useScan`, `useVerify`, `useScanStatus`,
+  `useSearchStats`, `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`.
+  Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
   `api_filters.ranges.price`. `useScan` приймає `{searchId, deep?}` і має
   `mutationKey: ['scan']` (щоб `useAutoRefresh` міг перевірити `queryClient.isMutating`),
-  інвалідовує `['listings', searchId]` і `['search-stats', searchId]`; `useScanStatus(searchId,
-  enabled)` поллить `GET .../scan-status` раз на ~1.5с, поки `enabled`; `useSearchStats(searchId)`
-  тягне `GET /api/searches/:id/stats` для панелі дій. `useUpdateListing()` —
+  інвалідовує `['listings', searchId]` і `['search-stats', searchId]`; `useVerify` (Етап 2,
+  A3) — `POST /api/searches/:id/verify` (`mutationKey: ['verify']`), та сама інвалідація;
+  `useScanStatus(searchId, enabled)` поллить `GET .../scan-status` раз на ~1.5с, поки
+  `enabled`; `useSearchStats(searchId)` тягне `GET /api/searches/:id/stats` для панелі дій. `useUpdateListing()` —
   `PATCH /api/listings/:id` (`{status?, note?}`) з оптимістичним апдейтом кешу
   `['listings', searchId]`. `useParamKeys(searchId, enabled)` — `GET .../param-keys` (для
   конструктора діапазонів, увімкнено лише коли відкрито `SearchFiltersDrawer`).
@@ -235,10 +244,12 @@ flowchart LR
   X · У базі: N · Давно не бачених: M» + «Останній скан: <відносний час> (<вид>) · +N нових
   · M вимкнено», іконка `LuTriangleAlert` з tooltip при `last_scan.error`); кнопки «Швидкий
   скан»/«Глибокий скан» (`useScan`, обидві `disabled` під час будь-якого скану цього пошуку,
-  прогрес — `useScanStatus`-поллінг, `Progress.Root`); «Перевірити неактивні (N)» — стала
-  `disabled`-заглушка з tooltip (показує `stats.stale_count`, чекає A3). «Глибокий скан»
-  відкриває `ConfirmActionDialog` (якщо не `skipDeepScanConfirm`) з оцінкою
-  `min(50, ceil(visible_total_count/40))` запитів і часу.
+  прогрес — `useScanStatus`-поллінг, `Progress.Root`); «Перевірити неактивні (N)» (Етап 2,
+  A3) — активна картка, N = `stats.verify_candidates`, `disabled` коли N=0, запуск
+  `useVerify` без діалогу підтвердження (прогрес/тост за тим самим патерном, підсумок —
+  реактивовано/вимкнено/дозаповнено). «Глибокий скан» відкриває `ConfirmActionDialog`
+  (якщо не `skipDeepScanConfirm`) з оцінкою `min(50, ceil(visible_total_count/40))` запитів
+  і часу.
 - `components/SearchFiltersDrawer.tsx` — Drawer редактора `local_filters` (відкривається з
   3-dot меню пошуку → «Фільтри»): стоп-слова як `Tag.Root` chips + `Input` з Enter; діапазони
   — рядки `NativeSelect` (ключі з `useParamKeys`) + `Input` мін/макс + кнопка видалення,

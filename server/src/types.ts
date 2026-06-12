@@ -69,6 +69,22 @@ export interface NormalizedPrice {
   currency: string;
 }
 
+/** Результат verify-проходу (повертається з /verify та CLI, Етап 2 A3). */
+export interface VerifyResult {
+  /** Скільки сторінок оголошень перевірено. */
+  checked: number;
+  alive: number;
+  dead: number;
+  /** Невизначений вердикт (JS-only сторінка, мережева помилка, неочікуваний код) — статус не змінено. */
+  unknown: number;
+  /** auto-disabled оголошення, що повернулись у 'new' після підтвердження живості. */
+  reactivated: number;
+  /** Скільки оголошень переведено в disabled (вердикт dead, auto/rejected). */
+  disabled_count: number;
+  /** Скільки рядків отримали description/seller_name, яких раніше не було (NULL → значення). */
+  backfilled: number;
+}
+
 /** Результат сканування (повертається з /scan та CLI). */
 export interface ScanResult {
   found: number;
@@ -159,8 +175,10 @@ export interface LastScanInfo {
 /** Відповідь GET /api/searches/:id/stats — для панелі дій (Етап 2). */
 export interface SearchStats {
   in_db: number;
-  /** Кандидати verify: status_source='auto' AND last_seen_at старше 3 днів. */
+  /** status_source='auto' AND last_seen_at старше 3 днів — для картки «Зниклі/Старі». */
   stale_count: number;
+  /** Кандидати verify-проходу (A3): давно не бачені (P1) + рядки без опису (P2), без перетину. */
+  verify_candidates: number;
   last_scan: LastScanInfo | null;
 }
 

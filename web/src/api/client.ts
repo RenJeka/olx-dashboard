@@ -13,6 +13,7 @@ import type {
   ScanStatus,
   SearchPatchResult,
   SearchStats,
+  VerifyResult,
   NewSearchInput,
 } from '../types';
 
@@ -88,6 +89,20 @@ export function useScan() {
         method: 'POST',
       }),
     onSuccess: (_data, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+      qc.invalidateQueries({ queryKey: ['search-stats', searchId] });
+    },
+  });
+}
+
+/** Verify-прохід (A3): перевірка живості + дозаповнення опису/продавця для давно не бачених. */
+export function useVerify() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['verify'],
+    mutationFn: (searchId: number) =>
+      api<VerifyResult>(`/api/searches/${searchId}/verify`, { method: 'POST' }),
+    onSuccess: (_data, searchId) => {
       qc.invalidateQueries({ queryKey: ['listings', searchId] });
       qc.invalidateQueries({ queryKey: ['search-stats', searchId] });
     },

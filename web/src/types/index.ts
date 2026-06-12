@@ -80,6 +80,17 @@ export interface ScanResult {
   disabled_count: number;
 }
 
+/** Результат verify-проходу (POST /api/searches/:id/verify, Етап 2 A3). */
+export interface VerifyResult {
+  checked: number;
+  alive: number;
+  dead: number;
+  unknown: number;
+  reactivated: number;
+  disabled_count: number;
+  backfilled: number;
+}
+
 /** Останній запис scan_runs для пошуку — для прогрес-бару глибокого скану. */
 export interface ScanStatus {
   id: number;
@@ -106,8 +117,10 @@ export interface LastScanInfo {
 /** Відповідь GET /api/searches/:id/stats — для панелі дій. */
 export interface SearchStats {
   in_db: number;
-  /** Кандидати verify: status_source='auto' AND last_seen_at старше 3 днів. */
+  /** status_source='auto' AND last_seen_at старше 3 днів — для картки «Зниклі/Старі». */
   stale_count: number;
+  /** Кандидати verify-проходу (A3): давно не бачені + рядки без опису, без перетину. */
+  verify_candidates: number;
   last_scan: LastScanInfo | null;
 }
 

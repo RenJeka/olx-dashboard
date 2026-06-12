@@ -14,7 +14,7 @@ import {
 } from './ui/dialog';
 import { Tooltip } from './ui/tooltip';
 import { toaster } from './ui/toaster';
-import { useScan, useScanStatus, useSearchStats } from '../api/client';
+import { useScan, useScanStatus, useSearchStats, useVerify } from '../api/client';
 import { formatRelativeTime } from '../utils/format';
 import { loadSkipDeepScanConfirm, saveSkipDeepScanConfirm } from '../utils/storage';
 import type { Search } from '../types';
@@ -36,15 +36,17 @@ interface Props {
 
 /** Панель дій вибраного пошуку у вигляді модального вікна: статистика + картки запуску сканування. */
 export function SearchActionPanel({ search }: Props) {
-  const [scanKind, setScanKind] = useState<'normal' | 'deep' | null>(null);
+  const [scanKind, setScanKind] = useState<'normal' | 'deep' | 'verify' | null>(null);
   const [confirmDeepOpen, setConfirmDeepOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const scan = useScan();
+  const verify = useVerify();
   const { data: stats } = useSearchStats(search.id);
   const { data: status } = useScanStatus(search.id, scanKind != null);
 
   const isScanning = scanKind != null;
   const lastScan = stats?.last_scan;
+  const verifyCandidates = stats?.verify_candidates ?? 0;
 
   const deepScanRequests =
     search.visible_total_count != null
@@ -88,6 +90,26 @@ export function SearchActionPanel({ search }: Props) {
         onSettled: () => setScanKind(null),
       },
     );
+  }
+
+  function runVerifyPass() {
+    setScanKind('verify');
+    verify.mutate(search.id, {
+      onSuccess: (r) => {
+        toaster.create({
+          type: 'success',
+          title: 'Перевірку завершено',
+          description: `Перевірено ${r.checked} · живих ${r.alive} · мертвих ${r.dead} · реактивовано ${r.reactivated} · вимкнено ${r.disabled_count} · дозаповнено ${r.backfilled}`,
+        });
+      },
+      onError: (err) =>
+        toaster.create({
+          type: 'error',
+          title: 'Помилка перевірки',
+          description: err instanceof Error ? err.message : String(err),
+        }),
+      onSettled: () => setScanKind(null),
+    });
   }
 
   return (
@@ -294,37 +316,50 @@ export function SearchActionPanel({ search }: Props) {
               </Button>
 
               {/* Перевірити неактивні */}
-              <Tooltip content="Перевірка статусу старих оголошень — залежить від детектора неактивних сторінок (ще не реалізовано)">
-                <Box
-                  p={4}
-                  rounded="xl"
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  bg="bg.panel"
-                  textAlign="left"
-                  opacity={0.5}
-                  cursor="not-allowed"
-                >
-                  <HStack gap={4} align="start">
-                    <Box p={2.5} rounded="lg" bg="gray.subtle" color="fg.muted">
-                      <LuStethoscope />
-                    </Box>
-                    <Stack gap={1} flex="1">
-                      <HStack justify="space-between" align="center">
-                        <Text textStyle="sm" fontWeight="bold" color="fg.muted">
-                          Перевірити неактивні
-                        </Text>
-                        <Badge size="sm" colorPalette="gray" variant="subtle">
-                          ~1 хв
-                        </Badge>
-                      </HStack>
-                      <Text textStyle="xs" color="fg.muted">
-                        Заходить на сторінки застарілих оголошень ({stats?.stale_count ?? 0}), щоб оновити їх статус на OLX.
+              <Button
+                variant="ghost"
+                onClick={() => !isScanning && verifyCandidates > 0 && runVerifyPass()}
+                disabled={isScanning || verifyCandidates === 0}
+                p={4}
+                rounded="xl"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                bg="bg.panel"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                height="auto"
+                whiteSpace="normal"
+                w="full"
+                fontWeight="normal"
+                _hover={
+                  !isScanning && verifyCandidates > 0
+                    ? { bg: 'bg.muted', borderColor: 'teal.muted', transform: 'translateY(-1px)' }
+                    : undefined
+                }
+                _active={!isScanning && verifyCandidates > 0 ? { transform: 'translateY(0)' } : undefined}
+                cursor={isScanning || verifyCandidates === 0 ? 'not-allowed' : 'pointer'}
+                opacity={(isScanning && scanKind !== 'verify') || verifyCandidates === 0 ? 0.5 : 1}
+                transition="all 0.2s"
+              >
+                <HStack gap={4} align="start" w="full">
+                  <Box p={2.5} rounded="lg" bg="teal.subtle" color="teal.fg" flexShrink={0}>
+                    <Box as={LuStethoscope} animation={isScanning && scanKind === 'verify' ? 'pulse 2s infinite' : undefined} />
+                  </Box>
+                  <Stack gap={1} flex="1" textAlign="left">
+                    <HStack justify="space-between" align="center" w="full">
+                      <Text textStyle="sm" fontWeight="bold" color="fg.default">
+                        Перевірити неактивні
                       </Text>
-                    </Stack>
-                  </HStack>
-                </Box>
-              </Tooltip>
+                      <Badge size="sm" colorPalette="teal" variant="subtle">
+                        ~1 хв
+                      </Badge>
+                    </HStack>
+                    <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
+                      Перевіряє сторінки давно не бачених оголошень і дозаповнює опис/продавця ({verifyCandidates}, до 50 сторінок за прохід).
+                    </Text>
+                  </Stack>
+                </HStack>
+              </Button>
             </Stack>
           </Stack>
         </DialogBody>

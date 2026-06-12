@@ -11,10 +11,11 @@ export const SELECTORS = {
   image: 'img',
   emptyState: '[data-cy="empty-state"]',
 
-  // detail-сторінка (для майбутніх етапів; зараз не використовується)
+  // detail-сторінка (verify-прохід, Етап 2 A3)
   detailParams: '[data-cy="ad-params"] li',
   detailDescription: '[data-testid="ad_description"]',
   detailTrader: '[data-testid="trader-title"]',
+  detailSellerName: '[data-testid="user-profile-user-name"]',
 } as const;
 
 export const OLX_BASE_URL = 'https://www.olx.ua';

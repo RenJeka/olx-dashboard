@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
-import { runScan } from '../scanner.js';
+import { runScan, runVerify, countVerifyCandidates } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import type { LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
 
@@ -234,6 +234,21 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Verify-прохід (A3): перевірка живості давно не бачених + дозаповнення опису/продавця.
+  app.post<{ Params: { id: string } }>('/api/searches/:id/verify', async (req, reply) => {
+    const id = Number(req.params.id);
+    const search = db.prepare('SELECT id FROM searches WHERE id = ?').get(id);
+    if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
+    try {
+      const result = await runVerify(id);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      app.log.error({ err }, 'Помилка verify-проходу');
+      return reply.code(500).send({ error: message });
+    }
+  });
+
   // Статус останнього скану — для поллінгу прогресу глибокого скану.
   app.get<{ Params: { id: string } }>(
     '/api/searches/:id/scan-status',
@@ -303,7 +318,9 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       )
       .get(id) as SearchStats['last_scan'] | undefined;
 
-    const stats: SearchStats = { in_db, stale_count, last_scan: lastScan ?? null };
+    const verify_candidates = countVerifyCandidates(id);
+
+    const stats: SearchStats = { in_db, stale_count, verify_candidates, last_scan: lastScan ?? null };
     return stats;
   });
 }

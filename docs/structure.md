@@ -48,9 +48,10 @@ olx-dashboard/
 │       │   ├── dateParser.ts # parseOlxDate(): текстові дати HTML-fallback → ISO ("Сьогодні/Вчора о HH:MM", "D <місяць> YYYY р.")
 │       │   ├── normalizer.ts # upsert по olx_id; olx_status auto-disable; filtered_out; postedAt HTML-fallback через parseOlxDate
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
-│       │   └── localFilters.ts # evaluateFilteredOut(): exclude_keywords + range-правила local_filters (Етап 2)
+│       │   ├── localFilters.ts # evaluateFilteredOut(): exclude_keywords + range-правила local_filters (Етап 2)
+│       │   └── verifier.ts   # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep) + scan-status + move + param-keys + stats + PATCH (filters)
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + stats + PATCH (filters)
 │           └── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
 │
 └── web/                      # workspace "web" (React + Vite), type: module
@@ -64,7 +65,7 @@ olx-dashboard/
         ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
         │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
         ├── api/
-        │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/scan-status, статуси/нотатки/масові
+        │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/verify/scan-status, статуси/нотатки/масові
         │                      #   дії, filters/param-keys/stats; DTO-типи з web/src/types)
         ├── components/
         │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
@@ -134,6 +135,7 @@ olx-dashboard/
 | Локальні фільтри (`exclude_keywords`, range-правила, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/SearchFiltersDrawer.tsx` |
 | Інлайн-едіт статусу/нотатки, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
+| Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphqlOlxFetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | Скрипти/воркспейси | кореневий `package.json` |
