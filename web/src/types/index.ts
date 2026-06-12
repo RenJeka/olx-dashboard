@@ -10,6 +10,23 @@ export interface Search {
   created_at: string;
 }
 
+/** Статус оголошення в моніторингу (ручний/auto-цикл, Етап 2). */
+export type ListingStatus = 'new' | 'interested' | 'contacted' | 'rejected' | 'disabled';
+
+export const LISTING_STATUSES: ListingStatus[] = [
+  'new',
+  'interested',
+  'contacted',
+  'rejected',
+  'disabled',
+];
+
+/** Тіло PATCH /api/listings/:id. */
+export interface ListingPatch {
+  status?: ListingStatus;
+  note?: string;
+}
+
 export interface Listing {
   id: number;
   olx_id: number;
@@ -25,6 +42,10 @@ export interface Listing {
   contact_name: string | null;
   olx_status: string | null;
   status: string;
+  status_source: string;
+  note: string;
+  filtered_out: number;
+  miss_count: number;
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;

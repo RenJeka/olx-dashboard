@@ -8,12 +8,15 @@ import {
   LuFileText,
   LuImage,
   LuMapPin,
+  LuNotebookPen,
   LuTag,
   LuUser,
 } from 'react-icons/lu';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
+import { StatusCell } from './StatusCell';
+import { NoteCell } from './NoteCell';
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -120,6 +123,24 @@ export const columns = [
       return <Badge colorPalette={value === 'active' ? 'green' : 'gray'}>{value}</Badge>;
     },
   }),
+  columnHelper.accessor('status', {
+    id: 'status',
+    header: () => <HeaderLabel icon={<LuCircleCheck />}>Статус</HeaderLabel>,
+    size: 130,
+    minSize: 110,
+    maxSize: 160,
+    enableSorting: false,
+    cell: (info) => <StatusCell listing={info.row.original} />,
+  }),
+  columnHelper.accessor('note', {
+    id: 'note',
+    header: () => <HeaderLabel icon={<LuNotebookPen />}>Нотатка</HeaderLabel>,
+    size: 220,
+    minSize: 140,
+    maxSize: 400,
+    enableSorting: false,
+    cell: (info) => <NoteCell listing={info.row.original} />,
+  }),
 ];
 
 export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
@@ -131,4 +152,6 @@ export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'posted_at', label: 'Дата' },
   { id: 'seller', label: 'Продавець' },
   { id: 'olx_status', label: 'Статус OLX' },
+  { id: 'status', label: 'Статус' },
+  { id: 'note', label: 'Нотатка' },
 ];

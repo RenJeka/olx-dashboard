@@ -3,7 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { Search, Listing, ScanResult, ScanStatus, NewSearchInput } from '../types';
+import type { Search, Listing, ListingPatch, ScanResult, ScanStatus, NewSearchInput } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.
@@ -95,5 +95,47 @@ export function useListings(searchId: number | null) {
     queryKey: ['listings', searchId],
     queryFn: () => api<Listing[]>(`/api/searches/${searchId}/listings`),
     enabled: searchId != null,
+  });
+}
+
+interface UpdateListingVars {
+  id: number;
+  searchId: number;
+  patch: ListingPatch;
+}
+
+/** PATCH /api/listings/:id зі оптимістичним апдейтом кешу ['listings', searchId]. */
+export function useUpdateListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: UpdateListingVars) =>
+      api<Listing>(`/api/listings/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      }),
+    onMutate: async ({ id, searchId, patch }: UpdateListingVars) => {
+      const queryKey = ['listings', searchId];
+      await qc.cancelQueries({ queryKey });
+      const previous = qc.getQueryData<Listing[]>(queryKey);
+      qc.setQueryData<Listing[]>(queryKey, (old) =>
+        old?.map((listing) =>
+          listing.id === id
+            ? {
+                ...listing,
+                ...patch,
+                status_source: patch.status !== undefined ? 'manual' : listing.status_source,
+                miss_count: patch.status !== undefined ? 0 : listing.miss_count,
+              }
+            : listing,
+        ),
+      );
+      return { previous, queryKey };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) qc.setQueryData(context.queryKey, context.previous);
+    },
+    onSettled: (_data, _err, { searchId }) => {
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+    },
   });
 }

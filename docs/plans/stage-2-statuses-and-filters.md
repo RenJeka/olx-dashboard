@@ -197,15 +197,20 @@ stateDiagram-v2
 
 ### B1. Колонка «Статус» + нотатки
 
-- [ ] `types/index.ts` + `client.ts`: `useUpdateListing()` (PATCH, оптимістичний апдейт
+- [x] `types/index.ts` + `client.ts`: `useUpdateListing()` (PATCH, оптимістичний апдейт
   кешу `['listings', searchId]`), статус-enum, лейбли/кольори:
   `new` (blue) / `interested` (green) / `contacted` (purple) / `rejected` (gray) /
   `disabled` (red, приглушений).
-- [ ] `columns.tsx`: колонка «Статус» — Chakra `Menu` або `NativeSelect` у комірці
+- [x] `columns.tsx`: колонка «Статус» — Chakra `Menu` або `NativeSelect` у комірці
   (компактний Badge-тригер); рядки зі `status='disabled'` або `'rejected'` — `opacity 0.5`.
-- [ ] Колонка «Нотатка»: показ обрізано (`lineClamp 2`); клік → `Popover` з `Textarea`
+- [x] Колонка «Нотатка»: показ обрізано (`lineClamp 2`); клік → `Popover` з `Textarea`
   (autofocus) + кнопка «Зберегти» (PATCH). Якщо Popover у комірці конфліктує з таблицею —
   fallback: поле нотатки в існуючому `DescriptionDialog`.
+
+  > Реалізовано через `Popover.Root`/`Popover.Trigger asChild`/`Portal` + `Popover.Positioner`
+  > (рендериться в `document.body`, не обмежений `overflow:auto` контейнером таблиці) —
+  > конфлікту з таблицею не виявлено при білді/смоук-тесті API; повна перевірка в браузері —
+  > рекомендована (playwright-tester за запитом).
 
 ### B2. Фільтр-панель таблиці
 

@@ -3,6 +3,7 @@ import { Table } from '@chakra-ui/react';
 import { flexRender, type Row } from '@tanstack/react-table';
 import type { Listing } from '../../types';
 import { DescriptionTooltip } from './DescriptionTooltip';
+import { isMutedStatus } from '../../utils/status';
 
 interface ListingsTableRowProps {
   row: Row<Listing>;
@@ -16,9 +17,12 @@ export const ListingsTableRow = memo(function ListingsTableRow({
   onOpenDescription,
 }: ListingsTableRowProps) {
   return (
-    <Table.Row>
+    <Table.Row opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}>
       {row.getVisibleCells().map((cell) => {
-        const isWideText = cell.column.id === 'title' || cell.column.id === 'description';
+        const isWideText =
+          cell.column.id === 'title' ||
+          cell.column.id === 'description' ||
+          cell.column.id === 'note';
         const rendered = flexRender(cell.column.columnDef.cell, cell.getContext());
         let content: ReactNode = rendered;
 
