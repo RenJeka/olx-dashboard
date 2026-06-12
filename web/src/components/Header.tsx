@@ -3,7 +3,7 @@ import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './SearchActionPanel';
-import { SettingsDrawer } from './SettingsDrawer';
+import { SettingsDrawer } from './settings/SettingsDrawer';
 import { Tooltip } from './ui/tooltip';
 import type { Search } from '../types';
 

@@ -265,14 +265,11 @@ flowchart LR
   (sidebar) + `ListingsTable`. `selectedId` може стати `null` (видалення активного пошуку) —
   тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled,
   autoRefreshIntervalMin)` викликається тут.
-- `components/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`):
-  розділ «Візуальний вигляд» — перемикач теми light/dark (`useColorMode` з `next-themes`,
-  персист — стандартний для `next-themes`), чекбокси видимості колонок таблиці та перемикач
-  «Розширений перегляд опису (тултіп + модалка)» (`descriptionExpandEnabled`); розділ
-  «Автооновлення» — `Switch` (дефолт вимкнено) + `NativeSelect` інтервалу (15/30/60 хв),
-  персист через `loadAutoRefreshEnabled`/`saveAutoRefreshEnabled`/
-  `loadAutoRefreshIntervalMin`/`saveAutoRefreshIntervalMin`. Видимість колонок персиститься
-  за допомогою `saveColumnVisibility` у `localStorage`.
+- `components/settings/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`), що єднає три підкомпоненти з `web/src/components/settings/sections/`:
+  - `VisualSection.tsx` — розділ «Візуальний вигляд»: перемикач теми light/dark (`useColorMode` з `@chakra-ui/react`), перемикач «Розширений перегляд опису (тултіп + модалка)» (`descriptionExpandEnabled`);
+  - `AutoRefreshSection.tsx` — розділ «Автооновлення»: `Switch` автооновлення + `NativeSelect` вибору інтервалу (15/30/60 хв);
+  - `ColumnsSection.tsx` — розділ «Колонки таблиці»: чекбокси видимості колонок таблиці (`TOGGLEABLE_COLUMNS`).
+  Усі налаштування персистяться в `localStorage` (за допомогою хелперів із `web/src/utils/storage.ts`).
 - `components/ui/` — Chakra UI v3 snippets, здебільшого додані через
   `npx @chakra-ui/cli snippet add` (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`,
   `switch`, `checkbox`, `close-button`); `dialog.tsx` написаний вручну за тим самим патерном

@@ -66,7 +66,12 @@ olx-dashboard/
         ├── components/
         │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── Header.tsx        # шапка (лого, кнопка бічної панелі, активний пошук, SettingsDrawer)
-        │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark), видимість колонок, перемикач опису, автооновлення
+        │   ├── settings/         # папка компонентів налаштувань
+        │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
+        │   │   └── sections/
+        │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
+        │   │       ├── AutoRefreshSection.tsx # секція "Автооновлення" (перемикач, інтервал)
+        │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── SearchActionPanel.tsx # панель дій активного пошуку: скан/глибокий скан, прогрес, лічильники
         │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку": api_filters + local_filters (exclude_keywords, ranges)
@@ -121,10 +126,10 @@ olx-dashboard/
 | Доменні типи | `server/src/types.ts` (бек), `web/src/types/index.ts` (фронт) |
 | Запити з фронту | `web/src/api/client.ts` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
-| Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx`, `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
+| Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
 | Локальні фільтри (`exclude_keywords`, range-правила, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/SearchFiltersDrawer.tsx` |
 | Інлайн-едіт статусу/нотатки, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
-| Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx`, `web/src/utils/storage.ts` |
+| Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | Скрипти/воркспейси | кореневий `package.json` |
