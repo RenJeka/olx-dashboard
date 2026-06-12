@@ -1,6 +1,7 @@
 import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
 import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
-import { LuChevronLeft, LuMenu, LuSearch, LuTimer } from 'react-icons/lu';
+import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
+import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './SearchActionPanel';
 import { SettingsDrawer } from './SettingsDrawer';
 import { Tooltip } from './ui/tooltip';
@@ -48,7 +49,7 @@ export function Header({
             </IconButton>
           </Tooltip>
           <HStack gap={2}>
-            <LuSearch size={20} />
+            <TbHeartRateMonitor size={20} />
             <Heading size="lg" fontWeight="bold">OLX Dashboard</Heading>
           </HStack>
           {selectedSearch && (
@@ -60,18 +61,13 @@ export function Header({
               borderColor="green.muted"
               px={3}
               py={1.5}
+              ml={"80px"}
               borderRadius="md"
               fontSize="sm"
               fontWeight="semibold"
               shadow="sm"
             >
-              <Box as={LuSearch} color="green.fg" />
-              <Heading size="xs" fontWeight="semibold">
-                Пошук:
-              </Heading>
-              <Badge colorPalette="green" variant="solid" size="sm" borderRadius="sm">
-                {selectedSearch.name}
-              </Badge>
+              {selectedSearch.name}
             </HStack>
           )}
         </HStack>

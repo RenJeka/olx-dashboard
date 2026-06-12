@@ -1,4 +1,4 @@
-import { Heading, HStack, IconButton, NativeSelect, Stack, Text } from '@chakra-ui/react';
+import { Heading, HStack, IconButton, NativeSelect, Separator, Stack, Text } from '@chakra-ui/react';
 import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuFileText, LuMoon, LuSettings, LuSun, LuTimer } from 'react-icons/lu';
 import { TOGGLEABLE_COLUMNS } from '../pages/ListingsTable';
@@ -53,9 +53,11 @@ export function SettingsDrawer({
       <DrawerContent>
         <DrawerCloseTrigger />
         <DrawerHeader>
-          <DrawerTitle>Налаштування</DrawerTitle>
+          <LuSettings size="24" />
+          <DrawerTitle ml="4">Налаштування</DrawerTitle>
         </DrawerHeader>
-        <DrawerBody>
+        <Separator />
+        <DrawerBody mt="4">
           <Stack gap={6}>
             <Stack gap={3}>
               <Heading size="sm">Візуальний вигляд</Heading>
