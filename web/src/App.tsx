@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Badge, Box, Flex, Heading, HStack, IconButton } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import type { VisibilityState } from '@tanstack/react-table';
-import { LuChevronLeft, LuMenu, LuSearch, LuTimer } from 'react-icons/lu';
 import { useSearches } from './api/client';
-import { SearchActionPanel } from './components/SearchActionPanel';
-import { SettingsDrawer } from './components/SettingsDrawer';
+import { Header } from './components/Header';
 import { Toaster } from './components/ui/toaster';
-import { Tooltip } from './components/ui/tooltip';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
 import { Searches } from './components/Searches';
 import { ListingsTable } from './pages/ListingsTable';
@@ -67,44 +64,19 @@ export function App() {
 
   return (
     <Flex direction="column" h="100vh">
-      <Box as="header" borderBottomWidth="1px" borderColor="border.subtle" px={4} py={3}>
-        <HStack justify="space-between">
-          <HStack gap={2}>
-            <Tooltip content={searchesVisible ? "Сховати бічну панель" : "Показати бічну панель"}>
-              <IconButton
-                aria-label="Toggle Sidebar"
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchesVisible(!searchesVisible)}
-              >
-                {searchesVisible ? <LuChevronLeft /> : <LuMenu />}
-              </IconButton>
-            </Tooltip>
-            <LuSearch />
-            <Heading size="lg">OLX Monitor</Heading>
-          </HStack>
-          <HStack gap={2}>
-            {autoRefreshEnabled && (
-              <Badge colorPalette="blue" variant="subtle">
-                <LuTimer /> авто: {autoRefreshIntervalMin} хв
-              </Badge>
-            )}
-            {selectedSearch && (
-              <SearchActionPanel search={selectedSearch} />
-            )}
-            <SettingsDrawer
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={setColumnVisibility}
-              descriptionExpandEnabled={descriptionExpandEnabled}
-              onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
-              autoRefreshEnabled={autoRefreshEnabled}
-              onAutoRefreshEnabledChange={setAutoRefreshEnabled}
-              autoRefreshIntervalMin={autoRefreshIntervalMin}
-              onAutoRefreshIntervalMinChange={setAutoRefreshIntervalMin}
-            />
-          </HStack>
-        </HStack>
-      </Box>
+      <Header
+        searchesVisible={searchesVisible}
+        onSearchesVisibleChange={setSearchesVisible}
+        selectedSearch={selectedSearch}
+        autoRefreshEnabled={autoRefreshEnabled}
+        onAutoRefreshEnabledChange={setAutoRefreshEnabled}
+        autoRefreshIntervalMin={autoRefreshIntervalMin}
+        onAutoRefreshIntervalMinChange={setAutoRefreshIntervalMin}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={setColumnVisibility}
+        descriptionExpandEnabled={descriptionExpandEnabled}
+        onDescriptionExpandEnabledChange={setDescriptionExpandEnabled}
+      />
       <Flex flex="1" overflow="hidden">
         <Searches
           selectedId={selectedId}
@@ -122,3 +94,4 @@ export function App() {
     </Flex>
   );
 }
+

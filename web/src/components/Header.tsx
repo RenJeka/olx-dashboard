@@ -1,5 +1,5 @@
 import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
-import type { VisibilityState } from '@tanstack/react-table';
+import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuChevronLeft, LuMenu, LuSearch, LuTimer } from 'react-icons/lu';
 import { SearchActionPanel } from './SearchActionPanel';
 import { SettingsDrawer } from './SettingsDrawer';
@@ -15,7 +15,7 @@ interface HeaderProps {
   autoRefreshIntervalMin: number;
   onAutoRefreshIntervalMinChange: (interval: number) => void;
   columnVisibility: VisibilityState;
-  onColumnVisibilityChange: (visibility: VisibilityState) => void;
+  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
   descriptionExpandEnabled: boolean;
   onDescriptionExpandEnabledChange: (enabled: boolean) => void;
 }
@@ -49,7 +49,7 @@ export function Header({
           </Tooltip>
           <HStack gap={2}>
             <LuSearch size={20} />
-            <Heading size="lg" fontWeight="bold">OLX Monitor</Heading>
+            <Heading size="lg" fontWeight="bold">OLX Dashboard</Heading>
           </HStack>
           {selectedSearch && (
             <HStack

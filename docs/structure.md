@@ -1,4 +1,4 @@
-# Структура проєкту — OLX Monitor
+# Структура проєкту — OLX Dashboard
 
 > Дерево файлів і призначення кожного елемента. Технічний огляд — у
 > [`architecture.md`](./architecture.md); вимоги/рішення — у [`olx-monitor-spec.md`](./olx-monitor-spec.md).
@@ -58,13 +58,14 @@ olx-dashboard/
     ├── index.html            # точка входу Vite
     └── src/
         ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
-        ├── App.tsx           # шапка (лого + SettingsDrawer) + Searches (sidebar) + SearchActionPanel + ListingsTable;
+        ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
         │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
         ├── api/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/scan-status, статуси/нотатки/масові
         │                      #   дії, filters/param-keys/stats; DTO-типи з web/src/types)
         ├── components/
         │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
+        │   ├── Header.tsx        # шапка (лого, кнопка бічної панелі, активний пошук, SettingsDrawer)
         │   ├── SettingsDrawer.tsx # Drawer "Налаштування": тема (light/dark), видимість колонок, перемикач опису, автооновлення
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── SearchActionPanel.tsx # панель дій активного пошуку: скан/глибокий скан, прогрес, лічильники

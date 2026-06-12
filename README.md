@@ -1,4 +1,4 @@
-# OLX Monitor
+# OLX Dashboard
 
 Персональна single-user система моніторингу оголошень **OLX.ua**: збір через GraphQL API OLX
 (fallback — HTML) → SQLite → React-таблиця зі статусами/нотатками/історією цін (за етапами)

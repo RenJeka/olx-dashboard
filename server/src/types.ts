@@ -1,4 +1,4 @@
-// Доменні типи OLX Monitor. Без `any` у доменному ядрі (scraper/db/logic).
+// Доменні типи OLX Dashboard. Без `any` у доменному ядрі (scraper/db/logic).
 
 /** Серверні фільтри OLX, що йдуть у URL пошуку. */
 export interface ApiFilters {

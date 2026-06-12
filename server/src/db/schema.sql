@@ -1,4 +1,4 @@
--- Канонічна схема БД OLX Monitor (див. docs/olx-monitor-spec.md §5).
+-- Канонічна схема БД OLX Dashboard (див. docs/olx-monitor-spec.md §5).
 -- Застосовується при старті через db.ts (CREATE TABLE IF NOT EXISTS).
 -- НЕ дублювати визначення таблиць у коді — джерело істини тут.
 

@@ -1,4 +1,4 @@
-# Архітектура — OLX Monitor
+# Архітектура — OLX Dashboard
 
 > Технічний огляд реалізації. Канон вимог і рішень — у [`olx-monitor-spec.md`](./olx-monitor-spec.md).
 > Деталі запитів до OLX (URL, параметри, заголовки, селектори) — у [`olx-api.md`](./olx-api.md).
@@ -217,6 +217,8 @@ flowchart LR
     (`setRowSelection({})`).
   - `DescriptionTooltip.tsx` — інтерактивний тултіп з прокруткою для попереднього перегляду тексту опису. Клік по вмісту відкриває `DescriptionDialog`.
   - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
+- `App.tsx` — компоновка сторінки (Header, Searches sidebar, ListingsTable). `selectedId` може стати `null` (видалення активного пошуку) — тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin)` викликається тут.
+- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), видимий лише коли `autoRefreshEnabled`, кнопка згортання бічної панелі, інформація про активний обраний пошук з підсвіткою та `SettingsDrawer`).
 - `components/DescriptionDialog.tsx` — модальне вікно повного опису оголошення (`DialogRoot
   size="lg" placement="center" scrollBehavior="inside"`): фото/назва/ціна/місто в хедері,
   повний текст опису (скрол) у тілі, «Відкрити на OLX» + «Закрити» у футері. Відкривається
@@ -257,7 +259,7 @@ flowchart LR
   `getPaginationRowModel()` (TanStack Table v8) тримає DOM обмеженим розміром сторінки навіть
   для ~2000 оголошень (фікс зависання UI після глибокого скану — `docs/plans/listings-pagination.md`).
   Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
-- `App.tsx` — шапка («OLX Monitor» + бейдж «авто: N хв» (`LuTimer`), видимий лише коли
+- `App.tsx` — шапка («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), видимий лише коли
   `autoRefreshEnabled`, + `SettingsDrawer`); під шапкою — `SearchActionPanel` для обраного
   пошуку (замінив попередній рядок «Результатів на OLX… · У базі…»); далі `Searches`
   (sidebar) + `ListingsTable`. `selectedId` може стати `null` (видалення активного пошуку) —
