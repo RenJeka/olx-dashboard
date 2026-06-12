@@ -68,16 +68,16 @@ olx-dashboard/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/verify/scan-status, статуси/нотатки/масові
         │                      #   дії, filters/param-keys/stats; DTO-типи з web/src/types)
         ├── components/
-        │   ├── Searches.tsx      # список пошуків (акордеон), форма створення, сортування ↑/↓, 3-dot меню (фільтри/видалення)
-        │   ├── Header.tsx        # шапка (лого, кнопка бічної панелі, активний пошук, SettingsDrawer)
+        │   ├── Searches.tsx      # бічна панель (акордеон пошуків), сортування ↑/↓, 3-dot меню (фільтри/видалення)
+        │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
         │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
         │   │       ├── AutoRefreshSection.tsx # секція "Автооновлення" (перемикач, інтервал)
-        │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (видимість колонок)
+        │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
-        │   ├── SearchActionPanel.tsx # панель дій активного пошуку: скан/глибокий скан, прогрес, лічильники
+        │   ├── SearchActionPanel.tsx # модальне вікно (DialogRoot) дій активного пошуку (скан/verify, статистика)
         │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку": api_filters + local_filters (exclude_keywords, ranges)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
         │   ├── table/             # компоненти таблиці оголошень
@@ -88,6 +88,7 @@ olx-dashboard/
         │   │   ├── ListingsTableRow.tsx # рядок таблиці (React.memo), приглушений стиль для disabled/rejected
         │   │   ├── StatusCell.tsx # інлайн-едіт статусу (NativeSelect) + status_source
         │   │   ├── NoteCell.tsx   # інлайн-едіт нотатки (Popover + textarea)
+        │   │   ├── ProsConsCell.tsx # інлайн-едіт плюсів/мінусів (Popover + textarea)
         │   │   ├── HighlightText.tsx # підсвітка збігів пошукового запиту (Mark)
         │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup), "показати filtered_out", пошук
         │   │   ├── BulkActionBar.tsx # панель масових дій над виділеними рядками (зміна статусу)
@@ -130,10 +131,10 @@ olx-dashboard/
 | Доменні типи | `server/src/types.ts` (бек), `web/src/types/index.ts` (фронт) |
 | Запити з фронту | `web/src/api/client.ts` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
-| Налаштування вигляду (тема, видимість колонок) | `web/src/components/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
+| Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
 | Локальні фільтри (`exclude_keywords`, range-правила, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/SearchFiltersDrawer.tsx` |
-| Інлайн-едіт статусу/нотатки, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
+| Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphqlOlxFetcher.ts`, `server/src/migratePostedAt.ts` |

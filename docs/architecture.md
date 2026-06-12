@@ -221,35 +221,31 @@ flowchart LR
   - `NoteCell.tsx` — обрізаний текст нотатки (`lineClamp 2`); клік відкриває
     `Popover.Root`/`Portal` з `Textarea` + кнопкою «Зберегти» (PATCH `note`). Portal —
     рендериться в `document.body`, не обмежений `overflow:auto` контейнером таблиці.
+  - `ProsConsCell.tsx` — комірки для колонок «Плюси» та «Мінуси», поведінка аналогічна
+    до `NoteCell.tsx`, але з відповідними іконками та кольорами.
   - `HighlightText.tsx` — підсвічує всі збіги пошукового запиту в тексті через
     `<Mark bg="yellow.subtle">`; використовується в колонках «Назва»/«Опис» і в
     `DescriptionTooltip`.
   - `ListingsFilterBar.tsx` — панель над таблицею: `SegmentGroup` фільтра статусів (Всі +
     `LISTING_STATUSES`, з лічильниками з урахуванням toggle filtered_out), `Switch`
-    «Показати відфільтровані», `Input` текстового пошуку.
+    «Показати відфільтровані», `Input` текстового пошуку із кнопкою очищення.
   - `BulkActionBar.tsx` — з'являється, коли є вибрані рядки: «Вибрано: N» + `Menu` зі
-    статусами (`LISTING_STATUSES`/`STATUS_LABELS`) → `Promise.allSettled` з
+    статусами (`LISTING_STATUSES`/`STATUS_LABELS` з відповідними іконками) → `Promise.allSettled` з
     `useUpdateListing().mutateAsync()` по кожному `id` (підсумковий toast), і «Скасувати»
     (`setRowSelection({})`).
   - `DescriptionTooltip.tsx` — інтерактивний тултіп з прокруткою для попереднього перегляду тексту опису. Клік по вмісту відкриває `DescriptionDialog`.
   - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
-- `App.tsx` — компоновка сторінки (Header, Searches sidebar, ListingsTable). `selectedId` може стати `null` (видалення активного пошуку) — тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin)` викликається тут.
-- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), видимий лише коли `autoRefreshEnabled`, кнопка згортання бічної панелі, інформація про активний обраний пошук з підсвіткою та `SettingsDrawer`).
+- `App.tsx` — компоновка сторінки (Header, Searches sidebar, ListingsTable). Керує станом видимості бічної панелі (`searchesVisible`). `selectedId` може стати `null` (видалення активного пошуку) — тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin)` викликається тут.
+- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), кнопка згортання/розгортання бічної панелі, інформація про активний обраний пошук з підсвіткою, `SearchActionPanel` (кнопка виклику модального вікна) та `SettingsDrawer`).
 - `components/DescriptionDialog.tsx` — модальне вікно повного опису оголошення (`DialogRoot
   size="lg" placement="center" scrollBehavior="inside"`): фото/назва/ціна/місто в хедері,
   повний текст опису (скрол) у тілі, «Відкрити на OLX» + «Закрити» у футері. Відкривається
   кліком по комірці «Опис» (`ListingsTable.tsx` тримає `descriptionListing` стан).
-- `components/SearchActionPanel.tsx` — постійна панель дій вибраного пошуку (рендериться в
-  `App.tsx` над `<Searches>`/`<ListingsTable>`): рядок стану з `useSearchStats()` («На OLX:
-  X · У базі: N · Давно не бачених: M» + «Останній скан: <відносний час> (<вид>) · +N нових
-  · M вимкнено», іконка `LuTriangleAlert` з tooltip при `last_scan.error`); кнопки «Швидкий
-  скан»/«Глибокий скан» (`useScan`, обидві `disabled` під час будь-якого скану цього пошуку,
-  прогрес — `useScanStatus`-поллінг, `Progress.Root`); «Перевірити неактивні (N)» (Етап 2,
-  A3) — активна картка, N = `stats.verify_candidates`, `disabled` коли N=0, запуск
-  `useVerify` без діалогу підтвердження (прогрес/тост за тим самим патерном, підсумок —
-  реактивовано/вимкнено/дозаповнено). «Глибокий скан» відкриває `ConfirmActionDialog`
-  (якщо не `skipDeepScanConfirm`) з оцінкою `min(50, ceil(visible_total_count/40))` запитів
-  і часу.
+- `components/SearchActionPanel.tsx` — модальне вікно дій вибраного пошуку (`DialogRoot`),
+  що викликається кнопкою "Сканувати" з `Header.tsx`. Містить рядок стану з `useSearchStats()`
+  (статистика бази, останній скан), прогрес-бар поточного скану та три кнопки дій:
+  «Швидкий скан» / «Глибокий скан» / «Перевірити неактивні (N)». Глибокий скан відкриває
+  додатковий `ConfirmActionDialog`. Усі кнопки блокуються під час активного скану.
 - `components/SearchFiltersDrawer.tsx` — Drawer редактора `local_filters` (відкривається з
   3-dot меню пошуку → «Фільтри»): стоп-слова як `Tag.Root` chips + `Input` з Enter; діапазони
   — рядки `NativeSelect` (ключі з `useParamKeys`) + `Input` мін/макс + кнопка видалення,
@@ -259,15 +255,13 @@ flowchart LR
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
   для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `components/Searches.tsx` — акордеон («Пошуки» / «Новий пошук»), форма створення. Кожен `SearchRow`:
+- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. Кожен `SearchRow`:
   - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
     disabled на краях списку;
   - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Фільтри» (`LuFilter`, відкриває
     `SearchFiltersDrawer`), розділювач, «Видалити» (`LuTrash2`, `color="fg.error"`,
     відкриває `DialogRoot role="alertdialog"` із підтвердженням і каскадно видаляє пошук
     через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).
-  Кнопки сканування й прогрес-бар перенесені в `SearchActionPanel` (B4) — у 3-dot меню їх
-  більше немає.
 - `pages/ListingsTable.tsx` — відображення списку оголошень: збирає разом
   `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу + toggle
   filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),
@@ -277,16 +271,10 @@ flowchart LR
   `getPaginationRowModel()` (TanStack Table v8) тримає DOM обмеженим розміром сторінки навіть
   для ~2000 оголошень (фікс зависання UI після глибокого скану — `docs/plans/listings-pagination.md`).
   Експортує `TOGGLEABLE_COLUMNS` для збереження зворотньої сумісності з `SettingsDrawer`.
-- `App.tsx` — шапка («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), видимий лише коли
-  `autoRefreshEnabled`, + `SettingsDrawer`); під шапкою — `SearchActionPanel` для обраного
-  пошуку (замінив попередній рядок «Результатів на OLX… · У базі…»); далі `Searches`
-  (sidebar) + `ListingsTable`. `selectedId` може стати `null` (видалення активного пошуку) —
-  тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled,
-  autoRefreshIntervalMin)` викликається тут.
 - `components/settings/SettingsDrawer.tsx` — Drawer «Налаштування» (іконка-шестерня в шапці, `App.tsx`), що єднає три підкомпоненти з `web/src/components/settings/sections/`:
   - `VisualSection.tsx` — розділ «Візуальний вигляд»: перемикач теми light/dark (`useColorMode` з `@chakra-ui/react`), перемикач «Розширений перегляд опису (тултіп + модалка)» (`descriptionExpandEnabled`);
   - `AutoRefreshSection.tsx` — розділ «Автооновлення»: `Switch` автооновлення + `NativeSelect` вибору інтервалу (15/30/60 хв);
-  - `ColumnsSection.tsx` — розділ «Колонки таблиці»: чекбокси видимості колонок таблиці (`TOGGLEABLE_COLUMNS`).
+  - `ColumnsSection.tsx` — розділ «Колонки таблиці»: підтримка drag-and-drop перевпорядкування колонок (на базі `@dnd-kit`) та чекбокси видимості колонок таблиці (`TOGGLEABLE_COLUMNS`).
   Усі налаштування персистяться в `localStorage` (за допомогою хелперів із `web/src/utils/storage.ts`).
 - `components/ui/` — Chakra UI v3 snippets, здебільшого додані через
   `npx @chakra-ui/cli snippet add` (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`,
