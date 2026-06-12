@@ -15,11 +15,11 @@ import { useListingsTableState } from '../hooks/useListingsTableState';
 import { columns } from '../components/table/columns';
 import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
 import { ListingsTableBody } from '../components/table/ListingsTableBody';
-import { ListingsFilterBar } from '../components/table/ListingsFilterBar';
-
+import { ListingsFilterBar } from '../components/table/topbar';
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
+import type { SearchScope } from '../components/table/topbar';
 import type { Listing, ListingStatus } from '../types';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
@@ -46,7 +46,8 @@ export function ListingsTable({
   const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
   const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
   const [showFilteredOut, setShowFilteredOut] = useState(false);
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   useEffect(() => {
@@ -75,7 +76,7 @@ export function ListingsTable({
       // 'select' завжди першою; решта — збережений порядок (порожній = дефолт TanStack)
       columnOrder: columnOrder.length > 0 ? ['select', ...columnOrder] : [],
       pagination,
-      globalFilter,
+      globalFilter: searchText,
       rowSelection,
     },
     getRowId: (row) => String(row.id),
@@ -85,13 +86,13 @@ export function ListingsTable({
     onColumnSizingChange: setColumnSizing,
     onColumnVisibilityChange: onColumnVisibilityChange,
     onPaginationChange: setPagination,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange: setSearchText,
     globalFilterFn: (row, _columnId, filterValue) => {
       const query = String(filterValue).trim().toLowerCase();
       if (!query) return true;
-      const title = (row.original.title ?? '').toLowerCase();
-      const description = stripDescriptionHtml(row.original.description).toLowerCase();
-      return title.includes(query) || description.includes(query);
+      const titleMatch = searchScope.inTitle && (row.original.title ?? '').toLowerCase().includes(query);
+      const descMatch = searchScope.inDescription && stripDescriptionHtml(row.original.description).toLowerCase().includes(query);
+      return titleMatch || descMatch;
     },
     columnResizeMode: 'onEnd',
     getCoreRowModel: getCoreRowModel(),
@@ -134,8 +135,10 @@ export function ListingsTable({
         onStatusFilterChange={setStatusFilter}
         showFilteredOut={showFilteredOut}
         onShowFilteredOutChange={setShowFilteredOut}
-        searchText={globalFilter}
-        onSearchTextChange={setGlobalFilter}
+        searchText={searchText}
+        onSearchTextChange={setSearchText}
+        searchScope={searchScope}
+        onSearchScopeChange={setSearchScope}
         searchId={searchId ?? undefined}
         selectedIds={selectedIds}
         onClearSelection={() => setRowSelection({})}
@@ -147,7 +150,7 @@ export function ListingsTable({
             table={table}
             descriptionExpandEnabled={descriptionExpandEnabled}
             onOpenDescription={setDescriptionListing}
-            searchQuery={globalFilter}
+            searchQuery={searchText}
           />
         </Table.Root>
         {table.getRowModel().rows.length === 0 && (

@@ -1,9 +1,9 @@
 import { Button, HStack, Menu, Portal, Text } from '@chakra-ui/react';
-import { LuChevronDown, LuX } from 'react-icons/lu';
-import { useUpdateListing } from '../../api/client';
-import { toaster } from '../ui/toaster';
-import { LISTING_STATUSES, type ListingStatus } from '../../types';
-import { STATUS_LABELS } from '../../utils/status';
+import { LuChevronDown, LuX, LuCircleDot, LuHeart, LuMessageCircle, LuThumbsDown, LuEyeOff } from 'react-icons/lu';
+import { useUpdateListing } from '../../../api/client';
+import { toaster } from '../../ui/toaster';
+import { LISTING_STATUSES, type ListingStatus } from '../../../types';
+import { STATUS_LABELS, STATUS_COLORS } from '../../../utils/status';
 
 interface Props {
   searchId: number;
@@ -35,6 +35,12 @@ export function BulkActionBar({ searchId, selectedIds, onClear }: Props) {
     <HStack
       gap={5}
       colorPalette="blue"
+      ml={10}
+      bg="colorPalette.subtle"
+      rounded="md"
+      px={3}
+      border="1px solid"
+      borderColor="colorPalette.muted"
     >
       <Text textStyle="sm" fontWeight="medium">
         Вибрано: {selectedIds.length}
@@ -48,11 +54,23 @@ export function BulkActionBar({ searchId, selectedIds, onClear }: Props) {
         <Portal>
           <Menu.Positioner>
             <Menu.Content>
-              {LISTING_STATUSES.map((status) => (
-                <Menu.Item key={status} value={status} onSelect={() => void applyStatus(status)}>
-                  {STATUS_LABELS[status]}
-                </Menu.Item>
-              ))}
+              {LISTING_STATUSES.map((status) => {
+                const Icon = {
+                  new: LuCircleDot,
+                  interested: LuHeart,
+                  contacted: LuMessageCircle,
+                  rejected: LuThumbsDown,
+                  disabled: LuEyeOff,
+                }[status];
+                return (
+                  <Menu.Item key={status} value={status} onSelect={() => void applyStatus(status)}>
+                    <HStack gap={2}>
+                      <Icon size={14} color={`var(--chakra-colors-${STATUS_COLORS[status]}-fg)`} />
+                      {STATUS_LABELS[status]}
+                    </HStack>
+                  </Menu.Item>
+                );
+              })}
             </Menu.Content>
           </Menu.Positioner>
         </Portal>
