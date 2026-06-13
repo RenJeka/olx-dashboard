@@ -9,6 +9,10 @@
 - **Frontend:** React 18 + **Vite** + **TanStack Table v8** + **TanStack Query v5** + **Chakra UI v3** (`@chakra-ui/react`, провайдер/тостер/тултіп — сніпети у `web/src/components/ui/`).
 - **Іконки:** `react-icons/lu` (набір Lucide) — стандартний вибір для Chakra UI v3.
 - **Notion:** `@notionhq/client`.
+- **LLM-аналіз:** OpenRouter через звичайний `fetch` (без SDK); Excel-експорт — **`exceljs`**
+  (єдина узгоджена нова залежність `server/`, обрано замість `xlsx`/SheetJS: той має
+  невиправлені high-severity CVE й перейшов на платну модель). `.env` — через
+  `process.loadEnvFile` (міні-лоадер у `server/src/analysis/config.ts`), без нової залежності.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
 ## Метод збору даних (КРИТИЧНО — підтверджено живими запитами 2026-06-10)
@@ -58,6 +62,26 @@
 - **Auto-reactivate:** auto-disabled оголошення знову з'явилося в GraphQL-видачі з `olx_status='active'` (або verify підтвердив живе) → назад у `new`, `miss_count=0`. Manual-disabled НЕ реактивується автоматично.
 - **filtered_out:** `local_filters` (стоп-слова у title+description, числові діапазони по `params`) ставлять прапорець, НЕ видаляють рядок. Зміна `local_filters` (`PATCH /api/searches/:id`) → синхронний ретроактивний перерахунок `filtered_out` для всіх рядків пошуку.
 - **Notion-синк:** one-way (app → Notion), match по `olx_id`. Двосторонній — поза скоупом.
+- **LLM-аналіз (мінуси/плюси, план `docs/plans/llm-analysis.md`):** аналіз описів через
+  4-етапний майстер (кнопка «AI» у хедері). **Ніколи не авто** — лише вручну за тригером
+  (жодного зі сканів/автооновлення/cron). Два рівноправні рушії: **авто** (OpenRouter,
+  `google/gemini-2.5-flash-lite` дефолт) і **повний ручний** (копіювання промпту → будь-який
+  безкоштовний чат → вставка відповіді → сервер парсить); ключ повністю опціональний.
+  Інваріанти:
+  - **Критерії — на рівні пошуку** (`searches.analysis_criteria`, JSON `{cons:[], pros:[]}`).
+    **Мінуси/плюси — на рівні оголошення** (`listings.cons`/`pros`, TEXT `• criterion\n• …`,
+    сумісно з ручним едітом `ProsConsCell`).
+  - **`evidence` (дослівний фрагмент) у БД НЕ зберігається.** LLM повертає `{criterion,
+    evidence}`; сервер верифікує `evidence` як підрядок опису (анти-галюцинація); у БД пише
+    лише масив `criterion`.
+  - **PII продавця в промпт не йде** (тільки `id/title/description/params`).
+  - Ключ OpenRouter — лише в `server/.env` (`OPENROUTER_API_KEY`), ніколи в код/git.
+  - Промпти — єдине джерело `server/src/analysis/prompts.ts` (спільне для авто й ручного).
+  - Зміна `title`/`description` після аналізу → `analysis_stale=1` (бейдж «застарілий
+    аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.
+  - Чанкування: авто — дрібні батчі (12), ручний пакет — авто-вибір 1 vs кілька частин за
+    порогом токенів. Реалізація — `server/src/analysis/*`, `server/src/routes/analysis.ts`,
+    `server/src/export/xlsx.ts`, фронт — `web/src/components/analysis/*`.
 
 ## Команди
 
@@ -87,6 +111,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
 - `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
 - `docs/plans/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
+- `docs/plans/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
 - Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 
@@ -100,6 +125,10 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
    дозаповнення опису/продавця.
 3. price_history + спарклайни + MD-експорт для аналізу в Claude.
 4. Notion-експорт + node-cron + журнал scan_runs.
+
+> Поза чергою (за окремим запитом): ✅ **LLM-аналіз мінусів/плюсів** — майстер «AI» (OpenRouter
+> + повний ручний режим), `docs/plans/llm-analysis.md`. Критерії на рівні пошуку, мінуси/плюси
+> на рівні оголошення; ніколи не авто.
 
 ## Що питати перед дією
 

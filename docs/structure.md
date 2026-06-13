@@ -41,6 +41,14 @@ olx-dashboard/
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
 │       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
+│       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md)
+│       │   ├── config.ts     # server/.env (process.loadEnvFile) + константи (модель, чанки, поріг пакета)
+│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample — ЄДИНЕ джерело промптів
+│       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
+│       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
+│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/estimateTokens
+│       ├── export/
+│       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
 │       ├── scraper/
 │       │   ├── graphqlOlxFetcher.ts # GraphqlOlxFetcher: GraphQL API (основний метод), exhausted-флаг
 │       │   ├── selectors.ts  # OLX-селектори + заголовки HTML-запиту (fallback)
@@ -52,7 +60,8 @@ olx-dashboard/
 │       │   └── verifier.ts   # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + stats + PATCH (filters)
-│           └── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
+│           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
+│           └── analysis.ts   # LLM-аналіз: /analysis/status, criteria (generate/prompt/import/PUT), analyze (auto/package/import), commit, export
 │
 └── web/                      # workspace "web" (React + Vite), type: module
     ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
@@ -70,11 +79,15 @@ olx-dashboard/
         ├── components/
         │   ├── Searches.tsx      # бічна панель (акордеон пошуків), сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
+        │   ├── analysis/        # майстер LLM-аналізу (план docs/plans/llm-analysis.md)
+        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка), режим cons/pros, обсяг вибрані/весь
+        │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт + вставити відповідь)
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
         │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
         │   │       ├── AutoRefreshSection.tsx # секція "Автооновлення" (перемикач, інтервал)
+        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, модель, reasoning, додаткові критерії)
         │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── SearchActionPanel.tsx # модальне вікно (DialogRoot) дій активного пошуку (скан/verify, статистика)
@@ -139,4 +152,5 @@ olx-dashboard/
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphqlOlxFetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
+| LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
 | Скрипти/воркспейси | кореневий `package.json` |
