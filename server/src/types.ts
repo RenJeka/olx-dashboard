@@ -150,9 +150,58 @@ export interface ListingRow {
   cons: string;
   filtered_out: number;
   miss_count: number;
+  analysis_at: string | null;
+  analysis_source: string | null;
+  analysis_model: string | null;
+  analysis_stale: number;
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+}
+
+// ── LLM-аналіз (план docs/plans/llm-analysis.md) ─────────────────────────────
+
+/** Режим аналізу: мінуси чи плюси. Критерії й промпти різні, механіка однакова. */
+export type AnalysisMode = 'cons' | 'pros';
+
+/** Критерії аналізу на рівні пошуку (searches.analysis_criteria, JSON). */
+export interface AnalysisCriteria {
+  cons: string[];
+  pros: string[];
+}
+
+/** Один знайдений збіг критерію в оголошенні (повертає LLM + прапорець верифікації). */
+export interface MatchedItem {
+  /** Нормалізований критерій з обраного списку. */
+  criterion: string;
+  /** Дослівний фрагмент опису (для верифікації/підсвітки); у БД НЕ зберігається. */
+  evidence: string;
+  /** evidence підтверджено як підрядок опису (анти-галюцинація). */
+  ok: boolean;
+}
+
+/** Результат аналізу одного оголошення (для кроку «Перевірка»). */
+export interface AnalyzedListing {
+  id: number;
+  items: MatchedItem[];
+}
+
+/** Відповідь matching-ендпойнтів (auto + manual import). */
+export interface AnalyzeResponse {
+  results: AnalyzedListing[];
+  errors: string[];
+}
+
+/** Один елемент запису в БД (commit). */
+export interface CommitItem {
+  id: number;
+  criteria: string[];
+}
+
+/** Частина пакета для ручного режиму (один файл/чат). */
+export interface PackagePart {
+  name: string;
+  content: string;
 }
 
 /** Елемент відповіді GET /api/searches/:id/param-keys — для конструктора діапазонів локальних фільтрів. */

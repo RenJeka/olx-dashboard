@@ -15,6 +15,7 @@ const SORTABLE = new Set([
 const LISTING_COLUMNS = `id, olx_id, search_id, title, url, price, currency, city, district,
                 photo_url, description, seller_name, contact_name, olx_status,
                 status, status_source, note, pros, cons, filtered_out, miss_count,
+                analysis_at, analysis_source, analysis_model, analysis_stale,
                 posted_at, first_seen_at, last_seen_at`;
 
 export async function listingsRoutes(app: FastifyInstance): Promise<void> {
