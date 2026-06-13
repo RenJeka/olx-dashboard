@@ -8,13 +8,11 @@ import {
   IconButton,
   Image,
   Input,
-  Mark,
   Progress,
   Stack,
   Text,
   Wrap,
 } from '@chakra-ui/react';
-import { Fragment } from 'react';
 import {
   LuSparkles,
   LuWandSparkles,
@@ -36,6 +34,7 @@ import {
 } from '../ui/dialog';
 import { ConfirmActionDialog } from '../ConfirmActionDialog';
 import { ManualAssistant } from './ManualAssistant';
+import { HighlightText } from '../table/HighlightText';
 import { toaster } from '../ui/toaster';
 import {
   useAnalysisStatus,
@@ -57,6 +56,7 @@ import {
   loadAnalysisExtraCriteria,
 } from '../../utils/storage';
 import { stripDescriptionHtml } from '../../utils/format';
+import { chunk } from '../../utils/array';
 import type { AnalysisMode, AnalyzedListing, Listing, PackagePart, Search } from '../../types';
 
 interface Props {
@@ -68,32 +68,6 @@ interface Props {
 const STEPS = ['Критерії', 'Пошук', 'Перевірка', 'Вставка'];
 const COMMIT_CHUNK = 50;
 const ANALYZE_CHUNK = 200;
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Підсвічує всі evidence-фрагменти в описі (анти-галюцинація — для кроку «Перевірка»). */
-function EvidenceText({ text, needles }: { text: string; needles: string[] }) {
-  const valid = needles.map((n) => n.trim()).filter((n) => n.length >= 3);
-  if (valid.length === 0) return <>{text}</>;
-  const re = new RegExp(`(${valid.map(escapeRegExp).join('|')})`, 'gi');
-  const parts = text.split(re);
-  const lower = new Set(valid.map((n) => n.toLowerCase()));
-  return (
-    <>
-      {parts.map((part, i) =>
-        lower.has(part.toLowerCase()) ? (
-          <Mark key={i} bg="yellow.subtle" rounded="sm">
-            {part}
-          </Mark>
-        ) : (
-          <Fragment key={i}>{part}</Fragment>
-        ),
-      )}
-    </>
-  );
-}
 
 export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const [open, setOpen] = useState(false);
@@ -275,10 +249,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       toaster.create({ type: 'error', title: 'Немає оголошень для аналізу' });
       return;
     }
-    const chunks: number[][] = [];
-    for (let i = 0; i < effectiveIds.length; i += ANALYZE_CHUNK) {
-      chunks.push(effectiveIds.slice(i, i + ANALYZE_CHUNK));
-    }
+    const chunks = chunk(effectiveIds, ANALYZE_CHUNK);
     setAnalyzeProgress({ done: 0, total: effectiveIds.length });
     let acc: AnalyzedListing[] = [];
     const errors: string[] = [];
@@ -369,8 +340,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     setCommitProgress({ done: 0, total: commitItems.length });
     try {
       let done = 0;
-      for (let i = 0; i < commitItems.length; i += COMMIT_CHUNK) {
-        const batch = commitItems.slice(i, i + COMMIT_CHUNK);
+      for (const batch of chunk(commitItems, COMMIT_CHUNK)) {
         await commit.mutateAsync({
           searchId: search.id,
           mode,
@@ -668,7 +638,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                           {l?.title ?? `#${r.id}`}
                         </Text>
                         <Text textStyle="xs" color="fg.muted" lineClamp={3} whiteSpace="pre-line">
-                          <EvidenceText text={desc} needles={okItems.map((it) => it.evidence)} />
+                          <HighlightText text={desc} query={okItems.map((it) => it.evidence)} />
                         </Text>
                         <Wrap gap={1} mt={1}>
                           {okItems.map((it, i) => (

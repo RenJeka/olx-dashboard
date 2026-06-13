@@ -127,7 +127,11 @@ olx-dashboard/
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS/STATUS_COLORS, isMutedStatus()
-            └── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState, автооновлення) у localStorage
+            ├── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState, автооновлення, AI-аналіз) у localStorage
+            ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
+            ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
+            ├── download.ts       # downloadBlob()/downloadText() — завантаження файлів (експорт, ручний пакет)
+            └── clipboard.ts      # copyToClipboard() — копіювання + toast «Скопійовано»
 ```
 
 ## Орієнтири «куди дивитись»

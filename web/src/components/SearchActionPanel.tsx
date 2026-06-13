@@ -14,6 +14,7 @@ import {
 } from './ui/dialog';
 import { Tooltip } from './ui/tooltip';
 import { toaster } from './ui/toaster';
+import { copyToClipboard } from '../utils/clipboard';
 import { useScan, useScanStatus, useSearchStats, useVerify } from '../api/client';
 import { formatRelativeTime } from '../utils/format';
 import { loadSkipDeepScanConfirm, saveSkipDeepScanConfirm } from '../utils/storage';
@@ -193,10 +194,7 @@ export function SearchActionPanel({ search }: Props) {
                         colorPalette="red"
                         h={6}
                         minW={6}
-                        onClick={() => {
-                          navigator.clipboard.writeText(lastScan.error!);
-                          toaster.create({ type: 'success', title: 'Скопійовано' });
-                        }}
+                        onClick={() => copyToClipboard(lastScan.error!)}
                       >
                         <LuCopy />
                       </IconButton>

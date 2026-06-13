@@ -3,6 +3,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { downloadBlob } from '../utils/download';
 import type {
   Search,
   Listing,
@@ -364,15 +365,7 @@ export async function exportPreview(
     body: JSON.stringify({ format, mode, rows }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `analysis-${mode}.${format}`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(await res.blob(), `analysis-${mode}.${format}`);
 }
 
 /** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */

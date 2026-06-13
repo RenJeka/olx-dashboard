@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Box, Button, HStack, Stack, Text, Textarea } from '@chakra-ui/react';
 import { LuCopy, LuDownload } from 'react-icons/lu';
-import { toaster } from '../ui/toaster';
+import { copyToClipboard } from '../../utils/clipboard';
+import { downloadText } from '../../utils/download';
 import type { PackagePart } from '../../types';
 
 interface Props {
@@ -16,23 +17,6 @@ interface Props {
   submitting?: boolean;
   /** Лічильник/підказка під полем вставки (напр. «Опрацьовано 12»). */
   footer?: React.ReactNode;
-}
-
-function copyText(text: string): void {
-  navigator.clipboard.writeText(text);
-  toaster.create({ type: 'success', title: 'Скопійовано' });
-}
-
-function downloadText(part: PackagePart): void {
-  const blob = new Blob([part.content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = part.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 /**
@@ -62,11 +46,11 @@ export function ManualAssistant({ title, parts, pasteLabel, onSubmit, submitting
                 {multiPart ? `Частина ${i + 1}/${parts.length}: ` : ''}
                 {part.name}
               </Text>
-              <Button size="xs" variant="outline" onClick={() => copyText(part.content)}>
+              <Button size="xs" variant="outline" onClick={() => copyToClipboard(part.content)}>
                 <LuCopy /> Копіювати
               </Button>
               {multiPart && (
-                <Button size="xs" variant="ghost" onClick={() => downloadText(part)}>
+                <Button size="xs" variant="ghost" onClick={() => downloadText(part.content, part.name)}>
                   <LuDownload />
                 </Button>
               )}
