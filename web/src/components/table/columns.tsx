@@ -1,6 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import { Badge, Box, HStack, Image, Link, Text } from '@chakra-ui/react';
-import { Tooltip } from '../ui/tooltip';
 import {
   LuCalendar,
   LuCircleCheck,
@@ -149,11 +148,9 @@ export const columns = [
       else if (diffDays === 6) bg = "blue.subtle/5";
 
       const content = (
-        <Tooltip content={d.full} openDelay={200} closeDelay={100}>
-          <Text as="span" cursor="default">
-            {d.short}
-          </Text>
-        </Tooltip>
+        <Text as="span" cursor="default" title={d.full}>
+          {d.short}
+        </Text>
       );
 
       return bg ? (

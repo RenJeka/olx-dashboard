@@ -46,36 +46,39 @@ footprint процесу.
 ## Файли та зміни (кроки з чекбоксами)
 
 ### 1. Мемоїзація рядка — `web/src/components/table/ListingsTableRow.tsx`
-- [ ] Обгорнути експорт у `React.memo` з кастомним компаратором `arePropsEqual`.
-- [ ] Компаратор порівнює `row.id`, `row.original` (референс із кешу TanStack —
+- [x] Обгорнути експорт у `React.memo` з кастомним компаратором `arePropsEqual`.
+- [x] Компаратор порівнює `row.id`, `row.original` (референс із кешу TanStack —
       стабільний між рендерами, поки дані не змінились), `isSelected`,
       `descriptionExpandEnabled`, `searchQuery`. Решта стану таблиці
-      (pagination/sorting) на вміст конкретного рядка не впливає.
-- [ ] Переконатися, що callback `onOpenDescription` стабільний по всьому ланцюжку
+      (pagination/sorting) на вміст конкретного рядка не впливає. Ширини колонок
+      задаються заголовком при `tableLayout: 'fixed'`, тож ресайз не вимагає
+      ре-рендеру тіла.
+- [x] Переконатися, що callback `onOpenDescription` стабільний по всьому ланцюжку
       `ListingsTable` → `ListingsTableBody` → `ListingsTableRow` (сеттер `useState`
-      стабільний; перевірити, що ніде не загортається інлайн).
+      `setDescriptionListing` стабільний; передається напряму без інлайн-обгортки).
 
 ### 2. Лінивий монтаж важких клітинок (головна перемога по сміттю)
 Патерн: рендерити легкий статичний тригер (`Box`/`Text`), а
 `Popover.Root`/`Tooltip` монтувати лише після першого відкриття/hover через локальний
 стан `mounted`. Поки `!mounted` — жодної zag-машини.
-- [ ] `web/src/components/table/NoteCell.tsx` — тримати легкий тригер-кнопку; при
+- [x] `web/src/components/table/NoteCell.tsx` — тримати легкий тригер-кнопку; при
       першому кліку `mounted=true` і відкриття Popover.
-- [ ] `web/src/components/table/ProsConsCell.tsx` — той самий патерн (×2 на рядок).
-- [ ] `web/src/components/table/DescriptionTooltip.tsx` /
+- [x] `web/src/components/table/ProsConsCell.tsx` — той самий патерн (×2 на рядок).
+- [x] `web/src/components/table/DescriptionTooltip.tsx` /
       `ListingsTableRow.tsx` — інтерактивний `Tooltip` опису монтувати лише при hover
       на клітинку (локальний `mounted` / `onMouseEnter`-гейт). До hover — статичний
       обрізаний текст із `cursor=pointer`, клік відкриває наявний `DescriptionDialog`.
 
 ### 3. Tooltip дати → нативний `title` — `web/src/components/table/columns.tsx`
-- [ ] У колонці `posted_at` замінити Chakra `<Tooltip content={d.full}>` на нативний
+- [x] У колонці `posted_at` замінити Chakra `<Tooltip content={d.full}>` на нативний
       `title={d.full}` на `<Text as="span">`. Прибирає 50 zag-машин тултіпів на
-      сторінку при нульовій втраті функціональності.
+      сторінку при нульовій втраті функціональності. (Невикористаний імпорт
+      `Tooltip` прибрано.)
 
 ### 4. Стабілізувати опції таблиці — `web/src/pages/ListingsTable.tsx`
-- [ ] `globalFilterFn` створюється інлайн на кожен рендер → винести в `useCallback`
-      (залежності: `searchScope`) або стабілізувати інакше, щоб не інвалідувати
-      внутрішні мемо TanStack. `columns` уже модульна константа — ОК.
+- [x] `globalFilterFn` створюється інлайн на кожен рендер → винесено в `useCallback`
+      (залежність: `searchScope`), щоб не інвалідувати внутрішні мемо TanStack.
+      `columns` уже модульна константа — ОК.
 
 ## Що НЕ робимо
 - Віртуалізація рядків (`@tanstack/react-virtual`) — відхилено: `pageSize=50` уже
