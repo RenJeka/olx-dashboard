@@ -13,7 +13,12 @@ interface StoredSettings {
   autoRefreshIntervalMin?: number;
   skipDeepScanConfirm?: boolean;
   searchesVisible?: boolean;
+  analysisModel?: string;
+  analysisReasoning?: boolean;
+  analysisExtraCriteria?: string;
 }
+
+export const DEFAULT_ANALYSIS_MODEL = 'google/gemini-2.5-flash-lite';
 
 export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
 
@@ -93,6 +98,30 @@ export function loadSearchesVisible(): boolean {
 
 export function saveSearchesVisible(searchesVisible: boolean): void {
   saveSettings({ searchesVisible });
+}
+
+export function loadAnalysisModel(): string {
+  return loadSettings().analysisModel || DEFAULT_ANALYSIS_MODEL;
+}
+
+export function saveAnalysisModel(analysisModel: string): void {
+  saveSettings({ analysisModel });
+}
+
+export function loadAnalysisReasoning(): boolean {
+  return loadSettings().analysisReasoning ?? false;
+}
+
+export function saveAnalysisReasoning(analysisReasoning: boolean): void {
+  saveSettings({ analysisReasoning });
+}
+
+export function loadAnalysisExtraCriteria(): string {
+  return loadSettings().analysisExtraCriteria ?? '';
+}
+
+export function saveAnalysisExtraCriteria(analysisExtraCriteria: string): void {
+  saveSettings({ analysisExtraCriteria });
 }
 
 export function loadTableState(): StoredTableState {

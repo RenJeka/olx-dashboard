@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Row } from '@tanstack/react-table';
 import {
   getCoreRowModel,
@@ -32,6 +32,8 @@ interface Props {
   columnOrder: string[];
   onColumnOrderChange: (order: string[]) => void;
   descriptionExpandEnabled: boolean;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange: OnChangeFn<RowSelectionState>;
 }
 
 export function ListingsTable({
@@ -40,6 +42,8 @@ export function ListingsTable({
   onColumnVisibilityChange,
   columnOrder,
   descriptionExpandEnabled,
+  rowSelection,
+  onRowSelectionChange,
 }: Props) {
   const { data, isLoading } = useListings(searchId);
   const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
@@ -49,11 +53,6 @@ export function ListingsTable({
   const [showFilteredOut, setShowFilteredOut] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-
-  useEffect(() => {
-    setRowSelection({});
-  }, [searchId]);
 
   // Стабільне посилання (залежить лише від searchScope), щоб не інвалідувати
   // внутрішні мемо TanStack на кожен рендер.
@@ -98,7 +97,7 @@ export function ListingsTable({
     },
     getRowId: (row) => String(row.id),
     enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: onRowSelectionChange,
     onSortingChange: setSorting,
     onColumnSizingChange: setColumnSizing,
     onColumnVisibilityChange: onColumnVisibilityChange,
@@ -152,7 +151,7 @@ export function ListingsTable({
         onSearchScopeChange={setSearchScope}
         searchId={searchId ?? undefined}
         selectedIds={selectedIds}
-        onClearSelection={() => setRowSelection({})}
+        onClearSelection={() => onRowSelectionChange({})}
       />
       <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
