@@ -34,6 +34,9 @@ const CONFIG = {
  * Один компонент для обох полів — логіка ідентична, різниться лише іконка та колір.
  */
 export function ProsConsCell({ listing, field }: Props) {
+  // `mounted` — лінивий монтаж: zag-машина Popover з'являється лише після першого
+  // кліку. До того в комірці лише легкий статичний тригер (без слухачів/таймерів).
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(listing[field]);
   const updateListing = useUpdateListing();
@@ -48,6 +51,37 @@ export function ProsConsCell({ listing, field }: Props) {
     setOpen(false);
   };
 
+  const label = listing[field] ? (
+    <HStack gap={1} align="flex-start">
+      <Box color={cfg.color} flexShrink={0} mt="2px">
+        {cfg.icon}
+      </Box>
+      <Text lineClamp={2} whiteSpace="pre-line">
+        {listing[field]}
+      </Text>
+    </HStack>
+  ) : (
+    <Text color="fg.subtle">{cfg.emptyLabel}</Text>
+  );
+
+  if (!mounted) {
+    return (
+      <Box
+        as="button"
+        textAlign="left"
+        w="full"
+        cursor="pointer"
+        onClick={() => {
+          setValue(listing[field]);
+          setOpen(true);
+          setMounted(true);
+        }}
+      >
+        {label}
+      </Box>
+    );
+  }
+
   return (
     <Popover.Root
       open={open}
@@ -59,18 +93,7 @@ export function ProsConsCell({ listing, field }: Props) {
     >
       <Popover.Trigger asChild>
         <Box as="button" textAlign="left" w="full" cursor="pointer">
-          {listing[field] ? (
-            <HStack gap={1} align="flex-start">
-              <Box color={cfg.color} flexShrink={0} mt="2px">
-                {cfg.icon}
-              </Box>
-              <Text lineClamp={2} whiteSpace="pre-line">
-                {listing[field]}
-              </Text>
-            </HStack>
-          ) : (
-            <Text color="fg.subtle">{cfg.emptyLabel}</Text>
-          )}
+          {label}
         </Box>
       </Popover.Trigger>
       <Portal>

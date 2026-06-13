@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Row } from '@tanstack/react-table';
 import {
   getCoreRowModel,
   getFilteredRowModel,
@@ -54,6 +55,22 @@ export function ListingsTable({
     setRowSelection({});
   }, [searchId]);
 
+  // Стабільне посилання (залежить лише від searchScope), щоб не інвалідувати
+  // внутрішні мемо TanStack на кожен рендер.
+  const globalFilterFn = useCallback(
+    (row: Row<Listing>, _columnId: string, filterValue: unknown) => {
+      const query = String(filterValue).trim().toLowerCase();
+      if (!query) return true;
+      const titleMatch =
+        searchScope.inTitle && (row.original.title ?? '').toLowerCase().includes(query);
+      const descMatch =
+        searchScope.inDescription &&
+        stripDescriptionHtml(row.original.description).toLowerCase().includes(query);
+      return titleMatch || descMatch;
+    },
+    [searchScope],
+  );
+
   const rows = useMemo(() => data ?? [], [data]);
 
   const visibleRows = useMemo(
@@ -87,13 +104,7 @@ export function ListingsTable({
     onColumnVisibilityChange: onColumnVisibilityChange,
     onPaginationChange: setPagination,
     onGlobalFilterChange: setSearchText,
-    globalFilterFn: (row, _columnId, filterValue) => {
-      const query = String(filterValue).trim().toLowerCase();
-      if (!query) return true;
-      const titleMatch = searchScope.inTitle && (row.original.title ?? '').toLowerCase().includes(query);
-      const descMatch = searchScope.inDescription && stripDescriptionHtml(row.original.description).toLowerCase().includes(query);
-      return titleMatch || descMatch;
-    },
+    globalFilterFn,
     columnResizeMode: 'onEnd',
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

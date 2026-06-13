@@ -12,6 +12,9 @@ interface Props {
  * Popover рендериться через Portal — не обмежується overflow таблиці.
  */
 export function NoteCell({ listing }: Props) {
+  // `mounted` — лінивий монтаж: zag-машина Popover з'являється лише після першого
+  // кліку. До того в комірці лише легкий статичний тригер (без слухачів/таймерів).
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(listing.note);
   const updateListing = useUpdateListing();
@@ -25,6 +28,32 @@ export function NoteCell({ listing }: Props) {
     setOpen(false);
   };
 
+  const label = listing.note ? (
+    <Text lineClamp={2} whiteSpace="pre-line">
+      {listing.note}
+    </Text>
+  ) : (
+    <Text color="fg.subtle">— додати нотатку —</Text>
+  );
+
+  if (!mounted) {
+    return (
+      <Box
+        as="button"
+        textAlign="left"
+        w="full"
+        cursor="pointer"
+        onClick={() => {
+          setValue(listing.note);
+          setOpen(true);
+          setMounted(true);
+        }}
+      >
+        {label}
+      </Box>
+    );
+  }
+
   return (
     <Popover.Root
       open={open}
@@ -36,13 +65,7 @@ export function NoteCell({ listing }: Props) {
     >
       <Popover.Trigger asChild>
         <Box as="button" textAlign="left" w="full" cursor="pointer">
-          {listing.note ? (
-            <Text lineClamp={2} whiteSpace="pre-line">
-              {listing.note}
-            </Text>
-          ) : (
-            <Text color="fg.subtle">— додати нотатку —</Text>
-          )}
+          {label}
         </Box>
       </Popover.Trigger>
       <Portal>

@@ -45,6 +45,7 @@ addColumnIfMissing('searches', 'visible_total_count', 'INTEGER');
 addColumnIfMissing('searches', 'sort_order', 'INTEGER');
 addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
+addColumnIfMissing('scan_runs', 'fetch_method', 'TEXT');
 addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
 addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
 addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");

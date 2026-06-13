@@ -89,7 +89,10 @@ async function fetchWithFallback(
   partial: boolean;
 }> {
   try {
-    const result = await graphqlFetcher.fetchSearch(search, options);
+    const result = await graphqlFetcher.fetchSearch(search, {
+      ...options,
+      onProgress: options?.onProgress ? (d, t) => options.onProgress!(d, t, 'GraphQL') : undefined,
+    });
     return {
       raw: result.listings,
       visibleTotalCount: result.visibleTotalCount,
@@ -104,7 +107,10 @@ async function fetchWithFallback(
       graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
 
     try {
-      const result = await htmlFetcher.fetchSearch(search, options);
+      const result = await htmlFetcher.fetchSearch(search, {
+        ...options,
+        onProgress: options?.onProgress ? (d, t) => options.onProgress!(d, t, 'HTML') : undefined,
+      });
       const notes = [`graphql failed: ${graphqlMessage}; fallback html OK`];
       if (result.warning) notes.push(result.warning);
       return {
@@ -148,12 +154,21 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       .run(searchId, new Date().toISOString(), kind).lastInsertRowid,
   );
 
-  const onProgress = (done: number, total: number): void => {
-    db.prepare('UPDATE scan_runs SET requests_done = ?, requests_total = ? WHERE id = ?').run(
-      done,
-      total,
-      runId,
-    );
+  const onProgress = (done: number, total: number, method?: string): void => {
+    if (method) {
+      db.prepare('UPDATE scan_runs SET requests_done = ?, requests_total = ?, fetch_method = ? WHERE id = ?').run(
+        done,
+        total,
+        method,
+        runId,
+      );
+    } else {
+      db.prepare('UPDATE scan_runs SET requests_done = ?, requests_total = ? WHERE id = ?').run(
+        done,
+        total,
+        runId,
+      );
+    }
   };
 
   try {

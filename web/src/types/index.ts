@@ -101,6 +101,7 @@ export interface ScanStatus {
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
+  fetch_method: string | null;
 }
 
 /** Останній скан пошуку — частина відповіді GET /api/searches/:id/stats. */

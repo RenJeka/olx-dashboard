@@ -1,6 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import { Badge, Box, HStack, Image, Link, Text } from '@chakra-ui/react';
-import { Tooltip } from '../ui/tooltip';
 import {
   LuCalendar,
   LuCircleCheck,
@@ -14,6 +13,7 @@ import {
   LuThumbsUp,
   LuUser,
 } from 'react-icons/lu';
+import { TbBrandDaysCounter } from 'react-icons/tb';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
@@ -128,15 +128,41 @@ export const columns = [
     minSize: 100,
     maxSize: 260,
     cell: (info) => {
-      const d = formatDate(info.getValue());
-      if (!d) return '—';
-      return (
-        <Tooltip content={d.full} openDelay={200} closeDelay={100}>
-          <Text as="span" cursor="default">
-            {d.short}
-          </Text>
-        </Tooltip>
+      const value = info.getValue();
+      const d = formatDate(value);
+      if (!d || !value) return '—';
+
+      let bg: string | undefined = undefined;
+      const posted = new Date(value);
+      const today = new Date();
+      posted.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((today.getTime() - posted.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) bg = "blue.subtle";
+      else if (diffDays === 1) bg = "blue.subtle/70";
+      else if (diffDays === 2) bg = "blue.subtle/50";
+      else if (diffDays === 3) bg = "blue.subtle/30";
+      else if (diffDays === 4) bg = "blue.subtle/15";
+      else if (diffDays === 5) bg = "blue.subtle/10";
+      else if (diffDays === 6) bg = "blue.subtle/5";
+
+      const content = (
+        <Text as="span" cursor="default" title={d.full}>
+          {d.short}
+        </Text>
       );
+
+      return bg ? (
+        <Box as="span" px={1.5} py={0.5} rounded="sm" bg={bg} display="inline-block" position="relative">
+          {diffDays === 0 && (
+            <Box position="absolute" top="-1.5" left="-2" color="blue.fg" bg="bg.panel" rounded="full" title="Сьогодні">
+              <TbBrandDaysCounter size={14} />
+            </Box>
+          )}
+          {content}
+        </Box>
+      ) : content;
     },
   }),
   columnHelper.accessor((row) => row.contact_name ?? row.seller_name ?? null, {

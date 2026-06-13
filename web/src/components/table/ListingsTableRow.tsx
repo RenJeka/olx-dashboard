@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { HStack, Table } from '@chakra-ui/react';
 import { flexRender, type Row } from '@tanstack/react-table';
 import { LuFilter } from 'react-icons/lu';
@@ -15,7 +15,7 @@ interface ListingsTableRowProps {
   searchQuery: string;
 }
 
-export function ListingsTableRow({
+function ListingsTableRowImpl({
   row,
   isSelected,
   descriptionExpandEnabled,
@@ -77,3 +77,23 @@ export function ListingsTableRow({
     </Table.Row>
   );
 }
+
+/**
+ * Рядок перерендерюється лише коли змінюються дані рядка чи стан, що впливає на
+ * його вміст. `row.original` — стабільне посилання з кешу TanStack (нове лише при
+ * зміні даних). Пагінація/сортування/ресайз колонок не змінюють вміст рядка
+ * (ширини задаються заголовком при `tableLayout: 'fixed'`), тож такі рендери
+ * пропускаються — головна економія сміття на взаємодію.
+ */
+function arePropsEqual(prev: ListingsTableRowProps, next: ListingsTableRowProps): boolean {
+  return (
+    prev.row.id === next.row.id &&
+    prev.row.original === next.row.original &&
+    prev.isSelected === next.isSelected &&
+    prev.descriptionExpandEnabled === next.descriptionExpandEnabled &&
+    prev.searchQuery === next.searchQuery &&
+    prev.onOpenDescription === next.onOpenDescription
+  );
+}
+
+export const ListingsTableRow = memo(ListingsTableRowImpl, arePropsEqual);
