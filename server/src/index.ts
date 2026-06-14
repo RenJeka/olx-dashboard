@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { searchesRoutes } from './routes/searches.js';
 import { listingsRoutes } from './routes/listings.js';
+import { analysisRoutes } from './routes/analysis.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -13,6 +14,7 @@ await app.register(cors, {
 
 await app.register(searchesRoutes);
 await app.register(listingsRoutes);
+await app.register(analysisRoutes);
 
 app.get('/health', async () => ({ ok: true }));
 

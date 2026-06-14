@@ -1,0 +1,731 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Badge,
+  Box,
+  Button,
+  Flex,
+  HStack,
+  IconButton,
+  Image,
+  Input,
+  Progress,
+  Stack,
+  Text,
+  Wrap,
+} from '@chakra-ui/react';
+import {
+  LuSparkles,
+  LuWandSparkles,
+  LuRefreshCw,
+  LuPlus,
+  LuFileSpreadsheet,
+  LuFileJson,
+  LuSearch,
+} from 'react-icons/lu';
+import {
+  DialogBackdrop,
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+} from '../ui/dialog';
+import { ConfirmActionDialog } from '../ConfirmActionDialog';
+import { ManualAssistant } from './ManualAssistant';
+import { HighlightText } from '../table/HighlightText';
+import { toaster } from '../ui/toaster';
+import {
+  useAnalysisStatus,
+  useSavedCriteria,
+  useGenerateCriteria,
+  fetchCriteriaPrompt,
+  useImportCriteria,
+  useSaveCriteria,
+  useAnalyze,
+  fetchAnalyzePackage,
+  useImportAnalysis,
+  useCommitAnalysis,
+  exportPreview,
+  useListings,
+} from '../../api/client';
+import {
+  loadAnalysisModel,
+  loadAnalysisReasoning,
+  loadAnalysisExtraCriteria,
+} from '../../utils/storage';
+import { stripDescriptionHtml } from '../../utils/format';
+import { chunk } from '../../utils/array';
+import {
+  ANALYSIS_SOURCE,
+  ANALYSIS_STEPS,
+  ANALYZE_CHUNK,
+  COMMIT_CHUNK,
+  MANUAL_MODEL,
+  MODE_LABELS,
+} from '../../constants';
+import type { AnalysisMode, AnalyzedListing, Listing, PackagePart, Search } from '../../types';
+
+interface Props {
+  search: Search;
+  /** Id вибраних рядків (чекбокси) — для режиму «вибрані». */
+  selectedIds: number[];
+}
+
+export function AnalysisWizardDialog({ search, selectedIds }: Props) {
+  const [open, setOpen] = useState(false);
+  const { data: status } = useAnalysisStatus();
+  const { data: savedCriteria } = useSavedCriteria(open ? search.id : null);
+  const { data: listings } = useListings(open ? search.id : null);
+
+  const [mode, setMode] = useState<AnalysisMode>('cons');
+  const [scope, setScope] = useState<'selected' | 'all'>(
+    selectedIds.length > 0 ? 'selected' : 'all',
+  );
+  const [step, setStep] = useState(1);
+
+  // Крок 1
+  const [available, setAvailable] = useState<string[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [customInput, setCustomInput] = useState('');
+  const [showCriteriaAssistant, setShowCriteriaAssistant] = useState(false);
+  const [criteriaParts, setCriteriaParts] = useState<PackagePart[]>([]);
+
+  // Крок 2
+  const [showMatchAssistant, setShowMatchAssistant] = useState(false);
+  const [matchParts, setMatchParts] = useState<PackagePart[]>([]);
+  const [accumulated, setAccumulated] = useState<AnalyzedListing[]>([]);
+  const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Крок 4
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  const [commitProgress, setCommitProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const generateCriteria = useGenerateCriteria();
+  const importCriteria = useImportCriteria();
+  const saveCriteria = useSaveCriteria();
+  const analyze = useAnalyze();
+  const importAnalysis = useImportAnalysis();
+  const commit = useCommitAnalysis();
+
+  const allIds = useMemo(() => (listings ?? []).map((l) => l.id), [listings]);
+  const listingById = useMemo(() => {
+    const m = new Map<number, Listing>();
+    for (const l of listings ?? []) m.set(l.id, l);
+    return m;
+  }, [listings]);
+
+  const effectiveIds = scope === 'selected' ? selectedIds : allIds;
+  const apiAvailable = status?.apiAvailable ?? false;
+  const model = loadAnalysisModel();
+  const reasoning = loadAnalysisReasoning();
+  const extra = loadAnalysisExtraCriteria();
+
+  // Перезавантаження критеріїв при зміні режиму / відкритті.
+  useEffect(() => {
+    if (!open || !savedCriteria) return;
+    const saved = savedCriteria[mode] ?? [];
+    setAvailable(saved);
+    setSelected(new Set(saved));
+  }, [open, mode, savedCriteria]);
+
+  function resetForReopen() {
+    setStep(1);
+    setAccumulated([]);
+    setMatchParts([]);
+    setCriteriaParts([]);
+    setShowCriteriaAssistant(false);
+    setShowMatchAssistant(false);
+    setAnalyzeProgress(null);
+    setCommitProgress(null);
+  }
+
+  function mergeCriteria(incoming: string[]) {
+    setAvailable((prev) => {
+      const set = new Set(prev.map((c) => c.toLowerCase()));
+      const merged = [...prev];
+      for (const c of incoming) {
+        if (!set.has(c.toLowerCase())) {
+          merged.push(c);
+          set.add(c.toLowerCase());
+        }
+      }
+      return merged;
+    });
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const c of incoming) next.add(c);
+      return next;
+    });
+  }
+
+  function toggleCriterion(c: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  }
+
+  function addCustom() {
+    const c = customInput.trim();
+    if (!c) return;
+    mergeCriteria([c]);
+    setCustomInput('');
+  }
+
+  async function handleGenerateCriteria() {
+    try {
+      const { criteria } = await generateCriteria.mutateAsync({
+        searchId: search.id,
+        mode,
+        model,
+        reasoning,
+        extra,
+      });
+      mergeCriteria(criteria);
+      toaster.create({ type: 'success', title: `Згенеровано критеріїв: ${criteria.length}` });
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Помилка генерації',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  async function openCriteriaAssistant() {
+    setShowCriteriaAssistant(true);
+    try {
+      const { prompt } = await fetchCriteriaPrompt(search.id, mode, extra);
+      setCriteriaParts([{ name: `критерії-${mode}.txt`, content: prompt }]);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Не вдалося підготувати промпт',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  function handleImportCriteria(raw: string) {
+    importCriteria.mutate(
+      { searchId: search.id, mode, raw },
+      {
+        onSuccess: ({ criteria }) => {
+          mergeCriteria(criteria);
+          toaster.create({ type: 'success', title: `Розпізнано критеріїв: ${criteria.length}` });
+        },
+        onError: (err) =>
+          toaster.create({
+            type: 'error',
+            title: 'Помилка розбору',
+            description: err instanceof Error ? err.message : String(err),
+          }),
+      },
+    );
+  }
+
+  async function goToMatching() {
+    const chosen = available.filter((c) => selected.has(c));
+    if (chosen.length === 0) {
+      toaster.create({ type: 'error', title: 'Оберіть хоча б один критерій' });
+      return;
+    }
+    try {
+      await saveCriteria.mutateAsync(
+        mode === 'cons' ? { searchId: search.id, cons: chosen } : { searchId: search.id, pros: chosen },
+      );
+      setStep(2);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Не вдалося зберегти критерії',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  async function runAutoAnalyze() {
+    if (effectiveIds.length === 0) {
+      toaster.create({ type: 'error', title: 'Немає оголошень для аналізу' });
+      return;
+    }
+    const chunks = chunk(effectiveIds, ANALYZE_CHUNK);
+    setAnalyzeProgress({ done: 0, total: effectiveIds.length });
+    let acc: AnalyzedListing[] = [];
+    const errors: string[] = [];
+    try {
+      let done = 0;
+      for (const ids of chunks) {
+        const res = await analyze.mutateAsync({ searchId: search.id, mode, ids, model, reasoning });
+        acc = [...acc, ...res.results];
+        errors.push(...res.errors);
+        done += ids.length;
+        setAnalyzeProgress({ done, total: effectiveIds.length });
+      }
+      setAccumulated(acc);
+      if (errors.length > 0) {
+        toaster.create({
+          type: 'warning',
+          title: `Аналіз завершено з ${errors.length} помилками батчів`,
+          description: errors[0],
+        });
+      }
+      setStep(3);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Помилка аналізу',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setAnalyzeProgress(null);
+    }
+  }
+
+  async function openMatchAssistant() {
+    setShowMatchAssistant(true);
+    try {
+      const { parts } = await fetchAnalyzePackage(search.id, mode, effectiveIds);
+      setMatchParts(parts);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Не вдалося підготувати пакет',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  function handleImportMatching(raw: string) {
+    importAnalysis.mutate(
+      { searchId: search.id, mode, raw, accumulated },
+      {
+        onSuccess: (res) => {
+          setAccumulated(res.results);
+          toaster.create({
+            type: 'success',
+            title: `Опрацьовано оголошень: ${res.results.length}`,
+          });
+        },
+        onError: (err) =>
+          toaster.create({
+            type: 'error',
+            title: 'Помилка розбору',
+            description: err instanceof Error ? err.message : String(err),
+          }),
+      },
+    );
+  }
+
+  // Елементи для запису: criterion з ok=true.
+  const commitItems = useMemo(
+    () =>
+      accumulated.map((r) => ({
+        id: r.id,
+        criteria: r.items.filter((it) => it.ok).map((it) => it.criterion),
+      })),
+    [accumulated],
+  );
+
+  const overwriteCount = useMemo(() => {
+    let n = 0;
+    for (const item of commitItems) {
+      const l = listingById.get(item.id);
+      if (l && (mode === 'cons' ? l.cons : l.pros)) n++;
+    }
+    return n;
+  }, [commitItems, listingById, mode]);
+
+  async function doCommit() {
+    setCommitProgress({ done: 0, total: commitItems.length });
+    try {
+      let done = 0;
+      for (const batch of chunk(commitItems, COMMIT_CHUNK)) {
+        await commit.mutateAsync({
+          searchId: search.id,
+          mode,
+          items: batch,
+          model: apiAvailable && status ? model : MANUAL_MODEL,
+          source: apiAvailable ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT,
+        });
+        done += batch.length;
+        setCommitProgress({ done, total: commitItems.length });
+      }
+      toaster.create({
+        type: 'success',
+        title: `Записано в таблицю: ${commitItems.length}`,
+      });
+      setOpen(false);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Помилка запису',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setCommitProgress(null);
+    }
+  }
+
+  function handleCommitClick() {
+    if (commitItems.length === 0) {
+      toaster.create({ type: 'error', title: 'Немає результатів для запису' });
+      return;
+    }
+    if (overwriteCount > 0) setConfirmOverwrite(true);
+    else void doCommit();
+  }
+
+  async function handleExport(format: 'xlsx' | 'json') {
+    const rows = accumulated.map((r) => {
+      const l = listingById.get(r.id);
+      return {
+        title: l?.title ?? '',
+        description: l?.description ?? '',
+        criteria: r.items.filter((it) => it.ok).map((it) => it.criterion),
+      };
+    });
+    try {
+      await exportPreview(search.id, mode, format, rows);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Помилка експорту',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  const modeLabel = MODE_LABELS[mode];
+  const chosenCount = available.filter((c) => selected.has(c)).length;
+
+  return (
+    <DialogRoot
+      open={open}
+      onOpenChange={(d) => {
+        setOpen(d.open);
+        if (d.open) resetForReopen();
+      }}
+      size="xl"
+      placement="center"
+      scrollBehavior="inside"
+    >
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" colorPalette="purple">
+          <LuSparkles /> AI
+        </Button>
+      </DialogTrigger>
+      <DialogBackdrop />
+      <DialogContent>
+        <DialogCloseTrigger />
+        <DialogHeader>
+          <Stack gap={3} w="full">
+            <DialogTitle>AI-аналіз: {modeLabel}</DialogTitle>
+            {/* Степер */}
+            <HStack gap={2}>
+              {ANALYSIS_STEPS.map((label, i) => (
+                <HStack key={label} gap={1.5}>
+                  <Box
+                    boxSize={6}
+                    rounded="full"
+                    fontSize="xs"
+                    fontWeight="bold"
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    bg={step === i + 1 ? 'blue.solid' : step > i + 1 ? 'green.solid' : 'bg.muted'}
+                    color={step >= i + 1 ? 'white' : 'fg.muted'}
+                  >
+                    {i + 1}
+                  </Box>
+                  <Text textStyle="xs" color={step === i + 1 ? 'fg.default' : 'fg.muted'} fontWeight={step === i + 1 ? 'bold' : 'normal'}>
+                    {label}
+                  </Text>
+                  {i < ANALYSIS_STEPS.length - 1 && <Box w={4} h="1px" bg="border.subtle" />}
+                </HStack>
+              ))}
+            </HStack>
+            {/* Перемикачі режиму та обсягу */}
+            <HStack gap={4} wrap="wrap">
+              <HStack gap={1}>
+                <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="red" onClick={() => setMode('cons')}>
+                  Мінуси
+                </Button>
+                <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="green" onClick={() => setMode('pros')}>
+                  Плюси
+                </Button>
+              </HStack>
+              <HStack gap={1}>
+                <Button
+                  size="xs"
+                  variant={scope === 'selected' ? 'solid' : 'outline'}
+                  colorPalette="blue"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => setScope('selected')}
+                >
+                  Вибрані ({selectedIds.length})
+                </Button>
+                <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
+                  Весь пошук ({allIds.length})
+                </Button>
+              </HStack>
+            </HStack>
+          </Stack>
+        </DialogHeader>
+
+        <DialogBody pb={6}>
+          {step === 1 && (
+            <Stack gap={4}>
+              <Text textStyle="sm" color="fg.muted">
+                Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
+              </Text>
+              <Wrap gap={2}>
+                {available.map((c) => (
+                  <Button
+                    key={c}
+                    size="xs"
+                    variant={selected.has(c) ? 'solid' : 'outline'}
+                    colorPalette={mode === 'cons' ? 'red' : 'green'}
+                    onClick={() => toggleCriterion(c)}
+                  >
+                    {c}
+                  </Button>
+                ))}
+                {available.length === 0 && (
+                  <Text textStyle="sm" color="fg.muted">
+                    Критеріїв ще немає — згенеруй або додай вручну.
+                  </Text>
+                )}
+              </Wrap>
+
+              <HStack gap={2}>
+                <Input
+                  size="sm"
+                  placeholder="Додати свій критерій…"
+                  value={customInput}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCustom()}
+                />
+                <IconButton size="sm" variant="outline" aria-label="Додати" onClick={addCustom}>
+                  <LuPlus />
+                </IconButton>
+              </HStack>
+
+              <HStack gap={2} wrap="wrap">
+                {apiAvailable && (
+                  <>
+                    <Button size="sm" colorPalette="purple" onClick={handleGenerateCriteria} loading={generateCriteria.isPending}>
+                      <LuWandSparkles /> Згенерувати критерії
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={handleGenerateCriteria} loading={generateCriteria.isPending}>
+                      <LuRefreshCw /> Ще варіанти
+                    </Button>
+                  </>
+                )}
+                <Button size="sm" variant="outline" onClick={openCriteriaAssistant}>
+                  Згенерувати вручну
+                </Button>
+              </HStack>
+
+              {showCriteriaAssistant && (
+                <ManualAssistant
+                  title="Помічник: генерація критеріїв"
+                  parts={criteriaParts}
+                  pasteLabel="Розпізнати критерії"
+                  onSubmit={handleImportCriteria}
+                  submitting={importCriteria.isPending}
+                />
+              )}
+
+              <HStack justify="space-between">
+                <Text textStyle="sm" color="fg.muted">
+                  Обрано {chosenCount} із {available.length}
+                </Text>
+                <Button colorPalette="blue" onClick={goToMatching} loading={saveCriteria.isPending}>
+                  Далі: пошук
+                </Button>
+              </HStack>
+            </Stack>
+          )}
+
+          {step === 2 && (
+            <Stack gap={4}>
+              <Text textStyle="sm" color="fg.muted">
+                Пошук {modeLabel.toLowerCase()} у {effectiveIds.length} оголошеннях за обраними критеріями.
+              </Text>
+
+              {apiAvailable && (
+                <Box>
+                  <Button colorPalette="purple" onClick={runAutoAnalyze} loading={analyzeProgress != null}>
+                    <LuSearch /> Знайти (авто)
+                  </Button>
+                  {analyzeProgress && (
+                    <Stack gap={1} mt={3}>
+                      <Text textStyle="xs" color="fg.muted">
+                        Опрацьовано {analyzeProgress.done}/{analyzeProgress.total}
+                      </Text>
+                      <Progress.Root size="xs" colorPalette="purple" value={(analyzeProgress.done / analyzeProgress.total) * 100}>
+                        <Progress.Track>
+                          <Progress.Range />
+                        </Progress.Track>
+                      </Progress.Root>
+                    </Stack>
+                  )}
+                </Box>
+              )}
+
+              <Button size="sm" variant="outline" onClick={openMatchAssistant}>
+                Ручний режим: підготувати пакет
+              </Button>
+
+              {showMatchAssistant && (
+                <ManualAssistant
+                  title="Помічник: пошук збігів"
+                  parts={matchParts}
+                  pasteLabel="Додати відповідь"
+                  onSubmit={handleImportMatching}
+                  submitting={importAnalysis.isPending}
+                  footer={
+                    <Text textStyle="xs" color="fg.muted">
+                      Опрацьовано {accumulated.length} оголошень
+                    </Text>
+                  }
+                />
+              )}
+
+              <HStack justify="space-between">
+                <Button variant="ghost" onClick={() => setStep(1)}>
+                  Назад
+                </Button>
+                <Button colorPalette="blue" disabled={accumulated.length === 0} onClick={() => setStep(3)}>
+                  Далі: перевірка ({accumulated.length})
+                </Button>
+              </HStack>
+            </Stack>
+          )}
+
+          {step === 3 && (
+            <Stack gap={4}>
+              <HStack justify="space-between">
+                <Text textStyle="sm" color="fg.muted">
+                  Перевір знайдені {modeLabel.toLowerCase()}. Закреслені пункти — evidence не підтверджено в описі.
+                </Text>
+                <HStack gap={2}>
+                  <Button size="xs" variant="outline" onClick={() => handleExport('xlsx')}>
+                    <LuFileSpreadsheet /> Excel
+                  </Button>
+                  <Button size="xs" variant="outline" onClick={() => handleExport('json')}>
+                    <LuFileJson /> JSON
+                  </Button>
+                </HStack>
+              </HStack>
+
+              <Stack gap={3} maxH="50vh" overflowY="auto">
+                {accumulated.map((r) => {
+                  const l = listingById.get(r.id);
+                  const desc = stripDescriptionHtml(l?.description ?? null);
+                  const okItems = r.items.filter((it) => it.ok);
+                  const droppedItems = r.items.filter((it) => !it.ok);
+                  return (
+                    <Flex key={r.id} gap={3} p={3} borderWidth="1px" borderColor="border.subtle" rounded="md">
+                      {l?.photo_url ? (
+                        <Image src={l.photo_url} alt="" boxSize={14} rounded="md" objectFit="cover" flexShrink={0} />
+                      ) : (
+                        <Box boxSize={14} rounded="md" bg="bg.muted" flexShrink={0} />
+                      )}
+                      <Stack gap={1} flex="1" minW={0}>
+                        <Text fontWeight="semibold" lineClamp={1}>
+                          {l?.title ?? `#${r.id}`}
+                        </Text>
+                        <Text textStyle="xs" color="fg.muted" lineClamp={3} whiteSpace="pre-line">
+                          <HighlightText text={desc} query={okItems.map((it) => it.evidence)} />
+                        </Text>
+                        <Wrap gap={1} mt={1}>
+                          {okItems.map((it, i) => (
+                            <Badge key={`ok-${i}`} colorPalette={mode === 'cons' ? 'red' : 'green'} variant="subtle">
+                              {it.criterion}
+                            </Badge>
+                          ))}
+                          {droppedItems.map((it, i) => (
+                            <Badge key={`drop-${i}`} colorPalette="gray" variant="outline" textDecoration="line-through">
+                              {it.criterion}
+                            </Badge>
+                          ))}
+                          {r.items.length === 0 && (
+                            <Text textStyle="xs" color="fg.subtle">
+                              нічого не знайдено
+                            </Text>
+                          )}
+                        </Wrap>
+                      </Stack>
+                    </Flex>
+                  );
+                })}
+              </Stack>
+
+              <HStack justify="space-between">
+                <Button variant="ghost" onClick={() => setStep(2)}>
+                  Назад
+                </Button>
+                <Button colorPalette="blue" onClick={() => setStep(4)}>
+                  Далі: вставка
+                </Button>
+              </HStack>
+            </Stack>
+          )}
+
+          {step === 4 && (
+            <Stack gap={4}>
+              <Text textStyle="sm">
+                Записати {modeLabel.toLowerCase()} у таблицю для {commitItems.length} оголошень?
+              </Text>
+              {overwriteCount > 0 && (
+                <Text textStyle="sm" color="orange.fg">
+                  Увага: у {overwriteCount} оголошень поле «{modeLabel}» вже заповнене — буде перезаписано.
+                </Text>
+              )}
+              {commitProgress && (
+                <Stack gap={1}>
+                  <Text textStyle="xs" color="fg.muted">
+                    Записано {commitProgress.done}/{commitProgress.total}
+                  </Text>
+                  <Progress.Root size="xs" colorPalette="blue" value={(commitProgress.done / commitProgress.total) * 100}>
+                    <Progress.Track>
+                      <Progress.Range />
+                    </Progress.Track>
+                  </Progress.Root>
+                </Stack>
+              )}
+              <HStack justify="space-between">
+                <Button variant="ghost" onClick={() => setStep(3)}>
+                  Назад
+                </Button>
+                <HStack gap={2}>
+                  <Button variant="outline" onClick={() => setOpen(false)}>
+                    Відмінити
+                  </Button>
+                  <Button colorPalette="blue" onClick={handleCommitClick} loading={commitProgress != null}>
+                    Вставити {modeLabel.toLowerCase()} у таблицю
+                  </Button>
+                </HStack>
+              </HStack>
+            </Stack>
+          )}
+        </DialogBody>
+      </DialogContent>
+
+      <ConfirmActionDialog
+        open={confirmOverwrite}
+        onOpenChange={setConfirmOverwrite}
+        title="Перезаписати наявні значення?"
+        description={`У ${overwriteCount} оголошень поле «${modeLabel}» вже заповнене. Перезаписати результатами аналізу?`}
+        confirmLabel="Перезаписати"
+        onConfirm={() => void doCommit()}
+      />
+    </DialogRoot>
+  );
+}

@@ -108,6 +108,17 @@ const upsertStmt = db.prepare(`
                          THEN CASE WHEN note IS NULL OR note = '' THEN @status_note
                                    ELSE note || char(10) || @status_note END
                        ELSE note
+                     END,
+    -- A6 (LLM-аналіз): title/description змінились після аналізу → бейдж «застарілий аналіз».
+    -- RHS бере СТАРІ значення рядка (до UPDATE). description-порівняння лише коли новий не NULL
+    -- (HTML-fallback опису не дає — COALESCE його не змінює, не позначаємо застарілим хибно).
+    analysis_stale = CASE
+                       WHEN analysis_at IS NOT NULL
+                            AND ( title IS NOT excluded.title
+                                  OR (excluded.description IS NOT NULL
+                                      AND description IS NOT excluded.description) )
+                         THEN 1
+                       ELSE analysis_stale
                      END
 `);
 

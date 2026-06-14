@@ -124,7 +124,10 @@ flowchart LR
 | `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
 | `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/stats`. |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`). |
-| `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, слухає `:3001`. |
+| `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_PACKAGE_TOKEN_CAP`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample` для авто Й ручного), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`/`estimateTokens`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
+| `export/xlsx.ts` | `buildXlsxBuffer(sheet, columns, rows)` на **ExcelJS** — спільний Excel-експорт (превʼю аналізу + майбутній експорт усієї таблиці): заголовки/ширини, заморожений рядок заголовків, перенос тексту. |
+| `routes/analysis.ts` | Ендпойнти LLM-аналізу (нижче §6). Критерії читаються/пишуться у `searches.analysis_criteria`; commit пише `pros`/`cons` + `analysis_at/source/model`, `analysis_stale=0`. |
+| `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, реєстрація `searchesRoutes`/`listingsRoutes`/`analysisRoutes`, слухає `:3001`. |
 | `scan.ts` | CLI-обгортка над `runScan` (`npm run scan -- --search <id>`). |
 | `migratePostedAt.ts` | Одноразова CLI-міграція (`npm run migrate:posted-at`): конвертує наявні текстові `posted_at` (старий HTML-fallback) через `dateParser.parseOlxDate` в ISO; нерозпізнане → `NULL`. Виводить кількість конвертованих/занулених. |
 
@@ -146,6 +149,14 @@ flowchart LR
 
 > `price_history` створена у схемі, але кодом ще не наповнюється (Етап 3).
 
+- LLM-аналіз (план `plans/llm-analysis.md`): `searches.analysis_criteria` (JSON `{cons:[],
+  pros:[]}` — обрані критерії пошуку); `listings.pros`/`cons` (масив criterion, TEXT
+  `• …\n• …`), `analysis_at`/`analysis_source` (`api`|`import`)/`analysis_model`/
+  `analysis_stale`. Нові колонки додаються через `addColumnIfMissing` **після**
+  `migrateListingsTable()` (rebuild не переносить їх → інакше крах на старій v1-БД).
+  `evidence` у БД не зберігається. `normalizer` ставить `analysis_stale=1`, якщо
+  `analysis_at` непорожній і title/опис змінились (бейдж «застарілий аналіз»).
+
 ## 6. REST API
 
 | Метод | Шлях | Стан |
@@ -158,7 +169,17 @@ flowchart LR
 | `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 |
 | `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів |
 | `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку (`verify_candidates` = P1+P2, лічильник кнопки «Перевірити неактивні») |
-| `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?}`; зміна `status` → `status_source='manual'`, `miss_count=0` |
+| `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?}`; зміна `status` → `status_source='manual'`, `miss_count=0` |
+| `GET` | `/api/analysis/status` | ✅ LLM-аналіз — `{apiAvailable, defaultModel}` (наявність `OPENROUTER_API_KEY`) |
+| `GET/PUT` | `/api/searches/:id/criteria` | ✅ — читання/збереження `searches.analysis_criteria` (`{cons[], pros[]}`) |
+| `POST` | `/api/searches/:id/criteria/generate` | ✅ — авто-генерація критеріїв (OpenRouter), без ключа → 409 |
+| `GET` | `/api/searches/:id/criteria/prompt?mode=` | ✅ — готовий промпт генерації (ручний режим) |
+| `POST` | `/api/searches/:id/criteria/import` | ✅ — парс вставленої відповіді LLM у список критеріїв |
+| `POST` | `/api/searches/:id/analyze` | ✅ — авто matching (чанки по 12), верифікація `evidence`; `{results, errors}`, НЕ пише в БД |
+| `GET` | `/api/searches/:id/analyze/package?mode=&ids=` | ✅ — ручний пакет(и) для безкоштовного чату (1 vs кілька частин) |
+| `POST` | `/api/searches/:id/analyze/import` | ✅ — парс однієї вставленої відповіді + верифікація + мерж у накопичене |
+| `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
+| `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта) |
 | `GET` | `/health` | ✅ |
 | `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 |
 | `GET` | `/api/listings/:id/export/markdown` | ⏳ Етап 3 |
@@ -169,7 +190,10 @@ flowchart LR
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки: `useSearches`, `useCreateSearch`,
   `useDeleteSearch`, `useReorderSearches`, `useScan`, `useVerify`, `useScanStatus`,
   `useSearchStats`, `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`.
-  Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
+  LLM-аналіз: `useAnalysisStatus`, `useSavedCriteria`, `useGenerateCriteria`,
+  `useImportCriteria`, `useSaveCriteria`, `useAnalyze` (клієнтське чанкування по 200),
+  `useImportAnalysis`, `useCommitAnalysis` (chunked) + плоскі хелпери `fetchCriteriaPrompt`/
+  `fetchAnalyzePackage`/`exportPreview` (GET/blob за кнопкою). Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
   `api_filters.ranges.price`. `useScan` приймає `{searchId, deep?}` і має
   `mutationKey: ['scan']` (щоб `useAutoRefresh` міг перевірити `queryClient.isMutating`),
   інвалідовує `['listings', searchId]` і `['search-stats', searchId]`; `useVerify` (Етап 2,
@@ -286,6 +310,18 @@ flowchart LR
   (`DialogRoot`/`DialogContent`/`DialogHeader`/`DialogBody`/`DialogFooter`/`DialogCloseTrigger`/
   `DialogBackdrop`) — використовується `DescriptionDialog`, `ConfirmActionDialog` і діалогом
   підтвердження видалення.
+- `components/analysis/` — майстер LLM-аналізу: `AnalysisWizardDialog.tsx` (`DialogRoot
+  size="xl"`, степер Критерії→Пошук→Перевірка→Вставка, перемикачі Мінуси/Плюси та
+  вибрані/весь пошук; крок 3 — превʼю з підсвіткою evidence через `<Mark>` і закресленням
+  непідтверджених пунктів, експорт Excel/JSON; крок 4 — commit chunked + `ConfirmActionDialog`
+  при перезаписі непорожніх `pros`/`cons`) і `ManualAssistant.tsx` (панель ручного режиму:
+  копіювати/завантажити промпт + вставити відповідь). Кнопка «AI» (`LuSparkles`) — у `Header`;
+  `rowSelection` піднято в `App.tsx` (передається в `ListingsTable` і як `selectedIds` у майстер).
+- `components/settings/sections/AnalysisSection.tsx` — секція «AI-аналіз»: статус ключа
+  (`useAnalysisStatus`), поле «Модель», `Switch` «reasoning», `Textarea` «Додаткові критерії»;
+  персист у `SETTINGS_STORAGE_KEY` (`analysisModel`/`analysisReasoning`/`analysisExtraCriteria`).
+- `components/table/ProsConsCell.tsx` — додано бейдж `LuTriangleAlert` (tooltip) при
+  `analysis_stale=1` та tooltip «Аналіз: <model|ручний імпорт>, <дата>» при `analysis_at`.
 - Vite proxy `/api → http://localhost:3001` (див. `web/vite.config.ts`).
 
 ## 8. Обробка помилок збору

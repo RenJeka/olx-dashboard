@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Box, Button, HStack, Popover, Portal, Text, Textarea } from '@chakra-ui/react';
-import { LuThumbsDown, LuThumbsUp } from 'react-icons/lu';
+import { LuThumbsDown, LuThumbsUp, LuTriangleAlert } from 'react-icons/lu';
 import { useUpdateListing } from '../../api/client';
+import { Tooltip } from '../ui/tooltip';
+import { formatDate } from '../../utils/format';
+import { ANALYSIS_SOURCE } from '../../constants';
 import type { Listing } from '../../types';
-
-// TODO: AI — автоматичне заповнення pros/cons на основі аналізу опису оголошення (Етап N).
-// Поки поля заповнюються лише вручну — аналогічно до поля "Нотатка".
 
 interface Props {
   listing: Listing;
@@ -51,6 +51,16 @@ export function ProsConsCell({ listing, field }: Props) {
     setOpen(false);
   };
 
+  // Індикація аналізу: бейдж «застарілий» + tooltip із моделлю/датою (план B6).
+  const analysisInfo =
+    listing.analysis_at != null
+      ? `Аналіз: ${
+          listing.analysis_source === ANALYSIS_SOURCE.IMPORT
+            ? 'ручний імпорт'
+            : listing.analysis_model ?? 'API'
+        }, ${formatDate(listing.analysis_at)?.short ?? listing.analysis_at}`
+      : null;
+
   const label = listing[field] ? (
     <HStack gap={1} align="flex-start">
       <Box color={cfg.color} flexShrink={0} mt="2px">
@@ -59,6 +69,20 @@ export function ProsConsCell({ listing, field }: Props) {
       <Text lineClamp={2} whiteSpace="pre-line">
         {listing[field]}
       </Text>
+      {listing.analysis_stale === 1 && (
+        <Tooltip content="Застарілий аналіз: title/опис змінились після аналізу">
+          <Box color="orange.fg" flexShrink={0} mt="2px">
+            <LuTriangleAlert />
+          </Box>
+        </Tooltip>
+      )}
+      {analysisInfo && listing.analysis_stale !== 1 && (
+        <Tooltip content={analysisInfo}>
+          <Box color="fg.subtle" flexShrink={0} mt="3px" fontSize="2xs">
+            ⓘ
+          </Box>
+        </Tooltip>
+      )}
     </HStack>
   ) : (
     <Text color="fg.subtle">{cfg.emptyLabel}</Text>

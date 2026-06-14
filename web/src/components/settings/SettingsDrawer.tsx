@@ -15,6 +15,7 @@ import { Tooltip } from '../ui/tooltip';
 import { VisualSection } from './sections/VisualSection';
 import { AutoRefreshSection } from './sections/AutoRefreshSection';
 import { ColumnsSection } from './sections/ColumnsSection';
+import { AnalysisSection } from './sections/AnalysisSection';
 
 interface Props {
   columnVisibility: VisibilityState;
@@ -71,6 +72,8 @@ export function SettingsDrawer({
               autoRefreshIntervalMin={autoRefreshIntervalMin}
               onAutoRefreshIntervalMinChange={onAutoRefreshIntervalMinChange}
             />
+            <Separator width="80%" alignSelf="center" />
+            <AnalysisSection />
             <Separator width="80%" alignSelf="center" />
             <ColumnsSection
               columnVisibility={columnVisibility}

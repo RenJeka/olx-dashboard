@@ -89,21 +89,21 @@ LLM-аналіз описів оголошень: знайти в кожному
 
 ## Зміни схеми (через `addColumnIfMissing`, table rebuild НЕ потрібен)
 
-- [ ] `searches`: `analysis_criteria TEXT DEFAULT '{}'` (JSON `{cons:[], pros:[]}`).
-- [ ] `listings`: `analysis_at TEXT`, `analysis_source TEXT` (`api|import`),
+- [x] `searches`: `analysis_criteria TEXT DEFAULT '{}'` (JSON `{cons:[], pros:[]}`).
+- [x] `listings`: `analysis_at TEXT`, `analysis_source TEXT` (`api|import`),
   `analysis_model TEXT`, `analysis_stale INTEGER DEFAULT 0`.
-- [ ] `schema.sql` — синхронно; `LISTING_COLUMNS` (routes/listings.ts) — додати нові.
+- [x] `schema.sql` — синхронно; `LISTING_COLUMNS` (routes/listings.ts) — додати нові.
 
 ## Група A — Backend (ядро, спільне для авто й ручного)
 
 ### A1. Конфіг
-- [ ] Завантаження `server/.env` (`OPENROUTER_API_KEY`) без нової залежності: `--env-file`
+- [x] Завантаження `server/.env` (`OPENROUTER_API_KEY`) без нової залежності: `--env-file`
   у скриптах (Node 20.6+, перевірити з `tsx watch`) або міні-лоадер (~10 рядків).
   Задокументувати в `architecture.md`. `.env.example` + `.gitignore` (перевірити).
-- [ ] `GET /api/analysis/status` → `{apiAvailable, defaultModel}`.
+- [x] `GET /api/analysis/status` → `{apiAvailable, defaultModel}`.
 
 ### A2. Промпти (єдине джерело для авто Й ручного — НЕ дублювати)
-- [ ] `server/src/analysis/prompts.ts`:
+- [x] `server/src/analysis/prompts.ts`:
   - `buildCriteriaPrompt(category, sampleDescriptions[], mode)` — генерація критеріїв.
     Базовий каркас зашитий; просити доповнити специфічними для категорії; вивід — JSON
     `{"criteria": ["...", ...]}` (≤50, кожен ≤6 слів, українською).
@@ -113,97 +113,97 @@ LLM-аналіз описів оголошень: знайти в кожному
     Інструкція: criterion ОБОВʼЯЗКОВО з наданого списку (нормалізація — різні формулювання
     зводити до одного критерію); evidence — дослівно з опису; нічого не вигадувати; нема
     збігів → `items: []`. Мова виводу — українська. БЕЗ PII продавця у вході.
-- [ ] Семплер: `pickSample(listings, k=30)` — сортувати за довжиною description +
+- [x] Семплер: `pickSample(listings, k=30)` — сортувати за довжиною description +
   наявністю «сигнальних» токенів, узяти топ-k.
 
 ### A3. OpenRouter-клієнт (авто)
-- [ ] `server/src/analysis/openrouter.ts`: `chat(messages, {model, reasoning})` —
+- [x] `server/src/analysis/openrouter.ts`: `chat(messages, {model, reasoning})` —
   `POST https://openrouter.ai/api/v1/chat/completions`, `Authorization: Bearer`,
   `HTTP-Referer`/`X-Title`, `response_format:{type:"json_object"}`, `reasoning` за
   налаштуванням. Парсинг з обрізанням ```json, 1 ретрай на невалідному JSON.
 
 ### A4. Ендпойнти — критерії
-- [ ] `POST /api/searches/:id/criteria/generate` body `{mode:'cons'|'pros', sampleSize?}` —
+- [x] `POST /api/searches/:id/criteria/generate` body `{mode:'cons'|'pros', sampleSize?}` —
   авто-режим: семпл → LLM → `{criteria[]}`. Без ключа → `409`.
-- [ ] `GET /api/searches/:id/criteria/prompt?mode=` — ручний: повертає готовий текст
+- [x] `GET /api/searches/:id/criteria/prompt?mode=` — ручний: повертає готовий текст
   промпту (семпл уже підставлений) для копіювання.
-- [ ] `POST /api/searches/:id/criteria/import` body `{mode, raw}` — парс відповіді LLM
+- [x] `POST /api/searches/:id/criteria/import` body `{mode, raw}` — парс відповіді LLM
   (масив рядків або `{criteria:[]}`), повертає нормалізований список (НЕ зберігає — вибір
   робить користувач у UI).
-- [ ] `PUT /api/searches/:id/criteria` body `{cons?:[], pros?:[]}` — зберегти обрані в
+- [x] `PUT /api/searches/:id/criteria` body `{cons?:[], pros?:[]}` — зберегти обрані в
   `searches.analysis_criteria`.
 
 ### A5. Ендпойнти — matching
-- [ ] `POST /api/searches/:id/analyze` body `{mode, ids:number[], reasoning?}` — авто:
+- [x] `POST /api/searches/:id/analyze` body `{mode, ids:number[], reasoning?}` — авто:
   чанки по 12 (сервер сам), для кожного LLM-виклик, верифікація evidence (substring;
   не пройшло → відкинути), агрегувати `{id→criterion[]}`. Ліміт `ids`≤200 за виклик
   (далі фронт повторює). Відповідь: `{results:[{id, criteria:[], dropped:[{criterion,
   evidence}]}], errors:[]}`. **НЕ пише в БД** — повертає для кроку «Перевірка».
-- [ ] `GET /api/searches/:id/analyze/package?mode=&ids=` — ручний: пакет(и) для
+- [x] `GET /api/searches/:id/analyze/package?mode=&ids=` — ручний: пакет(и) для
   безкоштовного чату. Авто-вибір розміру: один файл, якщо оцінка токенів ≤ поріг
   (`MANUAL_PACKAGE_TOKEN_CAP`, конст.), інакше — кілька частин (`part 1/3` у заголовку
   кожного). Повертає `{parts: [{name, content}]}`.
-- [ ] `POST /api/searches/:id/analyze/import` body `{mode, raw}` — парс однієї вставленої
+- [x] `POST /api/searches/:id/analyze/import` body `{mode, raw}` — парс однієї вставленої
   відповіді (масив по id), та сама верифікація evidence, мерж у накопичений результат
   (підтримка кількох послідовних вставок). Повертає поточний агрегат.
-- [ ] `POST /api/listings/analyze/commit` body `{mode, items:[{id, criteria:[]}], model?,
+- [x] `POST /api/listings/analyze/commit` body `{mode, items:[{id, criteria:[]}], model?,
   source:'api'|'import'}` — запис у БД chunked: `pros`/`cons` ← `'• '+join`,
   `analysis_at=now`, `analysis_source`, `analysis_model`, `analysis_stale=0`. Прогрес —
   клієнтське чанкування (без поллінгу).
 
 ### A6. Stale
-- [ ] `normalizer.ts` (UPDATE-гілка upsert): якщо `analysis_at IS NOT NULL` і нове
+- [x] `normalizer.ts` (UPDATE-гілка upsert): якщо `analysis_at IS NOT NULL` і нове
   title/description ≠ збереженому → `analysis_stale=1`.
 
 ### A7. Excel/JSON експорт превʼю (крок 3)
-- [ ] Спільний модуль `server/src/export/xlsx.ts` на **ExcelJS** (узгоджена єдина нова
+- [x] Спільний модуль `server/src/export/xlsx.ts` на **ExcelJS** (узгоджена єдина нова
   npm-залежність — див. нижче). `new Workbook()` → `addWorksheet()` → `columns` (заголовки
   + ширини) → `addRows()` → `xlsx.writeBuffer()`. Цей же модуль перевикористає майбутній
   Excel-експорт усієї таблиці.
-- [ ] `POST /api/searches/:id/analyze/export` body `{format:'xlsx'|'json', rows:[...]}` —
+- [x] `POST /api/searches/:id/analyze/export` body `{format:'xlsx'|'json', rows:[...]}` —
   віддає файл [Назва · Опис · Мінуси/Плюси]. `xlsx` → ExcelJS-буфер з `Content-Disposition`
   attachment; `json` — `application/json`. Заморозити рядок заголовків, розумні ширини колонок.
 
 ## Група B — Frontend (майстер)
 
 ### B1. Каркас майстра
-- [ ] Кнопка «AI» (`LuSparkles`) у `Header.tsx`. `AnalysisWizardDialog.tsx` — степер,
+- [x] Кнопка «AI» (`LuSparkles`) у `Header.tsx`. `AnalysisWizardDialog.tsx` — степер,
   перемикачі Мінуси/Плюси та вибрані/весь пошук, навігація кроків, спільний стан.
-- [ ] `client.ts` хуки: `useAnalysisStatus`, `useGenerateCriteria`, `useCriteriaPrompt`,
+- [x] `client.ts` хуки: `useAnalysisStatus`, `useGenerateCriteria`, `useCriteriaPrompt`,
   `useImportCriteria`, `useSaveCriteria`, `useAnalyze` (чанки), `useAnalyzePackage`,
   `useImportAnalysis`, `useCommitAnalysis`, `useExportPreview`.
 
 ### B2. Крок 1 — Критерії (+ ручний помічник)
-- [ ] Chips-редактор (обрати/додати/зняти), лічильник «Обрано K із P», «Ще варіанти».
-- [ ] Бічна панель-помічник (`bg.subtle`): «Скопіювати промпт» + Textarea «Вставити
+- [x] Chips-редактор (обрати/додати/зняти), лічильник «Обрано K із P», «Ще варіанти».
+- [x] Бічна панель-помічник (`bg.subtle`): «Скопіювати промпт» + Textarea «Вставити
   відповідь» → chips. Зберегти обрані → `PUT criteria`.
 
 ### B3. Крок 2 — Пошук (+ ручний помічник)
-- [ ] Авто: «Знайти» → прогрес X/N. Ручний: «Завантажити пакет»/«Скопіювати промпт»
+- [x] Авто: «Знайти» → прогрес X/N. Ручний: «Завантажити пакет»/«Скопіювати промпт»
   (1 vs кілька) + поле(я) «Вставити відповідь», підтримка кількох вставок, лічильник.
 
 ### B4. Крок 3 — Перевірка
-- [ ] Превʼю-таблиця [Фото·Назва·Опис(підсвітка evidence через наявний `HighlightText`)·
+- [x] Превʼю-таблиця [Фото·Назва·Опис(підсвітка evidence через наявний `HighlightText`)·
   Критерії]. Позначки «нічого не знайдено» і «evidence не підтверджено» (закреслені).
-- [ ] Кнопки «Експорт Excel»/«Експорт JSON».
+- [x] Кнопки «Експорт Excel»/«Експорт JSON».
 
 ### B5. Крок 4 — Вставка
-- [ ] «Відмінити» / «Вставити … у таблицю» → `commit` chunked + прогрес-бар.
-- [ ] `ConfirmActionDialog` (наявний) при перезаписі непорожніх pros/cons (лічильник M).
+- [x] «Відмінити» / «Вставити … у таблицю» → `commit` chunked + прогрес-бар.
+- [x] `ConfirmActionDialog` (наявний) при перезаписі непорожніх pros/cons (лічильник M).
 
 ### B6. Налаштування + індикація
-- [ ] Секція «AI-аналіз»: статус ключа, поле «Модель», Switch «reasoning для пошуку»,
+- [x] Секція «AI-аналіз»: статус ключа, поле «Модель», Switch «reasoning для пошуку»,
   Textarea «Додаткові критерії» (дотекст до промпту). Персист у `SETTINGS_STORAGE_KEY`.
-- [ ] `ProsConsCell`: бейдж `LuTriangleAlert` + tooltip при `analysis_stale=1`; tooltip
+- [x] `ProsConsCell`: бейдж `LuTriangleAlert` + tooltip при `analysis_stale=1`; tooltip
   «Аналіз: <model|ручний імпорт>, <дата>» при `analysis_at`.
 
 ## Група C — Документація
-- [ ] `CLAUDE.md`: новий канон (LLM-аналіз ручний за тригером; критерії на рівні пошуку,
+- [x] `CLAUDE.md`: новий канон (LLM-аналіз ручний за тригером; критерії на рівні пошуку,
   мінуси/плюси на рівні оголошення; evidence не зберігається; ключ лише в `server/.env`;
   PII продавця не передається; аналіз ніколи не авто). **+ зафіксувати `exceljs` як єдину
   узгоджену нову залежність** (чому не `xlsx`/SheetJS — CVE + платна модель); спільний
   модуль `server/src/export/xlsx.ts`.
-- [ ] `architecture.md` (модулі `analysis/*`, ендпойнти, env), `structure.md` (файли),
+- [x] `architecture.md` (модулі `analysis/*`, ендпойнти, env), `structure.md` (файли),
   `README.md` (як отримати ключ OpenRouter / як працювати безкоштовно).
 
 ## Верифікація / test-cases (перевіряє користувач вручну)

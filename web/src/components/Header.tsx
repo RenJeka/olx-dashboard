@@ -3,6 +3,7 @@ import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './SearchActionPanel';
+import { AnalysisWizardDialog } from './analysis/AnalysisWizardDialog';
 import { SettingsDrawer } from './settings/SettingsDrawer';
 import { Tooltip } from './ui/tooltip';
 import type { Search } from '../types';
@@ -11,6 +12,7 @@ interface HeaderProps {
   searchesVisible: boolean;
   onSearchesVisibleChange: (visible: boolean) => void;
   selectedSearch: Search | undefined;
+  selectedIds: number[];
   autoRefreshEnabled: boolean;
   onAutoRefreshEnabledChange: (enabled: boolean) => void;
   autoRefreshIntervalMin: number;
@@ -27,6 +29,7 @@ export function Header({
   searchesVisible,
   onSearchesVisibleChange,
   selectedSearch,
+  selectedIds,
   autoRefreshEnabled,
   onAutoRefreshEnabledChange,
   autoRefreshIntervalMin,
@@ -82,6 +85,7 @@ export function Header({
             </Badge>
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
+          {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
           <SettingsDrawer
             columnVisibility={columnVisibility}
             onColumnVisibilityChange={onColumnVisibilityChange}

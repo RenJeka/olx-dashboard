@@ -68,9 +68,53 @@ export interface Listing {
   cons: string;
   filtered_out: number;
   miss_count: number;
+  analysis_at: string | null;
+  analysis_source: string | null;
+  analysis_model: string | null;
+  analysis_stale: number;
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+}
+
+// ── LLM-аналіз (план docs/plans/llm-analysis.md) ─────────────────────────────
+
+export type AnalysisMode = 'cons' | 'pros';
+
+export interface AnalysisStatus {
+  apiAvailable: boolean;
+  defaultModel: string;
+}
+
+export interface AnalysisCriteria {
+  cons: string[];
+  pros: string[];
+}
+
+export interface MatchedItem {
+  criterion: string;
+  evidence: string;
+  ok: boolean;
+}
+
+export interface AnalyzedListing {
+  id: number;
+  items: MatchedItem[];
+}
+
+export interface AnalyzeResponse {
+  results: AnalyzedListing[];
+  errors: string[];
+}
+
+export interface PackagePart {
+  name: string;
+  content: string;
+}
+
+export interface CommitItem {
+  id: number;
+  criteria: string[];
 }
 
 export interface ScanResult {

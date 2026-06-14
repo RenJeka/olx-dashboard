@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Flex } from '@chakra-ui/react';
-import type { VisibilityState } from '@tanstack/react-table';
+import type { RowSelectionState, VisibilityState } from '@tanstack/react-table';
 import { useSearches } from './api/client';
 import { Header } from './components/Header';
 import { Toaster } from './components/ui/toaster';
@@ -40,8 +40,23 @@ export function App() {
   const [searchesVisible, setSearchesVisible] = useState<boolean>(() =>
     loadSearchesVisible(),
   );
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const { data: searches } = useSearches();
   const selectedSearch = searches?.find((s) => s.id === selectedId);
+
+  // Скидаємо виділення рядків при зміні пошуку (раніше — у ListingsTable).
+  useEffect(() => {
+    setRowSelection({});
+  }, [selectedId]);
+
+  // Id виділених рядків — для майстра AI-аналізу (режим «вибрані»). getRowId = String(id).
+  const selectedIds = useMemo(
+    () =>
+      Object.entries(rowSelection)
+        .filter(([, v]) => v)
+        .map(([k]) => Number(k)),
+    [rowSelection],
+  );
 
   useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin);
 
@@ -75,6 +90,7 @@ export function App() {
         searchesVisible={searchesVisible}
         onSearchesVisibleChange={setSearchesVisible}
         selectedSearch={selectedSearch}
+        selectedIds={selectedIds}
         autoRefreshEnabled={autoRefreshEnabled}
         onAutoRefreshEnabledChange={setAutoRefreshEnabled}
         autoRefreshIntervalMin={autoRefreshIntervalMin}
@@ -99,6 +115,8 @@ export function App() {
           columnOrder={columnOrder}
           onColumnOrderChange={setColumnOrder}
           descriptionExpandEnabled={descriptionExpandEnabled}
+          rowSelection={rowSelection}
+          onRowSelectionChange={setRowSelection}
         />
       </Flex>
       <Toaster />

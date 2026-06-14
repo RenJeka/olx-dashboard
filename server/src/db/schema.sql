@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS searches (
   cron_enabled INTEGER DEFAULT 0,
   visible_total_count INTEGER,       -- metadata.visible_total_count з останнього успішного скану (GraphQL)
   sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
+  analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -39,8 +40,12 @@ CREATE TABLE IF NOT EXISTS listings (
     CHECK (status IN ('new','interested','contacted','rejected','disabled')),
   status_source TEXT DEFAULT 'auto', -- auto | manual
   note TEXT DEFAULT '',
-  pros TEXT DEFAULT '',   -- TODO: заповнювати через AI (аналіз опису оголошення)
-  cons TEXT DEFAULT '',   -- TODO: заповнювати через AI (аналіз опису оголошення)
+  pros TEXT DEFAULT '',   -- LLM-аналіз: знайдені плюси (масив criterion, формат "• criterion\n• ...")
+  cons TEXT DEFAULT '',   -- LLM-аналіз: знайдені мінуси (масив criterion, формат "• criterion\n• ...")
+  analysis_at TEXT,                  -- ISO-час останнього LLM-аналізу (NULL — не аналізувалось)
+  analysis_source TEXT,              -- джерело аналізу: api (OpenRouter) | import (ручна вставка)
+  analysis_model TEXT,               -- модель аналізу (api) або 'manual' (import)
+  analysis_stale INTEGER DEFAULT 0,  -- 1 — title/description змінились після аналізу (бейдж «застарілий аналіз»)
   filtered_out INTEGER DEFAULT 0,
   miss_count INTEGER DEFAULT 0,      -- скани поспіль без цього оголошення у вікні покриття (Етап 2)
   first_seen_at TEXT DEFAULT (datetime('now')),

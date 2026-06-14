@@ -50,6 +50,9 @@ addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
 addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
 addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 
+// LLM-аналіз — критерії на рівні пошуку (searches не зачіпає rebuild нижче).
+addColumnIfMissing('searches', 'analysis_criteria', "TEXT DEFAULT '{}'");
+
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
  * miss_count. ALTER TABLE не міняє CHECK-констрейнти, тому потрібен повний rebuild
@@ -123,6 +126,13 @@ migrateListingsTable();
 
 // Після rebuild-міграції (інакше listings_new без цієї колонки втратив би її на v1-БД).
 addColumnIfMissing('listings', 'last_refresh_at', 'TEXT');
+
+// LLM-аналіз на рівні оголошення — теж ПІСЛЯ rebuild (LISTINGS_COMMON_COLUMNS їх не
+// переносить, тож на старій v1-БД rebuild затер би їх → крах normalizer на старті).
+addColumnIfMissing('listings', 'analysis_at', 'TEXT');
+addColumnIfMissing('listings', 'analysis_source', 'TEXT');
+addColumnIfMissing('listings', 'analysis_model', 'TEXT');
+addColumnIfMissing('listings', 'analysis_stale', 'INTEGER DEFAULT 0');
 
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).

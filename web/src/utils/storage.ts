@@ -1,9 +1,21 @@
 import type { VisibilityState } from '@tanstack/react-table';
 import type { StoredTableState } from '../types';
+import {
+  DEFAULT_ANALYSIS_MODEL,
+  DEFAULT_AUTO_REFRESH_INTERVAL_MIN,
+  DEFAULT_PAGE_SIZE,
+  SETTINGS_STORAGE_KEY,
+  TABLE_STORAGE_KEY,
+} from '../constants';
 
-export const SETTINGS_STORAGE_KEY = 'olx-ui-settings-v1';
-export const TABLE_STORAGE_KEY = 'olx-listings-table-v1';
-export const DEFAULT_PAGE_SIZE = 50;
+// Реекспорт для зворотної сумісності наявних імпортів зі storage.
+export {
+  DEFAULT_ANALYSIS_MODEL,
+  DEFAULT_AUTO_REFRESH_INTERVAL_MIN,
+  DEFAULT_PAGE_SIZE,
+  SETTINGS_STORAGE_KEY,
+  TABLE_STORAGE_KEY,
+};
 
 interface StoredSettings {
   columnVisibility?: VisibilityState;
@@ -13,9 +25,10 @@ interface StoredSettings {
   autoRefreshIntervalMin?: number;
   skipDeepScanConfirm?: boolean;
   searchesVisible?: boolean;
+  analysisModel?: string;
+  analysisReasoning?: boolean;
+  analysisExtraCriteria?: string;
 }
-
-export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
 
 function loadSettings(): StoredSettings {
   try {
@@ -93,6 +106,30 @@ export function loadSearchesVisible(): boolean {
 
 export function saveSearchesVisible(searchesVisible: boolean): void {
   saveSettings({ searchesVisible });
+}
+
+export function loadAnalysisModel(): string {
+  return loadSettings().analysisModel || DEFAULT_ANALYSIS_MODEL;
+}
+
+export function saveAnalysisModel(analysisModel: string): void {
+  saveSettings({ analysisModel });
+}
+
+export function loadAnalysisReasoning(): boolean {
+  return loadSettings().analysisReasoning ?? false;
+}
+
+export function saveAnalysisReasoning(analysisReasoning: boolean): void {
+  saveSettings({ analysisReasoning });
+}
+
+export function loadAnalysisExtraCriteria(): string {
+  return loadSettings().analysisExtraCriteria ?? '';
+}
+
+export function saveAnalysisExtraCriteria(analysisExtraCriteria: string): void {
+  saveSettings({ analysisExtraCriteria });
 }
 
 export function loadTableState(): StoredTableState {
