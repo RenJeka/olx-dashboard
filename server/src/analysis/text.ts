@@ -1,5 +1,5 @@
 // Текстові хелпери LLM-аналізу: очистка HTML-опису та нормалізація для верифікації evidence.
-import { CHARS_PER_TOKEN, EVIDENCE_MIN_LENGTH } from './constants.js';
+import { EVIDENCE_MIN_LENGTH } from './constants.js';
 
 /**
  * HTML-опис OLX (з <br /> тегами) → plain text. Дзеркалить web/src/utils/format.ts
@@ -32,9 +32,4 @@ export function evidenceConfirmed(evidence: string, description: string): boolea
   const needle = normalizeForMatch(evidence);
   if (needle.length < EVIDENCE_MIN_LENGTH) return false;
   return normalizeForMatch(description).includes(needle);
-}
-
-/** Груба оцінка токенів (≈CHARS_PER_TOKEN символів/токен) — для авто-вибору розміру пакета. */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / CHARS_PER_TOKEN);
 }

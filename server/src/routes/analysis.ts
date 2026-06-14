@@ -1,3 +1,4 @@
+import { ZipArchive } from 'archiver';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
 import { hasApiKey } from '../analysis/config.js';
@@ -10,30 +11,27 @@ import {
   DEFAULT_SAMPLE_SIZE,
   JSON_EXPORT_INDENT,
   MANUAL_MODEL,
-  MANUAL_PACKAGE_TOKEN_CAP,
+  MANUAL_ZIP_CHUNK_SIZE,
   MAX_ANALYZE_IDS,
   MIME_JSON,
   MIME_XLSX,
+  MIME_ZIP,
   MODE_LABEL,
   PREVIEW_XLSX_WIDTHS,
 } from '../analysis/constants.js';
 import { chat } from '../analysis/openrouter.js';
 import {
+  buildChunkListings,
   buildCriteriaPrompt,
+  buildManualZipInstructions,
   buildMatchingPrompt,
   pickSample,
   type PromptListing,
 } from '../analysis/prompts.js';
 import { mergeResults, parseCriteriaResponse, parseMatchingResponse } from '../analysis/parse.js';
-import { estimateTokens, stripHtml } from '../analysis/text.js';
+import { stripHtml } from '../analysis/text.js';
 import { buildXlsxBuffer } from '../export/xlsx.js';
-import type {
-  AnalysisMode,
-  AnalyzeResponse,
-  AnalyzedListing,
-  CommitItem,
-  PackagePart,
-} from '../types.js';
+import type { AnalysisMode, AnalyzeResponse, AnalyzedListing, CommitItem } from '../types.js';
 
 interface ListingRow {
   id: number;
@@ -245,9 +243,9 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     return response;
   });
 
-  // Ручний пакет для безкоштовного чату (авто-вибір 1 vs кілька частин).
+  // Ручний пакет для безкоштовного чату: ZIP з prompt.txt + descriptions/chunk-NNN.json.
   app.get<{ Params: { id: string }; Querystring: { mode?: string; ids?: string } }>(
-    '/api/searches/:id/analyze/package',
+    '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
       if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
@@ -266,37 +264,20 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       const listings = loadListings(id, ids);
       const mode = req.query.mode;
 
-      // Оцінюємо повний промпт; якщо вкладається у поріг — один файл, інакше ділимо.
-      const fullPrompt = buildMatchingPrompt(criteria, listings.map(toPromptListing), mode);
-      const parts: PackagePart[] = [];
+      const archive = new ZipArchive();
+      archive.on('error', (err: Error) => req.log.error(err));
 
-      if (estimateTokens(fullPrompt) <= MANUAL_PACKAGE_TOKEN_CAP || listings.length <= 1) {
-        parts.push({ name: `${mode}-аналіз.txt`, content: fullPrompt });
-      } else {
-        // Розбиваємо оголошення на групи з оцінкою токенів ≤ cap.
-        const groups: ListingRow[][] = [];
-        let curr: ListingRow[] = [];
-        for (const l of listings) {
-          const trial = buildMatchingPrompt(criteria, [...curr, l].map(toPromptListing), mode);
-          if (curr.length > 0 && estimateTokens(trial) > MANUAL_PACKAGE_TOKEN_CAP) {
-            groups.push(curr);
-            curr = [l];
-          } else {
-            curr.push(l);
-          }
-        }
-        if (curr.length > 0) groups.push(curr);
+      archive.append(buildManualZipInstructions(criteria, mode), { name: 'prompt.txt' });
+      chunk(listings, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
+        const name = `descriptions/chunk-${String(idx + 1).padStart(3, '0')}.json`;
+        const content = JSON.stringify(buildChunkListings(group.map(toPromptListing)), null, JSON_EXPORT_INDENT);
+        archive.append(content, { name });
+      });
+      void archive.finalize();
 
-        groups.forEach((group, idx) => {
-          const header = `# Частина ${idx + 1}/${groups.length}\n\n`;
-          parts.push({
-            name: `${mode}-аналіз-частина-${idx + 1}.txt`,
-            content: header + buildMatchingPrompt(criteria, group.map(toPromptListing), mode),
-          });
-        });
-      }
-
-      return { parts };
+      reply.header('Content-Disposition', `attachment; filename="analysis-${mode}-search-${id}.zip"`);
+      reply.type(MIME_ZIP);
+      return reply.send(archive);
     },
   );
 

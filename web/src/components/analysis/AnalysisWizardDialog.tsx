@@ -21,6 +21,7 @@ import {
   LuFileSpreadsheet,
   LuFileJson,
   LuSearch,
+  LuDownload,
 } from 'react-icons/lu';
 import {
   DialogBackdrop,
@@ -44,7 +45,7 @@ import {
   useImportCriteria,
   useSaveCriteria,
   useAnalyze,
-  fetchAnalyzePackage,
+  fetchAnalyzePackageZip,
   useImportAnalysis,
   useCommitAnalysis,
   exportPreview,
@@ -94,7 +95,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
 
   // Крок 2
   const [showMatchAssistant, setShowMatchAssistant] = useState(false);
-  const [matchParts, setMatchParts] = useState<PackagePart[]>([]);
+  const [zipDownloading, setZipDownloading] = useState(false);
   const [accumulated, setAccumulated] = useState<AnalyzedListing[]>([]);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -133,10 +134,10 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   function resetForReopen() {
     setStep(1);
     setAccumulated([]);
-    setMatchParts([]);
     setCriteriaParts([]);
     setShowCriteriaAssistant(false);
     setShowMatchAssistant(false);
+    setZipDownloading(false);
     setAnalyzeProgress(null);
     setCommitProgress(null);
   }
@@ -286,17 +287,23 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     }
   }
 
-  async function openMatchAssistant() {
-    setShowMatchAssistant(true);
+  async function downloadZipPackage() {
+    if (effectiveIds.length === 0) {
+      toaster.create({ type: 'error', title: 'Немає оголошень для аналізу' });
+      return;
+    }
+    setZipDownloading(true);
     try {
-      const { parts } = await fetchAnalyzePackage(search.id, mode, effectiveIds);
-      setMatchParts(parts);
+      await fetchAnalyzePackageZip(search.id, mode, effectiveIds);
+      setShowMatchAssistant(true);
     } catch (err) {
       toaster.create({
         type: 'error',
-        title: 'Не вдалося підготувати пакет',
+        title: 'Не вдалося підготувати ZIP-пакет',
         description: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      setZipDownloading(false);
     }
   }
 
@@ -578,17 +585,23 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </Box>
               )}
 
-              <Button size="sm" variant="outline" onClick={openMatchAssistant}>
-                Ручний режим: підготувати пакет
+              <Button size="sm" variant="outline" onClick={downloadZipPackage} loading={zipDownloading}>
+                <LuDownload /> Завантажити ZIP-пакет
               </Button>
 
               {showMatchAssistant && (
                 <ManualAssistant
                   title="Помічник: пошук збігів"
-                  parts={matchParts}
+                  parts={[]}
                   pasteLabel="Додати відповідь"
                   onSubmit={handleImportMatching}
                   submitting={importAnalysis.isPending}
+                  emptyHint={
+                    <Text textStyle="xs" color="fg.muted">
+                      Завантаж ZIP, проженеш через Claude (Projects/Code за один прохід), встав
+                      єдиний JSON-результат нижче.
+                    </Text>
+                  }
                   footer={
                     <Text textStyle="xs" color="fg.muted">
                       Опрацьовано {accumulated.length} оголошень

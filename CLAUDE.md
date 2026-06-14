@@ -10,8 +10,10 @@
 - **Іконки:** `react-icons/lu` (набір Lucide) — стандартний вибір для Chakra UI v3.
 - **Notion:** `@notionhq/client`.
 - **LLM-аналіз:** OpenRouter через звичайний `fetch` (без SDK); Excel-експорт — **`exceljs`**
-  (єдина узгоджена нова залежність `server/`, обрано замість `xlsx`/SheetJS: той має
-  невиправлені high-severity CVE й перейшов на платну модель). `.env` — через
+  (узгоджена нова залежність `server/`, обрано замість `xlsx`/SheetJS: той має
+  невиправлені high-severity CVE й перейшов на платну модель). ZIP-пакет ручного режиму
+  (промпт + чанки описів) — **`archiver`** (+ `@types/archiver`), друга узгоджена нова
+  залежність `server/`: у Node немає вбудованого ZIP-writer. `.env` — через
   `process.loadEnvFile` (міні-лоадер у `server/src/analysis/config.ts`), без нової залежності.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
@@ -79,9 +81,10 @@
   - Промпти — єдине джерело `server/src/analysis/prompts.ts` (спільне для авто й ручного).
   - Зміна `title`/`description` після аналізу → `analysis_stale=1` (бейдж «застарілий
     аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.
-  - Чанкування: авто — дрібні батчі (12), ручний пакет — авто-вибір 1 vs кілька частин за
-    порогом токенів. Реалізація — `server/src/analysis/*`, `server/src/routes/analysis.ts`,
-    `server/src/export/xlsx.ts`, фронт — `web/src/components/analysis/*`.
+  - Чанкування: авто — дрібні батчі (12), ручний ZIP-пакет — фіксовано 50 оголошень на файл
+    `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
+    `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, фронт —
+    `web/src/components/analysis/*`.
 
 ## Команди
 

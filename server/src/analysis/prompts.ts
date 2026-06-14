@@ -62,40 +62,28 @@ export function buildCriteriaPrompt(
   ].join('\n');
 }
 
-/**
- * Промпт matching: для кожного оголошення повернути збіги критеріїв з дослівним evidence.
- * criterion ОБОВʼЯЗКОВО з наданого списку; evidence — дослівно з опису. БЕЗ PII у вході.
- */
-export function buildMatchingPrompt(
-  criteria: string[],
-  listings: PromptListing[],
-  mode: AnalysisMode,
-): string {
-  const criteriaList = criteria.map((c, i) => `${i + 1}. ${c}`).join('\n');
-  const items = listings
-    .map((l) => {
-      const params = parseParamsLabel(l.params);
-      const desc = stripHtml(l.description).slice(0, MATCHING_DESC_SLICE) || '(опис відсутній)';
-      return [
-        `### id: ${l.id}`,
-        `Назва: ${l.title ?? '—'}`,
-        params ? `Характеристики: ${params}` : '',
-        `Опис: ${desc}`,
-      ]
-        .filter(Boolean)
-        .join('\n');
-    })
-    .join('\n\n');
+/** Оголошення для одного файлу `descriptions/chunk-NNN.json` ZIP-пакета (без PII). */
+export interface ChunkListing {
+  id: number;
+  title: string | null;
+  characteristics: string;
+  description: string;
+}
 
+/** Роль + завдання + список дозволених критеріїв (спільне для matching-промптів). */
+function matchingRoleAndCriteria(criteria: string[], mode: AnalysisMode): string {
+  const criteriaList = criteria.map((c, i) => `${i + 1}. ${c}`).join('\n');
   return [
     `Ти — асистент для аналізу оголошень OLX. Знайди ${MODE_NOUN[mode]} у кожному оголошенні.`,
     '',
     'Список дозволених критеріїв (criterion МАЄ бути рівно одним із цих рядків):',
     criteriaList,
-    '',
-    'Оголошення:',
-    items,
-    '',
+  ].join('\n');
+}
+
+/** Анти-галюцинаційні правила + формат відповіді (спільне для matching-промптів). */
+function matchingRulesAndFormat(): string {
+  return [
     'Правила:',
     '- Для кожного оголошення поверни знайдені збіги критеріїв.',
     '- criterion — ТІЛЬКИ з наведеного списку (нормалізуй: різні формулювання в описі → один критерій зі списку).',
@@ -106,6 +94,71 @@ export function buildMatchingPrompt(
     'Формат відповіді — СУВОРО валідний JSON-масив без тексту навколо:',
     '[{"id": <число>, "items": [{"criterion": "<зі списку>", "evidence": "<дослівно з опису>"}]}]',
   ].join('\n');
+}
+
+/** Текстовий блок одного оголошення для matching-промпту (id/назва/характеристики/опис). */
+function buildListingBlock(l: PromptListing): string {
+  const params = parseParamsLabel(l.params);
+  const desc = stripHtml(l.description).slice(0, MATCHING_DESC_SLICE) || '(опис відсутній)';
+  return [
+    `### id: ${l.id}`,
+    `Назва: ${l.title ?? '—'}`,
+    params ? `Характеристики: ${params}` : '',
+    `Опис: ${desc}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Промпт matching: для кожного оголошення повернути збіги критеріїв з дослівним evidence.
+ * criterion ОБОВʼЯЗКОВО з наданого списку; evidence — дослівно з опису. БЕЗ PII у вході.
+ * Авто-режим (`/analyze`): оголошення вставляються інлайн у текст промпту.
+ */
+export function buildMatchingPrompt(
+  criteria: string[],
+  listings: PromptListing[],
+  mode: AnalysisMode,
+): string {
+  const items = listings.map(buildListingBlock).join('\n\n');
+
+  return [
+    matchingRoleAndCriteria(criteria, mode),
+    '',
+    'Оголошення:',
+    items,
+    '',
+    matchingRulesAndFormat(),
+  ].join('\n');
+}
+
+/**
+ * Інструкції для ZIP-пакета ручного режиму (`prompt.txt`): роль/критерії +
+ * формат вхідних файлів `descriptions/chunk-NNN.json` + ті самі правила matching,
+ * але з вимогою опрацювати всі чанки й повернути ОДИН об'єднаний JSON-масив.
+ */
+export function buildManualZipInstructions(criteria: string[], mode: AnalysisMode): string {
+  return [
+    matchingRoleAndCriteria(criteria, mode),
+    '',
+    'Вхідні дані: у папці `descriptions/` лежать файли `chunk-NNN.json` — кожен містить JSON-масив',
+    'оголошень формату {"id": <число>, "title": "...", "characteristics": "...", "description": "..."}.',
+    '',
+    "Завдання: опрацюй КОЖЕН файл з `descriptions/` і поверни ОДИН JSON-масив, що об'єднує",
+    'результати для всіх оголошень з усіх файлів.',
+    '',
+    matchingRulesAndFormat(),
+  ].join('\n');
+}
+
+/** Оголошення → компактний обʼєкт для файлу `descriptions/chunk-NNN.json` (без PII). */
+export function buildChunkListings(listings: PromptListing[]): ChunkListing[] {
+  return listings.map((l) => ({
+    id: l.id,
+    title: l.title,
+    characteristics: parseParamsLabel(l.params),
+    description: stripHtml(l.description).slice(0, MATCHING_DESC_SLICE) || '(опис відсутній)',
+  }));
 }
 
 /** params (JSON {key:label}) → короткий рядок "label1, label2" для промпту. */

@@ -23,8 +23,8 @@ export const ENV_FILENAME = '.env';
 export const AUTO_CHUNK_SIZE = 12;
 /** Максимум id за один виклик /analyze (далі фронт повторює). */
 export const MAX_ANALYZE_IDS = 200;
-/** Поріг токенів ручного пакета: ≤ — один файл, інакше — кілька частин. */
-export const MANUAL_PACKAGE_TOKEN_CAP = 12000;
+/** Скільки оголошень кладеться в один файл `descriptions/chunk-NNN.json` ZIP-пакета. */
+export const MANUAL_ZIP_CHUNK_SIZE = 50;
 /** Ліміт критеріїв (узгоджено з промптом). */
 export const MAX_CRITERIA = 50;
 /** Розмір семпла описів для генерації критеріїв. */
@@ -42,11 +42,9 @@ export const SAMPLE_SCORE_LENGTH_CAP = 1500;
 /** Вага одного «сигнального» токена у скорі семплера. */
 export const SAMPLE_SIGNAL_TOKEN_WEIGHT = 300;
 
-// ── Верифікація / оцінка токенів ───────────────────────────────────────────────
+// ── Верифікація ──────────────────────────────────────────────────────────────
 /** Мінімальна довжина evidence для substring-перевірки (захист від шуму). */
 export const EVIDENCE_MIN_LENGTH = 3;
-/** Груба оцінка: символів на токен. */
-export const CHARS_PER_TOKEN = 4;
 
 // ── Запис / формат / експорт ───────────────────────────────────────────────────
 /** Префікс пункту у TEXT-полях pros/cons. */
@@ -59,6 +57,7 @@ export const MANUAL_MODEL = 'manual';
 export const JSON_EXPORT_INDENT = 2;
 export const MIME_JSON = 'application/json';
 export const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+export const MIME_ZIP = 'application/zip';
 /** Ширини колонок Excel-експорту превʼю. */
 export const PREVIEW_XLSX_WIDTHS = { title: 40, description: 60, criteria: 40 } as const;
 
