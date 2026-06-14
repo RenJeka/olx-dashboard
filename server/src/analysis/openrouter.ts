@@ -1,5 +1,13 @@
 // OpenRouter-клієнт (авто-режим). Звичайний fetch, без нової залежності.
-import { getApiKey, OPENROUTER_URL } from './config.js';
+import { getApiKey } from './config.js';
+import {
+  OPENROUTER_ERROR_DETAIL_MAX_CHARS,
+  OPENROUTER_MAX_ATTEMPTS,
+  OPENROUTER_REFERER,
+  OPENROUTER_RESPONSE_FORMAT,
+  OPENROUTER_TITLE,
+  OPENROUTER_URL,
+} from './constants.js';
 
 export interface ChatMessage {
   role: 'system' | 'user';
@@ -32,7 +40,7 @@ export async function chat(messages: ChatMessage[], options: ChatOptions): Promi
   const body: Record<string, unknown> = {
     model: options.model,
     messages,
-    response_format: { type: 'json_object' },
+    response_format: OPENROUTER_RESPONSE_FORMAT,
   };
   if (options.reasoning) {
     body.reasoning = { enabled: true };
@@ -41,22 +49,24 @@ export async function chat(messages: ChatMessage[], options: ChatOptions): Promi
   }
 
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < OPENROUTER_MAX_ATTEMPTS; attempt++) {
     try {
       const res = await fetch(OPENROUTER_URL, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'http://localhost:5173',
-          'X-Title': 'OLX Dashboard',
+          'HTTP-Referer': OPENROUTER_REFERER,
+          'X-Title': OPENROUTER_TITLE,
         },
         body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
-        throw new Error(`OpenRouter HTTP ${res.status}: ${detail.slice(0, 300)}`);
+        throw new Error(
+          `OpenRouter HTTP ${res.status}: ${detail.slice(0, OPENROUTER_ERROR_DETAIL_MAX_CHARS)}`,
+        );
       }
 
       const json = (await res.json()) as {

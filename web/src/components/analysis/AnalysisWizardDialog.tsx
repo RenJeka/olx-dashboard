@@ -57,6 +57,14 @@ import {
 } from '../../utils/storage';
 import { stripDescriptionHtml } from '../../utils/format';
 import { chunk } from '../../utils/array';
+import {
+  ANALYSIS_SOURCE,
+  ANALYSIS_STEPS,
+  ANALYZE_CHUNK,
+  COMMIT_CHUNK,
+  MANUAL_MODEL,
+  MODE_LABELS,
+} from '../../constants';
 import type { AnalysisMode, AnalyzedListing, Listing, PackagePart, Search } from '../../types';
 
 interface Props {
@@ -64,10 +72,6 @@ interface Props {
   /** Id вибраних рядків (чекбокси) — для режиму «вибрані». */
   selectedIds: number[];
 }
-
-const STEPS = ['Критерії', 'Пошук', 'Перевірка', 'Вставка'];
-const COMMIT_CHUNK = 50;
-const ANALYZE_CHUNK = 200;
 
 export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const [open, setOpen] = useState(false);
@@ -345,8 +349,8 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           searchId: search.id,
           mode,
           items: batch,
-          model: apiAvailable && status ? model : 'manual',
-          source: apiAvailable ? 'api' : 'import',
+          model: apiAvailable && status ? model : MANUAL_MODEL,
+          source: apiAvailable ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT,
         });
         done += batch.length;
         setCommitProgress({ done, total: commitItems.length });
@@ -396,7 +400,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     }
   }
 
-  const modeLabel = mode === 'cons' ? 'Мінуси' : 'Плюси';
+  const modeLabel = MODE_LABELS[mode];
   const chosenCount = available.filter((c) => selected.has(c)).length;
 
   return (
@@ -423,7 +427,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
             <DialogTitle>AI-аналіз: {modeLabel}</DialogTitle>
             {/* Степер */}
             <HStack gap={2}>
-              {STEPS.map((label, i) => (
+              {ANALYSIS_STEPS.map((label, i) => (
                 <HStack key={label} gap={1.5}>
                   <Box
                     boxSize={6}
@@ -441,7 +445,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                   <Text textStyle="xs" color={step === i + 1 ? 'fg.default' : 'fg.muted'} fontWeight={step === i + 1 ? 'bold' : 'normal'}>
                     {label}
                   </Text>
-                  {i < STEPS.length - 1 && <Box w={4} h="1px" bg="border.subtle" />}
+                  {i < ANALYSIS_STEPS.length - 1 && <Box w={4} h="1px" bg="border.subtle" />}
                 </HStack>
               ))}
             </HStack>

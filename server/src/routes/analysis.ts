@@ -1,12 +1,22 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
+import { hasApiKey } from '../analysis/config.js';
 import {
+  ANALYSIS_ERRORS,
+  ANALYSIS_SOURCE,
   AUTO_CHUNK_SIZE,
+  BULLET_PREFIX,
   DEFAULT_MODEL,
+  DEFAULT_SAMPLE_SIZE,
+  JSON_EXPORT_INDENT,
+  MANUAL_MODEL,
   MANUAL_PACKAGE_TOKEN_CAP,
   MAX_ANALYZE_IDS,
-  hasApiKey,
-} from '../analysis/config.js';
+  MIME_JSON,
+  MIME_XLSX,
+  MODE_LABEL,
+  PREVIEW_XLSX_WIDTHS,
+} from '../analysis/constants.js';
 import { chat } from '../analysis/openrouter.js';
 import {
   buildCriteriaPrompt,
@@ -31,8 +41,6 @@ interface ListingRow {
   description: string | null;
   params: string | null;
 }
-
-const MODE_LABEL: Record<AnalysisMode, string> = { cons: 'Мінуси', pros: 'Плюси' };
 
 function isMode(value: unknown): value is AnalysisMode {
   return value === 'cons' || value === 'pros';
@@ -98,7 +106,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   // Збережені критерії пошуку.
   app.get<{ Params: { id: string } }>('/api/searches/:id/criteria', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
+    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     return getSavedCriteria(id);
   });
 
@@ -109,14 +117,14 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   }>('/api/searches/:id/criteria/generate', async (req, reply) => {
     const id = Number(req.params.id);
     const search = getSearch(id);
-    if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
-    if (!isMode(req.body.mode)) return reply.code(400).send({ error: 'mode має бути cons|pros' });
+    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!hasApiKey()) {
-      return reply.code(409).send({ error: 'Авто-режим недоступний: немає OPENROUTER_API_KEY' });
+      return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
     }
 
     const listings = loadListings(id, []);
-    const sample = pickSample(listings, req.body.sampleSize ?? 30);
+    const sample = pickSample(listings, req.body.sampleSize ?? DEFAULT_SAMPLE_SIZE);
     const prompt = buildCriteriaPrompt(
       search.name,
       sample.map((l) => l.description ?? ''),
@@ -142,11 +150,11 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const id = Number(req.params.id);
       const search = getSearch(id);
-      if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
-      if (!isMode(req.query.mode)) return reply.code(400).send({ error: 'mode має бути cons|pros' });
+      if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+      if (!isMode(req.query.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
       const listings = loadListings(id, []);
-      const sample = pickSample(listings, 30);
+      const sample = pickSample(listings, DEFAULT_SAMPLE_SIZE);
       const prompt = buildCriteriaPrompt(
         search.name,
         sample.map((l) => l.description ?? ''),
@@ -162,8 +170,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/criteria/import',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
-      if (!req.body.raw) return reply.code(400).send({ error: 'Порожня відповідь' });
+      if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+      if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
       try {
         return { criteria: parseCriteriaResponse(req.body.raw) };
       } catch (err) {
@@ -177,7 +185,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/criteria',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
+      if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
 
       const current = getSavedCriteria(id);
       const next = {
@@ -197,10 +205,10 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
-    if (!isMode(req.body.mode)) return reply.code(400).send({ error: 'mode має бути cons|pros' });
+    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!hasApiKey()) {
-      return reply.code(409).send({ error: 'Авто-режим недоступний: немає OPENROUTER_API_KEY' });
+      return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
     }
 
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
@@ -210,7 +218,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
     const criteria = getSavedCriteria(id)[req.body.mode];
     if (criteria.length === 0) {
-      return reply.code(400).send({ error: 'Спершу збережіть критерії пошуку' });
+      return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
     }
 
     const listings = loadListings(id, ids);
@@ -242,8 +250,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/analyze/package',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
-      if (!isMode(req.query.mode)) return reply.code(400).send({ error: 'mode має бути cons|pros' });
+      if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+      if (!isMode(req.query.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
       const ids = (req.query.ids ?? '')
         .split(',')
@@ -252,7 +260,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
       const criteria = getSavedCriteria(id)[req.query.mode];
       if (criteria.length === 0) {
-        return reply.code(400).send({ error: 'Спершу збережіть критерії пошуку' });
+        return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
 
       const listings = loadListings(id, ids);
@@ -298,9 +306,9 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; raw?: string; accumulated?: AnalyzedListing[] };
   }>('/api/searches/:id/analyze/import', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
-    if (!isMode(req.body.mode)) return reply.code(400).send({ error: 'mode має бути cons|pros' });
-    if (!req.body.raw) return reply.code(400).send({ error: 'Порожня відповідь' });
+    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
+    if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
 
     const criteria = getSavedCriteria(id)[req.body.mode];
     const listings = loadListings(id, []);
@@ -325,36 +333,33 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     Body: { format?: string; mode?: string; rows?: { title?: string; description?: string; criteria?: string[] }[] };
   }>('/api/searches/:id/analyze/export', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: 'Пошук не знайдено' });
+    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     const mode: AnalysisMode = isMode(req.body.mode) ? req.body.mode : 'cons';
     const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
     const label = MODE_LABEL[mode];
 
     if (req.body.format === 'json') {
       reply.header('Content-Disposition', `attachment; filename="analysis-${mode}.json"`);
-      reply.type('application/json');
-      return JSON.stringify(rows, null, 2);
+      reply.type(MIME_JSON);
+      return JSON.stringify(rows, null, JSON_EXPORT_INDENT);
     }
 
     const buffer = await buildXlsxBuffer(
       label,
       [
-        { header: 'Назва', key: 'title', width: 40 },
-        { header: 'Опис', key: 'description', width: 60 },
-        { header: label, key: 'criteria', width: 40 },
+        { header: 'Назва', key: 'title', width: PREVIEW_XLSX_WIDTHS.title },
+        { header: 'Опис', key: 'description', width: PREVIEW_XLSX_WIDTHS.description },
+        { header: label, key: 'criteria', width: PREVIEW_XLSX_WIDTHS.criteria },
       ],
       rows.map((r) => ({
         title: r.title ?? '',
         description: stripHtml(r.description ?? ''),
-        criteria: (r.criteria ?? []).map((c) => `• ${c}`).join('\n'),
+        criteria: (r.criteria ?? []).map((c) => `${BULLET_PREFIX}${c}`).join('\n'),
       })),
     );
 
-    reply.header(
-      'Content-Disposition',
-      `attachment; filename="analysis-${mode}.xlsx"`,
-    );
-    reply.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    reply.header('Content-Disposition', `attachment; filename="analysis-${mode}.xlsx"`);
+    reply.type(MIME_XLSX);
     return reply.send(buffer);
   });
 
@@ -362,10 +367,10 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Body: { mode?: string; items?: CommitItem[]; model?: string; source?: string };
   }>('/api/listings/analyze/commit', async (req, reply) => {
-    if (!isMode(req.body.mode)) return reply.code(400).send({ error: 'mode має бути cons|pros' });
+    if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     const items = Array.isArray(req.body.items) ? req.body.items : [];
-    const source = req.body.source === 'api' ? 'api' : 'import';
-    const model = req.body.model ?? (source === 'import' ? 'manual' : DEFAULT_MODEL);
+    const source = req.body.source === ANALYSIS_SOURCE.API ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT;
+    const model = req.body.model ?? (source === ANALYSIS_SOURCE.IMPORT ? MANUAL_MODEL : DEFAULT_MODEL);
     const column = req.body.mode; // 'cons' | 'pros' — безпечно (whitelist через isMode)
 
     const stmt = db.prepare(
@@ -377,7 +382,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const run = db.transaction((rows: CommitItem[]) => {
       let updated = 0;
       for (const row of rows) {
-        const text = row.criteria.length > 0 ? row.criteria.map((c) => `• ${c}`).join('\n') : '';
+        const text =
+          row.criteria.length > 0 ? row.criteria.map((c) => `${BULLET_PREFIX}${c}`).join('\n') : '';
         const info = stmt.run(text, source, model, row.id);
         updated += info.changes;
       }

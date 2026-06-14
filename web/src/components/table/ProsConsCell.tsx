@@ -4,6 +4,7 @@ import { LuThumbsDown, LuThumbsUp, LuTriangleAlert } from 'react-icons/lu';
 import { useUpdateListing } from '../../api/client';
 import { Tooltip } from '../ui/tooltip';
 import { formatDate } from '../../utils/format';
+import { ANALYSIS_SOURCE } from '../../constants';
 import type { Listing } from '../../types';
 
 interface Props {
@@ -54,7 +55,7 @@ export function ProsConsCell({ listing, field }: Props) {
   const analysisInfo =
     listing.analysis_at != null
       ? `Аналіз: ${
-          listing.analysis_source === 'import'
+          listing.analysis_source === ANALYSIS_SOURCE.IMPORT
             ? 'ручний імпорт'
             : listing.analysis_model ?? 'API'
         }, ${formatDate(listing.analysis_at)?.short ?? listing.analysis_at}`

@@ -1,0 +1,120 @@
+// Єдине джерело magic-значень LLM-аналізу (числа, рядки, мапи). Тут — лише дані/конфіг;
+// логіка завантаження .env лишається в config.ts, промпт-прози — у prompts.ts.
+import type { AnalysisMode } from '../types.js';
+
+// ── Модель / OpenRouter ──────────────────────────────────────────────────────
+/** Дефолтна модель (редагована у налаштуваннях фронтенду, передається в тілі запиту). */
+export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
+export const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+/** Заголовки атрибуції OpenRouter (HTTP-Referer / X-Title). */
+export const OPENROUTER_REFERER = 'http://localhost:5173';
+export const OPENROUTER_TITLE = 'OLX Dashboard';
+/** Скільки спроб робить chat() (1 ретрай на невалідному JSON/мережевій помилці). */
+export const OPENROUTER_MAX_ATTEMPTS = 2;
+/** Обрізання тексту HTTP-помилки OpenRouter у повідомленні. */
+export const OPENROUTER_ERROR_DETAIL_MAX_CHARS = 300;
+/** Примус JSON-відповіді. */
+export const OPENROUTER_RESPONSE_FORMAT = { type: 'json_object' } as const;
+/** Імʼя файлу .env (у корені server/). */
+export const ENV_FILENAME = '.env';
+
+// ── Чанкування / ліміти ──────────────────────────────────────────────────────
+/** Авто-режим: дрібні батчі (модель деградує на довгому контексті). */
+export const AUTO_CHUNK_SIZE = 12;
+/** Максимум id за один виклик /analyze (далі фронт повторює). */
+export const MAX_ANALYZE_IDS = 200;
+/** Поріг токенів ручного пакета: ≤ — один файл, інакше — кілька частин. */
+export const MANUAL_PACKAGE_TOKEN_CAP = 12000;
+/** Ліміт критеріїв (узгоджено з промптом). */
+export const MAX_CRITERIA = 50;
+/** Розмір семпла описів для генерації критеріїв. */
+export const DEFAULT_SAMPLE_SIZE = 30;
+
+// ── Семпл / промпт ────────────────────────────────────────────────────────────
+/** Обрізання опису у промпті генерації критеріїв. */
+export const CRITERIA_DESC_SLICE = 800;
+/** Обрізання опису у промпті matching. */
+export const MATCHING_DESC_SLICE = 1500;
+/** Скільки значень params підставляти в промпт. */
+export const MAX_PARAMS_IN_PROMPT = 12;
+/** Стеля внеску довжини опису у скор семплера. */
+export const SAMPLE_SCORE_LENGTH_CAP = 1500;
+/** Вага одного «сигнального» токена у скорі семплера. */
+export const SAMPLE_SIGNAL_TOKEN_WEIGHT = 300;
+
+// ── Верифікація / оцінка токенів ───────────────────────────────────────────────
+/** Мінімальна довжина evidence для substring-перевірки (захист від шуму). */
+export const EVIDENCE_MIN_LENGTH = 3;
+/** Груба оцінка: символів на токен. */
+export const CHARS_PER_TOKEN = 4;
+
+// ── Запис / формат / експорт ───────────────────────────────────────────────────
+/** Префікс пункту у TEXT-полях pros/cons. */
+export const BULLET_PREFIX = '• ';
+/** Джерело аналізу (listings.analysis_source). */
+export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
+/** Позначка моделі для ручного імпорту (listings.analysis_model). */
+export const MANUAL_MODEL = 'manual';
+/** Відступ JSON-експорту превʼю. */
+export const JSON_EXPORT_INDENT = 2;
+export const MIME_JSON = 'application/json';
+export const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+/** Ширини колонок Excel-експорту превʼю. */
+export const PREVIEW_XLSX_WIDTHS = { title: 40, description: 60, criteria: 40 } as const;
+
+// ── Мапи режиму ────────────────────────────────────────────────────────────────
+/** Підпис режиму (заголовок колонки/файлу). */
+export const MODE_LABEL: Record<AnalysisMode, string> = { cons: 'Мінуси', pros: 'Плюси' };
+/** Іменник режиму для промптів. */
+export const MODE_NOUN: Record<AnalysisMode, string> = {
+  cons: 'мінуси (недоліки) товару',
+  pros: 'плюси (переваги) товару',
+};
+
+// ── Доменні дані промптів ────────────────────────────────────────────────────
+/** Базовий каркас критеріїв — зашитий, LLM доповнює специфічними для категорії. */
+export const BASE_SCAFFOLD: Record<AnalysisMode, string[]> = {
+  cons: [
+    'поганий стан',
+    'неповна комплектація',
+    'на запчастини / не працює',
+    'сліди ремонту',
+    'уцінка / дефект',
+    'без торгу',
+    'відсутні документи',
+  ],
+  pros: [
+    'відмінний стан',
+    'повна комплектація',
+    'на гарантії',
+    'документи в наявності',
+    'без слідів використання',
+    'можливий торг',
+    'нове / як нове',
+  ],
+};
+
+/** «Сигнальні» токени — описи з ними інформативніші для генерації критеріїв. */
+export const SIGNAL_TOKENS = [
+  'стан',
+  'ремонт',
+  'запчастини',
+  'не працює',
+  'дефект',
+  'торг',
+  'гарант',
+  'комплект',
+  'документ',
+  'новий',
+  'подряпин',
+  'тріщин',
+];
+
+// ── Повідомлення про помилки (повторювані в routes/analysis.ts) ────────────────
+export const ANALYSIS_ERRORS = {
+  SEARCH_NOT_FOUND: 'Пошук не знайдено',
+  BAD_MODE: 'mode має бути cons|pros',
+  NO_API_KEY: 'Авто-режим недоступний: немає OPENROUTER_API_KEY',
+  NO_CRITERIA: 'Спершу збережіть критерії пошуку',
+  EMPTY_RESPONSE: 'Порожня відповідь',
+} as const;

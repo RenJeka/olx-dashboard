@@ -1,6 +1,7 @@
 import { Mark } from '@chakra-ui/react';
 import { Fragment } from 'react';
 import { escapeRegExp } from '../../utils/text';
+import { HIGHLIGHT_MULTI_MIN_LENGTH, HIGHLIGHT_SINGLE_MIN_LENGTH } from '../../constants';
 
 interface Props {
   text: string;
@@ -14,9 +15,10 @@ interface Props {
  * Фрагменти коротші за 3 символи ігноруються (захист від шуму/порожніх evidence).
  */
 export function HighlightText({ text, query }: Props) {
+  const minLength = Array.isArray(query) ? HIGHLIGHT_MULTI_MIN_LENGTH : HIGHLIGHT_SINGLE_MIN_LENGTH;
   const needles = (Array.isArray(query) ? query : [query])
     .map((q) => q.trim())
-    .filter((q) => q.length >= (Array.isArray(query) ? 3 : 1));
+    .filter((q) => q.length >= minLength);
   if (needles.length === 0) return <>{text}</>;
 
   const lower = new Set(needles.map((n) => n.toLowerCase()));

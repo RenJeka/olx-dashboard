@@ -1,9 +1,21 @@
 import type { VisibilityState } from '@tanstack/react-table';
 import type { StoredTableState } from '../types';
+import {
+  DEFAULT_ANALYSIS_MODEL,
+  DEFAULT_AUTO_REFRESH_INTERVAL_MIN,
+  DEFAULT_PAGE_SIZE,
+  SETTINGS_STORAGE_KEY,
+  TABLE_STORAGE_KEY,
+} from '../constants';
 
-export const SETTINGS_STORAGE_KEY = 'olx-ui-settings-v1';
-export const TABLE_STORAGE_KEY = 'olx-listings-table-v1';
-export const DEFAULT_PAGE_SIZE = 50;
+// Реекспорт для зворотної сумісності наявних імпортів зі storage.
+export {
+  DEFAULT_ANALYSIS_MODEL,
+  DEFAULT_AUTO_REFRESH_INTERVAL_MIN,
+  DEFAULT_PAGE_SIZE,
+  SETTINGS_STORAGE_KEY,
+  TABLE_STORAGE_KEY,
+};
 
 interface StoredSettings {
   columnVisibility?: VisibilityState;
@@ -17,10 +29,6 @@ interface StoredSettings {
   analysisReasoning?: boolean;
   analysisExtraCriteria?: string;
 }
-
-export const DEFAULT_ANALYSIS_MODEL = 'google/gemini-2.5-flash-lite';
-
-export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
 
 function loadSettings(): StoredSettings {
   try {

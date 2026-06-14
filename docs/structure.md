@@ -42,7 +42,8 @@ olx-dashboard/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
 │       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md)
-│       │   ├── config.ts     # server/.env (process.loadEnvFile) + константи (модель, чанки, поріг пакета)
+│       │   ├── constants.ts  # ЄДИНЕ джерело magic-значень (моделі, ліміти, чанки, мапи режиму, scaffold, повідомлення)
+│       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample — ЄДИНЕ джерело промптів
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
@@ -73,6 +74,7 @@ olx-dashboard/
         ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
         ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
         │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
+        ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
         ├── api/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/verify/scan-status, статуси/нотатки/масові
         │                      #   дії, filters/param-keys/stats; DTO-типи з web/src/types)

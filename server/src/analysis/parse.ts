@@ -1,7 +1,7 @@
 // Парсинг відповідей LLM (критерії + matching) + верифікація evidence.
 // Спільне для авто (OpenRouter) і ручного режиму (вставлений текст із чату).
 import type { AnalyzedListing, MatchedItem } from '../types.js';
-import { MAX_CRITERIA } from './config.js';
+import { MAX_CRITERIA } from './constants.js';
 import { evidenceConfirmed } from './text.js';
 
 /** Знімає ```json … ``` обгортку (ручні вставки часто з нею). */

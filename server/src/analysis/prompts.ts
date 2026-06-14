@@ -1,7 +1,18 @@
 // Єдине джерело промптів LLM-аналізу — спільне для авто (OpenRouter) і ручного режиму.
 // НЕ дублювати тексти промптів деінде.
 import type { AnalysisMode } from '../types.js';
-import { MAX_CRITERIA } from './config.js';
+import {
+  BASE_SCAFFOLD,
+  CRITERIA_DESC_SLICE,
+  DEFAULT_SAMPLE_SIZE,
+  MATCHING_DESC_SLICE,
+  MAX_CRITERIA,
+  MAX_PARAMS_IN_PROMPT,
+  MODE_NOUN,
+  SAMPLE_SCORE_LENGTH_CAP,
+  SAMPLE_SIGNAL_TOKEN_WEIGHT,
+  SIGNAL_TOKENS,
+} from './constants.js';
 import { stripHtml } from './text.js';
 
 /** Оголошення для matching (БЕЗ PII продавця). */
@@ -11,33 +22,6 @@ export interface PromptListing {
   description: string | null;
   params: string | null;
 }
-
-/** Базовий каркас критеріїв — зашитий, LLM доповнює специфічними для категорії. */
-const BASE_SCAFFOLD: Record<AnalysisMode, string[]> = {
-  cons: [
-    'поганий стан',
-    'неповна комплектація',
-    'на запчастини / не працює',
-    'сліди ремонту',
-    'уцінка / дефект',
-    'без торгу',
-    'відсутні документи',
-  ],
-  pros: [
-    'відмінний стан',
-    'повна комплектація',
-    'на гарантії',
-    'документи в наявності',
-    'без слідів використання',
-    'можливий торг',
-    'нове / як нове',
-  ],
-};
-
-const MODE_NOUN: Record<AnalysisMode, string> = {
-  cons: 'мінуси (недоліки) товару',
-  pros: 'плюси (переваги) товару',
-};
 
 /**
  * Промпт генерації критеріїв: базовий каркас + доповнення специфічними для категорії
@@ -51,7 +35,7 @@ export function buildCriteriaPrompt(
 ): string {
   const scaffold = BASE_SCAFFOLD[mode].map((c) => `- ${c}`).join('\n');
   const samples = sampleDescriptions
-    .map((d, i) => `[${i + 1}] ${stripHtml(d).slice(0, 800)}`)
+    .map((d, i) => `[${i + 1}] ${stripHtml(d).slice(0, CRITERIA_DESC_SLICE)}`)
     .join('\n\n');
 
   return [
@@ -91,7 +75,7 @@ export function buildMatchingPrompt(
   const items = listings
     .map((l) => {
       const params = parseParamsLabel(l.params);
-      const desc = stripHtml(l.description).slice(0, 1500) || '(опис відсутній)';
+      const desc = stripHtml(l.description).slice(0, MATCHING_DESC_SLICE) || '(опис відсутній)';
       return [
         `### id: ${l.id}`,
         `Назва: ${l.title ?? '—'}`,
@@ -129,39 +113,27 @@ function parseParamsLabel(params: string | null): string {
   if (!params) return '';
   try {
     const obj = JSON.parse(params) as Record<string, string>;
-    return Object.values(obj).filter(Boolean).slice(0, 12).join(', ');
+    return Object.values(obj).filter(Boolean).slice(0, MAX_PARAMS_IN_PROMPT).join(', ');
   } catch {
     return '';
   }
 }
 
-/** «Сигнальні» токени — описи з ними інформативніші для генерації критеріїв. */
-const SIGNAL_TOKENS = [
-  'стан',
-  'ремонт',
-  'запчастини',
-  'не працює',
-  'дефект',
-  'торг',
-  'гарант',
-  'комплект',
-  'документ',
-  'новий',
-  'подряпин',
-  'тріщин',
-];
-
 /**
  * Семпл описів для генерації критеріїв: зважено за довжиною + наявністю сигнальних
  * токенів, топ-k. Вхід — рядки оголошень з description.
  */
-export function pickSample<T extends { description: string | null }>(listings: T[], k = 30): T[] {
+export function pickSample<T extends { description: string | null }>(
+  listings: T[],
+  k = DEFAULT_SAMPLE_SIZE,
+): T[] {
   const scored = listings
     .filter((l) => l.description)
     .map((l) => {
       const text = stripHtml(l.description).toLowerCase();
       const signalHits = SIGNAL_TOKENS.reduce((acc, tok) => (text.includes(tok) ? acc + 1 : acc), 0);
-      const score = Math.min(text.length, 1500) + signalHits * 300;
+      const score =
+        Math.min(text.length, SAMPLE_SCORE_LENGTH_CAP) + signalHits * SAMPLE_SIGNAL_TOKEN_WEIGHT;
       return { l, score };
     })
     .sort((a, b) => b.score - a.score);

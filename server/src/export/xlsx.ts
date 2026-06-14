@@ -3,6 +3,11 @@
 // (замість xlsx/SheetJS: невиправлені high-severity CVE + платна модель).
 import ExcelJS from 'exceljs';
 
+/** Дефолтна ширина колонки, якщо не задано явно. */
+const DEFAULT_COLUMN_WIDTH = 24;
+/** Кількість заморожених згори рядків (рядок заголовків). */
+const FROZEN_HEADER_ROWS = 1;
+
 export interface XlsxColumn {
   header: string;
   /** Ключ у рядку даних. */
@@ -25,11 +30,11 @@ export async function buildXlsxBuffer(
   sheet.columns = columns.map((c) => ({
     header: c.header,
     key: c.key,
-    width: c.width ?? 24,
+    width: c.width ?? DEFAULT_COLUMN_WIDTH,
   }));
 
   // Заморожуємо рядок заголовків.
-  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+  sheet.views = [{ state: 'frozen', ySplit: FROZEN_HEADER_ROWS }];
   sheet.getRow(1).font = { bold: true };
 
   for (const row of rows) {
