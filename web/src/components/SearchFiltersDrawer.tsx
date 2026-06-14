@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, HStack, IconButton, Input, NativeSelect, Stack, Tag, Text, Wrap } from '@chakra-ui/react';
-import { LuPlus, LuTrash2 } from 'react-icons/lu';
+import { HStack, Input, NativeSelect, Stack, Tag, Text, Wrap, Button } from '@chakra-ui/react';
 import {
   DrawerBackdrop,
   DrawerBody,
@@ -12,19 +11,13 @@ import {
   DrawerTitle,
 } from './ui/drawer';
 import { toaster } from './ui/toaster';
-import { useParamKeys, useUpdateSearchFilters } from '../api/client';
+import { useFilterOptions, useUpdateSearchFilters } from '../api/client';
 import type { LocalFilters, Search } from '../types';
 
 interface Props {
   search: Search;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface RangeRow {
-  key: string;
-  min: string;
-  max: string;
 }
 
 function parseLocalFilters(raw: string): LocalFilters {
@@ -35,70 +28,55 @@ function parseLocalFilters(raw: string): LocalFilters {
   }
 }
 
-/** Drawer редактора локальних фільтрів пошуку: стоп-слова + числові діапазони по params. */
+/** Drawer редактора локальних фільтрів пошуку: ціна / місто / продавець. */
 export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
-  const { data: paramKeys } = useParamKeys(search.id, open);
+  const { data: filterOptions } = useFilterOptions(search.id, open);
   const updateFilters = useUpdateSearchFilters();
 
-  const [keywords, setKeywords] = useState<string[]>([]);
-  const [newKeyword, setNewKeyword] = useState('');
-  const [ranges, setRanges] = useState<RangeRow[]>([]);
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [cities, setCities] = useState<string[]>([]);
+  const [sellers, setSellers] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
     const filters = parseLocalFilters(search.local_filters);
-    setKeywords(filters.exclude_keywords ?? []);
-    setRanges(
-      Object.entries(filters.ranges ?? {}).map(([key, range]) => ({
-        key,
-        min: range.min != null ? String(range.min) : '',
-        max: range.max != null ? String(range.max) : '',
-      })),
-    );
-    setNewKeyword('');
+    setPriceMin(filters.price_range?.min != null ? String(filters.price_range.min) : '');
+    setPriceMax(filters.price_range?.max != null ? String(filters.price_range.max) : '');
+    setCities(filters.cities ?? []);
+    setSellers(filters.sellers ?? []);
   }, [open, search.local_filters]);
 
-  function addKeyword() {
-    const value = newKeyword.trim();
-    if (!value || keywords.includes(value)) {
-      setNewKeyword('');
-      return;
-    }
-    setKeywords((prev) => [...prev, value]);
-    setNewKeyword('');
+  function addCity(city: string) {
+    if (!city || cities.includes(city)) return;
+    setCities((prev) => [...prev, city]);
   }
 
-  function removeKeyword(value: string) {
-    setKeywords((prev) => prev.filter((kw) => kw !== value));
+  function removeCity(city: string) {
+    setCities((prev) => prev.filter((c) => c !== city));
   }
 
-  function addRange() {
-    const usedKeys = new Set(ranges.map((r) => r.key));
-    const nextKey = paramKeys?.find((p) => !usedKeys.has(p.key))?.key ?? paramKeys?.[0]?.key ?? '';
-    setRanges((prev) => [...prev, { key: nextKey, min: '', max: '' }]);
+  function addSeller(seller: string) {
+    if (!seller || sellers.includes(seller)) return;
+    setSellers((prev) => [...prev, seller]);
   }
 
-  function updateRange(index: number, patch: Partial<RangeRow>) {
-    setRanges((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
-  }
-
-  function removeRange(index: number) {
-    setRanges((prev) => prev.filter((_, i) => i !== index));
+  function removeSeller(seller: string) {
+    setSellers((prev) => prev.filter((s) => s !== seller));
   }
 
   function handleSave() {
     const local_filters: LocalFilters = {};
-    if (keywords.length > 0) local_filters.exclude_keywords = keywords;
 
-    const rangeEntries: Record<string, { min?: number; max?: number }> = {};
-    for (const row of ranges) {
-      if (!row.key) continue;
-      const range: { min?: number; max?: number } = {};
-      if (row.min.trim() !== '') range.min = Number(row.min);
-      if (row.max.trim() !== '') range.max = Number(row.max);
-      if (range.min !== undefined || range.max !== undefined) rangeEntries[row.key] = range;
+    const priceRange: { min?: number; max?: number } = {};
+    if (priceMin.trim() !== '') priceRange.min = Number(priceMin);
+    if (priceMax.trim() !== '') priceRange.max = Number(priceMax);
+    if (priceRange.min !== undefined || priceRange.max !== undefined) {
+      local_filters.price_range = priceRange;
     }
-    if (Object.keys(rangeEntries).length > 0) local_filters.ranges = rangeEntries;
+
+    if (cities.length > 0) local_filters.cities = cities;
+    if (sellers.length > 0) local_filters.sellers = sellers;
 
     updateFilters.mutate(
       { searchId: search.id, local_filters },
@@ -130,90 +108,102 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
         <DrawerBody>
           <Stack gap={6}>
             <Stack gap={2}>
-              <Text fontWeight="medium">Стоп-слова</Text>
+              <Text fontWeight="medium">Діапазон цін</Text>
               <Text textStyle="xs" color="fg.muted">
-                Оголошення, де назва або опис містять одне зі слів — будуть приховані.
+                Оголошення з ціною поза межами діапазону — будуть приховані. Оголошення без
+                ціни цим правилом не приховуються.
+              </Text>
+              <HStack gap={2}>
+                <Input
+                  size="sm"
+                  w="120px"
+                  placeholder="мін"
+                  inputMode="decimal"
+                  value={priceMin}
+                  onChange={(e) => setPriceMin(e.target.value)}
+                />
+                <Input
+                  size="sm"
+                  w="120px"
+                  placeholder="макс"
+                  inputMode="decimal"
+                  value={priceMax}
+                  onChange={(e) => setPriceMax(e.target.value)}
+                />
+              </HStack>
+            </Stack>
+
+            <Stack gap={2}>
+              <Text fontWeight="medium">Місто</Text>
+              <Text textStyle="xs" color="fg.muted">
+                Якщо обрано хоча б одне місто — показуються лише оголошення з цих міст.
               </Text>
               <Wrap gap={2}>
-                {keywords.map((kw) => (
-                  <Tag.Root key={kw} size="md">
-                    <Tag.Label>{kw}</Tag.Label>
+                {cities.map((city) => (
+                  <Tag.Root key={city} size="md">
+                    <Tag.Label>{city}</Tag.Label>
                     <Tag.EndElement>
-                      <Tag.CloseTrigger onClick={() => removeKeyword(kw)} />
+                      <Tag.CloseTrigger onClick={() => removeCity(city)} />
                     </Tag.EndElement>
                   </Tag.Root>
                 ))}
               </Wrap>
-              <Input
-                size="sm"
-                placeholder="Додати слово і натиснути Enter"
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addKeyword();
-                  }
-                }}
-              />
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value=""
+                  onChange={(e) => {
+                    addCity(e.target.value);
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">Додати місто…</option>
+                  {filterOptions?.cities
+                    .filter((city) => !cities.includes(city))
+                    .map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             </Stack>
 
             <Stack gap={2}>
-              <Text fontWeight="medium">Діапазони параметрів</Text>
+              <Text fontWeight="medium">Продавець</Text>
               <Text textStyle="xs" color="fg.muted">
-                Оголошення, де значення параметра виходить за межі діапазону — будуть приховані.
+                Якщо обрано хоча б одного продавця — показуються лише оголошення цих
+                продавців.
               </Text>
-              <Stack gap={2}>
-                {ranges.map((row, index) => (
-                  <HStack key={index} gap={2}>
-                    <NativeSelect.Root size="sm" flex="1">
-                      <NativeSelect.Field
-                        value={row.key}
-                        onChange={(e) => updateRange(index, { key: e.target.value })}
-                      >
-                        {row.key && !paramKeys?.some((p) => p.key === row.key) && (
-                          <option value={row.key}>{row.key}</option>
-                        )}
-                        {paramKeys?.map((p) => (
-                          <option key={p.key} value={p.key}>
-                            {p.key}
-                            {p.samples[0] ? ` (напр. ${p.samples[0]})` : ''}
-                          </option>
-                        ))}
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                    <Input
-                      size="sm"
-                      w="90px"
-                      placeholder="мін"
-                      inputMode="decimal"
-                      value={row.min}
-                      onChange={(e) => updateRange(index, { min: e.target.value })}
-                    />
-                    <Input
-                      size="sm"
-                      w="90px"
-                      placeholder="макс"
-                      inputMode="decimal"
-                      value={row.max}
-                      onChange={(e) => updateRange(index, { max: e.target.value })}
-                    />
-                    <IconButton
-                      aria-label="Видалити правило"
-                      size="sm"
-                      variant="ghost"
-                      colorPalette="red"
-                      onClick={() => removeRange(index)}
-                    >
-                      <LuTrash2 />
-                    </IconButton>
-                  </HStack>
+              <Wrap gap={2}>
+                {sellers.map((seller) => (
+                  <Tag.Root key={seller} size="md">
+                    <Tag.Label>{seller}</Tag.Label>
+                    <Tag.EndElement>
+                      <Tag.CloseTrigger onClick={() => removeSeller(seller)} />
+                    </Tag.EndElement>
+                  </Tag.Root>
                 ))}
-              </Stack>
-              <Button size="sm" variant="outline" onClick={addRange}>
-                <LuPlus /> Додати правило
-              </Button>
+              </Wrap>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value=""
+                  onChange={(e) => {
+                    addSeller(e.target.value);
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">Додати продавця…</option>
+                  {filterOptions?.sellers
+                    .filter((seller) => !sellers.includes(seller))
+                    .map((seller) => (
+                      <option key={seller} value={seller}>
+                        {seller}
+                      </option>
+                    ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             </Stack>
           </Stack>
         </DrawerBody>
