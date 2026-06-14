@@ -180,8 +180,14 @@ export function useUpdateListing() {
     onError: (_err, _vars, context) => {
       if (context) qc.setQueryData(context.queryKey, context.previous);
     },
-    onSettled: (_data, _err, { searchId }) => {
-      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+    // Точкове оновлення кешу відповіддю сервера (авторитетні поля: status_source,
+    // miss_count тощо) БЕЗ invalidate — інакше повний рефетч списку «перевантажує»
+    // таблицю й скидає позицію скролу/порядок рядків. Рядок оновлюється на місці,
+    // тому сортування та позиція користувача зберігаються.
+    onSuccess: (updated, { id, searchId }) => {
+      qc.setQueryData<Listing[]>(['listings', searchId], (old) =>
+        old?.map((listing) => (listing.id === id ? updated : listing)),
+      );
     },
   });
 }
