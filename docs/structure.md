@@ -28,7 +28,7 @@ olx-dashboard/
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
-│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio
+│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
 │   ├── data/
 │   │   └── olx.db            # SQLite (gitignored, створюється при старті)
@@ -41,13 +41,13 @@ olx-dashboard/
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
 │       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
-│       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md)
-│       │   ├── constants.ts  # ЄДИНЕ джерело magic-значень (моделі, ліміти, чанки, мапи режиму, scaffold, повідомлення)
+│       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
+│       │   ├── constants.ts  # ЄДИНЕ джерело magic-значень (моделі, ліміти, чанки (AUTO_CHUNK_SIZE/MANUAL_ZIP_CHUNK_SIZE), мапи режиму, scaffold, повідомлення, MIME_ZIP)
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
-│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample — ЄДИНЕ джерело промптів
+│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings — ЄДИНЕ джерело промптів
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
-│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/estimateTokens
+│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed
 │       ├── export/
 │       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
 │       ├── scraper/
@@ -62,7 +62,7 @@ olx-dashboard/
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + stats + PATCH (filters)
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
-│           └── analysis.ts   # LLM-аналіз: /analysis/status, criteria (generate/prompt/import/PUT), analyze (auto/package/import), commit, export
+│           └── analysis.ts   # LLM-аналіз: /analysis/status, criteria (generate/prompt/import/PUT), analyze (auto/package.zip/import), commit, export
 │
 └── web/                      # workspace "web" (React + Vite), type: module
     ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
@@ -81,9 +81,9 @@ olx-dashboard/
         ├── components/
         │   ├── Searches.tsx      # бічна панель (акордеон пошуків), сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
-        │   ├── analysis/        # майстер LLM-аналізу (план docs/plans/llm-analysis.md)
-        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка), режим cons/pros, обсяг вибрані/весь
-        │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт + вставити відповідь)
+        │   ├── analysis/        # майстер LLM-аналізу (плани docs/plans/llm-analysis.md, docs/plans/analysis-wizard-review-rework.md)
+        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка), режим cons/pros, обсяг вибрані/весь; крок 2 (ручний) — ZIP-пакет; крок 3 — таблиця з фільтром/toggle/evidence
+        │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
