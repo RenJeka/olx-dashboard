@@ -3,13 +3,13 @@ import {
   Badge,
   Box,
   Button,
-  Flex,
   HStack,
   IconButton,
   Image,
   Input,
   Progress,
   Stack,
+  Table,
   Text,
   Wrap,
 } from '@chakra-ui/react';
@@ -34,8 +34,11 @@ import {
   DialogTrigger,
 } from '../ui/dialog';
 import { ConfirmActionDialog } from '../ConfirmActionDialog';
+import { DescriptionDialog } from '../DescriptionDialog';
 import { ManualAssistant } from './ManualAssistant';
+import { DescriptionTooltip } from '../table/DescriptionTooltip';
 import { HighlightText } from '../table/HighlightText';
+import { Tooltip } from '../ui/tooltip';
 import { toaster } from '../ui/toaster';
 import {
   useAnalysisStatus,
@@ -66,7 +69,7 @@ import {
   MANUAL_MODEL,
   MODE_LABELS,
 } from '../../constants';
-import type { AnalysisMode, AnalyzedListing, Listing, PackagePart, Search } from '../../types';
+import type { AnalysisMode, AnalyzedListing, Listing, MatchedItem, PackagePart, Search } from '../../types';
 
 interface Props {
   search: Search;
@@ -98,6 +101,10 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const [zipDownloading, setZipDownloading] = useState(false);
   const [accumulated, setAccumulated] = useState<AnalyzedListing[]>([]);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Крок 3
+  const [includedOverrides, setIncludedOverrides] = useState<Map<string, boolean>>(new Map());
+  const [openDescriptionListing, setOpenDescriptionListing] = useState<Listing | null>(null);
 
   // Крок 4
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
@@ -140,6 +147,8 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     setZipDownloading(false);
     setAnalyzeProgress(null);
     setCommitProgress(null);
+    setIncludedOverrides(new Map());
+    setOpenDescriptionListing(null);
   }
 
   function mergeCriteria(incoming: string[]) {
@@ -328,14 +337,38 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     );
   }
 
-  // Елементи для запису: criterion з ok=true.
+  // Ключ ручного toggle-override для пари (оголошення, критерій).
+  function criterionKey(id: number, criterion: string): string {
+    return `${id}:${criterion.toLowerCase()}`;
+  }
+
+  /** Чи включений критерій у результат: ручний override, або `item.ok` за замовчуванням. */
+  function isIncluded(id: number, item: MatchedItem): boolean {
+    return includedOverrides.get(criterionKey(id, item.criterion)) ?? item.ok;
+  }
+
+  function toggleIncluded(id: number, item: MatchedItem) {
+    const key = criterionKey(id, item.criterion);
+    setIncludedOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(key, !isIncluded(id, item));
+      return next;
+    });
+  }
+
+  // Рядки з результатами (приховуємо ті, де LLM нічого не знайшов).
+  const visibleRows = useMemo(() => accumulated.filter((r) => r.items.length > 0), [accumulated]);
+  const hiddenCount = accumulated.length - visibleRows.length;
+
+  // Елементи для запису: включені критерії (ручний toggle або item.ok за замовчуванням).
   const commitItems = useMemo(
     () =>
       accumulated.map((r) => ({
         id: r.id,
-        criteria: r.items.filter((it) => it.ok).map((it) => it.criterion),
+        criteria: r.items.filter((it) => isIncluded(r.id, it)).map((it) => it.criterion),
       })),
-    [accumulated],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [accumulated, includedOverrides],
   );
 
   const overwriteCount = useMemo(() => {
@@ -393,7 +426,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       return {
         title: l?.title ?? '',
         description: l?.description ?? '',
-        criteria: r.items.filter((it) => it.ok).map((it) => it.criterion),
+        criteria: r.items.filter((it) => isIncluded(r.id, it)).map((it) => it.criterion),
       };
     });
     try {
@@ -623,10 +656,16 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
 
           {step === 3 && (
             <Stack gap={4}>
-              <HStack justify="space-between">
-                <Text textStyle="sm" color="fg.muted">
-                  Перевір знайдені {modeLabel.toLowerCase()}. Закреслені пункти — evidence не підтверджено в описі.
-                </Text>
+              <HStack justify="space-between" wrap="wrap" gap={2}>
+                <Stack gap={0}>
+                  <Text textStyle="sm" color="fg.muted">
+                    Перевір знайдені {modeLabel.toLowerCase()}. Клікни на тег, щоб включити/виключити з результату.
+                  </Text>
+                  <Text textStyle="xs" color="fg.subtle">
+                    Показано {visibleRows.length} із {accumulated.length}
+                    {hiddenCount > 0 && ` (приховано ${hiddenCount} без результатів)`}
+                  </Text>
+                </Stack>
                 <HStack gap={2}>
                   <Button size="xs" variant="outline" onClick={() => handleExport('xlsx')}>
                     <LuFileSpreadsheet /> Excel
@@ -637,48 +676,86 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </HStack>
               </HStack>
 
-              <Stack gap={3} maxH="50vh" overflowY="auto">
-                {accumulated.map((r) => {
-                  const l = listingById.get(r.id);
-                  const desc = stripDescriptionHtml(l?.description ?? null);
-                  const okItems = r.items.filter((it) => it.ok);
-                  const droppedItems = r.items.filter((it) => !it.ok);
-                  return (
-                    <Flex key={r.id} gap={3} p={3} borderWidth="1px" borderColor="border.subtle" rounded="md">
-                      {l?.photo_url ? (
-                        <Image src={l.photo_url} alt="" boxSize={14} rounded="md" objectFit="cover" flexShrink={0} />
-                      ) : (
-                        <Box boxSize={14} rounded="md" bg="bg.muted" flexShrink={0} />
-                      )}
-                      <Stack gap={1} flex="1" minW={0}>
-                        <Text fontWeight="semibold" lineClamp={1}>
-                          {l?.title ?? `#${r.id}`}
-                        </Text>
-                        <Text textStyle="xs" color="fg.muted" lineClamp={3} whiteSpace="pre-line">
-                          <HighlightText text={desc} query={okItems.map((it) => it.evidence)} />
-                        </Text>
-                        <Wrap gap={1} mt={1}>
-                          {okItems.map((it, i) => (
-                            <Badge key={`ok-${i}`} colorPalette={mode === 'cons' ? 'red' : 'green'} variant="subtle">
-                              {it.criterion}
-                            </Badge>
-                          ))}
-                          {droppedItems.map((it, i) => (
-                            <Badge key={`drop-${i}`} colorPalette="gray" variant="outline" textDecoration="line-through">
-                              {it.criterion}
-                            </Badge>
-                          ))}
-                          {r.items.length === 0 && (
-                            <Text textStyle="xs" color="fg.subtle">
-                              нічого не знайдено
-                            </Text>
-                          )}
-                        </Wrap>
-                      </Stack>
-                    </Flex>
-                  );
-                })}
-              </Stack>
+              <Box maxH="50vh" overflowY="auto" borderWidth="1px" borderColor="border.subtle" rounded="md">
+                <Table.Root size="sm" css={{ tableLayout: 'fixed' }}>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="220px">
+                        Оголошення
+                      </Table.ColumnHeader>
+                      <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="50%">
+                        Опис
+                      </Table.ColumnHeader>
+                      <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg">
+                        {modeLabel}
+                      </Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {visibleRows.map((r) => {
+                      const l = listingById.get(r.id);
+                      const desc = stripDescriptionHtml(l?.description ?? null);
+                      const includedEvidence = r.items
+                        .filter((it) => isIncluded(r.id, it))
+                        .map((it) => it.evidence);
+                      return (
+                        <Table.Row key={r.id}>
+                          <Table.Cell verticalAlign="top">
+                            <HStack gap={2} align="start">
+                              {l?.photo_url ? (
+                                <Image src={l.photo_url} alt="" boxSize={12} rounded="md" objectFit="cover" flexShrink={0} />
+                              ) : (
+                                <Box boxSize={12} rounded="md" bg="bg.muted" flexShrink={0} />
+                              )}
+                              <Text fontWeight="semibold" fontSize="sm" lineClamp={2}>
+                                {l?.title ?? `#${r.id}`}
+                              </Text>
+                            </HStack>
+                          </Table.Cell>
+                          <Table.Cell verticalAlign="top" whiteSpace="normal">
+                            <DescriptionTooltip
+                              description={l?.description ?? null}
+                              query={includedEvidence}
+                              onClick={() => l && setOpenDescriptionListing(l)}
+                            >
+                              <Text textStyle="xs" color="fg.muted" lineClamp={3} whiteSpace="pre-line">
+                                <HighlightText text={desc} query={includedEvidence} />
+                              </Text>
+                            </DescriptionTooltip>
+                          </Table.Cell>
+                          <Table.Cell verticalAlign="top">
+                            <Wrap gap={1}>
+                              {r.items.map((it, i) => {
+                                const included = isIncluded(r.id, it);
+                                return (
+                                  <Tooltip key={i} content={it.evidence} disabled={!it.evidence}>
+                                    <Badge
+                                      colorPalette={included ? (mode === 'cons' ? 'red' : 'green') : 'gray'}
+                                      variant={included ? 'subtle' : 'outline'}
+                                      textDecoration={included ? undefined : 'line-through'}
+                                      borderWidth={it.ok ? undefined : '1px'}
+                                      borderStyle={it.ok ? undefined : 'dashed'}
+                                      cursor="pointer"
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => toggleIncluded(r.id, it)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') toggleIncluded(r.id, it);
+                                      }}
+                                    >
+                                      {it.criterion}
+                                    </Badge>
+                                  </Tooltip>
+                                );
+                              })}
+                            </Wrap>
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })}
+                  </Table.Body>
+                </Table.Root>
+              </Box>
 
               <HStack justify="space-between">
                 <Button variant="ghost" onClick={() => setStep(2)}>
@@ -739,6 +816,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
         confirmLabel="Перезаписати"
         onConfirm={() => void doCommit()}
       />
+      <DescriptionDialog listing={openDescriptionListing} onClose={() => setOpenDescriptionListing(null)} />
     </DialogRoot>
   );
 }
