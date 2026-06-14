@@ -96,6 +96,10 @@ export function ListingsTable({
       rowSelection,
     },
     getRowId: (row) => String(row.id),
+    // Не скидати сторінку/сортування при зміні data (інлайн-едіт нотатки/плюсів/
+    // мінусів/статусу оновлює масив через .map) — інакше TanStack автоматично
+    // повертає на 1-шу сторінку й користувач втрачає позицію.
+    autoResetPageIndex: false,
     enableRowSelection: true,
     onRowSelectionChange: onRowSelectionChange,
     onSortingChange: setSorting,
