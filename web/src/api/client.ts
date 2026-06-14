@@ -9,7 +9,7 @@ import type {
   Listing,
   ListingPatch,
   LocalFilters,
-  ParamKeyInfo,
+  FilterOptions,
   ScanResult,
   ScanStatus,
   SearchPatchResult,
@@ -187,10 +187,20 @@ export function useUpdateListing() {
 }
 
 /** Розподіл ключів params цього пошуку — для дропдауна конструктора діапазонів. */
-export function useParamKeys(searchId: number, enabled: boolean) {
+// ── Заплановано на майбутнє (закомментовано разом з UI діапазонів params) ────
+// export function useParamKeys(searchId: number, enabled: boolean) {
+//   return useQuery({
+//     queryKey: ['param-keys', searchId],
+//     queryFn: () => api<ParamKeyInfo[]>(`/api/searches/${searchId}/param-keys`),
+//     enabled,
+//   });
+// }
+
+/** Варіанти для фільтрів "Місто"/"Продавець" у Drawer локальних фільтрів. */
+export function useFilterOptions(searchId: number, enabled: boolean) {
   return useQuery({
-    queryKey: ['param-keys', searchId],
-    queryFn: () => api<ParamKeyInfo[]>(`/api/searches/${searchId}/param-keys`),
+    queryKey: ['filter-options', searchId],
+    queryFn: () => api<FilterOptions>(`/api/searches/${searchId}/filter-options`),
     enabled,
   });
 }

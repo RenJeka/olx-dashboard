@@ -46,7 +46,7 @@ function parseLocationDate(raw?: string): {
 const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
 const searchLocalFiltersStmt = db.prepare('SELECT local_filters FROM searches WHERE id = ?');
 const selectForFilterStmt = db.prepare(
-  'SELECT id, title, description, params FROM listings WHERE olx_id = ?',
+  'SELECT id, title, description, params, price, city, seller_name FROM listings WHERE olx_id = ?',
 );
 const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
 
@@ -213,7 +213,15 @@ export function upsertListings(
       });
 
       const persisted = selectForFilterStmt.get(item.olxId) as
-        | { id: number; title: string | null; description: string | null; params: string | null }
+        | {
+            id: number;
+            title: string | null;
+            description: string | null;
+            params: string | null;
+            price: number | null;
+            city: string | null;
+            seller_name: string | null;
+          }
         | undefined;
       if (persisted) {
         const filteredOut = evaluateFilteredOut(localFilters, persisted);

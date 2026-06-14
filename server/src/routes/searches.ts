@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
 import { runScan, runVerify, countVerifyCandidates } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
-import type { LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
+import type { FilterOptions, LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
 
 interface SearchBody {
   name?: string;
@@ -133,8 +133,16 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const listingRows = db
-        .prepare('SELECT id, title, description, params FROM listings WHERE search_id = ?')
-        .all(id) as { id: number; title: string | null; description: string | null; params: string | null }[];
+        .prepare('SELECT id, title, description, params, price, city, seller_name FROM listings WHERE search_id = ?')
+        .all(id) as {
+          id: number;
+          title: string | null;
+          description: string | null;
+          params: string | null;
+          price: number | null;
+          city: string | null;
+          seller_name: string | null;
+        }[];
 
       const updateFilteredOut = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
       const recompute = db.transaction((rows: typeof listingRows) => {
@@ -291,6 +299,29 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       .map(([key, samples]) => ({ key, samples }))
       .sort((a, b) => a.key.localeCompare(b.key));
 
+    return result;
+  });
+
+  // Варіанти для фільтрів "Місто"/"Продавець" (Drawer локальних фільтрів).
+  app.get<{ Params: { id: string } }>('/api/searches/:id/filter-options', async (req) => {
+    const id = Number(req.params.id);
+
+    const cityRows = db
+      .prepare(
+        "SELECT DISTINCT city FROM listings WHERE search_id = ? AND city IS NOT NULL AND city != '' ORDER BY city ASC",
+      )
+      .all(id) as { city: string }[];
+
+    const sellerRows = db
+      .prepare(
+        "SELECT DISTINCT seller_name FROM listings WHERE search_id = ? AND seller_name IS NOT NULL AND seller_name != '' ORDER BY seller_name ASC",
+      )
+      .all(id) as { seller_name: string }[];
+
+    const result: FilterOptions = {
+      cities: cityRows.map((r) => r.city),
+      sellers: sellerRows.map((r) => r.seller_name),
+    };
     return result;
   });
 

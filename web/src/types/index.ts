@@ -11,16 +11,30 @@ export interface Search {
   created_at: string;
 }
 
-/** Локальні (нерайонні) фільтри пошуку: стоп-слова й числові діапазони по params (Етап 2). */
+/** Локальні (нерайонні) фільтри пошуку: ціна/місто/продавець (Етап 2). */
 export interface LocalFilters {
-  exclude_keywords?: string[];
-  ranges?: Record<string, { min?: number; max?: number }>;
+  // ── Заплановано на майбутнє (закомментовано, не видаляти) ──────────────
+  // exclude_keywords?: string[];
+  // ranges?: Record<string, { min?: number; max?: number }>;
+
+  /** Діапазон ціни (UAH). price = null у оголошення → правило не застосовується. */
+  price_range?: { min?: number; max?: number };
+  /** Білий список міст (точна відповідність Listing.city). */
+  cities?: string[];
+  /** Білий список продавців (точна відповідність Listing.seller_name). */
+  sellers?: string[];
 }
 
 /** Розподіл ключів params цього пошуку (з GET /api/searches/:id/param-keys) — для конструктора діапазонів. */
 export interface ParamKeyInfo {
   key: string;
   samples: string[];
+}
+
+/** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець". */
+export interface FilterOptions {
+  cities: string[];
+  sellers: string[];
 }
 
 /** Відповідь PATCH /api/searches/:id при зміні local_filters — містить лічильник перерахунку. */
