@@ -230,6 +230,10 @@ flowchart LR
   пошуків (пауза 5–10с між ними), пропускаючи тік якщо вже триває скан
   (`queryClient.isMutating({mutationKey:['scan']})`). Toast на старті і підсумковий
   (`+N нових` або тихий «новин немає»). Глибокий скан/verify не запускає.
+- `hooks/useIsMobile.ts` — `useIsMobile()`: `useBreakpointValue({ base: true, md: false }) ??
+  false` — єдине джерело "мобільний/desktop" для умовного рендеру (size/layout
+  branching), напр. у `Searches.tsx` та `AnalysisWizardDialog.tsx`. Breakpoint —
+  Chakra default `md` (768px).
 - `components/table/` — ізольовані компоненти таблиці оголошень:
   - `HeaderLabel.tsx` — заголовок колонки з відповідною Lucide-іконкою.
   - `columns.tsx` — визначення колонок для TanStack Table (включно з display-колонкою
@@ -264,7 +268,7 @@ flowchart LR
   - `DescriptionTooltip.tsx` — інтерактивний тултіп з прокруткою для попереднього перегляду тексту опису. Клік по вмісту відкриває `DescriptionDialog`.
   - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
 - `App.tsx` — компоновка сторінки (Header, Searches sidebar, ListingsTable). Керує станом видимості бічної панелі (`searchesVisible`). `selectedId` може стати `null` (видалення активного пошуку) — тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin)` викликається тут.
-- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), кнопка згортання/розгортання бічної панелі, інформація про активний обраний пошук з підсвіткою, `SearchActionPanel` (кнопка виклику модального вікна) та `SettingsDrawer`).
+- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), кнопка згортання/розгортання бічної панелі, інформація про активний обраний пошук з підсвіткою, `SearchActionPanel` (кнопка виклику модального вікна) та `SettingsDrawer`). Responsive: зовнішній `HStack` з `wrap="wrap" rowGap={2}` (права група кнопок переноситься на новий рядок на вузьких екранах); текст «OLX Dashboard» прихований на `base` (іконка лишається); бейдж вибраного пошуку — `ml={{ base: 0, md: '80px' }}` з `lineClamp={1}`/`maxW={{ base: '40vw' }}`.
 - `components/DescriptionDialog.tsx` — модальне вікно повного опису оголошення (`DialogRoot
   size="lg" placement="center" scrollBehavior="inside"`): фото/назва/ціна/місто в хедері,
   повний текст опису (скрол) у тілі, «Відкрити на OLX» + «Закрити» у футері. Відкривається
@@ -283,7 +287,7 @@ flowchart LR
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
   для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. Кожен `SearchRow`:
+- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. На мобільному (`useIsMobile()`) той самий вміст рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом `visible`/`onVisibleChange` з `App.tsx`); вибір пошуку (`SearchRow`) на мобільному автоматично закриває drawer. На desktop — без змін (постійна панель `w="80"`). Кожен `SearchRow`:
   - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
     disabled на краях списку;
   - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Фільтри» (`LuFilter`, відкриває
@@ -311,13 +315,20 @@ flowchart LR
   `DialogBackdrop`) — використовується `DescriptionDialog`, `ConfirmActionDialog` і діалогом
   підтвердження видалення.
 - `components/analysis/` — майстер LLM-аналізу: `AnalysisWizardDialog.tsx` (`DialogRoot
-  size="xl"`, степер Критерії→Пошук→Перевірка→Вставка, перемикачі Мінуси/Плюси та
+  size={isMobile ? 'full' : 'xl'}` — на мобільному (`useIsMobile()`) діалог full-screen;
+  степер Критерії→Пошук→Перевірка→Вставка (`HStack wrap="wrap" rowGap={2}` — переноситься на
+  вузьких екранах), перемикачі Мінуси/Плюси та
   вибрані/весь пошук; крок 2 (ручний режим) — кнопка «Завантажити ZIP-пакет»
   (`fetchAnalyzePackageZip`, `prompt.txt` + `descriptions/chunk-NNN.json`), `ManualAssistant`
   без `parts` (`emptyHint` з підказкою прогнати ZIP через чат і вставити єдиний JSON); крок 3 —
-  таблиця (Chakra `Table.Root`, `tableLayout: 'fixed'`, скрол `maxH="50vh"`): фото+назва |
+  спільні рендер-фрагменти рядка (`renderPhotoTitle`/`renderDescriptionBlock`/
+  `renderCriteriaTags`, без дублювання логіки toggle/evidence) рендеряться або в
+  desktop-таблиці (Chakra `Table.Root`, `tableLayout: 'fixed'`, скрол `maxH="50vh"`), або —
+  на мобільному — як стек карток (`Stack maxH="60vh" overflowY="auto"`, кожна картка `Box
+  p={3} borderWidth="1px" rounded="md"` зі вмістом фото+назва → опис → теги): фото+назва |
   опис (`DescriptionTooltip`+`DescriptionDialog`, підсвітка `HighlightText` за evidence
-  включених критеріїв) | теги критеріїв (клік — toggle include/exclude через
+  включених критеріїв, `lineClamp` 3 на desktop / 4 на мобільному) | теги критеріїв (клік —
+  toggle include/exclude через
   `includedOverrides`, hover — tooltip з `evidence`, закреслення для виключених,
   пунктирна рамка для `!ok`); рядки без результатів (`items.length === 0`) приховані
   (лічильник «Показано N із M»); експорт Excel/JSON враховує toggle-стан; крок 4 — commit
