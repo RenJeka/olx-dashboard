@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, HStack, IconButton, Input, NativeSelect, Stack, Tag, Text, Wrap } from '@chakra-ui/react';
+import { Button, Flex, HStack, IconButton, Input, NativeSelect, Stack, Tag, Text, Wrap } from '@chakra-ui/react';
 import { LuPlus, LuTrash2 } from 'react-icons/lu';
 import {
   DrawerBackdrop,
@@ -165,8 +165,13 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               </Text>
               <Stack gap={2}>
                 {ranges.map((row, index) => (
-                  <HStack key={index} gap={2}>
-                    <NativeSelect.Root size="sm" flex="1">
+                  <Flex
+                    key={index}
+                    direction={{ base: 'column', sm: 'row' }}
+                    gap={2}
+                    align={{ base: 'stretch', sm: 'center' }}
+                  >
+                    <NativeSelect.Root size="sm" w={{ base: 'full', sm: 'auto' }} flex={{ sm: '1' }}>
                       <NativeSelect.Field
                         value={row.key}
                         onChange={(e) => updateRange(index, { key: e.target.value })}
@@ -183,32 +188,34 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
-                    <Input
-                      size="sm"
-                      w="90px"
-                      placeholder="мін"
-                      inputMode="decimal"
-                      value={row.min}
-                      onChange={(e) => updateRange(index, { min: e.target.value })}
-                    />
-                    <Input
-                      size="sm"
-                      w="90px"
-                      placeholder="макс"
-                      inputMode="decimal"
-                      value={row.max}
-                      onChange={(e) => updateRange(index, { max: e.target.value })}
-                    />
-                    <IconButton
-                      aria-label="Видалити правило"
-                      size="sm"
-                      variant="ghost"
-                      colorPalette="red"
-                      onClick={() => removeRange(index)}
-                    >
-                      <LuTrash2 />
-                    </IconButton>
-                  </HStack>
+                    <HStack gap={2}>
+                      <Input
+                        size="sm"
+                        w="90px"
+                        placeholder="мін"
+                        inputMode="decimal"
+                        value={row.min}
+                        onChange={(e) => updateRange(index, { min: e.target.value })}
+                      />
+                      <Input
+                        size="sm"
+                        w="90px"
+                        placeholder="макс"
+                        inputMode="decimal"
+                        value={row.max}
+                        onChange={(e) => updateRange(index, { max: e.target.value })}
+                      />
+                      <IconButton
+                        aria-label="Видалити правило"
+                        size="sm"
+                        variant="ghost"
+                        colorPalette="red"
+                        onClick={() => removeRange(index)}
+                      >
+                        <LuTrash2 />
+                      </IconButton>
+                    </HStack>
+                  </Flex>
                 ))}
               </Stack>
               <Button size="sm" variant="outline" onClick={addRange}>
