@@ -122,6 +122,8 @@ export interface ScanResult {
   new_count: number;
   requestsUsed: number;
   disabled_count: number;
+  /** Кількість цінових бакетів глибокого скану з авто-розбиттям (>1 — діапазон ділився). */
+  bucketsUsed?: number;
 }
 
 /** Результат verify-проходу (POST /api/searches/:id/verify, Етап 2 A3). */

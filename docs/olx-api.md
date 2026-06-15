@@ -294,6 +294,46 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - Результат скану (`ScanResult`/CLI-вивід) додатково містить `requestsUsed` —
   фактичну кількість виконаних запитів/сторінок.
 
+#### Розбиття по ціні (авто, всередині глибокого скану)
+
+Для пошуків із `visible_total_count > 1000` одне вікно пагінації **фізично не може**
+покрити всю видачу (~1040 верхніх оголошень — стеля). Глибокий скан тоді **автоматично**
+ділить ціновий діапазон на під-діапазони, кожен ≤ вікна, сканує кожен окремо й зливає в
+той самий пошук через дедуп `olxId` (`upsertListings`, `ON CONFLICT(olx_id)`). Реалізація —
+`graphqlOlxFetcher.ts`: `fetchSearchSplit` (оркестратор), `fetchPage` (один POST),
+`probeMaxPrice` (зондування верхньої межі). План — `docs/plans/price-range-split.md`.
+
+- **Тригер**: всередині наявної кнопки «Глибокий скан» (окремої кнопки немає). Скан робить
+  один зондувальний запит кореня; якщо `visible_total_count ≤ SPLIT_THRESHOLD (1000)` —
+  делегує звичайному `fetchSearch` (поведінка без змін). Інакше вмикає розбиття.
+- **Стратегія меж — адаптивна бісекція**: черга інтервалів, старт `[lo, hi]`. Для кожного —
+  `fetchPage` offset 0, читаємо `visible_total_count`; якщо `≤ SPLIT_THRESHOLD` (або ширина
+  `< MIN_PRICE_WIDTH=1`, або сягнуто `MAX_BUCKETS=40`) — це «лист»-бакет. Інакше ділимо на
+  `[a, mid]`/`[mid+1, b]`, `mid=⌊(a+b)/2⌋`. Стійко до нерівномірного розподілу цін.
+- **Нижня/верхня межа**: `lo = ranges.price.from ?? 0`; `hi = ranges.price.to`, а якщо `to`
+  не задано — `probeMaxPrice` (один запит, сортування за ціною спадно, бере макс. ціну
+  сторінки). **⚠️ Live-верифікація сортування за ціною не виконана** (мережа build-середовища
+  до OLX заблокована). Тому `probeMaxPrice` **самоперевіряється у рантаймі**: повертає число
+  лише якщо повернута сторінка реально впорядкована за ціною (non-increasing) — інакше (OLX
+  проігнорував `sort_by`, як ігнорує `order`) повертає `null`. Кандидати `sort_by`:
+  `filter_float_price:desc`, `price:desc`. Якщо `null` і `to` не задано → розбиття
+  вимикається: звичайний deep + `warning: "split skipped: no upper price bound"`
+  (UI-підказка — задати верхню межу ціни для повного покриття).
+- **Фаза скану листів**: для кожного бакета допагінація від offset 40 тим самим deep-патерном
+  (батчі по 3, паузи 3–6с між батчами й між бакетами), накопичення у спільний `Map<olxId>`.
+  Прогрес: під час бісекції `onProgress(done, 0)` (UI «Підготовка…»), далі
+  `onProgress(doneCumulative, totalEstimate)`.
+- **Глобальні запобіжники проти лавини запитів**: `MAX_BUCKETS=40`, `MAX_TOTAL_REQUESTS=200`.
+  При досягненні — бакет/скан завершується частковим (`warning: "...hit pagination/request
+  cap"`), без падіння.
+- **Вікно покриття НЕ запускається** для split-скану: union кількох діапазонів не
+  відсортований глобально за `last_refresh_time`, тож вісь `windowFloor` невалідна.
+  Реалізовано природно: `fetchSearchSplit` ставить `warning` (`"split: N price buckets;
+  coverage window skipped"`) → у `scanner.runScan` `partial=true` → `applyScanStatuses`
+  пропускається. Виродждений випадок (один бакет, без розбиття) — coverage працює як зараз.
+- Результат містить `bucketsUsed` (кількість листів-бакетів; `>1` — було розбиття) у
+  `FetchSearchResult`/`ScanResult` (для toast/звіту).
+
 > ⚠️ **Не плутати з `/api/searches/:id/listings`.** Ліміт «≤3 запити» вище — це
 > ввічливість стосовно **OLX.ua** під час *збору* (`GraphqlOlxFetcher`/`HtmlOlxFetcher`,
 > ≤120 сирих оголошень за скан). Наш власний `GET /api/searches/:id/listings`
@@ -477,3 +517,4 @@ DOM-селектори простіші й достатні).
 | 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |
 | 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/verify-pass.md` |
 | 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/coverage-window-fix.md` |
+| 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/price-range-split.md`, §2.9 |

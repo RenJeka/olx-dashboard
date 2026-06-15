@@ -51,16 +51,16 @@ OLX GraphQL має жорстке **вікно пагінації**: `offset ≤
 
 ### A1. `server/src/scraper/graphqlOlxFetcher.ts` — рефактор + новий оркестратор
 
-- [ ] Винести приватний `fetchPage(search, offset, referer)` → `{ items, visibleTotalCount,
+- [x] Винести приватний `fetchPage(search, offset, referer)` → `{ items, visibleTotalCount,
   listingError }` (один POST). Переписати наявний `fetchSearch` так, щоб він використовував
   `fetchPage` (поведінка без змін — регресій бути не повинно).
-- [ ] Нові константи: `SPLIT_THRESHOLD = MAX_OFFSET` (1000 — поріг, за яким бакет ще ділиться);
+- [x] Нові константи: `SPLIT_THRESHOLD = MAX_OFFSET` (1000 — поріг, за яким бакет ще ділиться);
   `MIN_PRICE_WIDTH = 1` (далі ділити нікуди); `MAX_BUCKETS = 40`, `MAX_TOTAL_REQUESTS = 200`
   (глобальні запобіжники проти лавини запитів).
-- [ ] `probeMaxPrice(search)`: один запит, сортування за ціною спадно, `limit 1` → ціна
+- [x] `probeMaxPrice(search)`: один запит, сортування за ціною спадно, `limit 1` → ціна
   верхнього. **Спершу верифікувати live**, що OLX приймає такий `sort_by`. Fallback, якщо ні:
   повернути `null` → оркестратор переходить у режим «вимагати явну `to`».
-- [ ] `fetchSearchSplit(search, options)` — оркестратор глибокого скану з розбиттям:
+- [x] `fetchSearchSplit(search, options)` — оркестратор глибокого скану з розбиттям:
   1. Визначити `lo = ranges.price.from ?? 0`, `hi = ranges.price.to ?? probeMaxPrice(search)`.
      Якщо `hi == null` (probe не спрацював і `to` не задано) → виконати **звичайний** глибокий
      `fetchSearch` (один діапазон) + `warning = 'split skipped: no upper price bound'`.
@@ -80,9 +80,9 @@ OLX GraphQL має жорстке **вікно пагінації**: `offset ≤
 
 ### A2. `server/src/scanner.ts`
 
-- [ ] `fetchWithFallback`: у deep-гілці GraphQL викликати `fetchSearchSplit` замість `fetchSearch`
+- [x] `fetchWithFallback`: у deep-гілці GraphQL викликати `fetchSearchSplit` замість `fetchSearch`
   (HTML-fallback лишається без розбиття — у нього немає `visible_total_count`).
-- [ ] **Вікно покриття:** для скану з розбиттям (бакетів > 1) `applyScanStatuses` **НЕ запускати** —
+- [x] **Вікно покриття:** для скану з розбиттям (бакетів > 1) `applyScanStatuses` **НЕ запускати** —
   вісь `windowFloor` (last_refresh_at останнього елемента) невалідна для об'єднання кількох
   діапазонів (union не відсортований глобально за refresh). Реалізується природно: оркестратор
   ставить `warning` → у `runScan` `partial=true` → наявна умова `usedGraphql && !partial`
@@ -90,37 +90,37 @@ OLX GraphQL має жорстке **вікно пагінації**: `offset ≤
 
 ### A3. `server/src/types.ts`
 
-- [ ] Додати у `ScanResult` опційне `bucketsUsed?: number` (для toast/звіту);
+- [x] Додати у `ScanResult` опційне `bucketsUsed?: number` (для toast/звіту);
   `FetchSearchResult` — опційне `bucketsUsed?: number`.
-- [ ] Нові magic-значення тримати поряд з наявними константами у `graphqlOlxFetcher.ts`.
+- [x] Нові magic-значення тримати поряд з наявними константами у `graphqlOlxFetcher.ts`.
 
 ## Група B — Frontend: оцінки й тексти
 
 ### B1. `web/src/components/SearchActionPanel.tsx`
 
-- [ ] Оцінка глибокого скану: якщо `visible_total_count > ~1000` — показати, що скан розіб'є
+- [x] Оцінка глибокого скану: якщо `visible_total_count > ~1000` — показати, що скан розіб'є
   на `ceil(count/1000)` діапазонів, перерахувати `deepScanRequests ≈ ceil(count/40)` (а не
   cap 26) і час. Оновити опис картки й текст confirm-діалогу («розіб'є на N цінових діапазонів,
   ~M запитів»).
-- [ ] Toast після скану: додати `· діапазонів ${r.bucketsUsed}`, якщо повернуто > 1.
-- [ ] Прогрес-бар не міняти структурно (індетермінований режим уже покриває фазу бісекції).
+- [x] Toast після скану: додати `· діапазонів ${r.bucketsUsed}`, якщо повернуто > 1.
+- [x] Прогрес-бар не міняти структурно (індетермінований режим уже покриває фазу бісекції).
 
 ### B2. `web/src/api/client.ts` / `web/src/types/index.ts`
 
-- [ ] Підхопити нове поле `bucketsUsed` у `ScanResult` (без зміни ендпойнтів — `?deep=true`
+- [x] Підхопити нове поле `bucketsUsed` у `ScanResult` (без зміни ендпойнтів — `?deep=true`
   уже існує).
 
 ## Група C — Документація
 
-- [ ] `docs/olx-api.md` §2.9 — підсекція «Розбиття по ціні»: бісекція, поріг 1000, probe макс.
+- [x] `docs/olx-api.md` §2.9 — підсекція «Розбиття по ціні»: бісекція, поріг 1000, probe макс.
   ціни (із позначкою результату live-верифікації сортування за ціною), глобальні запобіжники.
-- [ ] `CLAUDE.md` (розділ «Метод збору даних» / «Глибокий скан») — згадати авто-розбиття й що
+- [x] `CLAUDE.md` (розділ «Метод збору даних» / «Глибокий скан») — згадати авто-розбиття й що
   coverage-вікно для split-скану не запускається.
-- [ ] `docs/architecture.md` — оновити описи `graphqlOlxFetcher.ts` (fetchPage/fetchSearchSplit/
+- [x] `docs/architecture.md` — оновити описи `graphqlOlxFetcher.ts` (fetchPage/fetchSearchSplit/
   probeMaxPrice) і `scanner.ts`.
-- [ ] `docs/scan-mechanisms-explained.md` — додати блок про розбиття + виправити, що coverage
+- [x] `docs/scan-mechanisms-explained.md` — додати блок про розбиття + виправити, що coverage
   пропускається саме для split (а звичайний/повний deep — запускає).
-- [ ] `docs/structure.md` — якщо з'явиться новий файл; `docs/olx-monitor-spec.md` §4
+- [x] `docs/structure.md` — якщо з'явиться новий файл; `docs/olx-monitor-spec.md` §4
   (ввічливість) / §13 (ризики) — згадати запобіжники split.
 
 ## Ризики / відкриті питання
@@ -139,16 +139,29 @@ OLX GraphQL має жорстке **вікно пагінації**: `offset ≤
 
 ## Верифікація
 
-- [ ] `npm run build` (server tsc + web tsc/vite) — без помилок.
+> ⚠️ **Live-тести з OLX не виконані:** мережа build-середовища до `olx.ua` заблокована
+> (allowlist) — probe-тест сортування за ціною та живі глибокі скани провести неможливо.
+> Натомість: (1) `probeMaxPrice` зроблено **самоперевірним у рантаймі** (повертає ціну лише
+> якщо сторінка реально впорядкована за ціною, інакше `null` → безпечний fallback на звичайний
+> deep); (2) оркестратор `fetchSearchSplit` перевірено мок-симуляцією GraphQL-видачі (фільтр
+> по ціні + пагінація + емуляція вікна `offset>1000`): бісекція формує бакети, union
+> дедуплікується по `olxId`, малий пошук делегується `fetchSearch` без розбиття.
+> Live-перевірку (probe сортування, «ipad 9») лишити власнику в реальному середовищі.
+
+- [x] `npm run build` (server tsc + web tsc/vite) — без помилок.
 - [ ] **Live probe-тест** макс. ціни (один запит) — зафіксувати, чи працює сортування за ціною;
-  за результатом лишити probe або fallback.
+  за результатом лишити probe або fallback. _(блоковано: мережа до OLX недоступна; probe
+  самоперевіряється у рантаймі)._
 - [ ] Глибокий скан «ipad 9 (1450–8000)»: формуються бакети (лог/`scan_runs`), `found` росте до
   ~`visible_total_count`, помилок немає, між батчами/бакетами є паузи 3–6с, прогрес-бар
-  проходить «Підготовка…» → детермінований → завершення.
-- [ ] Перевірити, що для split-скану **немає масових auto-disable** (coverage пропущено).
-- [ ] Пошук ≤1000 результатів: deep працює як раніше (один діапазон, без розбиття).
-- [ ] Пошук без `to`: або probe знайшов межу й розбив, або (fallback) звичайний deep + підказка.
-- [ ] UI: оцінка часу/запитів і confirm-діалог відображають N діапазонів; toast показує
+  проходить «Підготовка…» → детермінований → завершення. _(блоковано: мережа; перевірено
+  мок-симуляцією)._
+- [x] Перевірити, що для split-скану **немає масових auto-disable** (coverage пропущено) —
+  `warning` → `partial=true` → `applyScanStatuses` не викликається (`scanner.ts`).
+- [x] Пошук ≤1000 результатів: deep працює як раніше (один діапазон, без розбиття) —
+  підтверджено мок-симуляцією (делегування `fetchSearch`).
+- [x] Пошук без `to`: або probe знайшов межу й розбив, або (fallback) звичайний deep + підказка.
+- [x] UI: оцінка часу/запитів і confirm-діалог відображають N діапазонів; toast показує
   `діапазонів N`.
 
 ## Коміт

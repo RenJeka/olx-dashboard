@@ -30,6 +30,8 @@ const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
 const DEEP_SCAN_PAGE_LIMIT = 40;
 /** Межа вікна пагінації GraphQL OLX (offset ≤ 1000) — дзеркалить MAX_PAGES у graphqlOlxFetcher.ts. */
 const DEEP_SCAN_MAX_PAGES = 26;
+/** Поріг розбиття по ціні (= вікно пагінації OLX) — дзеркалить SPLIT_THRESHOLD у graphqlOlxFetcher.ts. */
+const DEEP_SCAN_SPLIT_THRESHOLD = 1000;
 
 interface Props {
   search: Search;
@@ -49,9 +51,19 @@ export function SearchActionPanel({ search }: Props) {
   const lastScan = stats?.last_scan;
   const verifyCandidates = stats?.verify_candidates ?? 0;
 
+  // Великий пошук (> вікна) глибокий скан авто-розбиває на цінові діапазони
+  // (docs/plans/price-range-split.md): кожен ≤ вікна, тож сумарно ~ceil(count/40) запитів
+  // (а не cap 26). Малий пошук — один діапазон, як раніше (cap 26).
+  const visibleTotal = search.visible_total_count;
+  const willSplit = visibleTotal != null && visibleTotal > DEEP_SCAN_SPLIT_THRESHOLD;
+  const deepScanBuckets = willSplit
+    ? Math.ceil(visibleTotal! / DEEP_SCAN_SPLIT_THRESHOLD)
+    : 1;
   const deepScanRequests =
-    search.visible_total_count != null
-      ? Math.min(DEEP_SCAN_MAX_PAGES, Math.ceil(search.visible_total_count / DEEP_SCAN_PAGE_LIMIT))
+    visibleTotal != null
+      ? willSplit
+        ? Math.ceil(visibleTotal / DEEP_SCAN_PAGE_LIMIT)
+        : Math.min(DEEP_SCAN_MAX_PAGES, Math.ceil(visibleTotal / DEEP_SCAN_PAGE_LIMIT))
       : DEEP_SCAN_MAX_PAGES;
   const deepScanMinutes = Math.max(
     1,
@@ -73,8 +85,9 @@ export function SearchActionPanel({ search }: Props) {
       { searchId: search.id, deep },
       {
         onSuccess: (r) => {
+          const bucketsSuffix = r.bucketsUsed != null && r.bucketsUsed > 1 ? ` · діапазонів ${r.bucketsUsed}` : '';
           const description = deep
-            ? `${r.requestsUsed} запитів · знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}`
+            ? `${r.requestsUsed} запитів · знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}${bucketsSuffix}`
             : `Знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}`;
           toaster.create({
             type: 'success',
@@ -329,7 +342,9 @@ export function SearchActionPanel({ search }: Props) {
                       </Badge>
                     </HStack>
                     <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-                      Проходить всю видачу OLX вглиб (до {DEEP_SCAN_MAX_PAGES} запитів) для наповнення бази з нуля.
+                      {willSplit
+                        ? `Проходить всю видачу OLX вглиб із авто-розбиттям на ~${deepScanBuckets} цінових діапазони (~${deepScanRequests} запитів) для повного покриття.`
+                        : `Проходить всю видачу OLX вглиб (до ${DEEP_SCAN_MAX_PAGES} запитів) для наповнення бази з нуля.`}
                     </Text>
                   </Stack>
                 </HStack>
@@ -389,7 +404,11 @@ export function SearchActionPanel({ search }: Props) {
         open={confirmDeepOpen}
         onOpenChange={setConfirmDeepOpen}
         title="Запустити глибокий скан?"
-        description={`Глибокий скан зробить до ~${deepScanRequests} запитів до OLX з паузами (~${deepScanMinutes} хв) і додасть у базу оголошення з глибини видачі. Продовжити?`}
+        description={
+          willSplit
+            ? `Пошук великий (${visibleTotal!.toLocaleString('uk-UA')} на OLX) — скан розіб'є його на ~${deepScanBuckets} цінових діапазони, ~${deepScanRequests} запитів з паузами (~${deepScanMinutes} хв). Продовжити?`
+            : `Глибокий скан зробить до ~${deepScanRequests} запитів до OLX з паузами (~${deepScanMinutes} хв) і додасть у базу оголошення з глибини видачі. Продовжити?`
+        }
         confirmLabel="Сканувати"
         onConfirm={(skipNextTime) => {
           if (skipNextTime) saveSkipDeepScanConfirm(true);
