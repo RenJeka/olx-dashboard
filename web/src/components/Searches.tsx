@@ -34,18 +34,30 @@ import {
   DialogRoot,
   DialogTitle,
 } from './ui/dialog';
+import {
+  DrawerBackdrop,
+  DrawerBody,
+  DrawerCloseTrigger,
+  DrawerContent,
+  DrawerHeader,
+  DrawerRoot,
+  DrawerTitle,
+} from './ui/drawer';
 import { toaster } from './ui/toaster';
 import { Tooltip } from './ui/tooltip';
 import { useSearches, useCreateSearch, useDeleteSearch, useReorderSearches } from '../api/client';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { Search } from '../types';
 
 interface Props {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
   visible?: boolean;
+  onVisibleChange?: (visible: boolean) => void;
 }
 
-export function Searches({ selectedId, onSelect, visible = true }: Props) {
+export function Searches({ selectedId, onSelect, visible = true, onVisibleChange }: Props) {
+  const isMobile = useIsMobile();
   const { data: searches, isLoading } = useSearches();
   const createSearch = useCreateSearch();
 
@@ -75,6 +87,147 @@ export function Searches({ selectedId, onSelect, visible = true }: Props) {
     );
   }
 
+  function handleSelect(id: number | null) {
+    onSelect(id);
+    if (isMobile) onVisibleChange?.(false);
+  }
+
+  const content = (
+    <Accordion.Root multiple defaultValue={['searches']} variant="plain">
+      <Accordion.Item value="searches" borderBottomWidth="1px" borderColor="border.subtle">
+        <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
+          <HStack flex="1" gap={2} fontWeight="semibold">
+            <LuListChecks />
+            <Text>Пошуки</Text>
+            {searches && searches.length > 0 && (
+              <Badge colorPalette="blue" variant="subtle" rounded="full">
+                {searches.length}
+              </Badge>
+            )}
+          </HStack>
+          <Accordion.ItemIndicator />
+        </Accordion.ItemTrigger>
+        <Accordion.ItemContent>
+          <Accordion.ItemBody px={2} pt={0} pb={2}>
+            {isLoading && (
+              <Text textStyle="sm" color="fg.muted" px={2}>
+                Завантаження…
+              </Text>
+            )}
+            {!isLoading && (!searches || searches.length === 0) && (
+              <Text textStyle="sm" color="fg.muted" px={2}>
+                Поки що порожньо — додай перший пошук нижче.
+              </Text>
+            )}
+            <Stack gap="0.5">
+              {searches?.map((s, index) => (
+                <SearchRow
+                  key={s.id}
+                  search={s}
+                  selected={selectedId === s.id}
+                  isFirst={index === 0}
+                  isLast={index === searches.length - 1}
+                  onSelect={() => handleSelect(s.id)}
+                  onDeleted={() => {
+                    if (selectedId === s.id) onSelect(null);
+                  }}
+                />
+              ))}
+            </Stack>
+          </Accordion.ItemBody>
+        </Accordion.ItemContent>
+      </Accordion.Item>
+
+      <Accordion.Item value="new" borderBottomWidth="1px" borderColor="border.subtle">
+        <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
+          <HStack flex="1" gap={2} fontWeight="semibold">
+            <LuPlus />
+            <Text>Новий пошук</Text>
+          </HStack>
+          <Accordion.ItemIndicator />
+        </Accordion.ItemTrigger>
+        <Accordion.ItemContent>
+          <Accordion.ItemBody pt={0}>
+            <Stack as="form" onSubmit={submit} gap={3} px={2}>
+              <Field.Root required>
+                <Field.Label>
+                  Назва <Field.RequiredIndicator />
+                </Field.Label>
+                <Input
+                  size="sm"
+                  placeholder="напр. iPhone 13 Київ"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field.Root>
+              <Field.Root required>
+                <Field.Label>
+                  Запит <Field.RequiredIndicator />
+                </Field.Label>
+                <Input
+                  size="sm"
+                  placeholder="напр. iphone 13"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </Field.Root>
+              <HStack gap={2}>
+                <Field.Root>
+                  <Field.Label>Ціна від</Field.Label>
+                  <Input
+                    size="sm"
+                    inputMode="numeric"
+                    value={priceFrom}
+                    onChange={(e) => setPriceFrom(e.target.value)}
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Ціна до</Field.Label>
+                  <Input
+                    size="sm"
+                    inputMode="numeric"
+                    value={priceTo}
+                    onChange={(e) => setPriceTo(e.target.value)}
+                  />
+                </Field.Root>
+              </HStack>
+              <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
+                <LuPlus /> Створити
+              </Button>
+              {createSearch.isError && (
+                <Text textStyle="xs" color="fg.error">
+                  {createSearch.error instanceof Error
+                    ? createSearch.error.message
+                    : 'Помилка створення'}
+                </Text>
+              )}
+            </Stack>
+          </Accordion.ItemBody>
+        </Accordion.ItemContent>
+      </Accordion.Item>
+    </Accordion.Root>
+  );
+
+  if (isMobile) {
+    return (
+      <DrawerRoot
+        placement="start"
+        size="xs"
+        open={visible}
+        onOpenChange={(d) => onVisibleChange?.(d.open)}
+      >
+        <DrawerBackdrop />
+        <DrawerContent>
+          <DrawerCloseTrigger />
+          <DrawerHeader>
+            <DrawerTitle>Пошуки</DrawerTitle>
+          </DrawerHeader>
+          <DrawerBody px={0}>{content}</DrawerBody>
+        </DrawerContent>
+      </DrawerRoot>
+    );
+  }
+
   return (
     <Flex
       as="aside"
@@ -88,119 +241,7 @@ export function Searches({ selectedId, onSelect, visible = true }: Props) {
       overflowY="auto"
       display={visible ? 'flex' : 'none'}
     >
-      <Accordion.Root multiple defaultValue={['searches']} variant="plain">
-        <Accordion.Item value="searches" borderBottomWidth="1px" borderColor="border.subtle">
-          <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
-            <HStack flex="1" gap={2} fontWeight="semibold">
-              <LuListChecks />
-              <Text>Пошуки</Text>
-              {searches && searches.length > 0 && (
-                <Badge colorPalette="blue" variant="subtle" rounded="full">
-                  {searches.length}
-                </Badge>
-              )}
-            </HStack>
-            <Accordion.ItemIndicator />
-          </Accordion.ItemTrigger>
-          <Accordion.ItemContent>
-            <Accordion.ItemBody px={2} pt={0} pb={2}>
-              {isLoading && (
-                <Text textStyle="sm" color="fg.muted" px={2}>
-                  Завантаження…
-                </Text>
-              )}
-              {!isLoading && (!searches || searches.length === 0) && (
-                <Text textStyle="sm" color="fg.muted" px={2}>
-                  Поки що порожньо — додай перший пошук нижче.
-                </Text>
-              )}
-              <Stack gap="0.5">
-                {searches?.map((s, index) => (
-                  <SearchRow
-                    key={s.id}
-                    search={s}
-                    selected={selectedId === s.id}
-                    isFirst={index === 0}
-                    isLast={index === searches.length - 1}
-                    onSelect={() => onSelect(s.id)}
-                    onDeleted={() => {
-                      if (selectedId === s.id) onSelect(null);
-                    }}
-                  />
-                ))}
-              </Stack>
-            </Accordion.ItemBody>
-          </Accordion.ItemContent>
-        </Accordion.Item>
-
-        <Accordion.Item value="new" borderBottomWidth="1px" borderColor="border.subtle">
-          <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
-            <HStack flex="1" gap={2} fontWeight="semibold">
-              <LuPlus />
-              <Text>Новий пошук</Text>
-            </HStack>
-            <Accordion.ItemIndicator />
-          </Accordion.ItemTrigger>
-          <Accordion.ItemContent>
-            <Accordion.ItemBody pt={0}>
-              <Stack as="form" onSubmit={submit} gap={3} px={2}>
-                <Field.Root required>
-                  <Field.Label>
-                    Назва <Field.RequiredIndicator />
-                  </Field.Label>
-                  <Input
-                    size="sm"
-                    placeholder="напр. iPhone 13 Київ"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </Field.Root>
-                <Field.Root required>
-                  <Field.Label>
-                    Запит <Field.RequiredIndicator />
-                  </Field.Label>
-                  <Input
-                    size="sm"
-                    placeholder="напр. iphone 13"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </Field.Root>
-                <HStack gap={2}>
-                  <Field.Root>
-                    <Field.Label>Ціна від</Field.Label>
-                    <Input
-                      size="sm"
-                      inputMode="numeric"
-                      value={priceFrom}
-                      onChange={(e) => setPriceFrom(e.target.value)}
-                    />
-                  </Field.Root>
-                  <Field.Root>
-                    <Field.Label>Ціна до</Field.Label>
-                    <Input
-                      size="sm"
-                      inputMode="numeric"
-                      value={priceTo}
-                      onChange={(e) => setPriceTo(e.target.value)}
-                    />
-                  </Field.Root>
-                </HStack>
-                <Button type="submit" loading={createSearch.isPending} colorPalette="blue" size="sm">
-                  <LuPlus /> Створити
-                </Button>
-                {createSearch.isError && (
-                  <Text textStyle="xs" color="fg.error">
-                    {createSearch.error instanceof Error
-                      ? createSearch.error.message
-                      : 'Помилка створення'}
-                  </Text>
-                )}
-              </Stack>
-            </Accordion.ItemBody>
-          </Accordion.ItemContent>
-        </Accordion.Item>
-      </Accordion.Root>
+      {content}
     </Flex>
   );
 }
