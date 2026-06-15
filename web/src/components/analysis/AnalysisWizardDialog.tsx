@@ -61,6 +61,7 @@ import {
 } from '../../utils/storage';
 import { stripDescriptionHtml } from '../../utils/format';
 import { chunk } from '../../utils/array';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import {
   ANALYSIS_SOURCE,
   ANALYSIS_STEPS,
@@ -78,6 +79,7 @@ interface Props {
 }
 
 export function AnalysisWizardDialog({ search, selectedIds }: Props) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const { data: status } = useAnalysisStatus();
   const { data: savedCriteria } = useSavedCriteria(open ? search.id : null);
@@ -443,6 +445,66 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const modeLabel = MODE_LABELS[mode];
   const chosenCount = available.filter((c) => selected.has(c)).length;
 
+  // Крок 3: спільні фрагменти рядка для desktop-таблиці й mobile-карток.
+  function renderPhotoTitle(l: Listing | undefined, fallbackId: number) {
+    return (
+      <HStack gap={2} align="start">
+        {l?.photo_url ? (
+          <Image src={l.photo_url} alt="" boxSize={12} rounded="md" objectFit="cover" flexShrink={0} />
+        ) : (
+          <Box boxSize={12} rounded="md" bg="bg.muted" flexShrink={0} />
+        )}
+        <Text fontWeight="semibold" fontSize="sm" lineClamp={2}>
+          {l?.title ?? `#${fallbackId}`}
+        </Text>
+      </HStack>
+    );
+  }
+
+  function renderDescriptionBlock(l: Listing | undefined, desc: string, evidence: string[]) {
+    return (
+      <DescriptionTooltip
+        description={l?.description ?? null}
+        query={evidence}
+        onClick={() => l && setOpenDescriptionListing(l)}
+      >
+        <Text textStyle="xs" color="fg.muted" lineClamp={isMobile ? 4 : 3} whiteSpace="pre-line">
+          <HighlightText text={desc} query={evidence} />
+        </Text>
+      </DescriptionTooltip>
+    );
+  }
+
+  function renderCriteriaTags(r: AnalyzedListing) {
+    return (
+      <Wrap gap={1}>
+        {r.items.map((it, i) => {
+          const included = isIncluded(r.id, it);
+          return (
+            <Tooltip key={i} content={it.evidence} disabled={!it.evidence}>
+              <Badge
+                colorPalette={included ? (mode === 'cons' ? 'red' : 'green') : 'gray'}
+                variant={included ? 'subtle' : 'outline'}
+                textDecoration={included ? undefined : 'line-through'}
+                borderWidth={it.ok ? undefined : '1px'}
+                borderStyle={it.ok ? undefined : 'dashed'}
+                cursor="pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleIncluded(r.id, it)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') toggleIncluded(r.id, it);
+                }}
+              >
+                {it.criterion}
+              </Badge>
+            </Tooltip>
+          );
+        })}
+      </Wrap>
+    );
+  }
+
   return (
     <DialogRoot
       open={open}
@@ -450,7 +512,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
         setOpen(d.open);
         if (d.open) resetForReopen();
       }}
-      size="xl"
+      size={isMobile ? 'full' : 'xl'}
       placement="center"
       scrollBehavior="inside"
     >
@@ -466,7 +528,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           <Stack gap={3} w="full">
             <DialogTitle>AI-аналіз: {modeLabel}</DialogTitle>
             {/* Степер */}
-            <HStack gap={2}>
+            <HStack gap={2} wrap="wrap" rowGap={2}>
               {ANALYSIS_STEPS.map((label, i) => (
                 <HStack key={label} gap={1.5}>
                   <Box
@@ -676,86 +738,62 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </HStack>
               </HStack>
 
-              <Box maxH="50vh" overflowY="auto" borderWidth="1px" borderColor="border.subtle" rounded="md">
-                <Table.Root size="sm" css={{ tableLayout: 'fixed' }}>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="220px">
-                        Оголошення
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="50%">
-                        Опис
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg">
-                        {modeLabel}
-                      </Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {visibleRows.map((r) => {
-                      const l = listingById.get(r.id);
-                      const desc = stripDescriptionHtml(l?.description ?? null);
-                      const includedEvidence = r.items
-                        .filter((it) => isIncluded(r.id, it))
-                        .map((it) => it.evidence);
-                      return (
-                        <Table.Row key={r.id}>
-                          <Table.Cell verticalAlign="top">
-                            <HStack gap={2} align="start">
-                              {l?.photo_url ? (
-                                <Image src={l.photo_url} alt="" boxSize={12} rounded="md" objectFit="cover" flexShrink={0} />
-                              ) : (
-                                <Box boxSize={12} rounded="md" bg="bg.muted" flexShrink={0} />
-                              )}
-                              <Text fontWeight="semibold" fontSize="sm" lineClamp={2}>
-                                {l?.title ?? `#${r.id}`}
-                              </Text>
-                            </HStack>
-                          </Table.Cell>
-                          <Table.Cell verticalAlign="top" whiteSpace="normal">
-                            <DescriptionTooltip
-                              description={l?.description ?? null}
-                              query={includedEvidence}
-                              onClick={() => l && setOpenDescriptionListing(l)}
-                            >
-                              <Text textStyle="xs" color="fg.muted" lineClamp={3} whiteSpace="pre-line">
-                                <HighlightText text={desc} query={includedEvidence} />
-                              </Text>
-                            </DescriptionTooltip>
-                          </Table.Cell>
-                          <Table.Cell verticalAlign="top">
-                            <Wrap gap={1}>
-                              {r.items.map((it, i) => {
-                                const included = isIncluded(r.id, it);
-                                return (
-                                  <Tooltip key={i} content={it.evidence} disabled={!it.evidence}>
-                                    <Badge
-                                      colorPalette={included ? (mode === 'cons' ? 'red' : 'green') : 'gray'}
-                                      variant={included ? 'subtle' : 'outline'}
-                                      textDecoration={included ? undefined : 'line-through'}
-                                      borderWidth={it.ok ? undefined : '1px'}
-                                      borderStyle={it.ok ? undefined : 'dashed'}
-                                      cursor="pointer"
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={() => toggleIncluded(r.id, it)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') toggleIncluded(r.id, it);
-                                      }}
-                                    >
-                                      {it.criterion}
-                                    </Badge>
-                                  </Tooltip>
-                                );
-                              })}
-                            </Wrap>
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })}
-                  </Table.Body>
-                </Table.Root>
-              </Box>
+              {isMobile ? (
+                <Stack gap={3} maxH="60vh" overflowY="auto">
+                  {visibleRows.map((r) => {
+                    const l = listingById.get(r.id);
+                    const desc = stripDescriptionHtml(l?.description ?? null);
+                    const includedEvidence = r.items
+                      .filter((it) => isIncluded(r.id, it))
+                      .map((it) => it.evidence);
+                    return (
+                      <Box key={r.id} p={3} borderWidth="1px" borderColor="border.subtle" rounded="md">
+                        <Stack gap={2}>
+                          {renderPhotoTitle(l, r.id)}
+                          {renderDescriptionBlock(l, desc, includedEvidence)}
+                          {renderCriteriaTags(r)}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Box maxH="50vh" overflowY="auto" borderWidth="1px" borderColor="border.subtle" rounded="md">
+                  <Table.Root size="sm" css={{ tableLayout: 'fixed' }}>
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="220px">
+                          Оголошення
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="50%">
+                          Опис
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg">
+                          {modeLabel}
+                        </Table.ColumnHeader>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {visibleRows.map((r) => {
+                        const l = listingById.get(r.id);
+                        const desc = stripDescriptionHtml(l?.description ?? null);
+                        const includedEvidence = r.items
+                          .filter((it) => isIncluded(r.id, it))
+                          .map((it) => it.evidence);
+                        return (
+                          <Table.Row key={r.id}>
+                            <Table.Cell verticalAlign="top">{renderPhotoTitle(l, r.id)}</Table.Cell>
+                            <Table.Cell verticalAlign="top" whiteSpace="normal">
+                              {renderDescriptionBlock(l, desc, includedEvidence)}
+                            </Table.Cell>
+                            <Table.Cell verticalAlign="top">{renderCriteriaTags(r)}</Table.Cell>
+                          </Table.Row>
+                        );
+                      })}
+                    </Table.Body>
+                  </Table.Root>
+                </Box>
+              )}
 
               <HStack justify="space-between">
                 <Button variant="ghost" onClick={() => setStep(2)}>
