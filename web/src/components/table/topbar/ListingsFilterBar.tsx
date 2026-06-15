@@ -1,4 +1,4 @@
-import { HStack, SegmentGroup, Stack } from '@chakra-ui/react';
+import { Box, HStack, SegmentGroup, Stack } from '@chakra-ui/react';
 import { Switch } from '../../ui/switch';
 import { LISTING_STATUSES, type Listing, type ListingStatus } from '../../../types';
 import { STATUS_LABELS } from '../../../utils/status';
@@ -49,14 +49,16 @@ export function ListingsFilterBar({
   return (
     <Stack gap={2} px={4} pt={3} pb={2}>
       <HStack gap={4} wrap="wrap">
-        <SegmentGroup.Root
-          size="sm"
-          value={statusFilter}
-          onValueChange={(d) => onStatusFilterChange((d.value as ListingStatus | 'all') ?? 'all')}
-        >
-          <SegmentGroup.Indicator cursor="pointer" />
-          <SegmentGroup.Items items={items} cursor="pointer" />
-        </SegmentGroup.Root>
+        <Box overflowX="auto" maxW="100%">
+          <SegmentGroup.Root
+            size="sm"
+            value={statusFilter}
+            onValueChange={(d) => onStatusFilterChange((d.value as ListingStatus | 'all') ?? 'all')}
+          >
+            <SegmentGroup.Indicator cursor="pointer" />
+            <SegmentGroup.Items items={items} cursor="pointer" />
+          </SegmentGroup.Root>
+        </Box>
         <Switch
           checked={showFilteredOut}
           onCheckedChange={(d) => onShowFilteredOutChange(d.checked)}
