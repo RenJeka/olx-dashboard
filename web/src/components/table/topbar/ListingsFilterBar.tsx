@@ -35,7 +35,7 @@ export function ListingsFilterBar({
 }: Props) {
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const setStatusFilter = useListingsUiStore((s) => s.setStatusFilter);
-  const visible = listings.filter((l) => showFilteredOut || l.filtered_out === 0);
+  const visible = listings.filter((l) => showFilteredOut ? l.filtered_out === 1 : l.filtered_out === 0);
 
   const items = [
     { value: 'all', label: `Всі (${visible.length})` },

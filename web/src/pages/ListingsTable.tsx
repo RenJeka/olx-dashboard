@@ -77,7 +77,7 @@ export function ListingsTable({
     () =>
       rows.filter(
         (l) =>
-          (showFilteredOut || l.filtered_out === 0) &&
+          (showFilteredOut ? l.filtered_out === 1 : l.filtered_out === 0) &&
           (statusFilter === 'all' || l.status === statusFilter),
       ),
     [rows, showFilteredOut, statusFilter],
