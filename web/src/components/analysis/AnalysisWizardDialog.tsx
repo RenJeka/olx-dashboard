@@ -120,6 +120,8 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   // Крок 4
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [commitProgress, setCommitProgress] = useState<{ done: number; total: number } | null>(null);
+  // 'append' — додати до наявних (без дублів); 'replace' — перезаписати поле.
+  const [mergeMode, setMergeMode] = useState<'append' | 'replace'>('append');
 
   const generateCriteria = useGenerateCriteria();
   const importCriteria = useImportCriteria();
@@ -399,6 +401,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           items: batch,
           model: apiAvailable && status ? model : MANUAL_MODEL,
           source: apiAvailable ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT,
+          merge: mergeMode,
         });
         done += batch.length;
         setCommitProgress({ done, total: commitItems.length });
@@ -425,7 +428,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       toaster.create({ type: 'error', title: 'Немає результатів для запису' });
       return;
     }
-    if (overwriteCount > 0) setConfirmOverwrite(true);
+    if (mergeMode === 'replace' && overwriteCount > 0) setConfirmOverwrite(true);
     else void doCommit();
   }
 
@@ -872,10 +875,41 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
               <Text textStyle="sm">
                 Записати {modeLabel.toLowerCase()} у таблицю для {commitItems.length} оголошень?
               </Text>
-              {overwriteCount > 0 && (
-                <Text textStyle="sm" color="orange.fg">
-                  Увага: у {overwriteCount} оголошень поле «{modeLabel}» вже заповнене — буде перезаписано.
+
+              <Stack gap={1}>
+                <Text textStyle="xs" color="fg.muted">
+                  Режим запису в поле «{modeLabel}»:
                 </Text>
+                <HStack gap={1}>
+                  <Button
+                    size="xs"
+                    variant={mergeMode === 'append' ? 'solid' : 'outline'}
+                    colorPalette="blue"
+                    onClick={() => setMergeMode('append')}
+                  >
+                    Додати до наявних
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant={mergeMode === 'replace' ? 'solid' : 'outline'}
+                    colorPalette="orange"
+                    onClick={() => setMergeMode('replace')}
+                  >
+                    Перезаписати
+                  </Button>
+                </HStack>
+              </Stack>
+
+              {mergeMode === 'append' ? (
+                <Text textStyle="sm" color="fg.muted">
+                  Нові пункти буде додано до наявних значень (без дублікатів). Нічого не затирається.
+                </Text>
+              ) : (
+                overwriteCount > 0 && (
+                  <Text textStyle="sm" color="orange.fg">
+                    Увага: у {overwriteCount} оголошень поле «{modeLabel}» вже заповнене — буде перезаписано.
+                  </Text>
+                )
               )}
               {commitProgress && (
                 <Stack gap={1}>
@@ -898,7 +932,9 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                     Відмінити
                   </Button>
                   <Button colorPalette="blue" onClick={handleCommitClick} loading={commitProgress != null}>
-                    Вставити {modeLabel.toLowerCase()} у таблицю
+                    {mergeMode === 'append'
+                      ? `Додати ${modeLabel.toLowerCase()} у таблицю`
+                      : `Перезаписати ${modeLabel.toLowerCase()} у таблиці`}
                   </Button>
                 </HStack>
               </HStack>

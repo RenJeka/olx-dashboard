@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ZipArchive } from 'archiver';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
@@ -25,6 +28,7 @@ import {
   buildCriteriaPrompt,
   buildManualZipInstructions,
   buildMatchingPrompt,
+  PATTERNS_EXAMPLE_JSON,
   pickSample,
   type PromptListing,
 } from '../analysis/prompts.js';
@@ -32,6 +36,10 @@ import { mergeResults, parseCriteriaResponse, parseMatchingResponse } from '../a
 import { stripHtml } from '../analysis/text.js';
 import { buildXlsxBuffer } from '../export/xlsx.js';
 import type { AnalysisMode, AnalyzeResponse, AnalyzedListing, CommitItem } from '../types.js';
+
+// Готовий Python-движок для ZIP-пакета ручного режиму (читаємо з диску, як schema.sql).
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+const ANALYZE_PY_PATH = join(MODULE_DIR, '..', 'analysis', 'analyze.py');
 
 interface ListingRow {
   id: number;
@@ -81,9 +89,14 @@ function toPromptListing(row: ListingRow): PromptListing {
   return { id: row.id, title: row.title, description: row.description, params: row.params };
 }
 
+// Текст для верифікації evidence: title + опис (критерії можуть бути лише в заголовку,
+// напр. «iPhone на запчастини» — тоді evidence із заголовка теж має проходити перевірку).
 function descriptionMap(rows: ListingRow[]): Map<number, string> {
   const map = new Map<number, string>();
-  for (const row of rows) map.set(row.id, stripHtml(row.description));
+  for (const row of rows) {
+    const title = row.title ? `${row.title}\n` : '';
+    map.set(row.id, title + stripHtml(row.description));
+  }
   return map;
 }
 
@@ -268,6 +281,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       archive.on('error', (err: Error) => req.log.error(err));
 
       archive.append(buildManualZipInstructions(criteria, mode), { name: 'prompt.txt' });
+      archive.append(readFileSync(ANALYZE_PY_PATH), { name: 'analyze.py' });
+      archive.append(PATTERNS_EXAMPLE_JSON, { name: 'patterns.example.json' });
       chunk(listings, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
         const name = `descriptions/chunk-${String(idx + 1).padStart(3, '0')}.json`;
         const content = JSON.stringify(buildChunkListings(group.map(toPromptListing)), null, JSON_EXPORT_INDENT);
@@ -345,13 +360,16 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Commit: запис у БД (chunked з боку клієнта) ──────────────────────────
+  // merge='replace' (дефолт) — перезаписати поле; merge='append' — додати нові пункти до
+  // наявних (дедуплікація за нормалізованим текстом, наявні зберігаються, нічого не затирається).
   app.post<{
-    Body: { mode?: string; items?: CommitItem[]; model?: string; source?: string };
+    Body: { mode?: string; items?: CommitItem[]; model?: string; source?: string; merge?: string };
   }>('/api/listings/analyze/commit', async (req, reply) => {
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const source = req.body.source === ANALYSIS_SOURCE.API ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT;
     const model = req.body.model ?? (source === ANALYSIS_SOURCE.IMPORT ? MANUAL_MODEL : DEFAULT_MODEL);
+    const append = req.body.merge === 'append';
     const column = req.body.mode; // 'cons' | 'pros' — безпечно (whitelist через isMode)
 
     const stmt = db.prepare(
@@ -359,12 +377,20 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
               analysis_source = ?, analysis_model = ?, analysis_stale = 0
        WHERE id = ?`,
     );
+    const selectStmt = db.prepare(`SELECT ${column} AS val FROM listings WHERE id = ?`);
 
     const run = db.transaction((rows: CommitItem[]) => {
       let updated = 0;
       for (const row of rows) {
-        const text =
-          row.criteria.length > 0 ? row.criteria.map((c) => `${BULLET_PREFIX}${c}`).join('\n') : '';
+        let criteria = row.criteria;
+        if (append) {
+          const existing = (selectStmt.get(row.id) as { val: string | null } | undefined)?.val ?? null;
+          const existingItems = parseBullets(existing);
+          const seen = new Set(existingItems.map((c) => c.toLowerCase()));
+          const additions = row.criteria.filter((c) => !seen.has(c.toLowerCase()));
+          criteria = [...existingItems, ...additions];
+        }
+        const text = criteria.length > 0 ? criteria.map((c) => `${BULLET_PREFIX}${c}`).join('\n') : '';
         const info = stmt.run(text, source, model, row.id);
         updated += info.changes;
       }
@@ -374,4 +400,13 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const updated = run(items);
     return { updated };
   });
+}
+
+/** TEXT-поле pros/cons (`• item\n• item`, сумісне з ручним едітом) → масив пунктів. */
+function parseBullets(text: string | null): string[] {
+  if (!text) return [];
+  return text
+    .split('\n')
+    .map((line) => line.replace(/^•\s*/, '').trim())
+    .filter(Boolean);
 }

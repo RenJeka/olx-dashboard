@@ -346,16 +346,18 @@ export function useCommitAnalysis() {
       items,
       model,
       source,
+      merge,
     }: {
       searchId: number;
       mode: AnalysisMode;
       items: CommitItem[];
       model?: string;
       source: 'api' | 'import';
+      merge: 'append' | 'replace';
     }) =>
       api<{ updated: number }>('/api/listings/analyze/commit', {
         method: 'POST',
-        body: JSON.stringify({ mode, items, model, source }),
+        body: JSON.stringify({ mode, items, model, source, merge }),
       }),
     onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),

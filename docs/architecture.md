@@ -124,7 +124,7 @@ flowchart LR
 | `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
 | `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/stats`. |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`). |
-| `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`, доповнено `plans/analysis-wizard-review-rework.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_ZIP_CHUNK_SIZE=50`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки, `MIME_ZIP`), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample`/`buildManualZipInstructions`/`buildChunkListings` для авто Й ручного), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
+| `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`, доповнено `plans/analysis-wizard-review-rework.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_ZIP_CHUNK_SIZE=50`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки, `MIME_ZIP`), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample`/`buildManualZipInstructions`/`buildChunkListings`/`PATTERNS_EXAMPLE_JSON` для авто Й ручного), `analyze.py` (готовий детермінований Python-движок для ZIP-пакета: regex-матчинг критеріїв з клауза-скоуп запереченнями, морфологічними стемами, дослівним evidence; читається з диску як `schema.sql` і кладеться в ZIP), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
 | `export/xlsx.ts` | `buildXlsxBuffer(sheet, columns, rows)` на **ExcelJS** — спільний Excel-експорт (превʼю аналізу + майбутній експорт усієї таблиці): заголовки/ширини, заморожений рядок заголовків, перенос тексту. |
 | `routes/analysis.ts` | Ендпойнти LLM-аналізу (нижче §6). Критерії читаються/пишуться у `searches.analysis_criteria`; commit пише `pros`/`cons` + `analysis_at/source/model`, `analysis_stale=0`. |
 | `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, реєстрація `searchesRoutes`/`listingsRoutes`/`analysisRoutes`, слухає `:3001`. |
@@ -176,10 +176,10 @@ flowchart LR
 | `GET` | `/api/searches/:id/criteria/prompt?mode=` | ✅ — готовий промпт генерації (ручний режим) |
 | `POST` | `/api/searches/:id/criteria/import` | ✅ — парс вставленої відповіді LLM у список критеріїв |
 | `POST` | `/api/searches/:id/analyze` | ✅ — авто matching (чанки по 12), верифікація `evidence`; `{results, errors}`, НЕ пише в БД |
-| `GET` | `/api/searches/:id/analyze/package.zip?mode=&ids=` | ✅ — ZIP-пакет для безкоштовного чату: `prompt.txt` + `descriptions/chunk-NNN.json` (по 50 оголошень) |
+| `GET` | `/api/searches/:id/analyze/package.zip?mode=&ids=` | ✅ — ZIP-пакет ручного режиму: `prompt.txt` (інструкція з 2 варіантами) + `analyze.py` (готовий детермінований движок) + `patterns.example.json` (приклад мапи) + `descriptions/chunk-NNN.json` (по 50 оголошень) |
 | `POST` | `/api/searches/:id/analyze/import` | ✅ — парс однієї вставленої відповіді + верифікація + мерж у накопичене |
 | `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
-| `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта) |
+| `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта); `merge='append'` (дефолт UI — додати до наявних без дублів) \| `'replace'` (перезаписати) |
 | `GET` | `/health` | ✅ |
 | `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 |
 | `GET` | `/api/listings/:id/export/markdown` | ⏳ Етап 3 |
@@ -342,8 +342,9 @@ flowchart LR
   «Почати заново» — `reset()`. Scope «tab» → `effectiveIds` = оголошення з поточним
   статусом вкладки (fallback на весь пошук якщо `statusFilter === 'all'`).
   Крок 2 (ручний режим) — кнопка «Завантажити ZIP-пакет»
-  (`fetchAnalyzePackageZip`, `prompt.txt` + `descriptions/chunk-NNN.json`), `ManualAssistant`
-  без `parts` (`emptyHint` з підказкою прогнати ZIP через чат і вставити єдиний JSON); крок 3 —
+  (`fetchAnalyzePackageZip`, `prompt.txt` + `analyze.py` + `patterns.example.json` +
+  `descriptions/chunk-NNN.json`), `ManualAssistant`
+  без `parts` (`emptyHint` з підказкою прогнати ZIP через агента/чат і вставити єдиний JSON); крок 3 —
   спільні рендер-фрагменти рядка (`renderPhotoTitle`/`renderDescriptionBlock`/
   `renderCriteriaTags`, без дублювання логіки toggle/evidence) рендеряться або в
   desktop-таблиці (Chakra `Table.Root`, `tableLayout: 'fixed'`, скрол `maxH="50vh"`), або —

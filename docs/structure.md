@@ -30,6 +30,8 @@ olx-dashboard/
 ├── server/                   # workspace "server" (Node + Fastify), type: module
 │   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
+│   ├── scripts/
+│   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/
 │   │   └── olx.db            # SQLite (gitignored, створюється при старті)
 │   └── src/
@@ -44,7 +46,8 @@ olx-dashboard/
 │       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # ЄДИНЕ джерело magic-значень (моделі, ліміти, чанки (AUTO_CHUNK_SIZE/MANUAL_ZIP_CHUNK_SIZE), мапи режиму, scaffold, повідомлення, MIME_ZIP)
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
-│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings — ЄДИНЕ джерело промптів
+│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
+│       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
 │       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed
