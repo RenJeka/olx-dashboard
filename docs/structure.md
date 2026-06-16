@@ -66,7 +66,7 @@ olx-dashboard/
 │
 └── web/                      # workspace "web" (React + Vite), type: module
     ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
-    │                          #   @chakra-ui/react, next-themes, react-icons
+    │                          #   @chakra-ui/react, next-themes, react-icons, zustand
     ├── tsconfig.json         # module: ESNext, moduleResolution: Bundler, jsx
     ├── vite.config.ts        # react plugin, proxy /api → :3001
     ├── index.html            # точка входу Vite
@@ -82,7 +82,7 @@ olx-dashboard/
         │   ├── Searches.tsx      # бічна панель (акордеон пошуків), сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── analysis/        # майстер LLM-аналізу (плани docs/plans/llm-analysis.md, docs/plans/analysis-wizard-review-rework.md)
-        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка), режим cons/pros, обсяг вибрані/весь; крок 2 (ручний) — ZIP-пакет; крок 3 — таблиця з фільтром/toggle/evidence
+        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка); крок 1 — вибір режиму cons/pros та scope (вибрані/вкладка/весь пошук); кроки 2–4 — read-only підсумок; прогрес зберігається між відкриттями (Zustand in-memory); закриття повз вікно заборонено
         │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
@@ -105,7 +105,7 @@ olx-dashboard/
         │   │   ├── NoteCell.tsx   # інлайн-едіт нотатки (Popover + textarea)
         │   │   ├── ProsConsCell.tsx # інлайн-едіт плюсів/мінусів (Popover + textarea)
         │   │   ├── HighlightText.tsx # підсвітка збігів пошукового запиту (Mark)
-        │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup), "показати filtered_out", пошук
+        │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup з useListingsUiStore), "показати filtered_out", пошук
         │   │   ├── BulkActionBar.tsx # панель масових дій над виділеними рядками (зміна статусу)
         │   │   ├── DescriptionTooltip.tsx # тултіп для попереднього перегляду опису
         │   │   └── TablePagination.tsx # панель пагінації (Chakra Pagination + вибір pageSize)
@@ -119,6 +119,9 @@ olx-dashboard/
         │       ├── switch.tsx
         │       ├── checkbox.tsx
         │       └── close-button.tsx
+        ├── stores/
+        │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці) — спільний стан між таблицею і AI-майстром
+        │   └── analysisWizardStore.ts # useAnalysisWizardStore: прогрес AI-Flow (mode/scope/step/критерії/результати); bindSearch/reset
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         │   ├── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)

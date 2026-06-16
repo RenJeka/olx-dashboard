@@ -224,6 +224,16 @@ flowchart LR
 - `utils/status.ts` — `STATUS_LABELS`/`STATUS_COLORS` (Record по `ListingStatus`: `new` blue,
   `interested` green, `contacted` purple, `rejected` gray, `disabled` red) та
   `isMutedStatus(status)` (`disabled`/`rejected` → приглушений рядок).
+- `stores/listingsUiStore.ts` — Zustand-стор `useListingsUiStore`: `statusFilter: ListingStatus | 'all'`
+  (дефолт `'all'`) + `setStatusFilter`. Спільний in-memory стан вкладки фільтра статусів,
+  що читається і в `ListingsFilterBar` (для `SegmentGroup`), і в `AnalysisWizardDialog`
+  (scope «поточна вкладка»).
+- `stores/analysisWizardStore.ts` — Zustand-стор `useAnalysisWizardStore`: прогрес AI-Flow
+  (`mode`, `scope: 'selected'|'all'|'tab'`, `step`, `available`, `selected: Set<string>`,
+  `customInput`, `accumulated`, `includedOverrides: Map<string,boolean>`), `boundSearchId`,
+  `criteriaLoadedMode`. Дії: `bindSearch(id)` — скидає лише якщо змінився пошук;
+  `reset()` — повне скидання. In-memory (не persisted): переживає закриття/відкриття
+  модалки, але скидається при refresh сторінки.
 - `hooks/useListingsTableState.ts` — кастомний React-хук для збереження та завантаження стану сортування, розмірів колонок та пагінації (`pageSize` персиститься, `pageIndex` — ні) таблиці.
 - `hooks/useAutoRefresh.ts` — `useAutoRefresh(enabled, intervalMin)`: поки увімкнено і вкладка
   видима, раз на `intervalMin` хвилин послідовно запускає `useScan({deep:false})` для всіх
@@ -265,7 +275,8 @@ flowchart LR
     `<Mark bg="yellow.subtle">`; використовується в колонках «Назва»/«Опис» і в
     `DescriptionTooltip`.
   - `ListingsFilterBar.tsx` — панель над таблицею: `SegmentGroup` фільтра статусів (Всі +
-    `LISTING_STATUSES`, з лічильниками з урахуванням toggle filtered_out), `Switch`
+    `LISTING_STATUSES`, з лічильниками з урахуванням toggle filtered_out) — читає/пише
+    `statusFilter` через `useListingsUiStore` напряму (не через props); `Switch`
     «Показати відфільтровані», `Input` текстового пошуку із кнопкою очищення.
   - `BulkActionBar.tsx` — з'являється, коли є вибрані рядки: «Вибрано: N» + `Menu` зі
     статусами (`LISTING_STATUSES`/`STATUS_LABELS` з відповідними іконками) → `Promise.allSettled` з
@@ -301,8 +312,8 @@ flowchart LR
     відкриває `DialogRoot role="alertdialog"` із підтвердженням і каскадно видаляє пошук
     через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).
 - `pages/ListingsTable.tsx` — відображення списку оголошень: збирає разом
-  `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу + toggle
-  filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),
+  `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу з `useListingsUiStore` +
+  toggle filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),
   `BulkActionBar` (за наявності `rowSelection`), `ListingsTableHeader`/`ListingsTableBody`/
   `TablePagination`/`DescriptionDialog`. `rowSelection` (`getRowId: row => String(row.id)`,
   `enableRowSelection: true`) скидається при зміні `searchId`. Клієнтська пагінація через
@@ -321,10 +332,16 @@ flowchart LR
   `DialogBackdrop`) — використовується `DescriptionDialog`, `ConfirmActionDialog` і діалогом
   підтвердження видалення.
 - `components/analysis/` — майстер LLM-аналізу: `AnalysisWizardDialog.tsx` (`DialogRoot
-  size={isMobile ? 'full' : 'xl'}` — на мобільному (`useIsMobile()`) діалог full-screen;
-  степер Критерії→Пошук→Перевірка→Вставка (`HStack wrap="wrap" rowGap={2}` — переноситься на
-  вузьких екранах), перемикачі Мінуси/Плюси та
-  вибрані/весь пошук; крок 2 (ручний режим) — кнопка «Завантажити ZIP-пакет»
+  size={isMobile ? 'full' : 'xl'}`, `closeOnInteractOutside={false}` — прогрес не втрачається
+  при кліку повз вікно; X і Esc лишаються); степер Критерії→Пошук→Перевірка→Вставка.
+  **Тільки на кроці 1** — перемикачі Мінуси/Плюси та scope (Вибрані / [Назва вкладки] /
+  Весь пошук); кнопка «Назва вкладки (N)» видима лише коли `statusFilter !== 'all'` (стор
+  `listingsUiStore`); кроки 2–4 — read-only рядок «{режим} · {scope} (N)» у хедері.
+  **Прогрес Flow в Zustand** (`analysisWizardStore`): `bindSearch(id)` скидає лише при зміні
+  пошуку, закриття без commit зберігає крок/критерії/результати; після commit (крок 4) та
+  «Почати заново» — `reset()`. Scope «tab» → `effectiveIds` = оголошення з поточним
+  статусом вкладки (fallback на весь пошук якщо `statusFilter === 'all'`).
+  Крок 2 (ручний режим) — кнопка «Завантажити ZIP-пакет»
   (`fetchAnalyzePackageZip`, `prompt.txt` + `descriptions/chunk-NNN.json`), `ManualAssistant`
   без `parts` (`emptyHint` з підказкою прогнати ZIP через чат і вставити єдиний JSON); крок 3 —
   спільні рендер-фрагменти рядка (`renderPhotoTitle`/`renderDescriptionBlock`/

@@ -7,6 +7,7 @@
 - **Monorepo:** npm workspaces — `server/` + `web/`.
 - **Backend:** Node.js 20+, TypeScript, **Fastify**, **better-sqlite3** (синхронний), **cheerio** (парсинг), **node-cron** (опц.).
 - **Frontend:** React 18 + **Vite** + **TanStack Table v8** + **TanStack Query v5** + **Chakra UI v3** (`@chakra-ui/react`, провайдер/тостер/тултіп — сніпети у `web/src/components/ui/`).
+- **State management:** **Zustand** (узгоджена залежність `web/`, in-memory без persist) — для клієнтського UI-стану, який пересікає кілька компонентів без prop drilling. Стори: `web/src/stores/listingsUiStore.ts` (вкладка фільтра статусів), `web/src/stores/analysisWizardStore.ts` (прогрес AI-Flow).
 - **Іконки:** `react-icons/lu` (набір Lucide) — стандартний вибір для Chakra UI v3.
 - **Notion:** `@notionhq/client`.
 - **LLM-аналіз:** OpenRouter через звичайний `fetch` (без SDK); Excel-експорт — **`exceljs`**
