@@ -10,12 +10,20 @@ export interface ApiFilters {
   privateOnly?: boolean;
 }
 
-/** Локальні (нерайонні) фільтри пошуку: стоп-слова й числові діапазони по params (Етап 2). */
+/** Локальні (нерайонні) фільтри пошуку: ціна/місто/продавець (Етап 2). */
 export interface LocalFilters {
-  /** Case-insensitive підрядки — збіг у title+description → filtered_out=1. */
-  exclude_keywords?: string[];
-  /** Числові діапазони по значенню params[key] (перше число в label); ключ відсутній/не парситься → правило не застосовується. */
-  ranges?: Record<string, { min?: number; max?: number }>;
+  // ── Заплановано на майбутнє (закомментовано, не видаляти) ──────────────
+  // /** Case-insensitive підрядки — збіг у title+description → filtered_out=1. */
+  // exclude_keywords?: string[];
+  // /** Числові діапазони по значенню params[key] (перше число в label); ключ відсутній/не парситься → правило не застосовується. */
+  // ranges?: Record<string, { min?: number; max?: number }>;
+
+  /** Діапазон ціни (UAH). price IS NULL → правило не застосовується до цього рядка. */
+  price_range?: { min?: number; max?: number };
+  /** Білий список міст (точна відповідність listings.city). Порожньо/відсутньо → правило вимкнено. */
+  cities?: string[];
+  /** Білий список продавців (точна відповідність listings.seller_name). Порожньо/відсутньо → правило вимкнено. */
+  sellers?: string[];
 }
 
 /** Конфіг пошуку (рядок таблиці searches у зручному вигляді). */
@@ -211,6 +219,14 @@ export interface ParamKeyInfo {
   key: string;
   /** До 3 прикладів значень (label) цього ключа з оголошень пошуку. */
   samples: string[];
+}
+
+/** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець". */
+export interface FilterOptions {
+  /** Унікальні непорожні listings.city цього пошуку, відсортовані. */
+  cities: string[];
+  /** Унікальні непорожні listings.seller_name цього пошуку, відсортовані. */
+  sellers: string[];
 }
 
 /** Останній рядок scan_runs — частина відповіді GET /api/searches/:id/stats. */

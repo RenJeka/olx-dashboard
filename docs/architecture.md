@@ -121,8 +121,8 @@ flowchart LR
 | `scraper/statusEngine.ts` | `applyScanStatuses(searchId, fetched, exhausted) → {disabled_count}` (Етап 2, A2) — вікно покриття на осі `last_refresh_at`: `windowFloor = lastRefreshAt` останнього отриманого (`null`, якщо `exhausted`; немає осі → прохід пропускається), відсутні у видачі кандидати в межах вікна дістають `miss_count += 1`, при `>= 2` (auto/rejected) → `disabled` + маркер `auto-disabled: coverage miss_count=2` у `note`. Викликається з `scanner.ts` лише для повних успішних GraphQL-сканів (часткові з warning — ні). |
 | `scraper/localFilters.ts` | `evaluateFilteredOut(filters, listing) → boolean` (Етап 2, A4) — стоп-слова (case-insensitive підрядок у title+description) і числові діапазони по `params[key]` (перше число в label). Чиста функція, використовується `normalizer.ts` і `routes/searches.ts` (ретроактивний перерахунок). |
 | `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
-| `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback (deep-гілка GraphQL → `fetchSearchSplit`, звичайна → `fetchSearch`); пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише для повних GraphQL-сканів без warning (split-скан ставить warning → `partial` → coverage пропускається); веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`); повертає `bucketsUsed`. Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
-| `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/stats`. |
+| `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
+| `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`). |
 | `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`, доповнено `plans/analysis-wizard-review-rework.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_ZIP_CHUNK_SIZE=50`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки, `MIME_ZIP`), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample`/`buildManualZipInstructions`/`buildChunkListings`/`PATTERNS_EXAMPLE_JSON` для авто Й ручного), `analyze.py` (готовий детермінований Python-движок для ZIP-пакета: regex-матчинг критеріїв з клауза-скоуп запереченнями, морфологічними стемами, дослівним evidence; читається з диску як `schema.sql` і кладеться в ZIP), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
 | `export/xlsx.ts` | `buildXlsxBuffer(sheet, columns, rows)` на **ExcelJS** — спільний Excel-експорт (превʼю аналізу + майбутній експорт усієї таблиці): заголовки/ширини, заморожений рядок заголовків, перенос тексту. |
@@ -167,7 +167,8 @@ flowchart LR
 | `POST` | `/api/searches/:id/verify` | ✅ Етап 2 (A3) — verify-прохід (кандидати P1+P2, ≤50 сторінок); повертає `VerifyResult {checked, alive, dead, unknown, reactivated, disabled_count, backfilled}` |
 | `GET` | `/api/searches/:id/scan-status` | ✅ Етап 1/2 — останній рядок `scan_runs` (для поллінгу прогресу глибокого скану/verify) |
 | `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 |
-| `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів |
+| `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів (UI закомментовано, заплановано на майбутнє) |
+| `GET` | `/api/searches/:id/filter-options` | ✅ Етап 2 — `{cities, sellers}` (DISTINCT непорожні значення цього пошуку) для дропдаунів Drawer'а локальних фільтрів |
 | `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку (`verify_candidates` = P1+P2, лічильник кнопки «Перевірити неактивні») |
 | `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?}`; зміна `status` → `status_source='manual'`, `miss_count=0` |
 | `GET` | `/api/analysis/status` | ✅ LLM-аналіз — `{apiAvailable, defaultModel}` (наявність `OPENROUTER_API_KEY`) |
@@ -201,15 +202,18 @@ flowchart LR
   `useScanStatus(searchId, enabled)` поллить `GET .../scan-status` раз на ~1.5с, поки
   `enabled`; `useSearchStats(searchId)` тягне `GET /api/searches/:id/stats` для панелі дій. `useUpdateListing()` —
   `PATCH /api/listings/:id` (`{status?, note?}`) з оптимістичним апдейтом кешу
-  `['listings', searchId]`. `useParamKeys(searchId, enabled)` — `GET .../param-keys` (для
-  конструктора діапазонів, увімкнено лише коли відкрито `SearchFiltersDrawer`).
+  `['listings', searchId]`. `useFilterOptions(searchId, enabled)` — `GET .../filter-options`
+  (`{cities, sellers}` для дропдаунів Drawer'а, увімкнено лише коли відкрито
+  `SearchFiltersDrawer`). `useParamKeys` — закомментовано (заплановано на майбутнє разом з
+  UI діапазонів params).
   `useUpdateSearchFilters()` — `PATCH /api/searches/:id` з `local_filters`, інвалідовує
   `['searches']` і `['listings', searchId]`, повертає `filtered_out_count`. `useDeleteSearch`
   інвалідовує `['searches']` і прибирає кеш `['listings', id]`; `useReorderSearches` шле
   `POST /api/searches/:id/move` і інвалідовує `['searches']`.
 - `types/index.ts` — централізований файл з усіма фронтенд-типами: `Listing` (включно з
   `status`, `status_source`, `note`, `filtered_out`, `miss_count`, `olx_status`),
-  `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`,
+  `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters` (`price_range`, `cities`,
+  `sellers`; старі `exclude_keywords`/`ranges` закомментовано), `ParamKeyInfo`, `FilterOptions`,
   `LastScanInfo`, `SearchStats`, `Search` (включно з `sort_order`, `visible_total_count`,
   `local_filters`), `NewSearchInput`, `StoredTableState` тощо — дзеркало відповідних типів
   `server/src/types.ts`.
@@ -296,10 +300,10 @@ flowchart LR
   «Швидкий скан» / «Глибокий скан» / «Перевірити неактивні (N)». Глибокий скан відкриває
   додатковий `ConfirmActionDialog`. Усі кнопки блокуються під час активного скану.
 - `components/SearchFiltersDrawer.tsx` — Drawer редактора `local_filters` (відкривається з
-  3-dot меню пошуку → «Фільтри»): стоп-слова як `Tag.Root` chips + `Input` з Enter; діапазони
-  — рядки `NativeSelect` (ключі з `useParamKeys`) + `Input` мін/макс + кнопка видалення,
-  «Додати правило». «Зберегти» → `useUpdateSearchFilters()` → toast з
-  `filtered_out_count`.
+  3-dot меню пошуку → «Фільтри»): діапазон цін (`Input` мін/макс), місто і продавець —
+  `NativeSelect` (варіанти з `useFilterOptions`) + `Tag.Root` chips з видаленням. «Зберегти»
+  → `useUpdateSearchFilters()` → toast з `filtered_out_count`. Стоп-слова й діапазони
+  params — закомментовано, заплановано на майбутнє.
 - `components/ConfirmActionDialog.tsx` — спільний діалог підтвердження довгої дії
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
