@@ -33,7 +33,7 @@ export function ListingsFilterBar({
   const setStatusFilter = useListingsUiStore((s) => s.setStatusFilter);
   const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
   const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
-  const visible = listings.filter((l) => showFilteredOut ? l.filtered_out === 1 : l.filtered_out === 0);
+  const visible = listings.filter((l) => showFilteredOut || l.filtered_out === 0);
 
   const items = [
     { value: 'all', label: `Всі (${visible.length})` },
@@ -57,17 +57,17 @@ export function ListingsFilterBar({
           </SegmentGroup.Root>
         </Box>
         <Switch
-          checked={showFilteredOut}
-          onCheckedChange={(d) => setShowFilteredOut(d.checked)}
-          colorPalette={showFilteredOut ? 'orange' : undefined}
+          checked={!showFilteredOut}
+          onCheckedChange={(d) => setShowFilteredOut(!d.checked)}
+          colorPalette={showFilteredOut ? undefined : 'orange'}
         >
           Показані{' '}
           <Box
             as="span"
             fontWeight="bold"
-            color={showFilteredOut ? 'orange.500' : undefined}
+            color={showFilteredOut ? undefined : 'orange.500'}
           >
-            {showFilteredOut ? 'ВІДФІЛЬТРОВАНІ' : 'ВСІ'}
+            {showFilteredOut ? 'ВСІ' : 'ВІДФІЛЬТРОВАНІ'}
           </Box>{' '}
           товари
         </Switch>
