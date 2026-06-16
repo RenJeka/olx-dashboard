@@ -1,14 +1,13 @@
 import { Box, HStack, SegmentGroup, Stack } from '@chakra-ui/react';
 import { Switch } from '../../ui/switch';
-import { LISTING_STATUSES, type Listing, type ListingStatus } from '../../../types';
+import { LISTING_STATUSES, type Listing } from '../../../types';
 import { STATUS_LABELS } from '../../../utils/status';
 import { BulkActionBar } from './BulkActionBar';
 import { SearchInput, type SearchScope } from './SearchInput';
+import { useListingsUiStore } from '../../../stores/listingsUiStore';
 
 interface Props {
   listings: Listing[];
-  statusFilter: ListingStatus | 'all';
-  onStatusFilterChange: (value: ListingStatus | 'all') => void;
   showFilteredOut: boolean;
   onShowFilteredOutChange: (value: boolean) => void;
   searchText: string;
@@ -24,8 +23,6 @@ interface Props {
 /** Панель над таблицею: фільтр за статусом (з лічильниками), toggle filtered_out, пошук. */
 export function ListingsFilterBar({
   listings,
-  statusFilter,
-  onStatusFilterChange,
   showFilteredOut,
   onShowFilteredOutChange,
   searchText,
@@ -36,6 +33,8 @@ export function ListingsFilterBar({
   selectedIds,
   onClearSelection,
 }: Props) {
+  const statusFilter = useListingsUiStore((s) => s.statusFilter);
+  const setStatusFilter = useListingsUiStore((s) => s.setStatusFilter);
   const visible = listings.filter((l) => showFilteredOut || l.filtered_out === 0);
 
   const items = [
@@ -53,7 +52,7 @@ export function ListingsFilterBar({
           <SegmentGroup.Root
             size="sm"
             value={statusFilter}
-            onValueChange={(d) => onStatusFilterChange((d.value as ListingStatus | 'all') ?? 'all')}
+            onValueChange={(d) => setStatusFilter((d.value as typeof statusFilter) ?? 'all')}
           >
             <SegmentGroup.Indicator cursor="pointer" />
             <SegmentGroup.Items items={items} cursor="pointer" />

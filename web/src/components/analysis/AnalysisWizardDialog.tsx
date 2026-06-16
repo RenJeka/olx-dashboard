@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
+import { useListingsUiStore } from '../../stores/listingsUiStore';
+import { STATUS_LABELS } from '../../utils/status';
 import {
   Badge,
   Box,
@@ -85,27 +88,33 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const { data: savedCriteria } = useSavedCriteria(open ? search.id : null);
   const { data: listings } = useListings(open ? search.id : null);
 
-  const [mode, setMode] = useState<AnalysisMode>('cons');
-  const [scope, setScope] = useState<'selected' | 'all'>(
-    selectedIds.length > 0 ? 'selected' : 'all',
-  );
-  const [step, setStep] = useState(1);
+  // Flow state — Zustand (переживає закриття/відкриття модалки в межах сесії)
+  const {
+    mode, setMode,
+    scope, setScope,
+    step, setStep,
+    available, setAvailable,
+    selected, setSelected,
+    customInput, setCustomInput,
+    accumulated, setAccumulated,
+    includedOverrides, setIncludedOverrides,
+    criteriaLoadedMode, setCriteriaLoadedMode,
+    bindSearch,
+    reset,
+  } = useAnalysisWizardStore();
+  const statusFilter = useListingsUiStore((s) => s.statusFilter);
 
+  // Ephemeral UI — скидаються при remount (прийнятно)
   // Крок 1
-  const [available, setAvailable] = useState<string[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [customInput, setCustomInput] = useState('');
   const [showCriteriaAssistant, setShowCriteriaAssistant] = useState(false);
   const [criteriaParts, setCriteriaParts] = useState<PackagePart[]>([]);
 
   // Крок 2
   const [showMatchAssistant, setShowMatchAssistant] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
-  const [accumulated, setAccumulated] = useState<AnalyzedListing[]>([]);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Крок 3
-  const [includedOverrides, setIncludedOverrides] = useState<Map<string, boolean>>(new Map());
   const [openDescriptionListing, setOpenDescriptionListing] = useState<Listing | null>(null);
 
   // Крок 4
@@ -126,32 +135,29 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     return m;
   }, [listings]);
 
-  const effectiveIds = scope === 'selected' ? selectedIds : allIds;
+  const effectiveIds = useMemo(() => {
+    if (scope === 'selected') return selectedIds;
+    if (scope === 'tab') {
+      if (statusFilter === 'all') return allIds;
+      return allIds.filter((id) => listingById.get(id)?.status === statusFilter);
+    }
+    return allIds;
+  }, [scope, selectedIds, allIds, listingById, statusFilter]);
   const apiAvailable = status?.apiAvailable ?? false;
   const model = loadAnalysisModel();
   const reasoning = loadAnalysisReasoning();
   const extra = loadAnalysisExtraCriteria();
 
-  // Перезавантаження критеріїв при зміні режиму / відкритті.
+  // Завантажуємо критерії лише при першому відкритті або зміні режиму на кроці 1.
+  // На кроках 2–4 не перезаписуємо прогрес при повторному відкритті.
   useEffect(() => {
     if (!open || !savedCriteria) return;
+    if (step !== 1 || mode === criteriaLoadedMode) return;
     const saved = savedCriteria[mode] ?? [];
     setAvailable(saved);
     setSelected(new Set(saved));
-  }, [open, mode, savedCriteria]);
-
-  function resetForReopen() {
-    setStep(1);
-    setAccumulated([]);
-    setCriteriaParts([]);
-    setShowCriteriaAssistant(false);
-    setShowMatchAssistant(false);
-    setZipDownloading(false);
-    setAnalyzeProgress(null);
-    setCommitProgress(null);
-    setIncludedOverrides(new Map());
-    setOpenDescriptionListing(null);
-  }
+    setCriteriaLoadedMode(mode);
+  }, [open, mode, savedCriteria, step, criteriaLoadedMode]);
 
   function mergeCriteria(incoming: string[]) {
     setAvailable((prev) => {
@@ -401,6 +407,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
         type: 'success',
         title: `Записано в таблицю: ${commitItems.length}`,
       });
+      reset();
       setOpen(false);
     } catch (err) {
       toaster.create({
@@ -444,6 +451,13 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
 
   const modeLabel = MODE_LABELS[mode];
   const chosenCount = available.filter((c) => selected.has(c)).length;
+  const tabCount = statusFilter !== 'all'
+    ? allIds.filter((id) => listingById.get(id)?.status === statusFilter).length
+    : 0;
+  const scopeLabel =
+    scope === 'selected' ? 'Вибрані'
+    : scope === 'tab' && statusFilter !== 'all' ? STATUS_LABELS[statusFilter]
+    : 'Весь пошук';
 
   // Крок 3: спільні фрагменти рядка для desktop-таблиці й mobile-карток.
   function renderPhotoTitle(l: Listing | undefined, fallbackId: number) {
@@ -510,11 +524,23 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       open={open}
       onOpenChange={(d) => {
         setOpen(d.open);
-        if (d.open) resetForReopen();
+        if (d.open) {
+          const prevBound = useAnalysisWizardStore.getState().boundSearchId;
+          bindSearch(search.id);
+          if (prevBound !== search.id) {
+            // Свіжий Flow — виставляємо розумний дефолт scope
+            const defaultScope =
+              selectedIds.length > 0 ? 'selected'
+              : statusFilter !== 'all' ? 'tab'
+              : 'all';
+            setScope(defaultScope);
+          }
+        }
       }}
       size={isMobile ? 'full' : 'xl'}
       placement="center"
       scrollBehavior="inside"
+      closeOnInteractOutside={false}
     >
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" colorPalette="purple">
@@ -551,37 +577,54 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </HStack>
               ))}
             </HStack>
-            {/* Перемикачі режиму та обсягу */}
-            <HStack gap={4} wrap="wrap">
-              <HStack gap={1}>
-                <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="red" onClick={() => setMode('cons')}>
-                  Мінуси
-                </Button>
-                <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="green" onClick={() => setMode('pros')}>
-                  Плюси
-                </Button>
-              </HStack>
-              <HStack gap={1}>
-                <Button
-                  size="xs"
-                  variant={scope === 'selected' ? 'solid' : 'outline'}
-                  colorPalette="blue"
-                  disabled={selectedIds.length === 0}
-                  onClick={() => setScope('selected')}
-                >
-                  Вибрані ({selectedIds.length})
-                </Button>
-                <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
-                  Весь пошук ({allIds.length})
-                </Button>
-              </HStack>
-            </HStack>
+            {/* Кроки 2–4: read-only підсумок режиму та scope */}
+            {step > 1 && (
+              <Text textStyle="xs" color="fg.muted">
+                {modeLabel} · {scopeLabel} ({effectiveIds.length})
+              </Text>
+            )}
           </Stack>
         </DialogHeader>
 
         <DialogBody pb={6}>
           {step === 1 && (
             <Stack gap={4}>
+              {/* Перемикачі режиму та scope */}
+              <HStack gap={4} wrap="wrap">
+                <HStack gap={1}>
+                  <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="red" onClick={() => setMode('cons')}>
+                    Мінуси
+                  </Button>
+                  <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="green" onClick={() => setMode('pros')}>
+                    Плюси
+                  </Button>
+                </HStack>
+                <HStack gap={1}>
+                  <Button
+                    size="xs"
+                    variant={scope === 'selected' ? 'solid' : 'outline'}
+                    colorPalette="blue"
+                    disabled={selectedIds.length === 0}
+                    onClick={() => setScope('selected')}
+                  >
+                    Вибрані ({selectedIds.length})
+                  </Button>
+                  {statusFilter !== 'all' && (
+                    <Button
+                      size="xs"
+                      variant={scope === 'tab' ? 'solid' : 'outline'}
+                      colorPalette="blue"
+                      onClick={() => setScope('tab')}
+                    >
+                      {STATUS_LABELS[statusFilter]} ({tabCount})
+                    </Button>
+                  )}
+                  <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
+                    Весь пошук ({allIds.length})
+                  </Button>
+                </HStack>
+              </HStack>
+
               <Text textStyle="sm" color="fg.muted">
                 Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
               </Text>
@@ -644,9 +687,27 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
               )}
 
               <HStack justify="space-between">
-                <Text textStyle="sm" color="fg.muted">
-                  Обрано {chosenCount} із {available.length}
-                </Text>
+                <HStack gap={2}>
+                  <Text textStyle="sm" color="fg.muted">
+                    Обрано {chosenCount} із {available.length}
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="gray"
+                    onClick={() => {
+                      reset();
+                      bindSearch(search.id);
+                      const defaultScope =
+                        selectedIds.length > 0 ? 'selected'
+                        : statusFilter !== 'all' ? 'tab'
+                        : 'all';
+                      setScope(defaultScope);
+                    }}
+                  >
+                    Почати заново
+                  </Button>
+                </HStack>
                 <Button colorPalette="blue" onClick={goToMatching} loading={saveCriteria.isPending}>
                   Далі: пошук
                 </Button>

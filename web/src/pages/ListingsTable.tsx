@@ -13,6 +13,7 @@ import {
 import { Box, Flex, Spinner, Table, Text } from '@chakra-ui/react';
 import { useListings } from '../api/client';
 import { useListingsTableState } from '../hooks/useListingsTableState';
+import { useListingsUiStore } from '../stores/listingsUiStore';
 import { columns } from '../components/table/columns';
 import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
 import { ListingsTableBody } from '../components/table/ListingsTableBody';
@@ -21,7 +22,7 @@ import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
 import type { SearchScope } from '../components/table/topbar';
-import type { Listing, ListingStatus } from '../types';
+import type { Listing } from '../types';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
 
@@ -49,7 +50,7 @@ export function ListingsTable({
   const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
     useListingsTableState();
   const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
-  const [statusFilter, setStatusFilter] = useState<ListingStatus | 'all'>('all');
+  const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const [showFilteredOut, setShowFilteredOut] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
@@ -147,8 +148,6 @@ export function ListingsTable({
     <Flex direction="column" flex="1" overflow="hidden">
       <ListingsFilterBar
         listings={rows}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
         showFilteredOut={showFilteredOut}
         onShowFilteredOutChange={setShowFilteredOut}
         searchText={searchText}
