@@ -1,4 +1,5 @@
 import type { LocalFilters } from '../types.js';
+import { parseBullets } from '../analysis/text.js';
 
 /** Поля оголошення, потрібні для оцінки локальних фільтрів. */
 export interface FilterableListing {
@@ -8,6 +9,8 @@ export interface FilterableListing {
   price: number | null;
   city: string | null;
   seller_name: string | null;
+  pros: string | null;
+  cons: string | null;
 }
 
 // ── Заплановано на майбутнє (закомментовано, не видаляти) ──────────────────
@@ -32,6 +35,8 @@ export interface FilterableListing {
  * - `price_range` — `listing.price` поза межами min/max → filtered_out; `price IS NULL` → правило не застосовується.
  * - `cities` — білий список; якщо непорожній і `listing.city` відсутній або не в списку → filtered_out.
  * - `sellers` — білий список; якщо непорожній і `listing.seller_name` відсутній або не в списку → filtered_out.
+ * - `pros` — білий список критеріїв; якщо непорожній і жоден з обраних критеріїв не присутній у `listing.pros` → filtered_out.
+ * - `cons` — білий список критеріїв; якщо непорожній і жоден з обраних критеріїв не присутній у `listing.cons` → filtered_out.
  */
 export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableListing): boolean {
   // ── Заплановано на майбутнє (закомментовано, не видаляти) ────────────────
@@ -78,6 +83,18 @@ export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableLi
   const sellers = filters.sellers ?? [];
   if (sellers.length > 0) {
     if (listing.seller_name == null || !sellers.includes(listing.seller_name)) return true;
+  }
+
+  const filterPros = filters.pros ?? [];
+  if (filterPros.length > 0) {
+    const listingPros = parseBullets(listing.pros);
+    if (!listingPros.some((p) => filterPros.includes(p))) return true;
+  }
+
+  const filterCons = filters.cons ?? [];
+  if (filterCons.length > 0) {
+    const listingCons = parseBullets(listing.cons);
+    if (!listingCons.some((c) => filterCons.includes(c))) return true;
   }
 
   return false;

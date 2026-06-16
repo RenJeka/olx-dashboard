@@ -37,6 +37,8 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
   const [priceMax, setPriceMax] = useState('');
   const [cities, setCities] = useState<string[]>([]);
   const [sellers, setSellers] = useState<string[]>([]);
+  const [pros, setPros] = useState<string[]>([]);
+  const [cons, setCons] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +47,8 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     setPriceMax(filters.price_range?.max != null ? String(filters.price_range.max) : '');
     setCities(filters.cities ?? []);
     setSellers(filters.sellers ?? []);
+    setPros(filters.pros ?? []);
+    setCons(filters.cons ?? []);
   }, [open, search.local_filters]);
 
   function addCity(city: string) {
@@ -65,6 +69,24 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     setSellers((prev) => prev.filter((s) => s !== seller));
   }
 
+  function addPro(criterion: string) {
+    if (!criterion || pros.includes(criterion)) return;
+    setPros((prev) => [...prev, criterion]);
+  }
+
+  function removePro(criterion: string) {
+    setPros((prev) => prev.filter((p) => p !== criterion));
+  }
+
+  function addCon(criterion: string) {
+    if (!criterion || cons.includes(criterion)) return;
+    setCons((prev) => [...prev, criterion]);
+  }
+
+  function removeCon(criterion: string) {
+    setCons((prev) => prev.filter((c) => c !== criterion));
+  }
+
   function handleSave() {
     const local_filters: LocalFilters = {};
 
@@ -77,6 +99,8 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
 
     if (cities.length > 0) local_filters.cities = cities;
     if (sellers.length > 0) local_filters.sellers = sellers;
+    if (pros.length > 0) local_filters.pros = pros;
+    if (cons.length > 0) local_filters.cons = cons;
 
     updateFilters.mutate(
       { searchId: search.id, local_filters },
@@ -205,6 +229,84 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
             </Stack>
+
+            {filterOptions && filterOptions.pros.length > 0 && (
+              <Stack gap={2}>
+                <Text fontWeight="medium">Плюси</Text>
+                <Text textStyle="xs" color="fg.muted">
+                  Якщо обрано хоча б один плюс — показуються лише оголошення, де він
+                  знайдений. Незаналізовані оголошення — приховуються.
+                </Text>
+                <Wrap gap={2}>
+                  {pros.map((criterion) => (
+                    <Tag.Root key={criterion} size="md" colorPalette="green">
+                      <Tag.Label>{criterion}</Tag.Label>
+                      <Tag.EndElement>
+                        <Tag.CloseTrigger onClick={() => removePro(criterion)} />
+                      </Tag.EndElement>
+                    </Tag.Root>
+                  ))}
+                </Wrap>
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    value=""
+                    onChange={(e) => {
+                      addPro(e.target.value);
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Додати плюс…</option>
+                    {filterOptions.pros
+                      .filter((c) => !pros.includes(c))
+                      .map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Stack>
+            )}
+
+            {filterOptions && filterOptions.cons.length > 0 && (
+              <Stack gap={2}>
+                <Text fontWeight="medium">Мінуси</Text>
+                <Text textStyle="xs" color="fg.muted">
+                  Якщо обрано хоча б один мінус — показуються лише оголошення, де він
+                  знайдений. Незаналізовані оголошення — приховуються.
+                </Text>
+                <Wrap gap={2}>
+                  {cons.map((criterion) => (
+                    <Tag.Root key={criterion} size="md" colorPalette="red">
+                      <Tag.Label>{criterion}</Tag.Label>
+                      <Tag.EndElement>
+                        <Tag.CloseTrigger onClick={() => removeCon(criterion)} />
+                      </Tag.EndElement>
+                    </Tag.Root>
+                  ))}
+                </Wrap>
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    value=""
+                    onChange={(e) => {
+                      addCon(e.target.value);
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Додати мінус…</option>
+                    {filterOptions.cons
+                      .filter((c) => !cons.includes(c))
+                      .map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Stack>
+            )}
           </Stack>
         </DrawerBody>
         <DrawerFooter>

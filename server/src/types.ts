@@ -24,6 +24,10 @@ export interface LocalFilters {
   cities?: string[];
   /** Білий список продавців (точна відповідність listings.seller_name). Порожньо/відсутньо → правило вимкнено. */
   sellers?: string[];
+  /** Білий список критеріїв плюсів (listings.pros). Оголошення має мати хоча б один. Порожньо → вимкнено. */
+  pros?: string[];
+  /** Білий список критеріїв мінусів (listings.cons). Оголошення має мати хоча б один. Порожньо → вимкнено. */
+  cons?: string[];
 }
 
 /** Конфіг пошуку (рядок таблиці searches у зручному вигляді). */
@@ -221,12 +225,16 @@ export interface ParamKeyInfo {
   samples: string[];
 }
 
-/** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець". */
+/** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */
 export interface FilterOptions {
   /** Унікальні непорожні listings.city цього пошуку, відсортовані. */
   cities: string[];
   /** Унікальні непорожні listings.seller_name цього пошуку, відсортовані. */
   sellers: string[];
+  /** Критерії плюсів із searches.analysis_criteria для цього пошуку. */
+  pros: string[];
+  /** Критерії мінусів із searches.analysis_criteria для цього пошуку. */
+  cons: string[];
 }
 
 /** Останній рядок scan_runs — частина відповіді GET /api/searches/:id/stats. */

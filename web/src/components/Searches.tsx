@@ -261,12 +261,16 @@ function hasActiveLocalFilters(raw: string): boolean {
       price_range?: { min?: number; max?: number };
       cities?: string[];
       sellers?: string[];
+      pros?: string[];
+      cons?: string[];
     };
     return (
       f.price_range?.min != null ||
       f.price_range?.max != null ||
       (Array.isArray(f.cities) && f.cities.length > 0) ||
-      (Array.isArray(f.sellers) && f.sellers.length > 0)
+      (Array.isArray(f.sellers) && f.sellers.length > 0) ||
+      (Array.isArray(f.pros) && f.pros.length > 0) ||
+      (Array.isArray(f.cons) && f.cons.length > 0)
     );
   } catch {
     return false;
