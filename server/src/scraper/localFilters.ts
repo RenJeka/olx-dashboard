@@ -1,4 +1,5 @@
 import type { LocalFilters } from '../types.js';
+import { parseBullets } from '../analysis/text.js';
 
 /** Поля оголошення, потрібні для оцінки локальних фільтрів. */
 export interface FilterableListing {
@@ -8,6 +9,8 @@ export interface FilterableListing {
   price: number | null;
   city: string | null;
   seller_name: string | null;
+  pros: string | null;
+  cons: string | null;
 }
 
 // ── Заплановано на майбутнє (закомментовано, не видаляти) ──────────────────
@@ -29,9 +32,18 @@ export interface FilterableListing {
 /**
  * Оцінює, чи оголошення підпадає під локальні фільтри пошуку (filtered_out=1).
  *
- * - `price_range` — `listing.price` поза межами min/max → filtered_out; `price IS NULL` → правило не застосовується.
- * - `cities` — білий список; якщо непорожній і `listing.city` відсутній або не в списку → filtered_out.
- * - `sellers` — білий список; якщо непорожній і `listing.seller_name` відсутній або не в списку → filtered_out.
+ * Кожна група фільтрів має два режими (керується `filters.invert.<group>`):
+ * - **прямий** (false / відсутній): показувати лише збіги (білий список).
+ * - **інвертований** (true): збіги приховувати (чорний список).
+ *
+ * Групи:
+ * - `price_range` — `listing.price` поза/в межах min/max; `price IS NULL` → правило не застосовується.
+ * - `cities` — список міст (точна відповідність listing.city).
+ * - `sellers` — список продавців (точна відповідність listing.seller_name).
+ * - `pros` — список критеріїв плюсів; оголошення має мати хоча б один.
+ * - `cons` — список критеріїв мінусів; оголошення має мати хоча б один.
+ *
+ * Між групами — AND: повернути true, якщо будь-яке правило спрацювало.
  */
 export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableListing): boolean {
   // ── Заплановано на майбутнє (закомментовано, не видаляти) ────────────────
@@ -64,20 +76,43 @@ export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableLi
   //   }
   // }
 
+  const invert = filters.invert ?? {};
+
+  // ── Ціна ──────────────────────────────────────────────────────────────────
   const priceRange = filters.price_range;
   if (priceRange && listing.price != null) {
-    if (priceRange.min != null && listing.price < priceRange.min) return true;
-    if (priceRange.max != null && listing.price > priceRange.max) return true;
+    const within =
+      (priceRange.min == null || listing.price >= priceRange.min) &&
+      (priceRange.max == null || listing.price <= priceRange.max);
+    if (invert.price_range ? within : !within) return true;
   }
 
+  // ── Міста ─────────────────────────────────────────────────────────────────
   const cities = filters.cities ?? [];
   if (cities.length > 0) {
-    if (listing.city == null || !cities.includes(listing.city)) return true;
+    const inList = listing.city != null && cities.includes(listing.city);
+    if (invert.cities ? inList : !inList) return true;
   }
 
+  // ── Продавці ──────────────────────────────────────────────────────────────
   const sellers = filters.sellers ?? [];
   if (sellers.length > 0) {
-    if (listing.seller_name == null || !sellers.includes(listing.seller_name)) return true;
+    const inList = listing.seller_name != null && sellers.includes(listing.seller_name);
+    if (invert.sellers ? inList : !inList) return true;
+  }
+
+  // ── Плюси ─────────────────────────────────────────────────────────────────
+  const filterPros = filters.pros ?? [];
+  if (filterPros.length > 0) {
+    const hasAny = parseBullets(listing.pros).some((p) => filterPros.includes(p));
+    if (invert.pros ? hasAny : !hasAny) return true;
+  }
+
+  // ── Мінуси ────────────────────────────────────────────────────────────────
+  const filterCons = filters.cons ?? [];
+  if (filterCons.length > 0) {
+    const hasAny = parseBullets(listing.cons).some((c) => filterCons.includes(c));
+    if (invert.cons ? hasAny : !hasAny) return true;
   }
 
   return false;

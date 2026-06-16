@@ -51,7 +51,8 @@ export function ListingsTable({
     useListingsTableState();
   const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
-  const [showFilteredOut, setShowFilteredOut] = useState(false);
+  const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
+  const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
   const [searchText, setSearchText] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
 
@@ -148,8 +149,6 @@ export function ListingsTable({
     <Flex direction="column" flex="1" overflow="hidden">
       <ListingsFilterBar
         listings={rows}
-        showFilteredOut={showFilteredOut}
-        onShowFilteredOutChange={setShowFilteredOut}
         searchText={searchText}
         onSearchTextChange={setSearchText}
         searchScope={searchScope}

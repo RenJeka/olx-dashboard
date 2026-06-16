@@ -8,8 +8,6 @@ import { useListingsUiStore } from '../../../stores/listingsUiStore';
 
 interface Props {
   listings: Listing[];
-  showFilteredOut: boolean;
-  onShowFilteredOutChange: (value: boolean) => void;
   searchText: string;
   onSearchTextChange: (value: string) => void;
   searchScope: SearchScope;
@@ -23,8 +21,6 @@ interface Props {
 /** Панель над таблицею: фільтр за статусом (з лічильниками), toggle filtered_out, пошук. */
 export function ListingsFilterBar({
   listings,
-  showFilteredOut,
-  onShowFilteredOutChange,
   searchText,
   onSearchTextChange,
   searchScope,
@@ -35,6 +31,8 @@ export function ListingsFilterBar({
 }: Props) {
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const setStatusFilter = useListingsUiStore((s) => s.setStatusFilter);
+  const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
+  const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
   const visible = listings.filter((l) => showFilteredOut || l.filtered_out === 0);
 
   const items = [
@@ -59,10 +57,19 @@ export function ListingsFilterBar({
           </SegmentGroup.Root>
         </Box>
         <Switch
-          checked={showFilteredOut}
-          onCheckedChange={(d) => onShowFilteredOutChange(d.checked)}
+          checked={!showFilteredOut}
+          onCheckedChange={(d) => setShowFilteredOut(!d.checked)}
+          colorPalette={showFilteredOut ? undefined : 'orange'}
         >
-          Показати відфільтровані
+          Показані{' '}
+          <Box
+            as="span"
+            fontWeight="bold"
+            color={showFilteredOut ? undefined : 'orange.500'}
+          >
+            {showFilteredOut ? 'ВСІ' : 'ВІДФІЛЬТРОВАНІ'}
+          </Box>{' '}
+          товари
         </Switch>
       </HStack>
 

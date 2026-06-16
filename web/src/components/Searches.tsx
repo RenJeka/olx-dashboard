@@ -255,6 +255,28 @@ interface SearchRowProps {
   onDeleted: () => void;
 }
 
+function hasActiveLocalFilters(raw: string): boolean {
+  try {
+    const f = JSON.parse(raw || '{}') as {
+      price_range?: { min?: number; max?: number };
+      cities?: string[];
+      sellers?: string[];
+      pros?: string[];
+      cons?: string[];
+    };
+    return (
+      f.price_range?.min != null ||
+      f.price_range?.max != null ||
+      (Array.isArray(f.cities) && f.cities.length > 0) ||
+      (Array.isArray(f.sellers) && f.sellers.length > 0) ||
+      (Array.isArray(f.pros) && f.pros.length > 0) ||
+      (Array.isArray(f.cons) && f.cons.length > 0)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: SearchRowProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -296,9 +318,16 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
         onClick={onSelect}
       >
         <Box overflow="hidden" flex="1" minW={0}>
-          <Text textStyle="sm" fontWeight="medium" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-            {search.name}
-          </Text>
+          <HStack gap={1} overflow="hidden">
+            <Text textStyle="sm" fontWeight="medium" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" flex="1">
+              {search.name}
+            </Text>
+            {hasActiveLocalFilters(search.local_filters) && (
+              <Tooltip content="Застосований фільтр">
+                <Box w="2" h="2" bg="orange.500" rounded="full" flexShrink={0} cursor="default" />
+              </Tooltip>
+            )}
+          </HStack>
           <Text textStyle="xs" color="fg.muted" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {search.query}
           </Text>

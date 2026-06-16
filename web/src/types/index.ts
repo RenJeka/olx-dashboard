@@ -23,6 +23,21 @@ export interface LocalFilters {
   cities?: string[];
   /** Білий список продавців (точна відповідність Listing.seller_name). */
   sellers?: string[];
+  /** Білий список критеріїв плюсів. Оголошення має мати хоча б один. Порожньо → вимкнено. */
+  pros?: string[];
+  /** Білий список критеріїв мінусів. Оголошення має мати хоча б один. Порожньо → вимкнено. */
+  cons?: string[];
+  /**
+   * Інвертований режим для кожної групи фільтрів. Відсутній ключ / false = прямий режим.
+   * true = збіги приховуються (чорний список). Кожна група незалежна.
+   */
+  invert?: {
+    price_range?: boolean;
+    cities?: boolean;
+    sellers?: boolean;
+    pros?: boolean;
+    cons?: boolean;
+  };
 }
 
 /** Розподіл ключів params цього пошуку (з GET /api/searches/:id/param-keys) — для конструктора діапазонів. */
@@ -31,10 +46,12 @@ export interface ParamKeyInfo {
   samples: string[];
 }
 
-/** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець". */
+/** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */
 export interface FilterOptions {
   cities: string[];
   sellers: string[];
+  pros: string[];
+  cons: string[];
 }
 
 /** Відповідь PATCH /api/searches/:id при зміні local_filters — містить лічильник перерахунку. */

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
 import { runScan, runVerify, countVerifyCandidates } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
+import { parseBullets } from '../analysis/text.js';
 import type { FilterOptions, LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
 
 interface SearchBody {
@@ -133,7 +134,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const listingRows = db
-        .prepare('SELECT id, title, description, params, price, city, seller_name FROM listings WHERE search_id = ?')
+        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons FROM listings WHERE search_id = ?')
         .all(id) as {
           id: number;
           title: string | null;
@@ -142,6 +143,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
           price: number | null;
           city: string | null;
           seller_name: string | null;
+          pros: string | null;
+          cons: string | null;
         }[];
 
       const updateFilteredOut = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
@@ -302,7 +305,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     return result;
   });
 
-  // Варіанти для фільтрів "Місто"/"Продавець" (Drawer локальних фільтрів).
+  // Варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси" (Drawer локальних фільтрів).
+  // Плюси/мінуси — DISTINCT критерії з реальних рядків (враховує ручний едіт, не лише analysis_criteria).
   app.get<{ Params: { id: string } }>('/api/searches/:id/filter-options', async (req) => {
     const id = Number(req.params.id);
 
@@ -318,9 +322,24 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       )
       .all(id) as { seller_name: string }[];
 
+    // Унікальні критерії плюсів/мінусів — DISTINCT із рядків listings, парсинг bullet-тексту.
+    const prosRows = db
+      .prepare("SELECT pros FROM listings WHERE search_id = ? AND pros IS NOT NULL AND pros != ''")
+      .all(id) as { pros: string }[];
+    const consRows = db
+      .prepare("SELECT cons FROM listings WHERE search_id = ? AND cons IS NOT NULL AND cons != ''")
+      .all(id) as { cons: string }[];
+
+    const prosSet = new Set<string>();
+    for (const row of prosRows) parseBullets(row.pros).forEach((c) => prosSet.add(c));
+    const consSet = new Set<string>();
+    for (const row of consRows) parseBullets(row.cons).forEach((c) => consSet.add(c));
+
     const result: FilterOptions = {
       cities: cityRows.map((r) => r.city),
       sellers: sellerRows.map((r) => r.seller_name),
+      pros: [...prosSet].sort(),
+      cons: [...consSet].sort(),
     };
     return result;
   });
