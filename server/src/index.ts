@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { searchesRoutes } from './routes/searches.js';
 import { listingsRoutes } from './routes/listings.js';
-import { analysisRoutes } from './routes/analysis.js';
+import { analysisRoutes } from './routes/analysis/index.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 

@@ -16,7 +16,7 @@ import {
 import { TbBrandDaysCounter } from 'react-icons/tb';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
-import { formatPrice, formatDate, stripDescriptionHtml } from '../../utils/format';
+import { formatPrice, formatDate, stripDescriptionHtml, countProsConsItems } from '../../utils/format';
 import { StatusCell } from './StatusCell';
 import { NoteCell } from './NoteCell';
 import { ProsConsCell } from './ProsConsCell';
@@ -210,7 +210,11 @@ export const columns = [
     size: 200,
     minSize: 120,
     maxSize: 400,
-    enableSorting: false,
+    // Сортування за кількістю пунктів: більше плюсів — вищий пріоритет.
+    // `sortDescFirst` — перший клік одразу дає спадання (найбільше зверху).
+    sortDescFirst: true,
+    sortingFn: (a, b) =>
+      countProsConsItems(a.original.pros) - countProsConsItems(b.original.pros),
     cell: (info) => <ProsConsCell listing={info.row.original} field="pros" />,
   }),
   columnHelper.accessor('cons', {
@@ -219,7 +223,11 @@ export const columns = [
     size: 200,
     minSize: 120,
     maxSize: 400,
-    enableSorting: false,
+    // Сортування за кількістю пунктів: більше мінусів — вищий пріоритет.
+    // `sortDescFirst` — перший клік одразу дає спадання (найбільше зверху).
+    sortDescFirst: true,
+    sortingFn: (a, b) =>
+      countProsConsItems(a.original.cons) - countProsConsItems(b.original.cons),
     cell: (info) => <ProsConsCell listing={info.row.original} field="cons" />,
   }),
 ];

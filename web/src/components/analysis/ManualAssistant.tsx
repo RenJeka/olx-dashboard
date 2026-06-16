@@ -17,6 +17,8 @@ interface Props {
   submitting?: boolean;
   /** Лічильник/підказка під полем вставки (напр. «Опрацьовано 12»). */
   footer?: React.ReactNode;
+  /** Заміняє дефолтний текст-підказку, коли `parts` порожній (напр. підказка про ZIP). */
+  emptyHint?: React.ReactNode;
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * безкоштовного чату + поле для вставки відповіді. Перевикористовується для кроків
  * «Критерії» і «Пошук».
  */
-export function ManualAssistant({ title, parts, pasteLabel, onSubmit, submitting, footer }: Props) {
+export function ManualAssistant({ title, parts, pasteLabel, onSubmit, submitting, footer, emptyHint }: Props) {
   const [raw, setRaw] = useState('');
   const multiPart = parts.length > 1;
 
@@ -35,9 +37,11 @@ export function ManualAssistant({ title, parts, pasteLabel, onSubmit, submitting
       </Text>
 
       {parts.length === 0 ? (
-        <Text textStyle="xs" color="fg.muted">
-          Натисни кнопку нижче, щоб підготувати промпт.
-        </Text>
+        emptyHint ?? (
+          <Text textStyle="xs" color="fg.muted">
+            Натисни кнопку нижче, щоб підготувати промпт.
+          </Text>
+        )
       ) : (
         <Stack gap={2}>
           {parts.map((part, i) => (

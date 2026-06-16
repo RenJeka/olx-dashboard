@@ -107,6 +107,7 @@ export function App() {
           selectedId={selectedId}
           onSelect={setSelectedId}
           visible={searchesVisible}
+          onVisibleChange={setSearchesVisible}
         />
         <ListingsTable
           searchId={selectedId}
