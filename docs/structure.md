@@ -44,13 +44,15 @@ olx-dashboard/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
 │       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
-│       │   ├── constants.ts  # ЄДИНЕ джерело magic-значень (моделі, ліміти, чанки (AUTO_CHUNK_SIZE/MANUAL_ZIP_CHUNK_SIZE), мапи режиму, scaffold, повідомлення, MIME_ZIP)
+│       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
+│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getSavedCriteria/loadListings
+│       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
-│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed
+│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       ├── export/
 │       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
 │       ├── scraper/
@@ -65,7 +67,11 @@ olx-dashboard/
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + stats + PATCH (filters)
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
-│           └── analysis.ts   # LLM-аналіз: /analysis/status, criteria (generate/prompt/import/PUT), analyze (auto/package.zip/import), commit, export
+│           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
+│               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
+│               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import, GET .../prompt
+│               ├── matching.ts # A5: POST /analyze, GET /analyze/package.zip, POST /analyze/import+export
+│               └── commit.ts   # POST /api/listings/analyze/commit (запис cons/pros у БД)
 │
 └── web/                      # workspace "web" (React + Vite), type: module
     ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
@@ -165,5 +171,5 @@ olx-dashboard/
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphqlOlxFetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
-| LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
+| LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

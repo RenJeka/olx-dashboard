@@ -33,3 +33,12 @@ export function evidenceConfirmed(evidence: string, description: string): boolea
   if (needle.length < EVIDENCE_MIN_LENGTH) return false;
   return normalizeForMatch(description).includes(needle);
 }
+
+/** TEXT-поле pros/cons (`• item\n• item`, сумісне з ручним едітом) → масив пунктів. */
+export function parseBullets(text: string | null): string[] {
+  if (!text) return [];
+  return text
+    .split('\n')
+    .map((line) => line.replace(/^•\s*/, '').trim())
+    .filter(Boolean);
+}

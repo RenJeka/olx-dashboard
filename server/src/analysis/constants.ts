@@ -61,6 +61,11 @@ export const MIME_ZIP = 'application/zip';
 /** Ширини колонок Excel-експорту превʼю. */
 export const PREVIEW_XLSX_WIDTHS = { title: 40, description: 60, criteria: 40 } as const;
 
+// ── Типи / guard ────────────────────────────────────────────────────────────────
+export function isMode(value: unknown): value is AnalysisMode {
+  return value === 'cons' || value === 'pros';
+}
+
 // ── Мапи режиму ────────────────────────────────────────────────────────────────
 /** Підпис режиму (заголовок колонки/файлу). */
 export const MODE_LABEL: Record<AnalysisMode, string> = { cons: 'Мінуси', pros: 'Плюси' };
