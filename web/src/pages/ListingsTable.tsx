@@ -140,6 +140,8 @@ export function ListingsTable({
   }
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id);
+  // Підпис видимих колонок (порядок + видимість) — інвалідує memo-рядки при reorder/toggle.
+  const columnLayoutKey = table.getVisibleLeafColumns().map((c) => c.id).join(',');
 
   return (
     <Flex direction="column" flex="1" overflow="hidden">
@@ -165,6 +167,7 @@ export function ListingsTable({
             descriptionExpandEnabled={descriptionExpandEnabled}
             onOpenDescription={setDescriptionListing}
             searchQuery={searchText}
+            columnLayoutKey={columnLayoutKey}
           />
         </Table.Root>
         {table.getRowModel().rows.length === 0 && (
