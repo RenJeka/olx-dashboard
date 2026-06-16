@@ -39,6 +39,16 @@
   Прогрес (`requests_done`/`requests_total` у `scan_runs`) пишеться через
   `FetchOptions.onProgress` і віддається `GET /api/searches/:id/scan-status` для
   поллінгу фронтендом. Деталі — `docs/olx-api.md` §2.9.
+- **Авто-розбиття по ціні (всередині глибокого скану):** якщо `visible_total_count > 1000`
+  (вікно пагінації), глибокий скан автоматично ділить ціновий діапазон адаптивною бісекцією
+  на під-діапазони ≤ вікна, сканує кожен і зливає через дедуп `olx_id`. Верхня межа без явної
+  `to` — `probeMaxPrice` (зондування ціною спадно, **самоперевіряється**: сортування за ціною
+  в OLX GraphQL не верифіковане live; якщо не спрацювало — звичайний deep + попередження).
+  Запобіжники: `MAX_BUCKETS=40`, `MAX_TOTAL_REQUESTS=200`, паузи 3–6с між батчами/бакетами.
+  **Вікно покриття для split-скану НЕ запускається** (union кількох діапазонів не
+  відсортований глобально за refresh — `warning` робить скан `partial`). Реалізація —
+  `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`); план/деталі —
+  `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
 - Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`, `fetchSearch(search, options?: FetchOptions)`);
   подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
