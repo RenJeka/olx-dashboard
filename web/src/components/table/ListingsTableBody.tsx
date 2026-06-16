@@ -8,6 +8,7 @@ interface ListingsTableBodyProps {
   descriptionExpandEnabled: boolean;
   onOpenDescription: (listing: Listing) => void;
   searchQuery: string;
+  columnLayoutKey: string;
 }
 
 export function ListingsTableBody({
@@ -15,6 +16,7 @@ export function ListingsTableBody({
   descriptionExpandEnabled,
   onOpenDescription,
   searchQuery,
+  columnLayoutKey,
 }: ListingsTableBodyProps) {
   return (
     <Table.Body>
@@ -26,6 +28,7 @@ export function ListingsTableBody({
           descriptionExpandEnabled={descriptionExpandEnabled}
           onOpenDescription={onOpenDescription}
           searchQuery={searchQuery}
+          columnLayoutKey={columnLayoutKey}
         />
       ))}
     </Table.Body>

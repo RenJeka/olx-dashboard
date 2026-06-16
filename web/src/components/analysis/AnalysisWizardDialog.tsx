@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
+import { useListingsUiStore } from '../../stores/listingsUiStore';
+import { STATUS_LABELS } from '../../utils/status';
 import {
   Badge,
   Box,
   Button,
-  Flex,
   HStack,
   IconButton,
   Image,
   Input,
   Progress,
   Stack,
+  Table,
   Text,
   Wrap,
 } from '@chakra-ui/react';
@@ -21,6 +24,7 @@ import {
   LuFileSpreadsheet,
   LuFileJson,
   LuSearch,
+  LuDownload,
 } from 'react-icons/lu';
 import {
   DialogBackdrop,
@@ -33,8 +37,11 @@ import {
   DialogTrigger,
 } from '../ui/dialog';
 import { ConfirmActionDialog } from '../ConfirmActionDialog';
+import { DescriptionDialog } from '../DescriptionDialog';
 import { ManualAssistant } from './ManualAssistant';
+import { DescriptionTooltip } from '../table/DescriptionTooltip';
 import { HighlightText } from '../table/HighlightText';
+import { Tooltip } from '../ui/tooltip';
 import { toaster } from '../ui/toaster';
 import {
   useAnalysisStatus,
@@ -44,7 +51,7 @@ import {
   useImportCriteria,
   useSaveCriteria,
   useAnalyze,
-  fetchAnalyzePackage,
+  fetchAnalyzePackageZip,
   useImportAnalysis,
   useCommitAnalysis,
   exportPreview,
@@ -57,6 +64,7 @@ import {
 } from '../../utils/storage';
 import { stripDescriptionHtml } from '../../utils/format';
 import { chunk } from '../../utils/array';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import {
   ANALYSIS_SOURCE,
   ANALYSIS_STEPS,
@@ -65,7 +73,7 @@ import {
   MANUAL_MODEL,
   MODE_LABELS,
 } from '../../constants';
-import type { AnalysisMode, AnalyzedListing, Listing, PackagePart, Search } from '../../types';
+import type { AnalysisMode, AnalyzedListing, Listing, MatchedItem, PackagePart, Search } from '../../types';
 
 interface Props {
   search: Search;
@@ -74,33 +82,46 @@ interface Props {
 }
 
 export function AnalysisWizardDialog({ search, selectedIds }: Props) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const { data: status } = useAnalysisStatus();
   const { data: savedCriteria } = useSavedCriteria(open ? search.id : null);
   const { data: listings } = useListings(open ? search.id : null);
 
-  const [mode, setMode] = useState<AnalysisMode>('cons');
-  const [scope, setScope] = useState<'selected' | 'all'>(
-    selectedIds.length > 0 ? 'selected' : 'all',
-  );
-  const [step, setStep] = useState(1);
+  // Flow state — Zustand (переживає закриття/відкриття модалки в межах сесії)
+  const {
+    mode, setMode,
+    scope, setScope,
+    step, setStep,
+    available, setAvailable,
+    selected, setSelected,
+    customInput, setCustomInput,
+    accumulated, setAccumulated,
+    includedOverrides, setIncludedOverrides,
+    criteriaLoadedMode, setCriteriaLoadedMode,
+    bindSearch,
+    reset,
+  } = useAnalysisWizardStore();
+  const statusFilter = useListingsUiStore((s) => s.statusFilter);
 
+  // Ephemeral UI — скидаються при remount (прийнятно)
   // Крок 1
-  const [available, setAvailable] = useState<string[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [customInput, setCustomInput] = useState('');
   const [showCriteriaAssistant, setShowCriteriaAssistant] = useState(false);
   const [criteriaParts, setCriteriaParts] = useState<PackagePart[]>([]);
 
   // Крок 2
   const [showMatchAssistant, setShowMatchAssistant] = useState(false);
-  const [matchParts, setMatchParts] = useState<PackagePart[]>([]);
-  const [accumulated, setAccumulated] = useState<AnalyzedListing[]>([]);
+  const [zipDownloading, setZipDownloading] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Крок 3
+  const [openDescriptionListing, setOpenDescriptionListing] = useState<Listing | null>(null);
 
   // Крок 4
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [commitProgress, setCommitProgress] = useState<{ done: number; total: number } | null>(null);
+  // 'append' — додати до наявних (без дублів); 'replace' — перезаписати поле.
+  const [mergeMode, setMergeMode] = useState<'append' | 'replace'>('append');
 
   const generateCriteria = useGenerateCriteria();
   const importCriteria = useImportCriteria();
@@ -116,30 +137,29 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     return m;
   }, [listings]);
 
-  const effectiveIds = scope === 'selected' ? selectedIds : allIds;
+  const effectiveIds = useMemo(() => {
+    if (scope === 'selected') return selectedIds;
+    if (scope === 'tab') {
+      if (statusFilter === 'all') return allIds;
+      return allIds.filter((id) => listingById.get(id)?.status === statusFilter);
+    }
+    return allIds;
+  }, [scope, selectedIds, allIds, listingById, statusFilter]);
   const apiAvailable = status?.apiAvailable ?? false;
   const model = loadAnalysisModel();
   const reasoning = loadAnalysisReasoning();
   const extra = loadAnalysisExtraCriteria();
 
-  // Перезавантаження критеріїв при зміні режиму / відкритті.
+  // Завантажуємо критерії лише при першому відкритті або зміні режиму на кроці 1.
+  // На кроках 2–4 не перезаписуємо прогрес при повторному відкритті.
   useEffect(() => {
     if (!open || !savedCriteria) return;
+    if (step !== 1 || mode === criteriaLoadedMode) return;
     const saved = savedCriteria[mode] ?? [];
     setAvailable(saved);
     setSelected(new Set(saved));
-  }, [open, mode, savedCriteria]);
-
-  function resetForReopen() {
-    setStep(1);
-    setAccumulated([]);
-    setMatchParts([]);
-    setCriteriaParts([]);
-    setShowCriteriaAssistant(false);
-    setShowMatchAssistant(false);
-    setAnalyzeProgress(null);
-    setCommitProgress(null);
-  }
+    setCriteriaLoadedMode(mode);
+  }, [open, mode, savedCriteria, step, criteriaLoadedMode]);
 
   function mergeCriteria(incoming: string[]) {
     setAvailable((prev) => {
@@ -286,17 +306,23 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     }
   }
 
-  async function openMatchAssistant() {
-    setShowMatchAssistant(true);
+  async function downloadZipPackage() {
+    if (effectiveIds.length === 0) {
+      toaster.create({ type: 'error', title: 'Немає оголошень для аналізу' });
+      return;
+    }
+    setZipDownloading(true);
     try {
-      const { parts } = await fetchAnalyzePackage(search.id, mode, effectiveIds);
-      setMatchParts(parts);
+      await fetchAnalyzePackageZip(search.id, mode, effectiveIds);
+      setShowMatchAssistant(true);
     } catch (err) {
       toaster.create({
         type: 'error',
-        title: 'Не вдалося підготувати пакет',
+        title: 'Не вдалося підготувати ZIP-пакет',
         description: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      setZipDownloading(false);
     }
   }
 
@@ -321,14 +347,38 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     );
   }
 
-  // Елементи для запису: criterion з ok=true.
+  // Ключ ручного toggle-override для пари (оголошення, критерій).
+  function criterionKey(id: number, criterion: string): string {
+    return `${id}:${criterion.toLowerCase()}`;
+  }
+
+  /** Чи включений критерій у результат: ручний override, або `item.ok` за замовчуванням. */
+  function isIncluded(id: number, item: MatchedItem): boolean {
+    return includedOverrides.get(criterionKey(id, item.criterion)) ?? item.ok;
+  }
+
+  function toggleIncluded(id: number, item: MatchedItem) {
+    const key = criterionKey(id, item.criterion);
+    setIncludedOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(key, !isIncluded(id, item));
+      return next;
+    });
+  }
+
+  // Рядки з результатами (приховуємо ті, де LLM нічого не знайшов).
+  const visibleRows = useMemo(() => accumulated.filter((r) => r.items.length > 0), [accumulated]);
+  const hiddenCount = accumulated.length - visibleRows.length;
+
+  // Елементи для запису: включені критерії (ручний toggle або item.ok за замовчуванням).
   const commitItems = useMemo(
     () =>
       accumulated.map((r) => ({
         id: r.id,
-        criteria: r.items.filter((it) => it.ok).map((it) => it.criterion),
+        criteria: r.items.filter((it) => isIncluded(r.id, it)).map((it) => it.criterion),
       })),
-    [accumulated],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [accumulated, includedOverrides],
   );
 
   const overwriteCount = useMemo(() => {
@@ -351,6 +401,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           items: batch,
           model: apiAvailable && status ? model : MANUAL_MODEL,
           source: apiAvailable ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT,
+          merge: mergeMode,
         });
         done += batch.length;
         setCommitProgress({ done, total: commitItems.length });
@@ -359,6 +410,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
         type: 'success',
         title: `Записано в таблицю: ${commitItems.length}`,
       });
+      reset();
       setOpen(false);
     } catch (err) {
       toaster.create({
@@ -376,7 +428,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       toaster.create({ type: 'error', title: 'Немає результатів для запису' });
       return;
     }
-    if (overwriteCount > 0) setConfirmOverwrite(true);
+    if (mergeMode === 'replace' && overwriteCount > 0) setConfirmOverwrite(true);
     else void doCommit();
   }
 
@@ -386,7 +438,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       return {
         title: l?.title ?? '',
         description: l?.description ?? '',
-        criteria: r.items.filter((it) => it.ok).map((it) => it.criterion),
+        criteria: r.items.filter((it) => isIncluded(r.id, it)).map((it) => it.criterion),
       };
     });
     try {
@@ -402,17 +454,96 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
 
   const modeLabel = MODE_LABELS[mode];
   const chosenCount = available.filter((c) => selected.has(c)).length;
+  const tabCount = statusFilter !== 'all'
+    ? allIds.filter((id) => listingById.get(id)?.status === statusFilter).length
+    : 0;
+  const scopeLabel =
+    scope === 'selected' ? 'Вибрані'
+    : scope === 'tab' && statusFilter !== 'all' ? STATUS_LABELS[statusFilter]
+    : 'Весь пошук';
+
+  // Крок 3: спільні фрагменти рядка для desktop-таблиці й mobile-карток.
+  function renderPhotoTitle(l: Listing | undefined, fallbackId: number) {
+    return (
+      <HStack gap={2} align="start">
+        {l?.photo_url ? (
+          <Image src={l.photo_url} alt="" boxSize={12} rounded="md" objectFit="cover" flexShrink={0} />
+        ) : (
+          <Box boxSize={12} rounded="md" bg="bg.muted" flexShrink={0} />
+        )}
+        <Text fontWeight="semibold" fontSize="sm" lineClamp={2}>
+          {l?.title ?? `#${fallbackId}`}
+        </Text>
+      </HStack>
+    );
+  }
+
+  function renderDescriptionBlock(l: Listing | undefined, desc: string, evidence: string[]) {
+    return (
+      <DescriptionTooltip
+        description={l?.description ?? null}
+        query={evidence}
+        onClick={() => l && setOpenDescriptionListing(l)}
+      >
+        <Text textStyle="xs" color="fg.muted" lineClamp={isMobile ? 4 : 3} whiteSpace="pre-line">
+          <HighlightText text={desc} query={evidence} />
+        </Text>
+      </DescriptionTooltip>
+    );
+  }
+
+  function renderCriteriaTags(r: AnalyzedListing) {
+    return (
+      <Wrap gap={1}>
+        {r.items.map((it, i) => {
+          const included = isIncluded(r.id, it);
+          return (
+            <Tooltip key={i} content={it.evidence} disabled={!it.evidence}>
+              <Badge
+                colorPalette={included ? (mode === 'cons' ? 'red' : 'green') : 'gray'}
+                variant={included ? 'subtle' : 'outline'}
+                textDecoration={included ? undefined : 'line-through'}
+                borderWidth={it.ok ? undefined : '1px'}
+                borderStyle={it.ok ? undefined : 'dashed'}
+                cursor="pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleIncluded(r.id, it)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') toggleIncluded(r.id, it);
+                }}
+              >
+                {it.criterion}
+              </Badge>
+            </Tooltip>
+          );
+        })}
+      </Wrap>
+    );
+  }
 
   return (
     <DialogRoot
       open={open}
       onOpenChange={(d) => {
         setOpen(d.open);
-        if (d.open) resetForReopen();
+        if (d.open) {
+          const prevBound = useAnalysisWizardStore.getState().boundSearchId;
+          bindSearch(search.id);
+          if (prevBound !== search.id) {
+            // Свіжий Flow — виставляємо розумний дефолт scope
+            const defaultScope =
+              selectedIds.length > 0 ? 'selected'
+              : statusFilter !== 'all' ? 'tab'
+              : 'all';
+            setScope(defaultScope);
+          }
+        }
       }}
-      size="xl"
+      size={isMobile ? 'full' : 'xl'}
       placement="center"
       scrollBehavior="inside"
+      closeOnInteractOutside={false}
     >
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" colorPalette="purple">
@@ -426,7 +557,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           <Stack gap={3} w="full">
             <DialogTitle>AI-аналіз: {modeLabel}</DialogTitle>
             {/* Степер */}
-            <HStack gap={2}>
+            <HStack gap={2} wrap="wrap" rowGap={2}>
               {ANALYSIS_STEPS.map((label, i) => (
                 <HStack key={label} gap={1.5}>
                   <Box
@@ -449,37 +580,54 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </HStack>
               ))}
             </HStack>
-            {/* Перемикачі режиму та обсягу */}
-            <HStack gap={4} wrap="wrap">
-              <HStack gap={1}>
-                <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="red" onClick={() => setMode('cons')}>
-                  Мінуси
-                </Button>
-                <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="green" onClick={() => setMode('pros')}>
-                  Плюси
-                </Button>
-              </HStack>
-              <HStack gap={1}>
-                <Button
-                  size="xs"
-                  variant={scope === 'selected' ? 'solid' : 'outline'}
-                  colorPalette="blue"
-                  disabled={selectedIds.length === 0}
-                  onClick={() => setScope('selected')}
-                >
-                  Вибрані ({selectedIds.length})
-                </Button>
-                <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
-                  Весь пошук ({allIds.length})
-                </Button>
-              </HStack>
-            </HStack>
+            {/* Кроки 2–4: read-only підсумок режиму та scope */}
+            {step > 1 && (
+              <Text textStyle="xs" color="fg.muted">
+                {modeLabel} · {scopeLabel} ({effectiveIds.length})
+              </Text>
+            )}
           </Stack>
         </DialogHeader>
 
         <DialogBody pb={6}>
           {step === 1 && (
             <Stack gap={4}>
+              {/* Перемикачі режиму та scope */}
+              <HStack gap={4} wrap="wrap">
+                <HStack gap={1}>
+                  <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="red" onClick={() => setMode('cons')}>
+                    Мінуси
+                  </Button>
+                  <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="green" onClick={() => setMode('pros')}>
+                    Плюси
+                  </Button>
+                </HStack>
+                <HStack gap={1}>
+                  <Button
+                    size="xs"
+                    variant={scope === 'selected' ? 'solid' : 'outline'}
+                    colorPalette="blue"
+                    disabled={selectedIds.length === 0}
+                    onClick={() => setScope('selected')}
+                  >
+                    Вибрані ({selectedIds.length})
+                  </Button>
+                  {statusFilter !== 'all' && (
+                    <Button
+                      size="xs"
+                      variant={scope === 'tab' ? 'solid' : 'outline'}
+                      colorPalette="blue"
+                      onClick={() => setScope('tab')}
+                    >
+                      {STATUS_LABELS[statusFilter]} ({tabCount})
+                    </Button>
+                  )}
+                  <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
+                    Весь пошук ({allIds.length})
+                  </Button>
+                </HStack>
+              </HStack>
+
               <Text textStyle="sm" color="fg.muted">
                 Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
               </Text>
@@ -542,9 +690,27 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
               )}
 
               <HStack justify="space-between">
-                <Text textStyle="sm" color="fg.muted">
-                  Обрано {chosenCount} із {available.length}
-                </Text>
+                <HStack gap={2}>
+                  <Text textStyle="sm" color="fg.muted">
+                    Обрано {chosenCount} із {available.length}
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="gray"
+                    onClick={() => {
+                      reset();
+                      bindSearch(search.id);
+                      const defaultScope =
+                        selectedIds.length > 0 ? 'selected'
+                        : statusFilter !== 'all' ? 'tab'
+                        : 'all';
+                      setScope(defaultScope);
+                    }}
+                  >
+                    Почати заново
+                  </Button>
+                </HStack>
                 <Button colorPalette="blue" onClick={goToMatching} loading={saveCriteria.isPending}>
                   Далі: пошук
                 </Button>
@@ -578,17 +744,23 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </Box>
               )}
 
-              <Button size="sm" variant="outline" onClick={openMatchAssistant}>
-                Ручний режим: підготувати пакет
+              <Button size="sm" variant="outline" onClick={downloadZipPackage} loading={zipDownloading}>
+                <LuDownload /> Завантажити ZIP-пакет
               </Button>
 
               {showMatchAssistant && (
                 <ManualAssistant
                   title="Помічник: пошук збігів"
-                  parts={matchParts}
+                  parts={[]}
                   pasteLabel="Додати відповідь"
                   onSubmit={handleImportMatching}
                   submitting={importAnalysis.isPending}
+                  emptyHint={
+                    <Text textStyle="xs" color="fg.muted">
+                      Завантаж ZIP, проженеш через Claude (Projects/Code за один прохід), встав
+                      єдиний JSON-результат нижче.
+                    </Text>
+                  }
                   footer={
                     <Text textStyle="xs" color="fg.muted">
                       Опрацьовано {accumulated.length} оголошень
@@ -610,10 +782,16 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
 
           {step === 3 && (
             <Stack gap={4}>
-              <HStack justify="space-between">
-                <Text textStyle="sm" color="fg.muted">
-                  Перевір знайдені {modeLabel.toLowerCase()}. Закреслені пункти — evidence не підтверджено в описі.
-                </Text>
+              <HStack justify="space-between" wrap="wrap" gap={2}>
+                <Stack gap={0}>
+                  <Text textStyle="sm" color="fg.muted">
+                    Перевір знайдені {modeLabel.toLowerCase()}. Клікни на тег, щоб включити/виключити з результату.
+                  </Text>
+                  <Text textStyle="xs" color="fg.subtle">
+                    Показано {visibleRows.length} із {accumulated.length}
+                    {hiddenCount > 0 && ` (приховано ${hiddenCount} без результатів)`}
+                  </Text>
+                </Stack>
                 <HStack gap={2}>
                   <Button size="xs" variant="outline" onClick={() => handleExport('xlsx')}>
                     <LuFileSpreadsheet /> Excel
@@ -624,48 +802,62 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                 </HStack>
               </HStack>
 
-              <Stack gap={3} maxH="50vh" overflowY="auto">
-                {accumulated.map((r) => {
-                  const l = listingById.get(r.id);
-                  const desc = stripDescriptionHtml(l?.description ?? null);
-                  const okItems = r.items.filter((it) => it.ok);
-                  const droppedItems = r.items.filter((it) => !it.ok);
-                  return (
-                    <Flex key={r.id} gap={3} p={3} borderWidth="1px" borderColor="border.subtle" rounded="md">
-                      {l?.photo_url ? (
-                        <Image src={l.photo_url} alt="" boxSize={14} rounded="md" objectFit="cover" flexShrink={0} />
-                      ) : (
-                        <Box boxSize={14} rounded="md" bg="bg.muted" flexShrink={0} />
-                      )}
-                      <Stack gap={1} flex="1" minW={0}>
-                        <Text fontWeight="semibold" lineClamp={1}>
-                          {l?.title ?? `#${r.id}`}
-                        </Text>
-                        <Text textStyle="xs" color="fg.muted" lineClamp={3} whiteSpace="pre-line">
-                          <HighlightText text={desc} query={okItems.map((it) => it.evidence)} />
-                        </Text>
-                        <Wrap gap={1} mt={1}>
-                          {okItems.map((it, i) => (
-                            <Badge key={`ok-${i}`} colorPalette={mode === 'cons' ? 'red' : 'green'} variant="subtle">
-                              {it.criterion}
-                            </Badge>
-                          ))}
-                          {droppedItems.map((it, i) => (
-                            <Badge key={`drop-${i}`} colorPalette="gray" variant="outline" textDecoration="line-through">
-                              {it.criterion}
-                            </Badge>
-                          ))}
-                          {r.items.length === 0 && (
-                            <Text textStyle="xs" color="fg.subtle">
-                              нічого не знайдено
-                            </Text>
-                          )}
-                        </Wrap>
-                      </Stack>
-                    </Flex>
-                  );
-                })}
-              </Stack>
+              {isMobile ? (
+                <Stack gap={3} maxH="60vh" overflowY="auto">
+                  {visibleRows.map((r) => {
+                    const l = listingById.get(r.id);
+                    const desc = stripDescriptionHtml(l?.description ?? null);
+                    const includedEvidence = r.items
+                      .filter((it) => isIncluded(r.id, it))
+                      .map((it) => it.evidence);
+                    return (
+                      <Box key={r.id} p={3} borderWidth="1px" borderColor="border.subtle" rounded="md">
+                        <Stack gap={2}>
+                          {renderPhotoTitle(l, r.id)}
+                          {renderDescriptionBlock(l, desc, includedEvidence)}
+                          {renderCriteriaTags(r)}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Box maxH="50vh" overflowY="auto" borderWidth="1px" borderColor="border.subtle" rounded="md">
+                  <Table.Root size="sm" css={{ tableLayout: 'fixed' }}>
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="220px">
+                          Оголошення
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg" width="50%">
+                          Опис
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader position="sticky" top={0} zIndex={1} bg="bg">
+                          {modeLabel}
+                        </Table.ColumnHeader>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {visibleRows.map((r) => {
+                        const l = listingById.get(r.id);
+                        const desc = stripDescriptionHtml(l?.description ?? null);
+                        const includedEvidence = r.items
+                          .filter((it) => isIncluded(r.id, it))
+                          .map((it) => it.evidence);
+                        return (
+                          <Table.Row key={r.id}>
+                            <Table.Cell verticalAlign="top">{renderPhotoTitle(l, r.id)}</Table.Cell>
+                            <Table.Cell verticalAlign="top" whiteSpace="normal">
+                              {renderDescriptionBlock(l, desc, includedEvidence)}
+                            </Table.Cell>
+                            <Table.Cell verticalAlign="top">{renderCriteriaTags(r)}</Table.Cell>
+                          </Table.Row>
+                        );
+                      })}
+                    </Table.Body>
+                  </Table.Root>
+                </Box>
+              )}
 
               <HStack justify="space-between">
                 <Button variant="ghost" onClick={() => setStep(2)}>
@@ -683,10 +875,41 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
               <Text textStyle="sm">
                 Записати {modeLabel.toLowerCase()} у таблицю для {commitItems.length} оголошень?
               </Text>
-              {overwriteCount > 0 && (
-                <Text textStyle="sm" color="orange.fg">
-                  Увага: у {overwriteCount} оголошень поле «{modeLabel}» вже заповнене — буде перезаписано.
+
+              <Stack gap={1}>
+                <Text textStyle="xs" color="fg.muted">
+                  Режим запису в поле «{modeLabel}»:
                 </Text>
+                <HStack gap={1}>
+                  <Button
+                    size="xs"
+                    variant={mergeMode === 'append' ? 'solid' : 'outline'}
+                    colorPalette="blue"
+                    onClick={() => setMergeMode('append')}
+                  >
+                    Додати до наявних
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant={mergeMode === 'replace' ? 'solid' : 'outline'}
+                    colorPalette="orange"
+                    onClick={() => setMergeMode('replace')}
+                  >
+                    Перезаписати
+                  </Button>
+                </HStack>
+              </Stack>
+
+              {mergeMode === 'append' ? (
+                <Text textStyle="sm" color="fg.muted">
+                  Нові пункти буде додано до наявних значень (без дублікатів). Нічого не затирається.
+                </Text>
+              ) : (
+                overwriteCount > 0 && (
+                  <Text textStyle="sm" color="orange.fg">
+                    Увага: у {overwriteCount} оголошень поле «{modeLabel}» вже заповнене — буде перезаписано.
+                  </Text>
+                )
               )}
               {commitProgress && (
                 <Stack gap={1}>
@@ -709,7 +932,9 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                     Відмінити
                   </Button>
                   <Button colorPalette="blue" onClick={handleCommitClick} loading={commitProgress != null}>
-                    Вставити {modeLabel.toLowerCase()} у таблицю
+                    {mergeMode === 'append'
+                      ? `Додати ${modeLabel.toLowerCase()} у таблицю`
+                      : `Перезаписати ${modeLabel.toLowerCase()} у таблиці`}
                   </Button>
                 </HStack>
               </HStack>
@@ -726,6 +951,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
         confirmLabel="Перезаписати"
         onConfirm={() => void doCommit()}
       />
+      <DescriptionDialog listing={openDescriptionListing} onClose={() => setOpenDescriptionListing(null)} />
     </DialogRoot>
   );
 }

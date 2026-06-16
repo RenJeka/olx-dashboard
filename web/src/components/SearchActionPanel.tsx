@@ -139,7 +139,7 @@ export function SearchActionPanel({ search }: Props) {
         <DialogBody pb={6}>
           <Stack gap={5}>
             {/* Карточки статистики */}
-            <SimpleGrid columns={3} gap={3}>
+            <SimpleGrid columns={{ base: 2, md: 3 }} gap={3}>
               <Box p={3} bg="bg.muted" rounded="lg" borderWidth="1px" borderColor="border.subtle" textAlign="center">
                 <Text textStyle="xs" color="fg.muted" fontWeight="semibold">На OLX</Text>
                 <Text textStyle="xl" fontWeight="bold" mt={1}>

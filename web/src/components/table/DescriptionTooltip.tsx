@@ -6,7 +6,8 @@ import { HighlightText } from './HighlightText';
 
 interface DescriptionTooltipProps {
   description: string | null;
-  query: string;
+  /** Рядок-запит (фільтр таблиці) або масив фрагментів (evidence у превʼю аналізу). */
+  query: string | string[];
   children: ReactNode;
   onClick: () => void;
 }
@@ -44,7 +45,7 @@ export function DescriptionTooltip({ description, query, children, onClick }: De
           <HighlightText text={fullText} query={query} />
         </Box>
       }
-      contentProps={{ maxW: '380px' }}
+      contentProps={{ maxW: { base: '85vw', md: '380px' } }}
     >
       <Box
         cursor="pointer"
