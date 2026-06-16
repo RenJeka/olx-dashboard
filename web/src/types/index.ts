@@ -27,6 +27,17 @@ export interface LocalFilters {
   pros?: string[];
   /** Білий список критеріїв мінусів. Оголошення має мати хоча б один. Порожньо → вимкнено. */
   cons?: string[];
+  /**
+   * Інвертований режим для кожної групи фільтрів. Відсутній ключ / false = прямий режим.
+   * true = збіги приховуються (чорний список). Кожна група незалежна.
+   */
+  invert?: {
+    price_range?: boolean;
+    cities?: boolean;
+    sellers?: boolean;
+    pros?: boolean;
+    cons?: boolean;
+  };
 }
 
 /** Розподіл ключів params цього пошуку (з GET /api/searches/:id/param-keys) — для конструктора діапазонів. */

@@ -10,6 +10,7 @@ import {
   DrawerRoot,
   DrawerTitle,
 } from './ui/drawer';
+import { Switch } from './ui/switch';
 import { toaster } from './ui/toaster';
 import { useFilterOptions, useUpdateSearchFilters } from '../api/client';
 import type { LocalFilters, Search } from '../types';
@@ -28,17 +29,25 @@ function parseLocalFilters(raw: string): LocalFilters {
   }
 }
 
-/** Drawer редактора локальних фільтрів пошуку: ціна / місто / продавець. */
+/** Drawer редактора локальних фільтрів пошуку: ціна / місто / продавець / плюси / мінуси. */
 export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
   const { data: filterOptions } = useFilterOptions(search.id, open);
   const updateFilters = useUpdateSearchFilters();
 
+  // ── Значення фільтрів ─────────────────────────────────────────────────────
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [cities, setCities] = useState<string[]>([]);
   const [sellers, setSellers] = useState<string[]>([]);
   const [pros, setPros] = useState<string[]>([]);
   const [cons, setCons] = useState<string[]>([]);
+
+  // ── Режим інверсії для кожної групи ──────────────────────────────────────
+  const [priceInvert, setPriceInvert] = useState(false);
+  const [citiesInvert, setCitiesInvert] = useState(false);
+  const [sellersInvert, setSellersInvert] = useState(false);
+  const [prosInvert, setProsInvert] = useState(false);
+  const [consInvert, setConsInvert] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +58,12 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     setSellers(filters.sellers ?? []);
     setPros(filters.pros ?? []);
     setCons(filters.cons ?? []);
+    const inv = filters.invert ?? {};
+    setPriceInvert(inv.price_range ?? false);
+    setCitiesInvert(inv.cities ?? false);
+    setSellersInvert(inv.sellers ?? false);
+    setProsInvert(inv.pros ?? false);
+    setConsInvert(inv.cons ?? false);
   }, [open, search.local_filters]);
 
   function addCity(city: string) {
@@ -102,6 +117,15 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     if (pros.length > 0) local_filters.pros = pros;
     if (cons.length > 0) local_filters.cons = cons;
 
+    // Зберігаємо invert лише для груп, де є значення і прапорець true
+    const invert: LocalFilters['invert'] = {};
+    if (local_filters.price_range && priceInvert) invert.price_range = true;
+    if (local_filters.cities && citiesInvert) invert.cities = true;
+    if (local_filters.sellers && sellersInvert) invert.sellers = true;
+    if (local_filters.pros && prosInvert) invert.pros = true;
+    if (local_filters.cons && consInvert) invert.cons = true;
+    if (Object.keys(invert).length > 0) local_filters.invert = invert;
+
     updateFilters.mutate(
       { searchId: search.id, local_filters },
       {
@@ -131,11 +155,25 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
         </DrawerHeader>
         <DrawerBody>
           <Stack gap={6}>
+
+            {/* ── Діапазон цін ───────────────────────────────────────────── */}
             <Stack gap={2}>
-              <Text fontWeight="medium">Діапазон цін</Text>
+              <HStack justify="space-between">
+                <Text fontWeight="medium">Діапазон цін</Text>
+                <Switch
+                  size="sm"
+                  colorPalette="orange"
+                  checked={priceInvert}
+                  onCheckedChange={(d) => setPriceInvert(d.checked)}
+                >
+                  Інвертувати
+                </Switch>
+              </HStack>
               <Text textStyle="xs" color="fg.muted">
-                Оголошення з ціною поза межами діапазону — будуть приховані. Оголошення без
-                ціни цим правилом не приховуються.
+                {priceInvert
+                  ? 'Оголошення з ціною в межах діапазону — будуть приховані.'
+                  : 'Оголошення з ціною поза межами діапазону — будуть приховані.'}
+                {' '}Оголошення без ціни цим правилом не приховуються.
               </Text>
               <HStack gap={2}>
                 <Input
@@ -157,10 +195,23 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               </HStack>
             </Stack>
 
+            {/* ── Місто ──────────────────────────────────────────────────── */}
             <Stack gap={2}>
-              <Text fontWeight="medium">Місто</Text>
+              <HStack justify="space-between">
+                <Text fontWeight="medium">Місто</Text>
+                <Switch
+                  size="sm"
+                  colorPalette="orange"
+                  checked={citiesInvert}
+                  onCheckedChange={(d) => setCitiesInvert(d.checked)}
+                >
+                  Інвертувати
+                </Switch>
+              </HStack>
               <Text textStyle="xs" color="fg.muted">
-                Якщо обрано хоча б одне місто — показуються лише оголошення з цих міст.
+                {citiesInvert
+                  ? 'Оголошення з обраних міст — будуть приховані.'
+                  : 'Якщо обрано хоча б одне місто — показуються лише оголошення з цих міст.'}
               </Text>
               <Wrap gap={2}>
                 {cities.map((city) => (
@@ -193,11 +244,23 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               </NativeSelect.Root>
             </Stack>
 
+            {/* ── Продавець ──────────────────────────────────────────────── */}
             <Stack gap={2}>
-              <Text fontWeight="medium">Продавець</Text>
+              <HStack justify="space-between">
+                <Text fontWeight="medium">Продавець</Text>
+                <Switch
+                  size="sm"
+                  colorPalette="orange"
+                  checked={sellersInvert}
+                  onCheckedChange={(d) => setSellersInvert(d.checked)}
+                >
+                  Інвертувати
+                </Switch>
+              </HStack>
               <Text textStyle="xs" color="fg.muted">
-                Якщо обрано хоча б одного продавця — показуються лише оголошення цих
-                продавців.
+                {sellersInvert
+                  ? 'Оголошення обраних продавців — будуть приховані.'
+                  : 'Якщо обрано хоча б одного продавця — показуються лише оголошення цих продавців.'}
               </Text>
               <Wrap gap={2}>
                 {sellers.map((seller) => (
@@ -230,12 +293,24 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               </NativeSelect.Root>
             </Stack>
 
+            {/* ── Плюси ──────────────────────────────────────────────────── */}
             {filterOptions && filterOptions.pros.length > 0 && (
               <Stack gap={2}>
-                <Text fontWeight="medium">Плюси</Text>
+                <HStack justify="space-between">
+                  <Text fontWeight="medium">Плюси</Text>
+                  <Switch
+                    size="sm"
+                    colorPalette="orange"
+                    checked={prosInvert}
+                    onCheckedChange={(d) => setProsInvert(d.checked)}
+                  >
+                    Інвертувати
+                  </Switch>
+                </HStack>
                 <Text textStyle="xs" color="fg.muted">
-                  Якщо обрано хоча б один плюс — показуються лише оголошення, де він
-                  знайдений. Незаналізовані оголошення — приховуються.
+                  {prosInvert
+                    ? 'Оголошення з обраними плюсами — будуть приховані. Необрані — показуються.'
+                    : 'Показуються лише оголошення з обраними плюсами. Необрані — приховуються.'}
                 </Text>
                 <Wrap gap={2}>
                   {pros.map((criterion) => (
@@ -269,12 +344,24 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               </Stack>
             )}
 
+            {/* ── Мінуси ─────────────────────────────────────────────────── */}
             {filterOptions && filterOptions.cons.length > 0 && (
               <Stack gap={2}>
-                <Text fontWeight="medium">Мінуси</Text>
+                <HStack justify="space-between">
+                  <Text fontWeight="medium">Мінуси</Text>
+                  <Switch
+                    size="sm"
+                    colorPalette="orange"
+                    checked={consInvert}
+                    onCheckedChange={(d) => setConsInvert(d.checked)}
+                  >
+                    Інвертувати
+                  </Switch>
+                </HStack>
                 <Text textStyle="xs" color="fg.muted">
-                  Якщо обрано хоча б один мінус — показуються лише оголошення, де він
-                  знайдений. Незаналізовані оголошення — приховуються.
+                  {consInvert
+                    ? `Оголошення з обраними мінусами — будуть приховані. Необрані — показуються.`
+                    : `Показуються лише оголошення з обраними мінусами. Необрані — приховуються.`}
                 </Text>
                 <Wrap gap={2}>
                   {cons.map((criterion) => (
@@ -307,6 +394,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
                 </NativeSelect.Root>
               </Stack>
             )}
+
           </Stack>
         </DrawerBody>
         <DrawerFooter>
