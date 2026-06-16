@@ -61,8 +61,17 @@ export function ListingsFilterBar({
         <Switch
           checked={showFilteredOut}
           onCheckedChange={(d) => onShowFilteredOutChange(d.checked)}
+          colorPalette={showFilteredOut ? 'orange' : undefined}
         >
-          Показати відфільтровані
+          Показані{' '}
+          <Box
+            as="span"
+            fontWeight="bold"
+            color={showFilteredOut ? 'orange.500' : undefined}
+          >
+            {showFilteredOut ? 'ВІДФІЛЬТРОВАНІ' : 'ВСІ'}
+          </Box>{' '}
+          товари
         </Switch>
       </HStack>
 
