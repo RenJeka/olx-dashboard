@@ -21,7 +21,6 @@ import type {
   AnalysisMode,
   AnalyzeResponse,
   AnalyzedListing,
-  PackagePart,
   CommitItem,
 } from '../types';
 
@@ -180,8 +179,14 @@ export function useUpdateListing() {
     onError: (_err, _vars, context) => {
       if (context) qc.setQueryData(context.queryKey, context.previous);
     },
-    onSettled: (_data, _err, { searchId }) => {
-      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+    // Точкове оновлення кешу відповіддю сервера (авторитетні поля: status_source,
+    // miss_count тощо) БЕЗ invalidate — інакше повний рефетч списку «перевантажує»
+    // таблицю й скидає позицію скролу/порядок рядків. Рядок оновлюється на місці,
+    // тому сортування та позиція користувача зберігаються.
+    onSuccess: (updated, { id, searchId }) => {
+      qc.setQueryData<Listing[]>(['listings', searchId], (old) =>
+        old?.map((listing) => (listing.id === id ? updated : listing)),
+      );
     },
   });
 }
@@ -305,15 +310,20 @@ export function useAnalyze() {
   });
 }
 
-/** Ручний пакет(и) для безкоштовного чату (1 vs кілька частин). */
-export function fetchAnalyzePackage(
+/** Завантажує ZIP-пакет ручного режиму (prompt.txt + descriptions/chunk-NNN.json) через blob. */
+export async function fetchAnalyzePackageZip(
   searchId: number,
   mode: AnalysisMode,
   ids: number[],
-): Promise<{ parts: PackagePart[] }> {
+): Promise<void> {
   const q = new URLSearchParams({ mode });
   if (ids.length > 0) q.set('ids', ids.join(','));
-  return api<{ parts: PackagePart[] }>(`/api/searches/${searchId}/analyze/package?${q.toString()}`);
+  const res = await fetch(`/api/searches/${searchId}/analyze/package.zip?${q.toString()}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  downloadBlob(await res.blob(), `analysis-${mode}-search-${searchId}.zip`);
 }
 
 /** Парс однієї вставленої відповіді matching + мерж у накопичене. */
@@ -346,16 +356,18 @@ export function useCommitAnalysis() {
       items,
       model,
       source,
+      merge,
     }: {
       searchId: number;
       mode: AnalysisMode;
       items: CommitItem[];
       model?: string;
       source: 'api' | 'import';
+      merge: 'append' | 'replace';
     }) =>
       api<{ updated: number }>('/api/listings/analyze/commit', {
         method: 'POST',
-        body: JSON.stringify({ mode, items, model, source }),
+        body: JSON.stringify({ mode, items, model, source, merge }),
       }),
     onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),

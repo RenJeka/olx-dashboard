@@ -43,7 +43,7 @@ export function Header({
 }: HeaderProps) {
   return (
     <Box as="header" borderBottomWidth="1px" borderColor="border.subtle" px={4} py={3} bg="bg.panel">
-      <HStack justify="space-between">
+      <HStack justify="space-between" wrap="wrap" rowGap={2}>
         <HStack gap={3}>
           <Tooltip content={searchesVisible ? 'Сховати бічну панель' : 'Показати бічну панель'}>
             <IconButton
@@ -57,7 +57,9 @@ export function Header({
           </Tooltip>
           <HStack gap={2}>
             <TbHeartRateMonitor size={20} />
-            <Heading size="lg" fontWeight="bold">OLX Dashboard</Heading>
+            <Heading size="lg" fontWeight="bold" display={{ base: 'none', md: 'block' }}>
+              OLX Dashboard
+            </Heading>
           </HStack>
           {selectedSearch && (
             <HStack
@@ -68,13 +70,16 @@ export function Header({
               borderColor="green.muted"
               px={3}
               py={1.5}
-              ml={"80px"}
+              ml={{ base: 0, md: '80px' }}
               borderRadius="md"
               fontSize="sm"
               fontWeight="semibold"
               shadow="sm"
+              maxW={{ base: '40vw', md: 'none' }}
             >
-              {selectedSearch.name}
+              <Box as="span" lineClamp={1}>
+                {selectedSearch.name}
+              </Box>
             </HStack>
           )}
         </HStack>

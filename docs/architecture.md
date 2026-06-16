@@ -113,7 +113,7 @@ flowchart LR
 | `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
 | `db/schema.sql` | Канонічна схема (4 таблиці). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`). Без `any`. |
-| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний): POST на GraphQL-ендпойнт, `searchParameters` з `SearchConfig`, маппінг відповіді → структуровані `RawListing[]` + `exhausted` (остання сторінка `< 40` елементів). Підтримує `options.deep` (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`, завжди обмежена `MAX_PAGES=26` — вікно пагінації OLX `offset≤1000`) і `options.onProgress`. `ListingError` на `offset>0` з уже зібраними даними → частковий успіх (`warning` замість виключення). Деталі — `olx-api.md` §2. |
+| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний). `fetchPage(search, offset, referer, opts?)` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина). `fetchSearch` — звичайний/глибокий прохід одного діапазону (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`, обмежена `MAX_PAGES=26` — вікно `offset≤1000`); `ListingError` на `offset>0` з даними → частковий успіх (`warning`). `fetchSearchSplit` — глибокий скан із авто-розбиттям по ціні: якщо `visible_total_count > SPLIT_THRESHOLD(1000)`, адаптивна бісекція діапазону на бакети ≤ вікна, скан кожного, злиття дедупом `olxId`; інакше делегує `fetchSearch`. `probeMaxPrice` — зондування верхньої межі ціною спадно (самоперевірка впорядкованості; сортування за ціною не верифіковане live → `null`-fallback). Запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
 | `scraper/selectors.ts` | Усі OLX-селектори + заголовки HTML-запиту в одному місці (для fallback). |
 | `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. Той самий `FetchOptions`/глибокий режим (без уточнення цілі за `visible_total_count` — одразу `DEEP_SAFETY_CAP`); `exhausted` завжди `false`. |
 | `scraper/dateParser.ts` | `parseOlxDate(raw, now?) → string \| null` — текстові дати HTML-fallback («Сьогодні/Вчора о HH:MM», «D <місяць_родовий> YYYY р.») → ISO (`YYYY-MM-DD[THH:MM:00]`), сумісний з ISO-датами GraphQL для коректного порівняння у `statusEngine.ts`. Нерозпізнане → `null`. |
@@ -124,7 +124,7 @@ flowchart LR
 | `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
 | `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`). |
-| `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_PACKAGE_TOKEN_CAP`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample` для авто Й ручного), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`/`estimateTokens`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
+| `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`, доповнено `plans/analysis-wizard-review-rework.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_ZIP_CHUNK_SIZE=50`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки, `MIME_ZIP`), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample`/`buildManualZipInstructions`/`buildChunkListings`/`PATTERNS_EXAMPLE_JSON` для авто Й ручного), `analyze.py` (готовий детермінований Python-движок для ZIP-пакета: regex-матчинг критеріїв з клауза-скоуп запереченнями, морфологічними стемами, дослівним evidence; читається з диску як `schema.sql` і кладеться в ZIP), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
 | `export/xlsx.ts` | `buildXlsxBuffer(sheet, columns, rows)` на **ExcelJS** — спільний Excel-експорт (превʼю аналізу + майбутній експорт усієї таблиці): заголовки/ширини, заморожений рядок заголовків, перенос тексту. |
 | `routes/analysis.ts` | Ендпойнти LLM-аналізу (нижче §6). Критерії читаються/пишуться у `searches.analysis_criteria`; commit пише `pros`/`cons` + `analysis_at/source/model`, `analysis_stale=0`. |
 | `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, реєстрація `searchesRoutes`/`listingsRoutes`/`analysisRoutes`, слухає `:3001`. |
@@ -177,10 +177,10 @@ flowchart LR
 | `GET` | `/api/searches/:id/criteria/prompt?mode=` | ✅ — готовий промпт генерації (ручний режим) |
 | `POST` | `/api/searches/:id/criteria/import` | ✅ — парс вставленої відповіді LLM у список критеріїв |
 | `POST` | `/api/searches/:id/analyze` | ✅ — авто matching (чанки по 12), верифікація `evidence`; `{results, errors}`, НЕ пише в БД |
-| `GET` | `/api/searches/:id/analyze/package?mode=&ids=` | ✅ — ручний пакет(и) для безкоштовного чату (1 vs кілька частин) |
+| `GET` | `/api/searches/:id/analyze/package.zip?mode=&ids=` | ✅ — ZIP-пакет ручного режиму: `prompt.txt` (інструкція з 2 варіантами) + `analyze.py` (готовий детермінований движок) + `patterns.example.json` (приклад мапи) + `descriptions/chunk-NNN.json` (по 50 оголошень) |
 | `POST` | `/api/searches/:id/analyze/import` | ✅ — парс однієї вставленої відповіді + верифікація + мерж у накопичене |
 | `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
-| `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта) |
+| `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта); `merge='append'` (дефолт UI — додати до наявних без дублів) \| `'replace'` (перезаписати) |
 | `GET` | `/health` | ✅ |
 | `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 |
 | `GET` | `/api/listings/:id/export/markdown` | ⏳ Етап 3 |
@@ -194,7 +194,7 @@ flowchart LR
   LLM-аналіз: `useAnalysisStatus`, `useSavedCriteria`, `useGenerateCriteria`,
   `useImportCriteria`, `useSaveCriteria`, `useAnalyze` (клієнтське чанкування по 200),
   `useImportAnalysis`, `useCommitAnalysis` (chunked) + плоскі хелпери `fetchCriteriaPrompt`/
-  `fetchAnalyzePackage`/`exportPreview` (GET/blob за кнопкою). Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
+  `fetchAnalyzePackageZip`/`exportPreview` (GET/blob за кнопкою). Всі типи DTO імпортуються з `types/index.ts`. Форма пошуку маппить «ціна від/до» у
   `api_filters.ranges.price`. `useScan` приймає `{searchId, deep?}` і має
   `mutationKey: ['scan']` (щоб `useAutoRefresh` міг перевірити `queryClient.isMutating`),
   інвалідовує `['listings', searchId]` і `['search-stats', searchId]`; `useVerify` (Етап 2,
@@ -228,12 +228,26 @@ flowchart LR
 - `utils/status.ts` — `STATUS_LABELS`/`STATUS_COLORS` (Record по `ListingStatus`: `new` blue,
   `interested` green, `contacted` purple, `rejected` gray, `disabled` red) та
   `isMutedStatus(status)` (`disabled`/`rejected` → приглушений рядок).
+- `stores/listingsUiStore.ts` — Zustand-стор `useListingsUiStore`: `statusFilter: ListingStatus | 'all'`
+  (дефолт `'all'`) + `setStatusFilter`. Спільний in-memory стан вкладки фільтра статусів,
+  що читається і в `ListingsFilterBar` (для `SegmentGroup`), і в `AnalysisWizardDialog`
+  (scope «поточна вкладка»).
+- `stores/analysisWizardStore.ts` — Zustand-стор `useAnalysisWizardStore`: прогрес AI-Flow
+  (`mode`, `scope: 'selected'|'all'|'tab'`, `step`, `available`, `selected: Set<string>`,
+  `customInput`, `accumulated`, `includedOverrides: Map<string,boolean>`), `boundSearchId`,
+  `criteriaLoadedMode`. Дії: `bindSearch(id)` — скидає лише якщо змінився пошук;
+  `reset()` — повне скидання. In-memory (не persisted): переживає закриття/відкриття
+  модалки, але скидається при refresh сторінки.
 - `hooks/useListingsTableState.ts` — кастомний React-хук для збереження та завантаження стану сортування, розмірів колонок та пагінації (`pageSize` персиститься, `pageIndex` — ні) таблиці.
 - `hooks/useAutoRefresh.ts` — `useAutoRefresh(enabled, intervalMin)`: поки увімкнено і вкладка
   видима, раз на `intervalMin` хвилин послідовно запускає `useScan({deep:false})` для всіх
   пошуків (пауза 5–10с між ними), пропускаючи тік якщо вже триває скан
   (`queryClient.isMutating({mutationKey:['scan']})`). Toast на старті і підсумковий
   (`+N нових` або тихий «новин немає»). Глибокий скан/verify не запускає.
+- `hooks/useIsMobile.ts` — `useIsMobile()`: `useBreakpointValue({ base: true, md: false }) ??
+  false` — єдине джерело "мобільний/desktop" для умовного рендеру (size/layout
+  branching), напр. у `Searches.tsx` та `AnalysisWizardDialog.tsx`. Breakpoint —
+  Chakra default `md` (768px).
 - `components/table/` — ізольовані компоненти таблиці оголошень:
   - `HeaderLabel.tsx` — заголовок колонки з відповідною Lucide-іконкою.
   - `columns.tsx` — визначення колонок для TanStack Table (включно з display-колонкою
@@ -243,10 +257,13 @@ flowchart LR
     ресайзу колонок (`columnResizeMode: 'onEnd'`); ресайз-хендл рендериться лише якщо
     `header.column.getCanResize()`.
   - `ListingsTableBody.tsx` — тіло таблиці `<tbody>`, яке рендерить рядки.
-  - `ListingsTableRow.tsx` — рядок таблиці. **Увага:** не використовуйте `React.memo` для
-    цього компонента, оскільки TanStack Table не перестворює об'єкти `row` при зміні
-    порядку чи видимості колонок. З `memo` зміна `columnOrder` ламає вирівнювання хедерів
-    відносно даних. Рядки `status='disabled'`/`'rejected'` — приглушені (`isMutedStatus`).
+  - `ListingsTableRow.tsx` — рядок таблиці, обгорнутий у `React.memo` (економія ререндерів
+    на вибір рядка/typing/пагінацію). **Увага:** TanStack Table НЕ перестворює об'єкт `row`
+    при зміні порядку чи видимості колонок, тож `arePropsEqual` ОБОВ'ЯЗКОВО має містити
+    `columnLayoutKey` (підпис `table.getVisibleLeafColumns()`, прокидається з
+    `ListingsTable.tsx` через `ListingsTableBody`). Без нього memo пропускає ререндер і тіло
+    розсинхронізовується із заголовком при reorder/toggle колонок (доводиться робити
+    refresh). Рядки `status='disabled'`/`'rejected'` — приглушені (`isMutedStatus`).
   - `StatusCell.tsx` — компактний `NativeSelect` зі статусом у вигляді кольорового
     бейджа (`STATUS_COLORS`); зміна → `useUpdateListing()` (`status_source='manual'`,
     `miss_count=0`).
@@ -254,12 +271,16 @@ flowchart LR
     `Popover.Root`/`Portal` з `Textarea` + кнопкою «Зберегти» (PATCH `note`). Portal —
     рендериться в `document.body`, не обмежений `overflow:auto` контейнером таблиці.
   - `ProsConsCell.tsx` — комірки для колонок «Плюси» та «Мінуси», поведінка аналогічна
-    до `NoteCell.tsx`, але з відповідними іконками та кольорами.
+    до `NoteCell.tsx`, але з відповідними іконками та кольорами. Колонки сортовані за
+    кількістю пунктів (`countProsConsItems` з `utils/format.ts`, один непорожній рядок =
+    один пункт) із `sortDescFirst: true` — перший клік ставить угору оголошення з
+    найбільшою кількістю плюсів/мінусів.
   - `HighlightText.tsx` — підсвічує всі збіги пошукового запиту в тексті через
     `<Mark bg="yellow.subtle">`; використовується в колонках «Назва»/«Опис» і в
     `DescriptionTooltip`.
   - `ListingsFilterBar.tsx` — панель над таблицею: `SegmentGroup` фільтра статусів (Всі +
-    `LISTING_STATUSES`, з лічильниками з урахуванням toggle filtered_out), `Switch`
+    `LISTING_STATUSES`, з лічильниками з урахуванням toggle filtered_out) — читає/пише
+    `statusFilter` через `useListingsUiStore` напряму (не через props); `Switch`
     «Показати відфільтровані», `Input` текстового пошуку із кнопкою очищення.
   - `BulkActionBar.tsx` — з'являється, коли є вибрані рядки: «Вибрано: N» + `Menu` зі
     статусами (`LISTING_STATUSES`/`STATUS_LABELS` з відповідними іконками) → `Promise.allSettled` з
@@ -268,7 +289,7 @@ flowchart LR
   - `DescriptionTooltip.tsx` — інтерактивний тултіп з прокруткою для попереднього перегляду тексту опису. Клік по вмісту відкриває `DescriptionDialog`.
   - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
 - `App.tsx` — компоновка сторінки (Header, Searches sidebar, ListingsTable). Керує станом видимості бічної панелі (`searchesVisible`). `selectedId` може стати `null` (видалення активного пошуку) — тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin)` викликається тут.
-- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), кнопка згортання/розгортання бічної панелі, інформація про активний обраний пошук з підсвіткою, `SearchActionPanel` (кнопка виклику модального вікна) та `SettingsDrawer`).
+- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), кнопка згортання/розгортання бічної панелі, інформація про активний обраний пошук з підсвіткою, `SearchActionPanel` (кнопка виклику модального вікна) та `SettingsDrawer`). Responsive: зовнішній `HStack` з `wrap="wrap" rowGap={2}` (права група кнопок переноситься на новий рядок на вузьких екранах); текст «OLX Dashboard» прихований на `base` (іконка лишається); бейдж вибраного пошуку — `ml={{ base: 0, md: '80px' }}` з `lineClamp={1}`/`maxW={{ base: '40vw' }}`.
 - `components/DescriptionDialog.tsx` — модальне вікно повного опису оголошення (`DialogRoot
   size="lg" placement="center" scrollBehavior="inside"`): фото/назва/ціна/місто в хедері,
   повний текст опису (скрол) у тілі, «Відкрити на OLX» + «Закрити» у футері. Відкривається
@@ -287,7 +308,7 @@ flowchart LR
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
   для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. Кожен `SearchRow`:
+- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. На мобільному (`useIsMobile()`) той самий вміст рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом `visible`/`onVisibleChange` з `App.tsx`); вибір пошуку (`SearchRow`) на мобільному автоматично закриває drawer. На desktop — без змін (постійна панель `w="80"`). Кожен `SearchRow`:
   - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
     disabled на краях списку;
   - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Фільтри» (`LuFilter`, відкриває
@@ -295,8 +316,8 @@ flowchart LR
     відкриває `DialogRoot role="alertdialog"` із підтвердженням і каскадно видаляє пошук
     через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).
 - `pages/ListingsTable.tsx` — відображення списку оголошень: збирає разом
-  `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу + toggle
-  filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),
+  `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу з `useListingsUiStore` +
+  toggle filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),
   `BulkActionBar` (за наявності `rowSelection`), `ListingsTableHeader`/`ListingsTableBody`/
   `TablePagination`/`DescriptionDialog`. `rowSelection` (`getRowId: row => String(row.id)`,
   `enableRowSelection: true`) скидається при зміні `searchId`. Клієнтська пагінація через
@@ -315,12 +336,35 @@ flowchart LR
   `DialogBackdrop`) — використовується `DescriptionDialog`, `ConfirmActionDialog` і діалогом
   підтвердження видалення.
 - `components/analysis/` — майстер LLM-аналізу: `AnalysisWizardDialog.tsx` (`DialogRoot
-  size="xl"`, степер Критерії→Пошук→Перевірка→Вставка, перемикачі Мінуси/Плюси та
-  вибрані/весь пошук; крок 3 — превʼю з підсвіткою evidence через `<Mark>` і закресленням
-  непідтверджених пунктів, експорт Excel/JSON; крок 4 — commit chunked + `ConfirmActionDialog`
-  при перезаписі непорожніх `pros`/`cons`) і `ManualAssistant.tsx` (панель ручного режиму:
-  копіювати/завантажити промпт + вставити відповідь). Кнопка «AI» (`LuSparkles`) — у `Header`;
-  `rowSelection` піднято в `App.tsx` (передається в `ListingsTable` і як `selectedIds` у майстер).
+  size={isMobile ? 'full' : 'xl'}`, `closeOnInteractOutside={false}` — прогрес не втрачається
+  при кліку повз вікно; X і Esc лишаються); степер Критерії→Пошук→Перевірка→Вставка.
+  **Тільки на кроці 1** — перемикачі Мінуси/Плюси та scope (Вибрані / [Назва вкладки] /
+  Весь пошук); кнопка «Назва вкладки (N)» видима лише коли `statusFilter !== 'all'` (стор
+  `listingsUiStore`); кроки 2–4 — read-only рядок «{режим} · {scope} (N)» у хедері.
+  **Прогрес Flow в Zustand** (`analysisWizardStore`): `bindSearch(id)` скидає лише при зміні
+  пошуку, закриття без commit зберігає крок/критерії/результати; після commit (крок 4) та
+  «Почати заново» — `reset()`. Scope «tab» → `effectiveIds` = оголошення з поточним
+  статусом вкладки (fallback на весь пошук якщо `statusFilter === 'all'`).
+  Крок 2 (ручний режим) — кнопка «Завантажити ZIP-пакет»
+  (`fetchAnalyzePackageZip`, `prompt.txt` + `analyze.py` + `patterns.example.json` +
+  `descriptions/chunk-NNN.json`), `ManualAssistant`
+  без `parts` (`emptyHint` з підказкою прогнати ZIP через агента/чат і вставити єдиний JSON); крок 3 —
+  спільні рендер-фрагменти рядка (`renderPhotoTitle`/`renderDescriptionBlock`/
+  `renderCriteriaTags`, без дублювання логіки toggle/evidence) рендеряться або в
+  desktop-таблиці (Chakra `Table.Root`, `tableLayout: 'fixed'`, скрол `maxH="50vh"`), або —
+  на мобільному — як стек карток (`Stack maxH="60vh" overflowY="auto"`, кожна картка `Box
+  p={3} borderWidth="1px" rounded="md"` зі вмістом фото+назва → опис → теги): фото+назва |
+  опис (`DescriptionTooltip`+`DescriptionDialog`, підсвітка `HighlightText` за evidence
+  включених критеріїв, `lineClamp` 3 на desktop / 4 на мобільному) | теги критеріїв (клік —
+  toggle include/exclude через
+  `includedOverrides`, hover — tooltip з `evidence`, закреслення для виключених,
+  пунктирна рамка для `!ok`); рядки без результатів (`items.length === 0`) приховані
+  (лічильник «Показано N із M»); експорт Excel/JSON враховує toggle-стан; крок 4 — commit
+  chunked (лише включені критерії) + `ConfirmActionDialog` при перезаписі непорожніх
+  `pros`/`cons`) і `ManualAssistant.tsx` (панель ручного режиму: копіювати/завантажити
+  промпт(и) + вставити відповідь, опціональний `emptyHint`). Кнопка «AI» (`LuSparkles`) —
+  у `Header`; `rowSelection` піднято в `App.tsx` (передається в `ListingsTable` і як
+  `selectedIds` у майстер).
 - `components/settings/sections/AnalysisSection.tsx` — секція «AI-аналіз»: статус ключа
   (`useAnalysisStatus`), поле «Модель», `Switch` «reasoning», `Textarea` «Додаткові критерії»;
   персист у `SETTINGS_STORAGE_KEY` (`analysisModel`/`analysisReasoning`/`analysisExtraCriteria`).

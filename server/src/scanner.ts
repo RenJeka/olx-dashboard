@@ -87,12 +87,18 @@ async function fetchWithFallback(
   usedGraphql: boolean;
   /** Частковий результат (warning фетчера, напр. «window cap hit») — покриття неповне. */
   partial: boolean;
+  /** Кількість цінових бакетів split-скану (>1 — було розбиття); undefined для не-deep/HTML. */
+  bucketsUsed?: number;
 }> {
   try {
-    const result = await graphqlFetcher.fetchSearch(search, {
-      ...options,
-      onProgress: options?.onProgress ? (d, t) => options.onProgress!(d, t, 'GraphQL') : undefined,
-    });
+    // Глибокий скан — оркестратор із авто-розбиттям по ціні (docs/plans/price-range-split.md);
+    // звичайний — один прохід. HTML-fallback не розбивається (немає visible_total_count).
+    const onGraphqlProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
+      ? (d, t) => options.onProgress!(d, t, 'GraphQL')
+      : undefined;
+    const result = options?.deep
+      ? await graphqlFetcher.fetchSearchSplit(search, { ...options, onProgress: onGraphqlProgress })
+      : await graphqlFetcher.fetchSearch(search, { ...options, onProgress: onGraphqlProgress });
     return {
       raw: result.listings,
       visibleTotalCount: result.visibleTotalCount,
@@ -101,6 +107,7 @@ async function fetchWithFallback(
       exhausted: result.exhausted,
       usedGraphql: true,
       partial: result.warning != null,
+      bucketsUsed: result.bucketsUsed,
     };
   } catch (graphqlErr) {
     const graphqlMessage =
@@ -172,20 +179,22 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   };
 
   try {
-    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial } =
+    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed } =
       await fetchWithFallback(search, {
         deep: options?.deep,
         onProgress,
       });
     const upsertResult = upsertListings(searchId, raw);
 
-    // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів — не fallback
-    // і не часткових (частковий deep із «window cap hit» не дає повної картини покриття).
+    // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів — не fallback,
+    // не часткових (частковий deep із «window cap hit») і НЕ split (union кількох діапазонів
+    // не відсортований глобально за refresh — вісь windowFloor невалідна). Усі три випадки
+    // ставлять warning → partial=true → coverage пропускається.
     const { disabled_count } = usedGraphql && !partial
       ? applyScanStatuses(searchId, raw, exhausted)
       : { disabled_count: 0 };
 
-    const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count };
+    const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count, bucketsUsed };
 
     if (visibleTotalCount != null) {
       db.prepare('UPDATE searches SET visible_total_count = ? WHERE id = ?').run(

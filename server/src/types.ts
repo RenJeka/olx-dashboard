@@ -101,6 +101,8 @@ export interface ScanResult {
   requestsUsed: number;
   /** Скільки оголошень переведено в disabled через statusEngine (лише GraphQL-скани). */
   disabled_count: number;
+  /** Скільки цінових бакетів використав глибокий скан із авто-розбиттям (>1 — було розбиття). */
+  bucketsUsed?: number;
 }
 
 /** Останній запис scan_runs для пошуку — для ендпойнту прогресу глибокого скану. */
@@ -267,6 +269,11 @@ export interface FetchSearchResult {
    * з фактичною помилкою/fallback-нотою.
    */
   warning?: string;
+  /**
+   * Кількість цінових бакетів у глибокому скані з авто-розбиттям (`fetchSearchSplit`).
+   * `1`/відсутнє — розбиття не було (звичайний deep). `>1` — діапазон ділився на під-діапазони.
+   */
+  bucketsUsed?: number;
 }
 
 /** Опції одного скану. */

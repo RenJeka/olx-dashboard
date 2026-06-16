@@ -28,8 +28,10 @@ olx-dashboard/
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
-│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio
+│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
+│   ├── scripts/
+│   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/
 │   │   └── olx.db            # SQLite (gitignored, створюється при старті)
 │   └── src/
@@ -41,13 +43,16 @@ olx-dashboard/
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
 │       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
-│       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md)
-│       │   ├── constants.ts  # ЄДИНЕ джерело magic-значень (моделі, ліміти, чанки, мапи режиму, scaffold, повідомлення)
+│       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
+│       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
-│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample — ЄДИНЕ джерело промптів
+│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getSavedCriteria/loadListings
+│       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
+│       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
+│       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
-│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/estimateTokens
+│       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       ├── export/
 │       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
 │       ├── scraper/
@@ -62,11 +67,15 @@ olx-dashboard/
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + filter-options + stats + PATCH (filters)
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
-│           └── analysis.ts   # LLM-аналіз: /analysis/status, criteria (generate/prompt/import/PUT), analyze (auto/package/import), commit, export
+│           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
+│               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
+│               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import, GET .../prompt
+│               ├── matching.ts # A5: POST /analyze, GET /analyze/package.zip, POST /analyze/import+export
+│               └── commit.ts   # POST /api/listings/analyze/commit (запис cons/pros у БД)
 │
 └── web/                      # workspace "web" (React + Vite), type: module
     ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
-    │                          #   @chakra-ui/react, next-themes, react-icons
+    │                          #   @chakra-ui/react, next-themes, react-icons, zustand
     ├── tsconfig.json         # module: ESNext, moduleResolution: Bundler, jsx
     ├── vite.config.ts        # react plugin, proxy /api → :3001
     ├── index.html            # точка входу Vite
@@ -81,9 +90,9 @@ olx-dashboard/
         ├── components/
         │   ├── Searches.tsx      # бічна панель (акордеон пошуків), сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
-        │   ├── analysis/        # майстер LLM-аналізу (план docs/plans/llm-analysis.md)
-        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка), режим cons/pros, обсяг вибрані/весь
-        │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт + вставити відповідь)
+        │   ├── analysis/        # майстер LLM-аналізу (плани docs/plans/llm-analysis.md, docs/plans/analysis-wizard-review-rework.md)
+        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка); крок 1 — вибір режиму cons/pros та scope (вибрані/вкладка/весь пошук); кроки 2–4 — read-only підсумок; прогрес зберігається між відкриттями (Zustand in-memory); закриття повз вікно заборонено
+        │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
@@ -105,7 +114,7 @@ olx-dashboard/
         │   │   ├── NoteCell.tsx   # інлайн-едіт нотатки (Popover + textarea)
         │   │   ├── ProsConsCell.tsx # інлайн-едіт плюсів/мінусів (Popover + textarea)
         │   │   ├── HighlightText.tsx # підсвітка збігів пошукового запиту (Mark)
-        │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup), "показати filtered_out", пошук
+        │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup з useListingsUiStore), "показати filtered_out", пошук
         │   │   ├── BulkActionBar.tsx # панель масових дій над виділеними рядками (зміна статусу)
         │   │   ├── DescriptionTooltip.tsx # тултіп для попереднього перегляду опису
         │   │   └── TablePagination.tsx # панель пагінації (Chakra Pagination + вибір pageSize)
@@ -119,9 +128,13 @@ olx-dashboard/
         │       ├── switch.tsx
         │       ├── checkbox.tsx
         │       └── close-button.tsx
+        ├── stores/
+        │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці) — спільний стан між таблицею і AI-майстром
+        │   └── analysisWizardStore.ts # useAnalysisWizardStore: прогрес AI-Flow (mode/scope/step/критерії/результати); bindSearch/reset
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
-        │   └── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
+        │   ├── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
+        │   └── useIsMobile.ts    # useBreakpointValue < md (768px) — для responsive JS-розгалужень
         ├── pages/
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
         ├── types/
@@ -158,5 +171,5 @@ olx-dashboard/
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphqlOlxFetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
-| LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
+| LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

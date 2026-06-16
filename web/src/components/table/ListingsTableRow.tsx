@@ -13,6 +13,8 @@ interface ListingsTableRowProps {
   descriptionExpandEnabled: boolean;
   onOpenDescription: (listing: Listing) => void;
   searchQuery: string;
+  /** Підпис видимих колонок (їх id у поточному порядку) — сигнал memo для reorder/visibility. */
+  columnLayoutKey: string;
 }
 
 function ListingsTableRowImpl({
@@ -83,7 +85,10 @@ function ListingsTableRowImpl({
  * його вміст. `row.original` — стабільне посилання з кешу TanStack (нове лише при
  * зміні даних). Пагінація/сортування/ресайз колонок не змінюють вміст рядка
  * (ширини задаються заголовком при `tableLayout: 'fixed'`), тож такі рендери
- * пропускаються — головна економія сміття на взаємодію.
+ * пропускаються — головна економія сміття на взаємодію. ВАЖЛИВО: зміна порядку
+ * чи видимості колонок НЕ перестворює об'єкт `row` у TanStack, тож без
+ * `columnLayoutKey` (підпис `getVisibleLeafColumns`) memo пропустив би ререндер і
+ * тіло розсинхронізувалось би із заголовком.
  */
 function arePropsEqual(prev: ListingsTableRowProps, next: ListingsTableRowProps): boolean {
   return (
@@ -92,7 +97,8 @@ function arePropsEqual(prev: ListingsTableRowProps, next: ListingsTableRowProps)
     prev.isSelected === next.isSelected &&
     prev.descriptionExpandEnabled === next.descriptionExpandEnabled &&
     prev.searchQuery === next.searchQuery &&
-    prev.onOpenDescription === next.onOpenDescription
+    prev.onOpenDescription === next.onOpenDescription &&
+    prev.columnLayoutKey === next.columnLayoutKey
   );
 }
 

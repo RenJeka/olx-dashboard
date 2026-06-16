@@ -7,11 +7,14 @@
 - **Monorepo:** npm workspaces — `server/` + `web/`.
 - **Backend:** Node.js 20+, TypeScript, **Fastify**, **better-sqlite3** (синхронний), **cheerio** (парсинг), **node-cron** (опц.).
 - **Frontend:** React 18 + **Vite** + **TanStack Table v8** + **TanStack Query v5** + **Chakra UI v3** (`@chakra-ui/react`, провайдер/тостер/тултіп — сніпети у `web/src/components/ui/`).
+- **State management:** **Zustand** (узгоджена залежність `web/`, in-memory без persist) — для клієнтського UI-стану, який пересікає кілька компонентів без prop drilling. Стори: `web/src/stores/listingsUiStore.ts` (вкладка фільтра статусів), `web/src/stores/analysisWizardStore.ts` (прогрес AI-Flow).
 - **Іконки:** `react-icons/lu` (набір Lucide) — стандартний вибір для Chakra UI v3.
 - **Notion:** `@notionhq/client`.
 - **LLM-аналіз:** OpenRouter через звичайний `fetch` (без SDK); Excel-експорт — **`exceljs`**
-  (єдина узгоджена нова залежність `server/`, обрано замість `xlsx`/SheetJS: той має
-  невиправлені high-severity CVE й перейшов на платну модель). `.env` — через
+  (узгоджена нова залежність `server/`, обрано замість `xlsx`/SheetJS: той має
+  невиправлені high-severity CVE й перейшов на платну модель). ZIP-пакет ручного режиму
+  (промпт + чанки описів) — **`archiver`** (+ `@types/archiver`), друга узгоджена нова
+  залежність `server/`: у Node немає вбудованого ZIP-writer. `.env` — через
   `process.loadEnvFile` (міні-лоадер у `server/src/analysis/config.ts`), без нової залежності.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
@@ -36,6 +39,16 @@
   Прогрес (`requests_done`/`requests_total` у `scan_runs`) пишеться через
   `FetchOptions.onProgress` і віддається `GET /api/searches/:id/scan-status` для
   поллінгу фронтендом. Деталі — `docs/olx-api.md` §2.9.
+- **Авто-розбиття по ціні (всередині глибокого скану):** якщо `visible_total_count > 1000`
+  (вікно пагінації), глибокий скан автоматично ділить ціновий діапазон адаптивною бісекцією
+  на під-діапазони ≤ вікна, сканує кожен і зливає через дедуп `olx_id`. Верхня межа без явної
+  `to` — `probeMaxPrice` (зондування ціною спадно, **самоперевіряється**: сортування за ціною
+  в OLX GraphQL не верифіковане live; якщо не спрацювало — звичайний deep + попередження).
+  Запобіжники: `MAX_BUCKETS=40`, `MAX_TOTAL_REQUESTS=200`, паузи 3–6с між батчами/бакетами.
+  **Вікно покриття для split-скану НЕ запускається** (union кількох діапазонів не
+  відсортований глобально за refresh — `warning` робить скан `partial`). Реалізація —
+  `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`); план/деталі —
+  `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
 - Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`, `fetchSearch(search, options?: FetchOptions)`);
   подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
@@ -79,9 +92,10 @@
   - Промпти — єдине джерело `server/src/analysis/prompts.ts` (спільне для авто й ручного).
   - Зміна `title`/`description` після аналізу → `analysis_stale=1` (бейдж «застарілий
     аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.
-  - Чанкування: авто — дрібні батчі (12), ручний пакет — авто-вибір 1 vs кілька частин за
-    порогом токенів. Реалізація — `server/src/analysis/*`, `server/src/routes/analysis.ts`,
-    `server/src/export/xlsx.ts`, фронт — `web/src/components/analysis/*`.
+  - Чанкування: авто — дрібні батчі (12), ручний ZIP-пакет — фіксовано 50 оголошень на файл
+    `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
+    `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, фронт —
+    `web/src/components/analysis/*`.
 
 ## Команди
 
@@ -107,6 +121,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/architecture.md` — технічна архітектура, потік даних, модулі, стан API.
 - `docs/olx-api.md` — деталі запитів до OLX (URL/параметри/заголовки/селектори/fallback); оновлювати при будь-якій зміні розмітки чи параметрів OLX.
 - `docs/structure.md` — дерево файлів/папок і орієнтири «куди дивитись».
+- `docs/ai-flow.md` — короткий огляд AI-аналізу мінусів/плюсів (майстер, авто/ручний рушії, append/replace).
 - `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
 - `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
 - `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).

@@ -54,6 +54,16 @@ export function formatRelativeTime(iso: string): string {
 }
 
 /**
+ * Рахує кількість пунктів у тексті «Плюси»/«Мінуси» (формат `• criterion\n• …`,
+ * сумісний з ручним едітом). Один непорожній рядок = один пункт; маркер `•` і
+ * пробіли не впливають на підрахунок. Порожнє/`null` → 0.
+ */
+export function countProsConsItems(text: string | null): number {
+  if (!text) return 0;
+  return text.split('\n').filter((line) => line.trim() !== '').length;
+}
+
+/**
  * Конвертує HTML-опис OLX (з <br /> тегами) у plain text для безпечного рендеру.
  * <br>/<br/> → перенос рядка; решта тегів видаляється; основні HTML-ентіті декодуються.
  * Результат рендериться як текстовий вузол React (НЕ dangerouslySetInnerHTML) — XSS неможливий.
