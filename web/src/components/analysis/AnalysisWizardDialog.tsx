@@ -459,7 +459,8 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     : 0;
   const scopeLabel =
     scope === 'selected' ? 'Вибрані'
-    : scope === 'tab' && statusFilter !== 'all' ? STATUS_LABELS[statusFilter]
+    : scope === 'tab' && statusFilter !== 'all' && statusFilter !== 'ai_picks'
+      ? STATUS_LABELS[statusFilter]
     : 'Весь пошук';
 
   // Крок 3: спільні фрагменти рядка для desktop-таблиці й mobile-карток.
@@ -619,7 +620,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                       colorPalette="blue"
                       onClick={() => setScope('tab')}
                     >
-                      {STATUS_LABELS[statusFilter]} ({tabCount})
+                      {statusFilter !== 'ai_picks' ? STATUS_LABELS[statusFilter] : 'Таб'} ({tabCount})
                     </Button>
                   )}
                   <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>

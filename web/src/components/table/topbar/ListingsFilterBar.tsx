@@ -1,7 +1,7 @@
 import { Box, HStack, SegmentGroup, Stack } from '@chakra-ui/react';
 import { Switch } from '../../ui/switch';
 import { LISTING_STATUSES, type Listing } from '../../../types';
-import { STATUS_LABELS } from '../../../utils/status';
+import { STATUS_LABELS, isMutedStatus } from '../../../utils/status';
 import { BulkActionBar } from './BulkActionBar';
 import { SearchInput, type SearchScope } from './SearchInput';
 import { useListingsUiStore } from '../../../stores/listingsUiStore';
@@ -35,12 +35,17 @@ export function ListingsFilterBar({
   const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
   const visible = listings.filter((l) => showFilteredOut || l.filtered_out === 0);
 
+  const aiPicksCount = listings.filter(
+    (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0,
+  ).length;
+
   const items = [
     { value: 'all', label: `Всі (${visible.length})` },
     ...LISTING_STATUSES.map((status) => ({
       value: status,
       label: `${STATUS_LABELS[status]} (${visible.filter((l) => l.status === status).length})`,
     })),
+    { value: 'ai_picks', label: `AI Вибір (${aiPicksCount})` },
   ];
 
   return (

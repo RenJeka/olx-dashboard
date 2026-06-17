@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS listings (
   analysis_stale INTEGER DEFAULT 0,  -- 1 — title/description змінились після аналізу (бейдж «застарілий аналіз»)
   filtered_out INTEGER DEFAULT 0,
   miss_count INTEGER DEFAULT 0,      -- скани поспіль без цього оголошення у вікні покриття (Етап 2)
+  ai_rank INTEGER,                   -- AI Вибір: ранг серед найкращих (NULL = не обрано)
+  ai_pick_reason TEXT,               -- AI Вибір: пояснення чому оголошення обрано
+  ai_ranked_at TEXT,                 -- AI Вибір: час останнього AI-ранжування
   first_seen_at TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );

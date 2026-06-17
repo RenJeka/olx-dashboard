@@ -183,6 +183,35 @@ export interface ListingRow {
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+  ai_rank: number | null;
+  ai_pick_reason: string | null;
+  ai_ranked_at: string | null;
+}
+
+// ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────
+
+/** Кандидат для AI-ранжування (без PII продавця). */
+export interface PickCandidate {
+  id: number;
+  title: string | null;
+  price: number | null;
+  city: string | null;
+  params: string | null;
+  description: string | null;
+  pros: string;
+}
+
+/** Один обраний AI елемент. */
+export interface PickItem {
+  id: number;
+  rank: number;
+  reason: string;
+}
+
+/** Відповідь AI-ранжування. */
+export interface PickResult {
+  picks: PickItem[];
+  summary: string;
 }
 
 // ── LLM-аналіз (план docs/plans/llm-analysis.md) ─────────────────────────────

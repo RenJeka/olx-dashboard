@@ -22,6 +22,8 @@ import type {
   AnalyzeResponse,
   AnalyzedListing,
   CommitItem,
+  PickItem,
+  PickResult,
 } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -316,9 +318,12 @@ export async function fetchAnalyzePackageZip(
   mode: AnalysisMode,
   ids: number[],
 ): Promise<void> {
-  const q = new URLSearchParams({ mode });
-  if (ids.length > 0) q.set('ids', ids.join(','));
-  const res = await fetch(`/api/searches/${searchId}/analyze/package.zip?${q.toString()}`);
+  // POST (не GET): тисячі ids у query-рядку перевищують ліміт довжини заголовків (431).
+  const res = await fetch(`/api/searches/${searchId}/analyze/package.zip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, ids }),
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -388,6 +393,49 @@ export async function exportPreview(
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   downloadBlob(await res.blob(), `analysis-${mode}.${format}`);
+}
+
+// ── AI Вибір позицій ──────────────────────────────────────────────────────────
+
+/** Готовий промпт для ручного AI-ранжування. */
+export function fetchAiPicksPrompt(searchId: number): Promise<{ prompt: string }> {
+  return api<{ prompt: string }>(`/api/searches/${searchId}/ai-picks/prompt`);
+}
+
+/** Авто-ранжування через OpenRouter. НЕ пише в БД — повертає picks для перегляду. */
+export function useRunAiPicks() {
+  return useMutation({
+    mutationFn: ({ searchId, model }: { searchId: number; model?: string }) =>
+      api<PickResult>(`/api/searches/${searchId}/ai-picks/rank`, {
+        method: 'POST',
+        body: JSON.stringify({ model }),
+      }),
+  });
+}
+
+/** Парс ручної відповіді. НЕ пише в БД — повертає picks для перегляду. */
+export function useImportAiPicks() {
+  return useMutation({
+    mutationFn: ({ searchId, raw }: { searchId: number; raw: string }) =>
+      api<PickResult>(`/api/searches/${searchId}/ai-picks/import`, {
+        method: 'POST',
+        body: JSON.stringify({ raw }),
+      }),
+  });
+}
+
+/** Запис AI-picks у БД. Інвалідує кеш listings. */
+export function useCommitAiPicks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, picks }: { searchId: number; picks: PickItem[] }) =>
+      api<{ committed: number }>(`/api/searches/${searchId}/ai-picks/commit`, {
+        method: 'POST',
+        body: JSON.stringify({ picks }),
+      }),
+    onSuccess: (_data, { searchId }) =>
+      qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+  });
 }
 
 /** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */

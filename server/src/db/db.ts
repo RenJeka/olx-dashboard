@@ -134,6 +134,11 @@ addColumnIfMissing('listings', 'analysis_source', 'TEXT');
 addColumnIfMissing('listings', 'analysis_model', 'TEXT');
 addColumnIfMissing('listings', 'analysis_stale', 'INTEGER DEFAULT 0');
 
+// AI Вибір позицій — ранжування через OpenRouter (план docs/plans/AI-auto-top.md).
+addColumnIfMissing('listings', 'ai_rank', 'INTEGER');
+addColumnIfMissing('listings', 'ai_pick_reason', 'TEXT');
+addColumnIfMissing('listings', 'ai_ranked_at', 'TEXT');
+
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).
  * Зберігає поточний видимий порядок (найновіші згори) як 0..N-1.

@@ -106,6 +106,22 @@ export interface Listing {
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string | null;
+  ai_rank: number | null;
+  ai_pick_reason: string | null;
+  ai_ranked_at: string | null;
+}
+
+// ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────
+
+export interface PickItem {
+  id: number;
+  rank: number;
+  reason: string;
+}
+
+export interface PickResult {
+  picks: PickItem[];
+  summary: string;
 }
 
 // ── LLM-аналіз (план docs/plans/llm-analysis.md) ─────────────────────────────

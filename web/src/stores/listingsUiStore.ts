@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import type { ListingStatus } from '../types';
 
 interface ListingsUiState {
-  statusFilter: ListingStatus | 'all';
-  setStatusFilter: (v: ListingStatus | 'all') => void;
+  statusFilter: ListingStatus | 'all' | 'ai_picks';
+  setStatusFilter: (v: ListingStatus | 'all' | 'ai_picks') => void;
   showFilteredOut: boolean;
   setShowFilteredOut: (v: boolean) => void;
 }

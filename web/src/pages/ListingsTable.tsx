@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Row } from '@tanstack/react-table';
 import {
   getCoreRowModel,
@@ -21,6 +21,7 @@ import { ListingsFilterBar } from '../components/table/topbar';
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
+import { isMutedStatus } from '../utils/status';
 import type { SearchScope } from '../components/table/topbar';
 import type { Listing } from '../types';
 
@@ -74,13 +75,25 @@ export function ListingsTable({
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  // Авто-показ/приховання колонки ai_rank та скидання сортування при переключенні табу.
+  useEffect(() => {
+    const isAiPicks = statusFilter === 'ai_picks';
+    onColumnVisibilityChange((prev) => ({ ...prev, ai_rank: isAiPicks }));
+    if (isAiPicks) {
+      setSorting([{ id: 'price', desc: false }]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
   const visibleRows = useMemo(
     () =>
-      rows.filter(
-        (l) =>
-          (showFilteredOut || l.filtered_out === 0) &&
-          (statusFilter === 'all' || l.status === statusFilter),
-      ),
+      statusFilter === 'ai_picks'
+        ? rows.filter((l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0)
+        : rows.filter(
+            (l) =>
+              (showFilteredOut || l.filtered_out === 0) &&
+              (statusFilter === 'all' || l.status === statusFilter),
+          ),
     [rows, showFilteredOut, statusFilter],
   );
 

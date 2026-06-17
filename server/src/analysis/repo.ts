@@ -1,4 +1,5 @@
 import { db } from '../db/db.js';
+import type { PickCandidate } from '../types.js';
 
 export interface ListingRow {
   id: number;
@@ -38,4 +39,21 @@ export function loadListings(searchId: number, ids: number[]): ListingRow[] {
       `SELECT id, title, description, params FROM listings WHERE search_id = ? AND id IN (${placeholders})`,
     )
     .all(searchId, ...ids) as ListingRow[];
+}
+
+/**
+ * Кандидати для AI-ранжування: без мінусів, активні, не відфільтровані,
+ * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт 30.
+ */
+export function loadPickCandidates(searchId: number): PickCandidate[] {
+  return db
+    .prepare(
+      `SELECT id, title, price, city, params, description, pros
+       FROM listings
+       WHERE search_id = ? AND cons = '' AND status NOT IN ('disabled','rejected')
+         AND filtered_out = 0
+       ORDER BY CASE WHEN price IS NULL THEN 1 ELSE 0 END, price ASC
+       LIMIT 30`,
+    )
+    .all(searchId) as PickCandidate[];
 }
