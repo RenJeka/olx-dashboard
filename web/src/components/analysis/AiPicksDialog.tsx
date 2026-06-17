@@ -30,6 +30,7 @@ import {
 } from '../../api/client';
 import { loadAnalysisModel } from '../../utils/storage';
 import { isMutedStatus } from '../../utils/status';
+import { PICK_CANDIDATES_LIMIT, PICK_TOP_N } from '../../constants';
 import type { PickItem, PickResult, Search } from '../../types';
 
 interface Props {
@@ -54,6 +55,7 @@ export function AiPicksDialog({ search }: Props) {
   const candidateCount = (listings ?? []).filter(
     (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0,
   ).length;
+  const promptCount = Math.min(candidateCount, PICK_CANDIDATES_LIMIT);
 
   function applyResult(result: PickResult) {
     setPendingPicks(result.picks);
@@ -156,7 +158,9 @@ export function AiPicksDialog({ search }: Props) {
             <Stack gap={4}>
               <Text textStyle="sm" color="fg.muted">
                 Кандидати для ранжування: оголошення без мінусів, активні, не відфільтровані.
-                Знайдено <strong>{candidateCount}</strong> кандидатів.
+                Знайдено <strong>{candidateCount}</strong> кандидатів, у промпт піде{' '}
+                <strong>{promptCount}</strong> найдешевших (ліміт {PICK_CANDIDATES_LIMIT}).
+                AI обере та відсортує топ-{PICK_TOP_N} найкращих.
               </Text>
 
               <Button
@@ -202,7 +206,7 @@ export function AiPicksDialog({ search }: Props) {
           {step === 'running' && (
             <HStack gap={3} p={4} justify="center">
               <Spinner color="teal.500" />
-              <Text>Аналізую {candidateCount} оголошень…</Text>
+              <Text>Аналізую {promptCount} оголошень…</Text>
             </HStack>
           )}
 

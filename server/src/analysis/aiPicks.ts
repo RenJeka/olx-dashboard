@@ -1,5 +1,5 @@
 import type { PickCandidate, PickItem, PickResult } from '../types.js';
-import { DEFAULT_MODEL } from './constants.js';
+import { DEFAULT_MODEL, PICK_TOP_N } from './constants.js';
 import { chat } from './openrouter.js';
 import { hasApiKey } from './config.js';
 
@@ -35,9 +35,11 @@ export function buildPickPrompt(candidates: PickCandidate[]): string {
     pros: truncate(c.pros, MAX_PROS_CHARS),
   }));
 
-  return `Ти — AI-помічник для вибору найкращого оголошення про покупку.
+  return `Ти — AI-помічник для вибору найкращих оголошень про покупку.
 Тобі надається список оголошень без явних мінусів.
-Твоє завдання — ВИБРАТИ 3–5 НАЙКРАЩИХ кандидатів і пояснити чому.
+Твоє завдання — ВИБРАТИ ТОП-${PICK_TOP_N} НАЙКРАЩИХ кандидатів і відсортувати їх від
+найкращого (rank=1) до найгіршого (rank=${PICK_TOP_N}), коротко пояснивши чому кожен туди потрапив.
+Якщо кандидатів менше ${PICK_TOP_N} — повернути всіх, відсортованих за рейтингом.
 Відкидай решту. Якщо жоден не відповідає критеріям якості — можеш повернути порожній масив.
 
 Критерії відбору (за пріоритетом):
@@ -85,7 +87,7 @@ export function parsePickResponse(raw: string, validIds: number[]): PickResult {
   picks.sort((a, b) => a.rank - b.rank);
 
   return {
-    picks,
+    picks: picks.slice(0, PICK_TOP_N),
     summary: String(obj.summary ?? ''),
   };
 }
