@@ -1,6 +1,5 @@
 import { Badge, Box, HStack, Link, Stack, Text } from '@chakra-ui/react';
-import type { PickItem } from '../../types';
-import type { Listing } from '../../types';
+import type { Listing, PickItem } from '../../types';
 
 interface Props {
   pick: PickItem;

@@ -92,8 +92,8 @@ export function Header({
             </Badge>
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
-          {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
           {selectedSearch && <RelevanceFilterDialog search={selectedSearch} selectedIds={selectedIds} />}
+          {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
           {selectedSearch && <AiPicksDialog search={selectedSearch} />}
           <SettingsDrawer
             columnVisibility={columnVisibility}

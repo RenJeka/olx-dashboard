@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
+import type { AnalysisScope } from '../../stores/analysisWizardStore';
 import { useListingsUiStore } from '../../stores/listingsUiStore';
 import { STATUS_LABELS } from '../../utils/status';
 import {
@@ -73,7 +74,15 @@ import {
   MANUAL_MODEL,
   MODE_LABELS,
 } from '../../constants';
-import type { AnalysisMode, AnalyzedListing, Listing, MatchedItem, PackagePart, Search } from '../../types';
+import type { AnalyzedListing, Listing, MatchedItem, PackagePart, Search } from '../../types';
+
+function showErrorToast(title: string, err: unknown) {
+  toaster.create({
+    type: 'error',
+    title,
+    description: err instanceof Error ? err.message : String(err),
+  });
+}
 
 interface Props {
   search: Search;
@@ -150,6 +159,13 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const reasoning = loadAnalysisReasoning();
   const extra = loadAnalysisExtraCriteria();
 
+  // Розумний дефолт scope при свіжому відкритті Flow.
+  function computeDefaultScope(): AnalysisScope {
+    if (selectedIds.length > 0) return 'selected';
+    if (statusFilter !== 'all') return 'tab';
+    return 'all';
+  }
+
   // Завантажуємо критерії лише при першому відкритті або зміні режиму на кроці 1.
   // На кроках 2–4 не перезаписуємо прогрес при повторному відкритті.
   useEffect(() => {
@@ -208,11 +224,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       mergeCriteria(criteria);
       toaster.create({ type: 'success', title: `Згенеровано критеріїв: ${criteria.length}` });
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка генерації',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка генерації', err);
     }
   }
 
@@ -222,11 +234,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       const { prompt } = await fetchCriteriaPrompt(search.id, mode, extra);
       setCriteriaParts([{ name: `критерії-${mode}.txt`, content: prompt }]);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Не вдалося підготувати промпт',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Не вдалося підготувати промпт', err);
     }
   }
 
@@ -238,12 +246,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           mergeCriteria(criteria);
           toaster.create({ type: 'success', title: `Розпізнано критеріїв: ${criteria.length}` });
         },
-        onError: (err) =>
-          toaster.create({
-            type: 'error',
-            title: 'Помилка розбору',
-            description: err instanceof Error ? err.message : String(err),
-          }),
+        onError: (err) => showErrorToast('Помилка розбору', err),
       },
     );
   }
@@ -260,11 +263,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       );
       setStep(2);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Не вдалося зберегти критерії',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Не вдалося зберегти критерії', err);
     }
   }
 
@@ -296,11 +295,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       }
       setStep(3);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка аналізу',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка аналізу', err);
     } finally {
       setAnalyzeProgress(null);
     }
@@ -316,11 +311,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       await fetchAnalyzePackageZip(search.id, mode, effectiveIds);
       setShowMatchAssistant(true);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Не вдалося підготувати ZIP-пакет',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Не вдалося підготувати ZIP-пакет', err);
     } finally {
       setZipDownloading(false);
     }
@@ -337,12 +328,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
             title: `Опрацьовано оголошень: ${res.results.length}`,
           });
         },
-        onError: (err) =>
-          toaster.create({
-            type: 'error',
-            title: 'Помилка розбору',
-            description: err instanceof Error ? err.message : String(err),
-          }),
+        onError: (err) => showErrorToast('Помилка розбору', err),
       },
     );
   }
@@ -413,11 +399,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
       reset();
       setOpen(false);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка запису',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка запису', err);
     } finally {
       setCommitProgress(null);
     }
@@ -444,11 +426,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     try {
       await exportPreview(search.id, mode, format, rows);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка експорту',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка експорту', err);
     }
   }
 
@@ -533,11 +511,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           bindSearch(search.id);
           if (prevBound !== search.id) {
             // Свіжий Flow — виставляємо розумний дефолт scope
-            const defaultScope =
-              selectedIds.length > 0 ? 'selected'
-              : statusFilter !== 'all' ? 'tab'
-              : 'all';
-            setScope(defaultScope);
+            setScope(computeDefaultScope());
           }
         }
       }}
@@ -702,11 +676,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
                     onClick={() => {
                       reset();
                       bindSearch(search.id);
-                      const defaultScope =
-                        selectedIds.length > 0 ? 'selected'
-                        : statusFilter !== 'all' ? 'tab'
-                        : 'all';
-                      setScope(defaultScope);
+                      setScope(computeDefaultScope());
                     }}
                   >
                     Почати заново

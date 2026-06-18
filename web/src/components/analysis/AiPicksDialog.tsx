@@ -40,6 +40,14 @@ interface Props {
 
 type Step = 'idle' | 'running' | 'done';
 
+function showErrorToast(title: string, err: unknown) {
+  toaster.create({
+    type: 'error',
+    title,
+    description: err instanceof Error ? err.message : String(err),
+  });
+}
+
 export function AiPicksDialog({ search }: Props) {
   const { data: listings } = useListings(search.id);
   const [open, setOpen] = useState(false);
@@ -79,11 +87,7 @@ export function AiPicksDialog({ search }: Props) {
       applyResult(result);
     } catch (err) {
       setStep('idle');
-      toaster.create({
-        type: 'error',
-        title: 'Помилка AI-ранжування',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка AI-ранжування', err);
     }
   }
 
@@ -92,11 +96,7 @@ export function AiPicksDialog({ search }: Props) {
       const result = await importAiPicks.mutateAsync({ searchId: search.id, raw });
       applyResult(result);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка парсингу відповіді',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка парсингу відповіді', err);
     }
   }
 
@@ -107,11 +107,7 @@ export function AiPicksDialog({ search }: Props) {
       setOpen(false);
       reset();
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка збереження',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка збереження', err);
     }
   }
 
@@ -134,11 +130,7 @@ export function AiPicksDialog({ search }: Props) {
       await fetchAiPicksPackageZip(search.id);
       setZipDownloaded(true);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Не вдалося підготувати ZIP-пакет',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Не вдалося підготувати ZIP-пакет', err);
     } finally {
       setZipDownloading(false);
     }
@@ -153,6 +145,35 @@ export function AiPicksDialog({ search }: Props) {
   }
 
   const listingsMap = new Map((listings ?? []).map((l) => [l.id, l]));
+
+  const manualEmptyHint = useZip ? (
+    zipDownloaded ? (
+      <Text textStyle="xs" color="fg.muted">
+        ZIP завантажено. Опрацюй усі candidates/chunk-NNN.json за 2-етапною
+        інструкцією у prompt.txt і встав сюди лише ОДНУ фінальну JSON-відповідь.
+      </Text>
+    ) : (
+      <Button
+        size="xs"
+        variant="outline"
+        loading={zipDownloading}
+        disabled={candidateCount === 0}
+        onClick={downloadZipPackage}
+      >
+        Завантажити ZIP-пакет
+      </Button>
+    )
+  ) : (
+    <Button
+      size="xs"
+      variant="outline"
+      loading={loadingPrompt}
+      disabled={candidateCount === 0}
+      onClick={loadPrompt}
+    >
+      Завантажити промпт
+    </Button>
+  );
 
   return (
     <DialogRoot
@@ -200,56 +221,22 @@ export function AiPicksDialog({ search }: Props) {
                 <Text textStyle="xs" color="fg.muted" mb={2} fontWeight="semibold">
                   Ручний режим (без API-ключа)
                 </Text>
-                {useZip ? (
-                  <ManualAssistant
-                    title="Завантаж ZIP-пакет та вставте фінальну відповідь"
-                    parts={[]}
-                    pasteLabel="Застосувати відповідь"
-                    onSubmit={handleImport}
-                    submitting={importAiPicks.isPending}
-                    emptyHint={
-                      zipDownloaded ? (
-                        <Text textStyle="xs" color="fg.muted">
-                          ZIP завантажено. Опрацюй усі candidates/chunk-NNN.json за 2-етапною
-                          інструкцією у prompt.txt і встав сюди лише ОДНУ фінальну JSON-відповідь.
-                        </Text>
-                      ) : (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          loading={zipDownloading}
-                          disabled={candidateCount === 0}
-                          onClick={downloadZipPackage}
-                        >
-                          Завантажити ZIP-пакет
-                        </Button>
-                      )
-                    }
-                  />
-                ) : (
-                  <ManualAssistant
-                    title="Скопіюй промпт та вставте відповідь"
-                    parts={
-                      prompt !== null
-                        ? [{ name: 'Промпт AI Вибір', content: prompt }]
-                        : []
-                    }
-                    pasteLabel="Застосувати відповідь"
-                    onSubmit={handleImport}
-                    submitting={importAiPicks.isPending}
-                    emptyHint={
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        loading={loadingPrompt}
-                        disabled={candidateCount === 0}
-                        onClick={loadPrompt}
-                      >
-                        Завантажити промпт
-                      </Button>
-                    }
-                  />
-                )}
+                <ManualAssistant
+                  title={
+                    useZip
+                      ? 'Завантаж ZIP-пакет та вставте фінальну відповідь'
+                      : 'Скопіюй промпт та вставте відповідь'
+                  }
+                  parts={
+                    !useZip && prompt !== null
+                      ? [{ name: 'Промпт AI Вибір', content: prompt }]
+                      : []
+                  }
+                  pasteLabel="Застосувати відповідь"
+                  onSubmit={handleImport}
+                  submitting={importAiPicks.isPending}
+                  emptyHint={manualEmptyHint}
+                />
               </Box>
             </Stack>
           )}
