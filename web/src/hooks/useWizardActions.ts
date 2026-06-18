@@ -28,6 +28,7 @@ import { toaster } from '../components/ui/toaster';
 import { useListingsMap } from './useListingsMap';
 import { chunk } from '../utils/array';
 import {
+  AI_PICKS_LABEL,
   ANALYSIS_SOURCE,
   ANALYZE_CHUNK,
   COMMIT_CHUNK,
@@ -381,7 +382,7 @@ export function useWizardActions(search: Search, selectedIds: number[], open: bo
 
   const scopeLabel =
     scope === 'selected' ? 'Вибрані'
-    : scope === 'tab' && statusFilter === 'ai_picks' ? 'Найкращі кандидати'
+    : scope === 'tab' && statusFilter === 'ai_picks' ? AI_PICKS_LABEL
     : scope === 'tab' && statusFilter !== 'all'
       ? STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]
     : 'Весь пошук';

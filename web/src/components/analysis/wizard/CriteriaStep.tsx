@@ -14,6 +14,7 @@ import {
 } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
 import { STATUS_LABELS } from '../../../utils/status';
+import { AI_PICKS_LABEL } from '../../../constants';
 import type { useWizardActions } from '../../../hooks/useWizardActions';
 
 type Actions = ReturnType<typeof useWizardActions>;
@@ -70,7 +71,7 @@ export function CriteriaStep({ w }: Props) {
               colorPalette="blue"
               onClick={() => setScope('tab')}
             >
-              {statusFilter === 'ai_picks' ? 'Найкращі кандидати' : STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]} ({tabCount})
+              {statusFilter === 'ai_picks' ? AI_PICKS_LABEL : STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]} ({tabCount})
             </Button>
           )}
           <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>

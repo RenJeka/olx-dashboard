@@ -244,9 +244,11 @@ export const columns = [
       const rank = info.getValue();
       if (rank == null) return null;
       const reason = info.row.original.ai_pick_reason ?? '';
+      // 1–10 зелений, 11–20 жовтий, 21+ помаранчевий (ближче до червоного).
+      const color = rank <= 10 ? 'green.500' : rank <= 20 ? 'yellow.500' : 'orange.600';
       return (
         <Tooltip content={reason} disabled={!reason}>
-          <Text fontWeight="semibold" cursor={reason ? 'help' : 'default'}>
+          <Text fontSize="lg" fontWeight="bold" color={color} cursor={reason ? 'help' : 'default'}>
             #{rank}
           </Text>
         </Tooltip>

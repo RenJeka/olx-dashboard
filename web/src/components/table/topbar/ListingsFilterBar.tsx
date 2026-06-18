@@ -6,6 +6,7 @@ import { Tooltip } from '../../ui/tooltip';
 import { LISTING_STATUSES, type Listing } from '../../../types';
 import { STATUS_LABELS } from '../../../utils/status';
 import { isAiPickCandidate, passesNoiseFilters } from '../../../utils/listingVisibility';
+import { AI_PICKS_LABEL } from '../../../constants';
 import { BulkActionBar } from './BulkActionBar';
 import { SearchInput, type SearchScope } from './SearchInput';
 import { useListingsUiStore } from '../../../stores/listingsUiStore';
@@ -46,7 +47,7 @@ export function ListingsFilterBar({
 
   const aiPicksTooltipContent = (
     <Stack gap={1.5} maxW="320px" py={1} px={1}>
-      <Text fontWeight="semibold" fontSize="xs" color="fg.default">«Найкращі кандидати» — це шорт-лист оголошень:</Text>
+      <Text fontWeight="semibold" fontSize="xs" color="fg.default">«{AI_PICKS_LABEL}» — це шорт-лист оголошень:</Text>
       <Box as="ul" pl={4} fontSize="xs" color="fg.muted" css={{ '& li': { mb: 0.5 } }}>
         <li><strong>Без мінусів</strong> — поле cons порожнє</li>
         <li><strong>Активні</strong> — не disabled/rejected</li>
@@ -68,7 +69,7 @@ export function ListingsFilterBar({
         <Tooltip content={aiPicksTooltipContent} positioning={{ placement: 'top' }} showArrow openDelay={200}>
           <HStack as="span" gap={1.5} display="inline-flex" position="relative" pr={3}>
             <Icon asChild fontSize="md"><PiFolderSimpleStarThin /></Icon>
-            <Box as="span">Найкращі кандидати ({aiPicksCount})</Box>
+            <Box as="span">{AI_PICKS_LABEL} ({aiPicksCount})</Box>
             <Box as="span" position="absolute" top="-2px" right="-4px" color="fg.subtle" fontSize="10px">
               <LuInfo />
             </Box>

@@ -22,6 +22,8 @@ export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
 export const MANUAL_MODEL = 'manual';
 
 // ── AI Вибір (ранжування) ──────────────────────────────────────────────────────
+/** Підпис псевдо-вкладки/scope «Найкращі кандидати» (ai_picks) — спільний для таблиці й майстра. */
+export const AI_PICKS_LABEL = 'Найкращі кандидати';
 /** Скільки кандидатів (без мінусів) максимум іде в промпт (дзеркалить PICK_CANDIDATES_LIMIT сервера). */
 export const PICK_CANDIDATES_LIMIT = 500;
 /** Скільки найкращих кандидатів LLM повертає (дзеркалить PICK_TOP_N сервера). */
