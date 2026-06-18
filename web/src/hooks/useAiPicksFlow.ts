@@ -8,7 +8,7 @@ import {
   useListings,
 } from '../api/client';
 import { loadAnalysisModel } from '../utils/storage';
-import { isMutedStatus } from '../utils/status';
+import { isAiPickCandidate } from '../utils/listingVisibility';
 import { showErrorToast } from '../utils/toast';
 import { toaster } from '../components/ui/toaster';
 import { useListingsMap } from './useListingsMap';
@@ -32,9 +32,7 @@ export function useAiPicksFlow(search: Search) {
   const importAiPicks = useImportAiPicks();
   const commitAiPicks = useCommitAiPicks();
 
-  const candidateCount = (listings ?? []).filter(
-    (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0,
-  ).length;
+  const candidateCount = (listings ?? []).filter(isAiPickCandidate).length;
   const promptCount = Math.min(candidateCount, PICK_CANDIDATES_LIMIT);
   const useZip = promptCount > MANUAL_PICKS_ZIP_CHUNK_SIZE;
 

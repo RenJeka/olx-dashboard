@@ -60,8 +60,10 @@ export function loadListings(searchId: number, ids: number[]): ListingRow[] {
 }
 
 /**
- * Кандидати для AI-ранжування: без мінусів, активні, не відфільтровані,
+ * Кандидати для AI-ранжування: без мінусів, активні, не відфільтровані, релевантні
+ * (`ai_relevant IS NOT 0` лишає 1 та NULL-«не перевірено», відсікає нерелевантні),
  * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт PICK_CANDIDATES_LIMIT.
+ * Предикат збігається з вкладкою «Найкращі кандидати» в UI.
  */
 export function loadPickCandidates(searchId: number): PickCandidate[] {
   return db
@@ -69,7 +71,7 @@ export function loadPickCandidates(searchId: number): PickCandidate[] {
       `SELECT id, title, price, city, params, description, pros
        FROM listings
        WHERE search_id = ? AND cons = '' AND status NOT IN ('disabled','rejected')
-         AND filtered_out = 0
+         AND filtered_out = 0 AND ai_relevant IS NOT 0
        ORDER BY CASE WHEN price IS NULL THEN 1 ELSE 0 END, price ASC
        LIMIT ?`,
     )

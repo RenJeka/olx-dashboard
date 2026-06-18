@@ -22,6 +22,7 @@ import {
   loadAnalysisExtraCriteria,
 } from '../utils/storage';
 import { STATUS_LABELS } from '../utils/status';
+import { isListingVisible, passesNoiseFilters } from '../utils/listingVisibility';
 import { showErrorToast } from '../utils/toast';
 import { toaster } from '../components/ui/toaster';
 import { useListingsMap } from './useListingsMap';
@@ -55,6 +56,8 @@ export function useWizardActions(search: Search, selectedIds: number[], open: bo
     reset,
   } = useAnalysisWizardStore();
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
+  const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
+  const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
 
   // Ephemeral UI
   const [showCriteriaAssistant, setShowCriteriaAssistant] = useState(false);
@@ -74,16 +77,33 @@ export function useWizardActions(search: Search, selectedIds: number[], open: bo
   const importAnalysis = useImportAnalysis();
   const commit = useCommitAnalysis();
 
-  const allIds = useMemo(() => (listings ?? []).map((l) => l.id), [listings]);
+  // «Весь пошук» = всі рядки, видимі за «шумовими» перемикачами (відфільтровані/
+  // нерелевантні не входять). Збігається з лічильником вкладки «Всі (N)».
+  const allIds = useMemo(
+    () =>
+      (listings ?? [])
+        .filter((l) => passesNoiseFilters(l, showFilteredOut, showIrrelevant))
+        .map((l) => l.id),
+    [listings, showFilteredOut, showIrrelevant],
+  );
+
+  // «Таб» = рядки поточної вкладки, видимі за тими ж фільтрами, що й у таблиці —
+  // рівно стільки, скільки користувач бачить (число в дужках вкладки).
+  const tabIds = useMemo(
+    () =>
+      statusFilter === 'all'
+        ? allIds
+        : (listings ?? [])
+            .filter((l) => isListingVisible(l, statusFilter, showFilteredOut, showIrrelevant))
+            .map((l) => l.id),
+    [listings, statusFilter, showFilteredOut, showIrrelevant, allIds],
+  );
 
   const effectiveIds = useMemo(() => {
     if (scope === 'selected') return selectedIds;
-    if (scope === 'tab') {
-      if (statusFilter === 'all') return allIds;
-      return allIds.filter((id) => listingById.get(id)?.status === statusFilter);
-    }
+    if (scope === 'tab') return tabIds;
     return allIds;
-  }, [scope, selectedIds, allIds, listingById, statusFilter]);
+  }, [scope, selectedIds, allIds, tabIds]);
 
   const apiAvailable = status?.apiAvailable ?? false;
   const model = loadAnalysisModel();
@@ -357,9 +377,7 @@ export function useWizardActions(search: Search, selectedIds: number[], open: bo
 
   const modeLabel = MODE_LABELS[mode];
   const chosenCount = available.filter((c) => selected.has(c)).length;
-  const tabCount = statusFilter !== 'all'
-    ? allIds.filter((id) => listingById.get(id)?.status === statusFilter).length
-    : 0;
+  const tabCount = statusFilter !== 'all' ? tabIds.length : 0;
 
   const scopeLabel =
     scope === 'selected' ? 'Вибрані'

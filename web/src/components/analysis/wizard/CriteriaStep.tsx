@@ -79,6 +79,13 @@ export function CriteriaStep({ w }: Props) {
         </HStack>
       </HStack>
 
+      {scope !== 'selected' && (
+        <Text textStyle="xs" color="fg.muted">
+          В аналіз потрапляють лише видимі оголошення — стільки ж, скільки в дужках вкладки.
+          Нерелевантні та відфільтровані виключені (керується перемикачами над таблицею).
+        </Text>
+      )}
+
       <Text textStyle="sm" color="fg.muted">
         Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
       </Text>

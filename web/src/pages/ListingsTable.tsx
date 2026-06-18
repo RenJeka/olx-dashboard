@@ -21,7 +21,7 @@ import { ListingsFilterBar } from '../components/table/topbar';
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
-import { isMutedStatus } from '../utils/status';
+import { isListingVisible } from '../utils/listingVisibility';
 import type { SearchScope } from '../components/table/topbar';
 import type { Listing } from '../types';
 
@@ -86,17 +86,7 @@ export function ListingsTable({
   }, [statusFilter]);
 
   const visibleRows = useMemo(
-    () =>
-      statusFilter === 'ai_picks'
-        ? rows.filter(
-            (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0 && l.ai_relevant !== 0,
-          )
-        : rows.filter(
-            (l) =>
-              (showFilteredOut || l.filtered_out === 0) &&
-              (showIrrelevant || l.ai_relevant !== 0) &&
-              (statusFilter === 'all' || l.status === statusFilter),
-          ),
+    () => rows.filter((l) => isListingVisible(l, statusFilter, showFilteredOut, showIrrelevant)),
     [rows, showFilteredOut, showIrrelevant, statusFilter],
   );
 

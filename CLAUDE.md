@@ -116,6 +116,13 @@
     списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
   - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
     нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
+  - **Консистентність обсягу:** видимість рядка в таблиці й обсяг AI-аналізу (плюси/мінуси,
+    AI Picks) керуються ОДНИМ предикатом — `web/src/utils/listingVisibility.ts`
+    (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`). Scope майстра «Весь пошук»/«Таб»
+    = рівно стільки рядків, скільки в дужках вкладки (нерелевантні/відфільтровані виключені,
+    керується перемикачами над таблицею; «Вибрані» — точний ручний вибір, без фільтрів). Кандидати
+    AI Picks (`loadPickCandidates`, фронт `useAiPicksFlow`) теж виключають `ai_relevant=0`
+    (`ai_relevant IS NOT 0` — лишає 1 та NULL).
   - **Ручний ZIP** (для агентного CLI типу Antigravity зі слабкою моделлю): крім `prompt.txt` +
     `descriptions/chunk-NNN.json` (лише кандидати після пре-фільтра) кладе готові `merge.py`/
     `verify.py` (`server/src/analysis/relevance_merge.py`/`relevance_verify.py`). Промпт —

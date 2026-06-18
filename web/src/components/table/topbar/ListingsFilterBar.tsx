@@ -4,7 +4,8 @@ import { PiFolderSimpleStarThin } from 'react-icons/pi';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
 import { LISTING_STATUSES, type Listing } from '../../../types';
-import { STATUS_LABELS, isMutedStatus } from '../../../utils/status';
+import { STATUS_LABELS } from '../../../utils/status';
+import { isAiPickCandidate, passesNoiseFilters } from '../../../utils/listingVisibility';
 import { BulkActionBar } from './BulkActionBar';
 import { SearchInput, type SearchScope } from './SearchInput';
 import { useListingsUiStore } from '../../../stores/listingsUiStore';
@@ -38,14 +39,10 @@ export function ListingsFilterBar({
   const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
   const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
   const setShowIrrelevant = useListingsUiStore((s) => s.setShowIrrelevant);
-  const visible = listings.filter(
-    (l) => (showFilteredOut || l.filtered_out === 0) && (showIrrelevant || l.ai_relevant !== 0),
-  );
+  const visible = listings.filter((l) => passesNoiseFilters(l, showFilteredOut, showIrrelevant));
   const irrelevantCount = listings.filter((l) => l.ai_relevant === 0).length;
 
-  const aiPicksCount = listings.filter(
-    (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0 && l.ai_relevant !== 0,
-  ).length;
+  const aiPicksCount = listings.filter(isAiPickCandidate).length;
 
   const aiPicksTooltipContent = (
     <Stack gap={1.5} maxW="320px" py={1} px={1}>

@@ -164,6 +164,7 @@ olx-dashboard/
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS/STATUS_COLORS, isMutedStatus()
+            ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
             ├── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState, автооновлення, AI-аналіз) у localStorage
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
