@@ -82,5 +82,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   error TEXT,
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
   requests_total INTEGER,            -- прогрес глибокого скану: ціль (NULL поки невідома)
-  fetch_method TEXT                  -- GraphQL | HTML
+  fetch_method TEXT,                 -- GraphQL | HTML
+  stage TEXT,                        -- людиномовний поточний етап (транзієнтний текст, docs/plans/scan-progress-detail.md)
+  sub_done INTEGER,                  -- позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify
+  sub_total INTEGER                  -- загальна кількість підпослідовності
 );

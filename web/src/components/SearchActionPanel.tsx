@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Badge, Box, Button, HStack, Progress, SimpleGrid, Stack, Text, IconButton } from '@chakra-ui/react';
+import { Badge, Box, Button, HStack, SimpleGrid, Stack, Text, IconButton } from '@chakra-ui/react';
 import { LuActivity, LuLayers, LuRefreshCw, LuStethoscope, LuTriangleAlert, LuCopy } from 'react-icons/lu';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
+import { ScanProgressPanel } from './ScanProgressPanel';
 import {
   DialogBackdrop,
   DialogBody,
@@ -20,7 +21,7 @@ import { formatRelativeTime } from '../utils/format';
 import { loadSkipDeepScanConfirm, saveSkipDeepScanConfirm } from '../utils/storage';
 import type { Search } from '../types';
 
-const SCAN_KIND_LABELS: Record<string, string> = {
+export const SCAN_KIND_LABELS: Record<string, string> = {
   normal: 'швидкий',
   deep: 'глибокий',
   verify: 'перевірка',
@@ -220,42 +221,13 @@ export function SearchActionPanel({ search }: Props) {
               </Box>
             )}
 
-            {/* Рядок прогресу сканування */}
-            {isScanning && status && (
-              <Stack gap={1.5} p={3} rounded="lg" bg="blue.subtle/10" borderWidth="1px" borderColor="blue.subtle">
-                <HStack justify="space-between">
-                  <Text textStyle="xs" fontWeight="semibold" color="blue.fg">
-                    Виконується {SCAN_KIND_LABELS[scanKind] ?? scanKind} скан...
-                    {status.fetch_method && ` (${status.fetch_method})`}
-                  </Text>
-                  <Text textStyle="xs" color="fg.muted">
-                    {status.requests_total == null
-                      ? 'Підготовка…'
-                      : `Запит ${status.requests_done ?? 0}/${status.requests_total}`}
-                  </Text>
-                </HStack>
-                <Progress.Root
-                  size="xs"
-                  colorPalette="blue"
-                  value={
-                    status.requests_total == null
-                      ? null
-                      : ((status.requests_done ?? 0) / status.requests_total) * 100
-                  }
-                >
-                  <Progress.Track>
-                    <Progress.Range />
-                  </Progress.Track>
-                </Progress.Root>
-                {status.requests_total != null && (
-                  <Text textStyle="2xs" color="fg.muted" textAlign="right">
-                    Залишилось: ~{Math.round(
-                      (status.requests_total - (status.requests_done ?? 0)) *
-                        DEEP_SCAN_SECONDS_PER_REQUEST,
-                    )} с
-                  </Text>
-                )}
-              </Stack>
+            {/* Деталізований прогрес сканування (docs/plans/scan-progress-detail.md) */}
+            {isScanning && status && scanKind && (
+              <ScanProgressPanel
+                scanKind={scanKind}
+                status={status}
+                secondsPerRequest={DEEP_SCAN_SECONDS_PER_REQUEST}
+              />
             )}
 
             {/* Дії */}

@@ -216,6 +216,13 @@ export interface ScanStatus {
   requests_done: number | null;
   requests_total: number | null;
   fetch_method: string | null;
+  kind: string | null;
+  /** Людиномовний поточний етап (docs/plans/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
+  stage: string | null;
+  /** Позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify. */
+  sub_done: number | null;
+  /** Загальна кількість підпослідовності — керує сегментованою смугою прогресу. */
+  sub_total: number | null;
 }
 
 /** Останній скан пошуку — частина відповіді GET /api/searches/:id/stats. */

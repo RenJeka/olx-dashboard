@@ -47,6 +47,11 @@ addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
 addColumnIfMissing('scan_runs', 'fetch_method', 'TEXT');
 addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
+
+// Деталізований прогрес сканування (docs/plans/scan-progress-detail.md).
+addColumnIfMissing('scan_runs', 'stage', 'TEXT');
+addColumnIfMissing('scan_runs', 'sub_done', 'INTEGER');
+addColumnIfMissing('scan_runs', 'sub_total', 'INTEGER');
 addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
 addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 

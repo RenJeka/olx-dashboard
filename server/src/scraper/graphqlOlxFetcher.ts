@@ -343,7 +343,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
 
       requestsUsed = i + 1;
-      options?.onProgress?.(requestsUsed, target);
+      options?.onProgress?.({ done: requestsUsed, total: target });
 
       if (items.length < PAGE_LIMIT) {
         exhausted = true;
@@ -406,6 +406,8 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const onProgress = options?.onProgress;
     let requestsUsed = 0;
 
+    onProgress?.({ done: 0, stage: 'Зондування видачі' });
+
     // 1. Зондуємо корінь: visible_total_count усього пошуку (з власним діапазоном apiFilters).
     const rootPage = await this.fetchPage(search, 0, referer);
     requestsUsed++;
@@ -424,6 +426,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const lo = priceRange?.from ?? 0;
     let hi: number | null = priceRange?.to ?? null;
     if (hi == null) {
+      onProgress?.({ done: requestsUsed, stage: 'Зондування максимальної ціни' });
       hi = await this.probeMaxPrice(search);
       requestsUsed += PRICE_SORT_CANDIDATES.length; // верхня оцінка probe-запитів
       if (hi == null) {
@@ -469,6 +472,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
       if (isLeaf) {
         buckets.push({ from: interval.from, to: interval.to, count, page0: page.items });
+        onProgress?.({
+          done: requestsUsed,
+          stage: `Розбиття діапазону (знайдено ${buckets.length})`,
+        });
       } else {
         const mid = Math.floor((interval.from + interval.to) / 2);
         queue.push({ from: interval.from, to: mid });
@@ -514,7 +521,14 @@ export class GraphqlOlxFetcher implements OlxFetcher {
           priceRange: { from: bucket.from, to: bucket.to },
         });
         requestsUsed++;
-        onProgress?.(requestsUsed, totalEstimate, 'GraphQL');
+        onProgress?.({
+          done: requestsUsed,
+          total: totalEstimate,
+          method: 'GraphQL',
+          stage: `Бакет ₴${bucket.from}–${bucket.to} · стор. ${p}/${pages}`,
+          subDone: bi + 1,
+          subTotal: buckets.length,
+        });
 
         if (page.listingError) {
           // Бакет усе одно вперся у вікно пагінації — частковий результат, без падіння.
@@ -530,7 +544,9 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         }
 
         if (requestsUsed % BATCH_SIZE === 0) {
-          await sleep(batchPauseDelay());
+          const delay = batchPauseDelay();
+          onProgress?.({ done: requestsUsed, stage: `Пауза ~${Math.round(delay / 1000)}с` });
+          await sleep(delay);
         } else {
           await sleep(randomDelay());
         }
@@ -544,7 +560,9 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
       // Пауза між бакетами (ввічливість — як між батчами).
       if (bi < buckets.length - 1) {
-        await sleep(batchPauseDelay());
+        const delay = batchPauseDelay();
+        onProgress?.({ done: requestsUsed, stage: `Пауза перед наступним бакетом ~${Math.round(delay / 1000)}с` });
+        await sleep(delay);
       }
     }
 

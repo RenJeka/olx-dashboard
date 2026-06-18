@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, HStack, IconButton, Input, Stack, Text, Wrap } from '@chakra-ui/react';
+import { Button, HStack, IconButton, Input, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { LuPlus, LuWandSparkles, LuX } from 'react-icons/lu';
 import {
   DialogBackdrop,
@@ -10,6 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from './ui/dialog';
+import { Tooltip } from './ui/tooltip';
 import { ManualAssistant } from './analysis/ManualAssistant';
 import {
   useAnalysisStatus,
@@ -18,6 +19,23 @@ import {
   fetchSynonymsPrompt,
 } from '../api/client';
 import { showErrorToast } from '../utils/toast';
+
+const CYRILLIC_RE = /[Ѐ-ӿ]/;
+
+/** Латиниця — рядки без кириличних символів (інші алфавіти/цифри теж вважаються "не латиницею"). */
+function isLatinScript(s: string): boolean {
+  return !CYRILLIC_RE.test(s) && /[a-z]/i.test(s);
+}
+
+/** Алфавітом (укр. колація); рядки латиницею — у кінець списку, теж алфавітом між собою. */
+function sortSynonyms(list: string[]): string[] {
+  return [...list].sort((a, b) => {
+    const aLatin = isLatinScript(a);
+    const bLatin = isLatinScript(b);
+    if (aLatin !== bLatin) return aLatin ? 1 : -1;
+    return a.localeCompare(b, 'uk', { sensitivity: 'base' });
+  });
+}
 
 interface Props {
   open: boolean;
@@ -131,35 +149,44 @@ export function SearchVariantsDialog({ open, onOpenChange, query, value, onChang
               проскановано окремо, а видача об'єднана в цей же пошук.
             </Text>
 
-            <Wrap gap={2}>
-              {draft.map((s) => (
-                <HStack
-                  key={s}
-                  gap={1}
-                  pl={3}
-                  pr={1}
-                  py={1}
-                  borderWidth="1px"
-                  borderColor="border.subtle"
-                  rounded="full"
-                >
-                  <Text textStyle="sm">{s}</Text>
-                  <IconButton
-                    size="2xs"
-                    variant="ghost"
-                    aria-label="Видалити синонім"
-                    onClick={() => removeSynonym(s)}
-                  >
-                    <LuX />
-                  </IconButton>
-                </HStack>
-              ))}
-              {draft.length === 0 && (
-                <Text textStyle="sm" color="fg.muted">
-                  Синонімів ще немає — додай вручну або згенеруй нижче.
-                </Text>
-              )}
-            </Wrap>
+            {draft.length === 0 ? (
+              <Text textStyle="sm" color="fg.muted">
+                Синонімів ще немає — додай вручну або згенеруй нижче.
+              </Text>
+            ) : (
+              <SimpleGrid columns={{ base: 2, sm: 3 }} gap={2}>
+                {sortSynonyms(draft).map((s) => (
+                  <Tooltip key={s} content={s}>
+                    <HStack
+                      justify="space-between"
+                      gap={1}
+                      pl={3}
+                      pr={1}
+                      py={2}
+                      borderWidth="1px"
+                      borderColor="border.subtle"
+                      rounded="lg"
+                      bg="bg.subtle"
+                      _hover={{ borderColor: 'colorPalette.solid', shadow: 'xs' }}
+                      colorPalette="blue"
+                    >
+                      <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+                        {s}
+                      </Text>
+                      <IconButton
+                        size="2xs"
+                        variant="ghost"
+                        aria-label="Видалити синонім"
+                        onClick={() => removeSynonym(s)}
+                        flexShrink={0}
+                      >
+                        <LuX />
+                      </IconButton>
+                    </HStack>
+                  </Tooltip>
+                ))}
+              </SimpleGrid>
+            )}
 
             <HStack gap={2}>
               <Input

@@ -274,7 +274,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       const row = db
         .prepare(
-          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total
+          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total,
+                  fetch_method, kind, stage, sub_done, sub_total
            FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
         )
         .get(id);

@@ -107,7 +107,7 @@ export class HtmlOlxFetcher implements OlxFetcher {
 
       const html = await res.text();
       requestsUsed = page;
-      options?.onProgress?.(requestsUsed, target);
+      options?.onProgress?.({ done: requestsUsed, total: target });
 
       const listings = this.parseList(html);
 
