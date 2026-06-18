@@ -50,7 +50,7 @@ export function ListingsFilterBar({
   const aiPicksTooltipContent = (
     <Stack gap={1.5} maxW="320px" py={1} px={1}>
       <Text fontWeight="semibold" fontSize="xs" color="fg.default">«Найкращі кандидати» — це шорт-лист оголошень:</Text>
-      <Box as="ul" pl={4} fontSize="xs" color="fg.muted" sx={{ '& li': { mb: 0.5 } }}>
+      <Box as="ul" pl={4} fontSize="xs" color="fg.muted" css={{ '& li': { mb: 0.5 } }}>
         <li><strong>Без мінусів</strong> — поле cons порожнє</li>
         <li><strong>Активні</strong> — не disabled/rejected</li>
         <li><strong>В зоні фільтрів</strong> — не відфільтровані</li>

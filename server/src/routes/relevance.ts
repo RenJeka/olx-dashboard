@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { ZipArchive } from 'archiver';
 import type { FastifyInstance } from 'fastify';
 import { hasApiKey } from '../analysis/config.js';
@@ -11,10 +12,16 @@ import {
 import {
   buildRelevanceZipInstructions,
   parseRelevanceResponse,
+  prefilterCandidates,
   runRelevance,
 } from '../analysis/relevance.js';
 import { buildChunkListings } from '../analysis/prompts.js';
-import { chunk, toPromptListing } from '../analysis/promptData.js';
+import {
+  RELEVANCE_MERGE_PY_PATH,
+  RELEVANCE_VERIFY_PY_PATH,
+  chunk,
+  toPromptListing,
+} from '../analysis/promptData.js';
 import {
   getRelevanceTarget,
   getSearch,
@@ -50,6 +57,20 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       setRelevanceTarget(id, (req.body.target ?? '').trim());
       return { target: getRelevanceTarget(id) };
+    },
+  );
+
+  // Превʼю розбивки пре-фільтра (для UI): скільки піде в ШІ, скільки авто-відсіється. НЕ пише в БД.
+  app.post<{ Params: { id: string }; Body: { target?: string; ids?: number[] } }>(
+    '/api/searches/:id/relevance/preview',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      const target = resolveTarget(id, req.body.target);
+      const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
+      const listings = loadListings(id, ids);
+      const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing));
+      return { total: listings.length, candidates: candidates.length, autoRejected: rejected.length };
     },
   );
 
@@ -91,14 +112,18 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
       const listings = loadListings(id, ids);
+      // У ZIP кладемо лише кандидатів (відсіяні евристикою додаються при import).
+      const { candidates } = prefilterCandidates(target, listings.map(toPromptListing));
 
       const archive = new ZipArchive();
       archive.on('error', (err: Error) => req.log.error(err));
 
       archive.append(buildRelevanceZipInstructions(target), { name: 'prompt.txt' });
-      chunk(listings, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
+      archive.append(readFileSync(RELEVANCE_MERGE_PY_PATH), { name: 'merge.py' });
+      archive.append(readFileSync(RELEVANCE_VERIFY_PY_PATH), { name: 'verify.py' });
+      chunk(candidates, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
         const name = `descriptions/chunk-${String(idx + 1).padStart(3, '0')}.json`;
-        const content = JSON.stringify(buildChunkListings(group.map(toPromptListing)), null, JSON_EXPORT_INDENT);
+        const content = JSON.stringify(buildChunkListings(group), null, JSON_EXPORT_INDENT);
         archive.append(content, { name });
       });
       void archive.finalize();
@@ -110,15 +135,21 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Парс вставленої відповіді + мерж у накопичене (за id). НЕ пише в БД.
+  // ids — той самий scope, що й у package.zip: на ньому проганяємо пре-фільтр, щоб відсіяні
+  // евристикою (їх немає у ZIP/відповіді) теж потрапили у результат як relevant=false.
   app.post<{
     Params: { id: string };
-    Body: { raw?: string; accumulated?: RelevanceItem[] };
+    Body: { raw?: string; accumulated?: RelevanceItem[]; ids?: number[]; target?: string };
   }>('/api/searches/:id/relevance/import', async (req, reply) => {
     const id = Number(req.params.id);
     if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
     if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
-    const validIds = loadListings(id, []).map((l) => l.id);
+    const target = resolveTarget(id, req.body.target);
+    const scopeIds = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
+    const listings = loadListings(id, scopeIds);
+    const { rejected } = prefilterCandidates(target, listings.map(toPromptListing));
+    const validIds = listings.map((l) => l.id);
 
     let parsed: RelevanceItem[];
     try {
@@ -127,10 +158,12 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
     }
 
+    // Порядок мержу: накопичене → евристичні відсіяні → вердикти ШІ (останні перемагають).
     const byId = new Map<number, RelevanceItem>();
     for (const item of Array.isArray(req.body.accumulated) ? req.body.accumulated : []) {
       byId.set(item.id, item);
     }
+    for (const item of rejected) byId.set(item.id, item);
     for (const item of parsed) byId.set(item.id, item);
 
     const response: RelevanceResponse = { results: Array.from(byId.values()), errors: [] };

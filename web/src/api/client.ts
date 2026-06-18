@@ -475,6 +475,25 @@ export function useSaveRelevanceTarget() {
   });
 }
 
+/** Превʼю розбивки пре-фільтра: скільки піде в ШІ vs авто-відсіється (для UI перед запуском). */
+export function useRelevancePreview(
+  searchId: number,
+  target: string,
+  ids: number[],
+  enabled: boolean,
+) {
+  return useQuery({
+    // Ключ компактний: повний масив ids може бути великим — досить сигнатури scope.
+    queryKey: ['relevance-preview', searchId, target, ids.length, ids[0] ?? null, ids[ids.length - 1] ?? null],
+    queryFn: () =>
+      api<{ total: number; candidates: number; autoRejected: number }>(
+        `/api/searches/${searchId}/relevance/preview`,
+        { method: 'POST', body: JSON.stringify({ target, ids }) },
+      ),
+    enabled: enabled && target.trim().length > 0 && ids.length > 0,
+  });
+}
+
 /** Авто-класифікація релевантності через OpenRouter. НЕ пише в БД — повертає results для перегляду. */
 export function useRunRelevance() {
   return useMutation({
@@ -503,14 +522,18 @@ export function useImportRelevance() {
       searchId,
       raw,
       accumulated,
+      ids,
+      target,
     }: {
       searchId: number;
       raw: string;
       accumulated: RelevanceItem[];
+      ids?: number[];
+      target?: string;
     }) =>
       api<RelevanceResponse>(`/api/searches/${searchId}/relevance/import`, {
         method: 'POST',
-        body: JSON.stringify({ raw, accumulated }),
+        body: JSON.stringify({ raw, accumulated, ids, target }),
       }),
   });
 }

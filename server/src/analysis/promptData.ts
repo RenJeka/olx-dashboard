@@ -4,8 +4,12 @@ import type { PromptListing } from './prompts.js';
 import type { ListingRow } from './repo.js';
 import { stripHtml } from './text.js';
 
-// analyze.py лежить поряд із цим файлом у analysis/ — тому шлях прямий, без '../'.
-export const ANALYZE_PY_PATH = join(dirname(fileURLToPath(import.meta.url)), 'analyze.py');
+// Python-асети ZIP-пакетів лежать поряд із цим файлом у analysis/ — шлях прямий, без '../'.
+const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+export const ANALYZE_PY_PATH = join(MODULE_DIR, 'analyze.py');
+/** Готові скрипти ZIP-пакета семантичного фільтра (merge/verify) — кладуться у ZIP. */
+export const RELEVANCE_MERGE_PY_PATH = join(MODULE_DIR, 'relevance_merge.py');
+export const RELEVANCE_VERIFY_PY_PATH = join(MODULE_DIR, 'relevance_verify.py');
 
 export function toPromptListing(row: ListingRow): PromptListing {
   return { id: row.id, title: row.title, description: row.description, params: row.params };

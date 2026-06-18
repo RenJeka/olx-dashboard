@@ -26,6 +26,7 @@ import {
   useAnalysisStatus,
   useListings,
   useRelevanceTarget,
+  useRelevancePreview,
   useSaveRelevanceTarget,
   useRunRelevance,
   useImportRelevance,
@@ -93,6 +94,10 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
 
   const listingsMap = useListingsMap(listings);
 
+  // Розбивка пре-фільтра: скільки реально піде в ШІ/ZIP, скільки авто-відсіється без ШІ.
+  const { data: preview } = useRelevancePreview(search.id, target, effectiveIds, open && step === 'idle');
+  const candidatesCount = preview?.candidates ?? null;
+
   function reset() {
     setStep('idle');
     setResults([]);
@@ -143,7 +148,13 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
 
   async function handleImport(raw: string) {
     try {
-      const res = await importRelevance.mutateAsync({ searchId: search.id, raw, accumulated: results });
+      const res = await importRelevance.mutateAsync({
+        searchId: search.id,
+        raw,
+        accumulated: results,
+        ids: effectiveIds,
+        target: target.trim(),
+      });
       setSource('import');
       setResults(res.results);
       setStep('done');
@@ -183,6 +194,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
   }
 
   const irrelevantCount = results.filter((r) => !isRelevant(r)).length;
+  const autoRejectedCount = results.filter((r) => r.reason.startsWith('Авто-відсіяно')).length;
 
   return (
     <DialogRoot
@@ -259,8 +271,21 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
                     Весь пошук ({all.length})
                   </Button>
                 </HStack>
+                {preview && preview.autoRejected > 0 ? (
+                  <Text textStyle="xs" color="fg.muted" mt={1}>
+                    Всього <strong>{preview.total}</strong> · у ШІ піде{' '}
+                    <strong>{preview.candidates}</strong> · авто-відсіяно без ШІ{' '}
+                    <strong>{preview.autoRejected}</strong>.
+                  </Text>
+                ) : (
+                  <Text textStyle="xs" color="fg.muted" mt={1}>
+                    До класифікації: <strong>{effectiveIds.length}</strong> оголошень.
+                  </Text>
+                )}
                 <Text textStyle="xs" color="fg.muted" mt={1}>
-                  До класифікації: <strong>{effectiveIds.length}</strong> оголошень.
+                  Спершу спрацьовує швидкий авто-відсів без ШІ (бренд і номер моделі мають стояти
+                  поряд у тексті). У ШІ / ZIP-пакет потрапляють лише кандидати; решта одразу
+                  позначаються нерелевантними (їх видно у результаті й можна виправити).
                 </Text>
               </Box>
 
@@ -299,20 +324,28 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
                   Ручний режим (без API-ключа)
                 </Text>
                 <ManualAssistant
-                  title="Завантаж ZIP, проженеш через будь-який чат, встав JSON-відповідь"
+                  title="Завантаж ZIP, проженеш через агента/чат, встав вміст output.json"
                   parts={[]}
                   pasteLabel="Додати відповідь"
                   onSubmit={handleImport}
                   submitting={importRelevance.isPending}
                   emptyHint={
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      disabled={effectiveIds.length === 0 || !target.trim()}
-                      onClick={handleDownloadZip}
-                    >
-                      <LuDownload /> Завантажити ZIP-пакет
-                    </Button>
+                    <Stack gap={2} align="start">
+                      <Text textStyle="xs" color="fg.muted">
+                        У ZIP — лише кандидати{candidatesCount != null ? ` (${candidatesCount})` : ''},
+                        готові `merge.py`/`verify.py` та інструкція. Агент класифікує чанки →
+                        `output.json`; встав його вміст нижче. Авто-відсіяні додадуться автоматично.
+                      </Text>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        disabled={effectiveIds.length === 0 || !target.trim()}
+                        onClick={handleDownloadZip}
+                      >
+                        <LuDownload /> Завантажити ZIP-пакет
+                        {candidatesCount != null ? ` (${candidatesCount})` : ''}
+                      </Button>
+                    </Stack>
                   }
                 />
               </Box>
@@ -325,6 +358,12 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
                 Класифіковано <strong>{results.length}</strong>, нерелевантних:{' '}
                 <strong>{irrelevantCount}</strong>. Натисни на вердикт, щоб виправити.
               </Text>
+              {autoRejectedCount > 0 && (
+                <Text textStyle="xs" color="fg.muted">
+                  З них <strong>{autoRejectedCount}</strong> відсіяно автоматично без ШІ (бренд і
+                  номер моделі не стоять поруч у тексті). Перевір і виправ за потреби.
+                </Text>
+              )}
 
               <Stack gap={2} maxH="50vh" overflowY="auto">
                 {results.map((r) => {

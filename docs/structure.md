@@ -54,7 +54,9 @@ olx-dashboard/
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
 │       │   ├── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (2-етапні map-reduce інструкції для ZIP ручного режиму)
-│       │   └── relevance.ts  # семантичний фільтр: buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (docs/plans/semantic-relevance-filter.md)
+│       │   ├── relevance.ts  # семантичний фільтр: prefilterCandidates (евристичний пре-фільтр бренд+модель перед ШІ), buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (docs/plans/semantic-relevance-filter.md)
+│       │   ├── relevance_merge.py  # ZIP-скрипт ручного режиму: classifications/result-*.json → output.json
+│       │   └── relevance_verify.py # ZIP-скрипт: перевірка, що output.json покриває всі id з descriptions/chunk-*.json
 │       ├── export/
 │       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
 │       ├── scraper/

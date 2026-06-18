@@ -108,8 +108,20 @@
   - **Ручний override** (бейдж у таблиці / `PATCH /api/listings/:id` з `ai_relevant`) ставить
     `ai_relevant_source='manual'` і НЕ перетирається авто-прогоном (commit пропускає manual).
   - **PII продавця в промпт не йде** (тільки `id/title/params/description`).
+  - **Евристичний пре-фільтр перед ШІ** (`prefilterCandidates`, ідея з Antigravity CLI): для
+    цілей «бренд + номер моделі» відсіює оголошення, де бренд і номер моделі НЕ поруч
+    (`RELEVANCE_PROXIMITY_WINDOW=4`; модель «5»/«5s», не «15»/«50») — у ШІ йдуть лише кандидати,
+    відсіяні одразу `relevant=false`. **Обережний:** ціль без номера моделі/бренду або «відкинуло
+    б усе» → всі до ШІ (краще false-positive у ШІ, ніж мовчазний false-negative). Відсіяні видно у
+    списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
   - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
     нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
+  - **Ручний ZIP** (для агентного CLI типу Antigravity зі слабкою моделлю): крім `prompt.txt` +
+    `descriptions/chunk-NNN.json` (лише кандидати після пре-фільтра) кладе готові `merge.py`/
+    `verify.py` (`server/src/analysis/relevance_merge.py`/`relevance_verify.py`). Промпт —
+    жорстка покрокова процедура (класифікуй чанк → `classifications/result-NNN.json` → `merge.py`
+    → `verify.py`): обробка по чанку обходить ліміт відповіді, заборона власних скриптів усуває
+    «brain»-файли. `POST /relevance/preview` дає UI розбивку total/candidates/autoRejected.
     Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
     `web/src/components/analysis/RelevanceFilterDialog.tsx`.
 

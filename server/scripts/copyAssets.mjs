@@ -10,6 +10,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = [
   ['src/db/schema.sql', 'dist/db/schema.sql'],
   ['src/analysis/analyze.py', 'dist/analysis/analyze.py'],
+  ['src/analysis/relevance_merge.py', 'dist/analysis/relevance_merge.py'],
+  ['src/analysis/relevance_verify.py', 'dist/analysis/relevance_verify.py'],
 ];
 
 for (const [from, to] of ASSETS) {
