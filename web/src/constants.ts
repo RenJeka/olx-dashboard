@@ -26,6 +26,8 @@ export const MANUAL_MODEL = 'manual';
 export const PICK_CANDIDATES_LIMIT = 500;
 /** Скільки найкращих кандидатів LLM повертає (дзеркалить PICK_TOP_N сервера). */
 export const PICK_TOP_N = 30;
+/** Понад скільки кандидатів ручний режим перемикається з одного промпту на ZIP-пакет (дзеркалить MANUAL_PICKS_ZIP_CHUNK_SIZE сервера). */
+export const MANUAL_PICKS_ZIP_CHUNK_SIZE = 50;
 
 // ── Підсвітка (HighlightText) ─────────────────────────────────────────────────
 /** Мін. довжина одиночного запиту-фільтра для підсвітки. */
