@@ -151,6 +151,8 @@ export interface ListingPatch {
   note?: string;
   pros?: string;
   cons?: string;
+  /** Ручний override семантичного фільтра: 1=релевантне, 0=нерелевантне, null=скинути. */
+  ai_relevant?: number | null;
 }
 
 /** Рядок listings для віддачі у API/UI. */
@@ -186,6 +188,27 @@ export interface ListingRow {
   ai_rank: number | null;
   ai_pick_reason: string | null;
   ai_ranked_at: string | null;
+  ai_relevant: number | null;
+  ai_relevant_reason: string | null;
+  ai_relevant_at: string | null;
+  ai_relevant_source: string | null;
+}
+
+// ── Семантичний фільтр релевантності (план docs/plans/semantic-relevance-filter.md) ──
+
+/** Вердикт релевантності одного оголошення (повертає LLM, парситься сервером). */
+export interface RelevanceItem {
+  id: number;
+  /** true — лот продає цільовий товар; false — аксесуар/запчастина/згадка/«куплю». */
+  relevant: boolean;
+  /** Коротке пояснення вердикту. */
+  reason: string;
+}
+
+/** Відповідь relevance-ендпойнтів (auto + manual import). */
+export interface RelevanceResponse {
+  results: RelevanceItem[];
+  errors: string[];
 }
 
 // ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────

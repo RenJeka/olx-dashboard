@@ -170,7 +170,7 @@ flowchart LR
 | `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів (UI закомментовано, заплановано на майбутнє) |
 | `GET` | `/api/searches/:id/filter-options` | ✅ Етап 2 — `{cities, sellers}` (DISTINCT непорожні значення цього пошуку) для дропдаунів Drawer'а локальних фільтрів |
 | `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку (`verify_candidates` = P1+P2, лічильник кнопки «Перевірити неактивні») |
-| `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?}`; зміна `status` → `status_source='manual'`, `miss_count=0` |
+| `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?, ai_relevant?}`; зміна `status` → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'` (ручний override семантичного фільтра) |
 | `GET` | `/api/analysis/status` | ✅ LLM-аналіз — `{apiAvailable, defaultModel}` (наявність `OPENROUTER_API_KEY`) |
 | `GET/PUT` | `/api/searches/:id/criteria` | ✅ — читання/збереження `searches.analysis_criteria` (`{cons[], pros[]}`) |
 | `POST` | `/api/searches/:id/criteria/generate` | ✅ — авто-генерація критеріїв (OpenRouter), без ключа → 409 |
@@ -181,6 +181,11 @@ flowchart LR
 | `POST` | `/api/searches/:id/analyze/import` | ✅ — парс однієї вставленої відповіді + верифікація + мерж у накопичене |
 | `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
 | `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта); `merge='append'` (дефолт UI — додати до наявних без дублів) \| `'replace'` (перезаписати) |
+| `GET/PUT` | `/api/searches/:id/relevance/target` | ✅ Семантичний фільтр — читання/збереження `searches.relevance_target` (порожній → `query` як передзаповнення) |
+| `POST` | `/api/searches/:id/relevance/analyze` | ✅ — авто-класифікація «лот продає <товар>?» (чанки по 12), `{results, errors}`, НЕ пише в БД; без ключа → 409 |
+| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + `descriptions/chunk-NNN.json` (по 50; без `analyze.py` — класифікація семантична) |
+| `POST` | `/api/searches/:id/relevance/import` | ✅ — парс вставленої відповіді + мерж у накопичене за `id` |
+| `POST` | `/api/searches/:id/relevance/commit` | ✅ — запис `ai_relevant`/`ai_relevant_*`; рядки з `ai_relevant_source='manual'` НЕ перетираються |
 | `GET` | `/health` | ✅ |
 | `GET` | `/api/listings/:id/price-history` | ⏳ Етап 3 |
 | `GET` | `/api/listings/:id/export/markdown` | ⏳ Етап 3 |

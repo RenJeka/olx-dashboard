@@ -52,6 +52,8 @@ olx-dashboard/
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
+│       │   ├── aiPicks.ts    # AI Вибір позицій: buildPickPrompt/parsePickResponse/runAiPicks
+│       │   ├── relevance.ts  # семантичний фільтр: buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (docs/plans/semantic-relevance-filter.md)
 │       │   └── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       ├── export/
 │       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
@@ -66,7 +68,9 @@ olx-dashboard/
 │       │   └── verifier.ts   # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + filter-options + stats + PATCH (filters)
-│           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
+│           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/ai_relevant override)
+│           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt, POST .../rank/.../import/.../commit
+│           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
 │               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import, GET .../prompt
@@ -92,7 +96,9 @@ olx-dashboard/
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── analysis/        # майстер LLM-аналізу (плани docs/plans/llm-analysis.md, docs/plans/analysis-wizard-review-rework.md)
         │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка); крок 1 — вибір режиму cons/pros та scope (вибрані/вкладка/весь пошук); кроки 2–4 — read-only підсумок; прогрес зберігається між відкриттями (Zustand in-memory); закриття повз вікно заборонено
-        │   │   └── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
+        │   │   ├── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
+        │   │   ├── AiPicksDialog.tsx        # діалог «AI Вибір» (ранжування найкращих оголошень, авто+ручний)
+        │   │   └── RelevanceFilterDialog.tsx # діалог «AI Фільтр»: семантична класифікація «лот продає <товар>?» (авто+ручний ZIP), commit ai_relevant
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
@@ -129,7 +135,7 @@ olx-dashboard/
         │       ├── checkbox.tsx
         │       └── close-button.tsx
         ├── stores/
-        │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці) — спільний стан між таблицею і AI-майстром
+        │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці), showFilteredOut, showIrrelevant — спільний стан між таблицею і AI-майстром
         │   └── analysisWizardStore.ts # useAnalysisWizardStore: прогрес AI-Flow (mode/scope/step/критерії/результати); bindSearch/reset
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)

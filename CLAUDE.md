@@ -96,6 +96,22 @@
     `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
     `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, фронт —
     `web/src/components/analysis/*`.
+- **Семантичний фільтр релевантності (план `docs/plans/semantic-relevance-filter.md`):** OLX шукає
+  й за `description` (через «АБО»), тож у видачу потрапляють чохли/запчастини/згадки. Окремий ручний
+  AI-крок (кнопка «AI Фільтр» у хедері) класифікує кожне оголошення за питанням «чи цей лот ПРОДАЄ
+  товар `<цільовий товар>`?» і ставить `listings.ai_relevant` (1=продає, 0=ні, NULL=не перевірено).
+  Інваріанти:
+  - **Цільовий товар — на рівні пошуку** (`searches.relevance_target`, порожній → `query`),
+    редагований у діалозі. Вердикт — на рівні оголошення (`ai_relevant`/`ai_relevant_reason`/
+    `ai_relevant_at`/`ai_relevant_source`).
+  - **Ніколи не авто** — лише вручну за кнопкою (не зі сканів/cron), як плюси/мінуси.
+  - **Ручний override** (бейдж у таблиці / `PATCH /api/listings/:id` з `ai_relevant`) ставить
+    `ai_relevant_source='manual'` і НЕ перетирається авто-прогоном (commit пропускає manual).
+  - **PII продавця в промпт не йде** (тільки `id/title/params/description`).
+  - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
+    нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
+    Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
+    `web/src/components/analysis/RelevanceFilterDialog.tsx`.
 
 ## Команди
 

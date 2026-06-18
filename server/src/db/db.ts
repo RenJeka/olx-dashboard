@@ -53,6 +53,9 @@ addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 // LLM-аналіз — критерії на рівні пошуку (searches не зачіпає rebuild нижче).
 addColumnIfMissing('searches', 'analysis_criteria', "TEXT DEFAULT '{}'");
 
+// Семантичний фільтр релевантності — цільовий товар на рівні пошуку.
+addColumnIfMissing('searches', 'relevance_target', "TEXT DEFAULT ''");
+
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
  * miss_count. ALTER TABLE не міняє CHECK-констрейнти, тому потрібен повний rebuild
@@ -138,6 +141,12 @@ addColumnIfMissing('listings', 'analysis_stale', 'INTEGER DEFAULT 0');
 addColumnIfMissing('listings', 'ai_rank', 'INTEGER');
 addColumnIfMissing('listings', 'ai_pick_reason', 'TEXT');
 addColumnIfMissing('listings', 'ai_ranked_at', 'TEXT');
+
+// Семантичний фільтр релевантності (план docs/plans/semantic-relevance-filter.md).
+addColumnIfMissing('listings', 'ai_relevant', 'INTEGER');
+addColumnIfMissing('listings', 'ai_relevant_reason', 'TEXT');
+addColumnIfMissing('listings', 'ai_relevant_at', 'TEXT');
+addColumnIfMissing('listings', 'ai_relevant_source', 'TEXT');
 
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).

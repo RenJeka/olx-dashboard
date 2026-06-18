@@ -5,6 +5,7 @@ import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './SearchActionPanel';
 import { AnalysisWizardDialog } from './analysis/AnalysisWizardDialog';
 import { AiPicksDialog } from './analysis/AiPicksDialog';
+import { RelevanceFilterDialog } from './analysis/RelevanceFilterDialog';
 import { SettingsDrawer } from './settings/SettingsDrawer';
 import { Tooltip } from './ui/tooltip';
 import type { Search } from '../types';
@@ -92,6 +93,7 @@ export function Header({
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
           {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
+          {selectedSearch && <RelevanceFilterDialog search={selectedSearch} selectedIds={selectedIds} />}
           {selectedSearch && <AiPicksDialog search={selectedSearch} />}
           <SettingsDrawer
             columnVisibility={columnVisibility}

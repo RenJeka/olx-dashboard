@@ -53,7 +53,7 @@ export function ListingsTable({
   const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
-  const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
+  const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
   const [searchText, setSearchText] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
 
@@ -88,13 +88,16 @@ export function ListingsTable({
   const visibleRows = useMemo(
     () =>
       statusFilter === 'ai_picks'
-        ? rows.filter((l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0)
+        ? rows.filter(
+            (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0 && l.ai_relevant !== 0,
+          )
         : rows.filter(
             (l) =>
               (showFilteredOut || l.filtered_out === 0) &&
+              (showIrrelevant || l.ai_relevant !== 0) &&
               (statusFilter === 'all' || l.status === statusFilter),
           ),
-    [rows, showFilteredOut, statusFilter],
+    [rows, showFilteredOut, showIrrelevant, statusFilter],
   );
 
   const table = useReactTable({

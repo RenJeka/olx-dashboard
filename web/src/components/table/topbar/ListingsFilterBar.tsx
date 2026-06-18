@@ -33,10 +33,15 @@ export function ListingsFilterBar({
   const setStatusFilter = useListingsUiStore((s) => s.setStatusFilter);
   const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
   const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
-  const visible = listings.filter((l) => showFilteredOut || l.filtered_out === 0);
+  const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
+  const setShowIrrelevant = useListingsUiStore((s) => s.setShowIrrelevant);
+  const visible = listings.filter(
+    (l) => (showFilteredOut || l.filtered_out === 0) && (showIrrelevant || l.ai_relevant !== 0),
+  );
+  const irrelevantCount = listings.filter((l) => l.ai_relevant === 0).length;
 
   const aiPicksCount = listings.filter(
-    (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0,
+    (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0 && l.ai_relevant !== 0,
   ).length;
 
   const items = [
@@ -76,6 +81,15 @@ export function ListingsFilterBar({
           </Box>{' '}
           товари
         </Switch>
+        {irrelevantCount > 0 && (
+          <Switch
+            checked={showIrrelevant}
+            onCheckedChange={(d) => setShowIrrelevant(d.checked)}
+            colorPalette="cyan"
+          >
+            Показати нерелевантні ({irrelevantCount})
+          </Switch>
+        )}
       </HStack>
 
       {/* Search + BulkActionBar у тому ж рядку */}

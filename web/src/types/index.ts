@@ -76,6 +76,8 @@ export interface ListingPatch {
   note?: string;
   pros?: string;
   cons?: string;
+  /** Ручний override семантичного фільтра: 1=релевантне, 0=нерелевантне, null=скинути. */
+  ai_relevant?: number | null;
 }
 
 export interface Listing {
@@ -109,6 +111,23 @@ export interface Listing {
   ai_rank: number | null;
   ai_pick_reason: string | null;
   ai_ranked_at: string | null;
+  ai_relevant: number | null;
+  ai_relevant_reason: string | null;
+  ai_relevant_at: string | null;
+  ai_relevant_source: string | null;
+}
+
+// ── Семантичний фільтр релевантності (docs/plans/semantic-relevance-filter.md) ──
+
+export interface RelevanceItem {
+  id: number;
+  relevant: boolean;
+  reason: string;
+}
+
+export interface RelevanceResponse {
+  results: RelevanceItem[];
+  errors: string[];
 }
 
 // ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────
