@@ -94,12 +94,21 @@ olx-dashboard/
         ├── components/
         │   ├── Searches.tsx      # бічна панель (акордеон пошуків), сортування ↑/↓, 3-dot меню (фільтри/видалення)
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
-        │   ├── analysis/        # майстер LLM-аналізу (плани docs/plans/llm-analysis.md, docs/plans/analysis-wizard-review-rework.md)
-        │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка); крок 1 — вибір режиму cons/pros та scope (вибрані/вкладка/весь пошук); кроки 2–4 — read-only підсумок; прогрес зберігається між відкриттями (Zustand in-memory); закриття повз вікно заборонено
-        │   │   ├── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
-        │   │   ├── AiPicksDialog.tsx        # AI Вибір (план docs/plans/AI-auto-top.md): запуск/імпорт ранжування, ручний режим — один промпт (≤50 кандидатів) або ZIP-пакет map-reduce (>50, useZip), коміт результату
-        │   │   ├── AiRankCard.tsx           # картка одного AI-обраного оголошення (rank/reason) у результаті AiPicksDialog
-        │   │   └── RelevanceFilterDialog.tsx # діалог «AI Фільтр»: семантична класифікація «лот продає <товар>?» (авто+ручний ZIP), commit ai_relevant
+        │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
+        │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
+        │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
+        │   │   ├── RelevanceFilterDialog.tsx # діалог «AI Фільтр»: семантична класифікація (авто+ручний ZIP), commit ai_relevant
+        │   │   ├── ai-picks/               # workflow «AI Вибір» (план docs/plans/AI-auto-top.md)
+        │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
+        │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
+        │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
+        │   │   └── wizard/                 # workflow «AI-аналіз» (4-етапний майстер мінуси/плюси)
+        │   │       ├── AnalysisWizardDialog.tsx # оболонка діалогу (DialogRoot + степер + switch по кроках)
+        │   │       ├── WizardStepper.tsx    # UI степеру (4 кроки: критерії→пошук→перевірка→вставка)
+        │   │       ├── CriteriaStep.tsx     # крок 1: вибір режиму/scope, критеріїв, генерація
+        │   │       ├── MatchingStep.tsx     # крок 2: авто-аналіз або ZIP + ручний імпорт
+        │   │       ├── ReviewStep.tsx       # крок 3: перевірка (таблиця desktop / картки mobile)
+        │   │       └── CommitStep.tsx       # крок 4: merge mode + запис у БД
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
@@ -141,7 +150,11 @@ olx-dashboard/
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         │   ├── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
-        │   └── useIsMobile.ts    # useBreakpointValue < md (768px) — для responsive JS-розгалужень
+        │   ├── useIsMobile.ts    # useBreakpointValue < md (768px) — для responsive JS-розгалужень
+        │   ├── useListingsMap.ts  # мемоїзована Map<id, Listing> з масиву listings (спільний для AI-діалогів)
+        │   ├── useZipDownload.ts  # хук для паттерну «завантажити ZIP» (downloading/downloaded/download)
+        │   ├── useAiPicksFlow.ts  # бізнес-логіка AI Вибір (стан step/picks, handleRun/Import/Commit)
+        │   └── useWizardActions.ts # бізнес-логіка AI-аналізу (критерії, аналіз, перевірка, запис)
         ├── pages/
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
         ├── types/

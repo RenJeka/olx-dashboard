@@ -34,6 +34,9 @@ import {
 } from '../../api/client';
 import { useListingsUiStore } from '../../stores/listingsUiStore';
 import { loadAnalysisModel } from '../../utils/storage';
+import { showErrorToast } from '../../utils/toast';
+import { useListingsMap } from '../../hooks/useListingsMap';
+import { chunk } from '../../utils/array';
 import { ANALYZE_CHUNK } from '../../constants';
 import type { RelevanceItem, Search } from '../../types';
 
@@ -88,13 +91,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
         ? all.filter((l) => l.status === statusFilter).map((l) => l.id)
         : all.map((l) => l.id);
 
-  const listingsMap = new Map(all.map((l) => [l.id, l]));
-
-  function chunkIds(ids: number[], size: number): number[][] {
-    const out: number[][] = [];
-    for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
-    return out;
-  }
+  const listingsMap = useListingsMap(listings);
 
   function reset() {
     setStep('idle');
@@ -112,7 +109,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
     setProgress({ done: 0, total: effectiveIds.length });
     const acc: RelevanceItem[] = [];
     try {
-      for (const batch of chunkIds(effectiveIds, ANALYZE_CHUNK)) {
+      for (const batch of chunk(effectiveIds, ANALYZE_CHUNK)) {
         const res = await runRelevance.mutateAsync({
           searchId: search.id,
           target: target.trim(),
@@ -128,11 +125,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
     } catch (err) {
       setStep('idle');
       setProgress(null);
-      toaster.create({
-        type: 'error',
-        title: 'Помилка класифікації',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка класифікації', err);
     }
   }
 
@@ -144,11 +137,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
     try {
       await fetchRelevancePackageZip(search.id, target.trim(), effectiveIds);
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка завантаження ZIP',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка завантаження ZIP', err);
     }
   }
 
@@ -159,11 +148,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
       setResults(res.results);
       setStep('done');
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка парсингу відповіді',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка парсингу відповіді', err);
     }
   }
 
@@ -193,11 +178,7 @@ export function RelevanceFilterDialog({ search, selectedIds }: Props) {
       setOpen(false);
       reset();
     } catch (err) {
-      toaster.create({
-        type: 'error',
-        title: 'Помилка збереження',
-        description: err instanceof Error ? err.message : String(err),
-      });
+      showErrorToast('Помилка збереження', err);
     }
   }
 
