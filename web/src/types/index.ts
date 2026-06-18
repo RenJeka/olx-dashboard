@@ -8,6 +8,8 @@ export interface Search {
   local_filters: string;
   visible_total_count: number | null;
   sort_order: number;
+  /** JSON-масив альтернативних пошукових запитів (синоніми query, docs/plans/search-synonyms.md). */
+  query_synonyms: string;
   created_at: string;
 }
 
@@ -242,6 +244,7 @@ export interface NewSearchInput {
   query: string;
   priceFrom?: number;
   priceTo?: number;
+  querySynonyms?: string[];
 }
 
 export interface StoredTableState {

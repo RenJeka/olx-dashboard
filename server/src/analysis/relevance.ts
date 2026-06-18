@@ -22,12 +22,17 @@ function extractJson(text: string): string {
 }
 
 /** Спільні правила класифікації (інлайн-промпт + ZIP-інструкція). */
-function relevanceRules(target: string): string {
+function relevanceRules(target: string, aliases: string[] = []): string {
+  const aliasLine =
+    aliases.length > 0
+      ? `Синоніми назви товару (та самі лоти можуть бути названі так): ${aliases.map((a) => `"${a}"`).join(', ')}.`
+      : null;
   return [
     `Ти — асистент, що фільтрує видачу OLX за релевантністю до пошуку.`,
     `Цільовий товар: "${target}".`,
+    ...(aliasLine ? [aliasLine] : []),
     '',
-    'Головне питання для КОЖНОГО оголошення: чи цей лот ПРОДАЄ саме цей товар?',
+    'Головне питання для КОЖНОГО оголошення: чи цей лот ПРОДАЄ саме цей товар (під будь-якою з назв вище)?',
     '- relevant=true: лот продає цільовий товар (новий або б/в, як основний товар АБО',
     '  у складі асортименту лота — продавець перелічує кілька позицій і серед них є потрібна).',
     '- relevant=false: лот про супутнє — чохол, плівка, захисне скло, підставка, кабель,',
@@ -46,10 +51,14 @@ function relevanceFormat(): string {
 }
 
 /** Інлайн-промпт авто-режиму: оголошення подаються як JSON-масив. */
-export function buildRelevancePrompt(target: string, listings: PromptListing[]): string {
+export function buildRelevancePrompt(
+  target: string,
+  listings: PromptListing[],
+  aliases: string[] = [],
+): string {
   const items = buildChunkListings(listings);
   return [
-    relevanceRules(target),
+    relevanceRules(target, aliases),
     '',
     `Оголошення (${items.length} шт.):`,
     JSON.stringify(items, null, 2),
@@ -68,9 +77,9 @@ export function buildRelevancePrompt(target: string, listings: PromptListing[]):
  * по одному обходить ліміт довжини відповіді, а суворі заборони прибирають латитуду на
  * «дослідження датасету» й створення зайвих скриптів/«brain»-файлів.
  */
-export function buildRelevanceZipInstructions(target: string): string {
+export function buildRelevanceZipInstructions(target: string, aliases: string[] = []): string {
   return [
-    relevanceRules(target),
+    relevanceRules(target, aliases),
     '',
     'Це МЕХАНІЧНА процедура на файлах — НЕ дослідницька задача. Дані вже поділені на чанки.',
     'Твоє ЄДИНЕ змістове завдання — класифікувати кожне оголошення за правилами вище.',
@@ -183,10 +192,23 @@ function parseTarget(target: string): { words: string[]; models: string[] } {
 export function prefilterCandidates(
   target: string,
   listings: PromptListing[],
+  aliases: string[] = [],
 ): { candidates: PromptListing[]; rejected: RelevanceItem[] } {
-  const { words, models } = parseTarget(target);
+  const names = [target, ...aliases];
+  // Синоніми (docs/plans/search-synonyms.md) — union брендів/моделей з усіх назв. Лише
+  // РОЗШИРЮЄ коло кандидатів (ніколи не звужує) — безпечно: гірше зайвий запуск ШІ, ніж
+  // мовчазний false-negative через пропущений синонім.
+  const wordsSet = new Set<string>();
+  const modelsSet = new Set<string>();
+  for (const name of names) {
+    const parsed = parseTarget(name);
+    parsed.words.forEach((w) => wordsSet.add(w));
+    parsed.models.forEach((m) => modelsSet.add(m));
+  }
+  const words = [...wordsSet];
+  const models = [...modelsSet];
 
-  // Немає номера моделі або бренду — нема за чим розрізняти; пропускаємо всіх до ШІ.
+  // Немає номера моделі або бренду (в жодній з назв) — нема за чим розрізняти; пропускаємо всіх до ШІ.
   if (models.length === 0 || words.length === 0) {
     return { candidates: listings, rejected: [] };
   }
@@ -219,7 +241,7 @@ export function prefilterCandidates(
       rejected.push({
         id: l.id,
         relevant: false,
-        reason: `Авто-відсіяно: «${target}» не згадано поряд у тексті`,
+        reason: `Авто-відсіяно: ${names.map((n) => `«${n}»`).join(' / ')} не згадано поряд у тексті`,
       });
     }
   }
@@ -240,17 +262,18 @@ export async function runRelevance(
   target: string,
   listings: PromptListing[],
   model?: string,
+  aliases: string[] = [],
 ): Promise<RelevanceResponse> {
   if (!hasApiKey()) {
     throw new Error('Авто-режим недоступний: немає OPENROUTER_API_KEY');
   }
 
-  const { candidates, rejected } = prefilterCandidates(target, listings);
+  const { candidates, rejected } = prefilterCandidates(target, listings, aliases);
   const results: RelevanceItem[] = [...rejected];
   const errors: string[] = [];
 
   for (const batch of chunk(candidates, AUTO_CHUNK_SIZE)) {
-    const prompt = buildRelevancePrompt(target, batch);
+    const prompt = buildRelevancePrompt(target, batch, aliases);
     const validIds = batch.map((l) => l.id);
     try {
       const raw = await chat([{ role: 'user', content: prompt }], { model: model ?? DEFAULT_MODEL });

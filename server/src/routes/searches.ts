@@ -12,6 +12,8 @@ interface SearchBody {
   api_filters?: unknown;
   local_filters?: unknown;
   cron_enabled?: number;
+  /** Синоніми query (docs/plans/search-synonyms.md). */
+  query_synonyms?: string[];
 }
 
 /** api_filters/local_filters приймаємо як обʼєкт або рядок → зберігаємо як JSON-рядок. */
@@ -53,8 +55,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const info = db
       .prepare(
-        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -64,6 +66,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         toJsonText(req.body.local_filters),
         req.body.cron_enabled ?? 0,
         sortOrder,
+        toJsonText(req.body.query_synonyms, '[]'),
       );
 
     return reply
@@ -109,6 +112,10 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       if (req.body.cron_enabled !== undefined) {
         fields.push('cron_enabled = ?');
         values.push(req.body.cron_enabled);
+      }
+      if (req.body.query_synonyms !== undefined) {
+        fields.push('query_synonyms = ?');
+        values.push(toJsonText(req.body.query_synonyms, '[]'));
       }
 
       if (fields.length > 0) {

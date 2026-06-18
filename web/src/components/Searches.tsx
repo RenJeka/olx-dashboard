@@ -19,11 +19,13 @@ import {
   LuChevronUp,
   LuEllipsisVertical,
   LuFilter,
+  LuLayers,
   LuListChecks,
   LuPlus,
   LuTrash2,
 } from 'react-icons/lu';
 import { SearchFiltersDrawer } from './SearchFiltersDrawer';
+import { SearchVariantsDialog } from './SearchVariantsDialog';
 import {
   DialogBackdrop,
   DialogBody,
@@ -45,7 +47,13 @@ import {
 } from './ui/drawer';
 import { toaster } from './ui/toaster';
 import { Tooltip } from './ui/tooltip';
-import { useSearches, useCreateSearch, useDeleteSearch, useReorderSearches } from '../api/client';
+import {
+  useSearches,
+  useCreateSearch,
+  useDeleteSearch,
+  useReorderSearches,
+  useUpdateSearchSynonyms,
+} from '../api/client';
 import { useIsMobile } from '../hooks/useIsMobile';
 import type { Search } from '../types';
 
@@ -65,6 +73,8 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
   const [query, setQuery] = useState('');
   const [priceFrom, setPriceFrom] = useState('');
   const [priceTo, setPriceTo] = useState('');
+  const [synonyms, setSynonyms] = useState<string[]>([]);
+  const [variantsOpen, setVariantsOpen] = useState(false);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +85,7 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
         query: query.trim(),
         priceFrom: priceFrom ? Number(priceFrom) : undefined,
         priceTo: priceTo ? Number(priceTo) : undefined,
+        querySynonyms: synonyms,
       },
       {
         onSuccess: () => {
@@ -82,6 +93,7 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
           setQuery('');
           setPriceFrom('');
           setPriceTo('');
+          setSynonyms([]);
         },
       },
     );
@@ -171,6 +183,15 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
                   onChange={(e) => setQuery(e.target.value)}
                 />
               </Field.Root>
+              <Button
+                size="xs"
+                variant="outline"
+                alignSelf="start"
+                disabled={!query.trim()}
+                onClick={() => setVariantsOpen(true)}
+              >
+                <LuLayers /> Варіанти пошуку{synonyms.length > 0 ? ` (${synonyms.length})` : ''}
+              </Button>
               <HStack gap={2}>
                 <Field.Root>
                   <Field.Label>Ціна від</Field.Label>
@@ -208,41 +229,57 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
     </Accordion.Root>
   );
 
+  const variantsDialog = (
+    <SearchVariantsDialog
+      open={variantsOpen}
+      onOpenChange={setVariantsOpen}
+      query={query}
+      value={synonyms}
+      onChange={setSynonyms}
+    />
+  );
+
   if (isMobile) {
     return (
-      <DrawerRoot
-        placement="start"
-        size="xs"
-        open={visible}
-        onOpenChange={(d) => onVisibleChange?.(d.open)}
-      >
-        <DrawerBackdrop />
-        <DrawerContent>
-          <DrawerCloseTrigger />
-          <DrawerHeader>
-            <DrawerTitle>Пошуки</DrawerTitle>
-          </DrawerHeader>
-          <DrawerBody px={0}>{content}</DrawerBody>
-        </DrawerContent>
-      </DrawerRoot>
+      <>
+        <DrawerRoot
+          placement="start"
+          size="xs"
+          open={visible}
+          onOpenChange={(d) => onVisibleChange?.(d.open)}
+        >
+          <DrawerBackdrop />
+          <DrawerContent>
+            <DrawerCloseTrigger />
+            <DrawerHeader>
+              <DrawerTitle>Пошуки</DrawerTitle>
+            </DrawerHeader>
+            <DrawerBody px={0}>{content}</DrawerBody>
+          </DrawerContent>
+        </DrawerRoot>
+        {variantsDialog}
+      </>
     );
   }
 
   return (
-    <Flex
-      as="aside"
-      direction="column"
-      w="80"
-      flexShrink={0}
-      h="full"
-      borderRightWidth="1px"
-      borderColor="border.subtle"
-      bg="bg.subtle"
-      overflowY="auto"
-      display={visible ? 'flex' : 'none'}
-    >
-      {content}
-    </Flex>
+    <>
+      <Flex
+        as="aside"
+        direction="column"
+        w="80"
+        flexShrink={0}
+        h="full"
+        borderRightWidth="1px"
+        borderColor="border.subtle"
+        bg="bg.subtle"
+        overflowY="auto"
+        display={visible ? 'flex' : 'none'}
+      >
+        {content}
+      </Flex>
+      {variantsDialog}
+    </>
   );
 }
 
@@ -277,11 +314,23 @@ function hasActiveLocalFilters(raw: string): boolean {
   }
 }
 
+function parseSynonyms(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: SearchRowProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [variantsOpen, setVariantsOpen] = useState(false);
   const deleteSearch = useDeleteSearch();
   const reorderSearch = useReorderSearches();
+  const updateSynonyms = useUpdateSearchSynonyms();
+  const synonyms = parseSynonyms(search.query_synonyms);
 
   function handleDelete() {
     deleteSearch.mutate(search.id, {
@@ -379,6 +428,11 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
                     <LuFilter /> <Text>Фільтри</Text>
                   </HStack>
                 </Menu.Item>
+                <Menu.Item value="variants" onSelect={() => setVariantsOpen(true)}>
+                  <HStack gap={2}>
+                    <LuLayers /> <Text>Варіанти пошуку{synonyms.length > 0 ? ` (${synonyms.length})` : ''}</Text>
+                  </HStack>
+                </Menu.Item>
                 <Menu.Separator />
                 <Menu.Item value="delete" color="fg.error" onSelect={() => setConfirmOpen(true)}>
                   <HStack gap={2}>
@@ -391,6 +445,13 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
         </Menu.Root>
       </HStack>
       <SearchFiltersDrawer search={search} open={filtersOpen} onOpenChange={setFiltersOpen} />
+      <SearchVariantsDialog
+        open={variantsOpen}
+        onOpenChange={setVariantsOpen}
+        query={search.query}
+        value={synonyms}
+        onChange={(next) => updateSynonyms.mutate({ searchId: search.id, querySynonyms: next })}
+      />
       <DialogRoot
         role="alertdialog"
         placement="center"

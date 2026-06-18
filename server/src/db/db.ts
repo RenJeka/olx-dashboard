@@ -56,6 +56,9 @@ addColumnIfMissing('searches', 'analysis_criteria', "TEXT DEFAULT '{}'");
 // Семантичний фільтр релевантності — цільовий товар на рівні пошуку.
 addColumnIfMissing('searches', 'relevance_target', "TEXT DEFAULT ''");
 
+// Синоніми пошукового запиту (docs/plans/search-synonyms.md) — JSON-масив рядків.
+addColumnIfMissing('searches', 'query_synonyms', "TEXT DEFAULT '[]'");
+
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
  * miss_count. ALTER TABLE не міняє CHECK-констрейнти, тому потрібен повний rebuild

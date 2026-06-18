@@ -49,6 +49,8 @@ export interface SearchConfig {
   query: string;
   categoryId?: number | null;
   apiFilters: ApiFilters;
+  /** Синоніми query (docs/plans/search-synonyms.md) — скануються разом, видача зливається по olx_id. */
+  querySynonyms?: string[];
 }
 
 /** Сире оголошення зі сторінки пошуку (до нормалізації). */

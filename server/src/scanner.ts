@@ -46,11 +46,12 @@ interface SearchRow {
   query: string;
   category_id: number | null;
   api_filters: string;
+  query_synonyms: string;
 }
 
 function loadSearch(id: number): SearchConfig | null {
   const row = db
-    .prepare('SELECT id, name, query, category_id, api_filters FROM searches WHERE id = ?')
+    .prepare('SELECT id, name, query, category_id, api_filters, query_synonyms FROM searches WHERE id = ?')
     .get(id) as SearchRow | undefined;
 
   if (!row) return null;
@@ -62,13 +63,37 @@ function loadSearch(id: number): SearchConfig | null {
     apiFilters = {};
   }
 
+  let querySynonyms: string[] = [];
+  try {
+    const parsed = JSON.parse(row.query_synonyms || '[]');
+    if (Array.isArray(parsed)) querySynonyms = parsed.filter((v): v is string => typeof v === 'string');
+  } catch {
+    querySynonyms = [];
+  }
+
   return {
     id: row.id,
     name: row.name,
     query: row.query,
     categoryId: row.category_id,
     apiFilters,
+    querySynonyms,
   };
+}
+
+/** Дедуплікація варіантів query (case-insensitive), порожні відкидаються. */
+function dedupeQueries(queries: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const q of queries) {
+    const trimmed = q.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
 }
 
 /**
@@ -139,6 +164,76 @@ async function fetchWithFallback(
 }
 
 /**
+ * Сканує основний query + усі синоніми (docs/plans/search-synonyms.md), зливає видачі по
+ * olxId. 1 query (без синонімів) — без змін поведінки, делегує fetchWithFallback напряму.
+ * >1 query — завжди partial=true: union кількох незалежних видач не відсортований глобально
+ * за last_refresh, тож вікно покриття statusEngine (CLAUDE.md) застосовувати небезпечно —
+ * той самий принцип, що й у split-скані (graphqlOlxFetcher.fetchSearchSplit).
+ */
+async function fetchAllQueries(
+  search: SearchConfig,
+  options?: FetchOptions,
+): ReturnType<typeof fetchWithFallback> {
+  const variants = dedupeQueries([search.query, ...(search.querySynonyms ?? [])]);
+
+  if (variants.length <= 1) {
+    return fetchWithFallback(search, options);
+  }
+
+  const merged = new Map<number, RawListing>();
+  let requestsUsed = 0;
+  let usedGraphql = true;
+  let allExhausted = true;
+  let bucketsUsed = 0;
+  const notes: string[] = [`multi-query: ${variants.length} варіантів запиту змерджено`];
+
+  // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів,
+  // але прогрес-бар лишається монотонним і орієнтовним).
+  let doneOffset = 0;
+  let totalOffset = 0;
+
+  for (let vi = 0; vi < variants.length; vi++) {
+    const variant = variants[vi] as string;
+    const variantSearch: SearchConfig = { ...search, query: variant };
+    const onVariantProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
+      ? (done, total, method) => options.onProgress!(doneOffset + done, totalOffset + total, method)
+      : undefined;
+
+    const result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
+
+    for (const item of result.raw) merged.set(item.olxId, item);
+    requestsUsed += result.requestsUsed;
+    if (!result.usedGraphql) usedGraphql = false;
+    if (!result.exhausted) allExhausted = false;
+    if (result.bucketsUsed) bucketsUsed += result.bucketsUsed;
+    if (result.note) notes.push(`«${variant}»: ${result.note}`);
+
+    doneOffset += result.requestsUsed;
+    totalOffset += Math.max(result.requestsUsed, 1);
+
+    // Ввічливість між варіантами синонімів — як пауза між батчами глибокого скану.
+    if (vi < variants.length - 1) {
+      await sleep(batchPauseDelay());
+    }
+  }
+
+  notes.push('вікно покриття пропущено (union кількох видач)');
+
+  return {
+    raw: [...merged.values()],
+    // Об'єднана видача кількох незалежних запитів — visible_total_count окремого
+    // запиту тут не репрезентативний (перетин/розбіжність неконтрольована).
+    visibleTotalCount: null,
+    note: notes.join('; '),
+    requestsUsed,
+    exhausted: allExhausted,
+    usedGraphql,
+    partial: true,
+    bucketsUsed: bucketsUsed > 0 ? bucketsUsed : undefined,
+  };
+}
+
+/**
  * Запускає сканування пошуку: fetcher (GraphQL → HTML fallback) → normalizer → запис scan_run.
  * Помилки скрейпінгу пишуться у scan_runs.error і прокидаються нагору
  * (роут мапить на 500), процес НЕ валиться.
@@ -180,7 +275,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
 
   try {
     const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed } =
-      await fetchWithFallback(search, {
+      await fetchAllQueries(search, {
         deep: options?.deep,
         onProgress,
       });

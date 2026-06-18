@@ -93,6 +93,16 @@ flowchart LR
    падає**.
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
+> **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
+> непорожній, `scanner.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
+> крок 3, послідовно з паузою 3–6с між варіантами) і зливає видачі по `olxId` в один
+> `search_id`. >1 варіант запиту → крок 5 (вікно покриття) **завжди пропускається**
+> (`partial=true`) — union кількох незалежних видач не відсортований глобально за
+> `last_refresh_at`, той самий принцип, що й у split-скані (deep). Синоніми також передаються
+> як alias-назви товару в AI-фільтр релевантності (`relevance.ts`, `getRelevanceAliases`).
+> Генерація синонімів — окремі stateless-ендпойнти `routes/searchSynonyms.ts` (промпт/авто
+> OpenRouter/парс вставки), UI — `web/src/components/SearchVariantsDialog.tsx`.
+
 > **Verify-сценарій (реалізовано, A3):** `runVerify(searchId)` — окремий `kind='verify'`
 > прохід без фетчера видачі. Кандидати (≤`VERIFY_PAGE_CAP=50`): P1 — `last_seen_at` старше
 > 3 днів і (`status_source='auto'` АБО `status='rejected'`), включно з `disabled` для

@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS searches (
   sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
+  query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
   created_at TEXT DEFAULT (datetime('now'))
 );
 

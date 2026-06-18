@@ -23,6 +23,7 @@ import {
   toPromptListing,
 } from '../analysis/promptData.js';
 import {
+  getRelevanceAliases,
   getRelevanceTarget,
   getSearch,
   loadListings,
@@ -67,9 +68,10 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       const target = resolveTarget(id, req.body.target);
+      const aliases = getRelevanceAliases(id);
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
       const listings = loadListings(id, ids);
-      const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing));
+      const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
       return { total: listings.length, candidates: candidates.length, autoRejected: rejected.length };
     },
   );
@@ -85,6 +87,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
 
     const target = resolveTarget(id, req.body.target);
     if (!target) return reply.code(400).send({ error: NO_TARGET });
+    const aliases = getRelevanceAliases(id);
 
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
     if (ids.length > MAX_ANALYZE_IDS) {
@@ -93,7 +96,12 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
 
     const listings = loadListings(id, ids);
     try {
-      const result = await runRelevance(target, listings.map(toPromptListing), req.body.model ?? DEFAULT_MODEL);
+      const result = await runRelevance(
+        target,
+        listings.map(toPromptListing),
+        req.body.model ?? DEFAULT_MODEL,
+        aliases,
+      );
       return result satisfies RelevanceResponse;
     } catch (err) {
       return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
@@ -109,16 +117,17 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
 
       const target = resolveTarget(id, req.body.target);
       if (!target) return reply.code(400).send({ error: NO_TARGET });
+      const aliases = getRelevanceAliases(id);
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
       const listings = loadListings(id, ids);
       // У ZIP кладемо лише кандидатів (відсіяні евристикою додаються при import).
-      const { candidates } = prefilterCandidates(target, listings.map(toPromptListing));
+      const { candidates } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
 
       const archive = new ZipArchive();
       archive.on('error', (err: Error) => req.log.error(err));
 
-      archive.append(buildRelevanceZipInstructions(target), { name: 'prompt.txt' });
+      archive.append(buildRelevanceZipInstructions(target, aliases), { name: 'prompt.txt' });
       archive.append(readFileSync(RELEVANCE_MERGE_PY_PATH), { name: 'merge.py' });
       archive.append(readFileSync(RELEVANCE_VERIFY_PY_PATH), { name: 'verify.py' });
       chunk(candidates, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
@@ -146,9 +155,10 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
     const target = resolveTarget(id, req.body.target);
+    const aliases = getRelevanceAliases(id);
     const scopeIds = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
     const listings = loadListings(id, scopeIds);
-    const { rejected } = prefilterCandidates(target, listings.map(toPromptListing));
+    const { rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
     const validIds = listings.map((l) => l.id);
 
     let parsed: RelevanceItem[];

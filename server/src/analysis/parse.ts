@@ -1,7 +1,7 @@
 // Парсинг відповідей LLM (критерії + matching) + верифікація evidence.
 // Спільне для авто (OpenRouter) і ручного режиму (вставлений текст із чату).
 import type { AnalyzedListing, MatchedItem } from '../types.js';
-import { MAX_CRITERIA } from './constants.js';
+import { MAX_CRITERIA, MAX_SYNONYMS } from './constants.js';
 import { evidenceConfirmed } from './text.js';
 
 /** Знімає ```json … ``` обгортку (ручні вставки часто з нею). */
@@ -57,6 +57,42 @@ export function parseCriteriaResponse(raw: string): string[] {
     seen.add(key);
     result.push(norm);
     if (result.length >= MAX_CRITERIA) break;
+  }
+  return result;
+}
+
+/**
+ * Парс відповіді генерації синонімів: приймає масив рядків АБО {synonyms:[...]}.
+ * Нормалізує, дедуплікує (case-insensitive), відкидає порожні, обрізає до MAX_SYNONYMS.
+ */
+export function parseSynonymsResponse(raw: string): string[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(extractJson(raw));
+  } catch {
+    throw new Error('Не вдалося розпарсити відповідь як JSON (синоніми)');
+  }
+
+  let list: unknown[];
+  if (Array.isArray(data)) {
+    list = data;
+  } else if (data && typeof data === 'object' && Array.isArray((data as { synonyms?: unknown }).synonyms)) {
+    list = (data as { synonyms: unknown[] }).synonyms;
+  } else {
+    throw new Error('Очікувався масив синонімів або {synonyms: [...]}');
+  }
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of list) {
+    if (typeof item !== 'string') continue;
+    const norm = normalizeCriterion(item);
+    if (!norm) continue;
+    const key = norm.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(norm);
+    if (result.length >= MAX_SYNONYMS) break;
   }
   return result;
 }

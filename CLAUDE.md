@@ -131,6 +131,25 @@
     «brain»-файли. `POST /relevance/preview` дає UI розбивку total/candidates/autoRejected.
     Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
     `web/src/components/analysis/RelevanceFilterDialog.tsx`.
+- **Синоніми пошукового запиту (план `docs/plans/search-synonyms.md`):** на OLX той самий товар
+  часто шукають за різними словами («біговел»/«велобіг»). Один «Пошук» може мати список
+  синонімів `query` (`searches.query_synonyms`, JSON-масив), редагованих у модалі «Варіанти
+  пошуку» (відкривається з форми створення пошуку й з 3-dot меню існуючого). Інваріанти:
+  - **Скан — автоматично**, без окремої кнопки: `scanner.fetchAllQueries()` сканує основний
+    `query` + кожен синонім окремо (пауза 3–6с між варіантами, як батчі deep-скану), зливає
+    видачі по `olx_id` в один `search_id` (upsert уже дедуплікує глобально).
+  - **Вікно покриття (auto-disable) ЗАВЖДИ пропускається**, якщо синонімів >0 (`partial=true`,
+    як split-скан) — union кількох незалежних видач не відсортований глобально за
+    `last_refresh_at`, тож вісь вікна невалідна. Живість таких оголошень перевіряє verify-прохід.
+  - **Синоніми = alias-назви товару для AI-фільтра релевантності** (`getRelevanceAliases`) —
+    лот, що продає товар під будь-яким із синонімів, теж релевантний; пре-фільтр бренд+модель
+    рахує union токенів target+aliases (лише розширює коло кандидатів, ніколи не звужує).
+  - **Генерація** — окремі stateless-ендпойнти `POST /api/search-synonyms/prompt|generate|import`
+    (не прив'язані до `searchId` — працюють ще до збереження пошуку), той самий патерн
+    авто+ручний (ManualAssistant), що й критерії LLM-аналізу.
+  - Реалізація — `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`,
+    `server/src/analysis/{prompts,parse,relevance,repo}.ts`, фронт —
+    `web/src/components/SearchVariantsDialog.tsx`.
 
 ## Команди
 
@@ -162,6 +181,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
 - `docs/plans/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
 - `docs/plans/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
+- `docs/plans/search-synonyms.md` — план синонімів пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) із прогресом.
 - Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 

@@ -44,6 +44,23 @@ export function setRelevanceTarget(searchId: number, target: string): void {
   db.prepare('UPDATE searches SET relevance_target = ? WHERE id = ?').run(target, searchId);
 }
 
+/**
+ * Синоніми query (docs/plans/search-synonyms.md) як alias-назви товару для AI-фільтра
+ * релевантності — оголошення, що продає товар під будь-яким із синонімів, теж релевантне.
+ */
+export function getRelevanceAliases(searchId: number): string[] {
+  const row = db.prepare('SELECT query_synonyms FROM searches WHERE id = ?').get(searchId) as
+    | { query_synonyms: string | null }
+    | undefined;
+  if (!row) return [];
+  try {
+    const parsed = JSON.parse(row.query_synonyms || '[]');
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Завантажує оголошення за id (або всі пошуку, якщо ids порожній). */
 export function loadListings(searchId: number, ids: number[]): ListingRow[] {
   if (ids.length === 0) {
