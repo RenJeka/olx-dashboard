@@ -96,6 +96,41 @@
     `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
     `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, фронт —
     `web/src/components/analysis/*`.
+- **Семантичний фільтр релевантності (план `docs/plans/semantic-relevance-filter.md`):** OLX шукає
+  й за `description` (через «АБО»), тож у видачу потрапляють чохли/запчастини/згадки. Окремий ручний
+  AI-крок (кнопка «AI Фільтр» у хедері) класифікує кожне оголошення за питанням «чи цей лот ПРОДАЄ
+  товар `<цільовий товар>`?» і ставить `listings.ai_relevant` (1=продає, 0=ні, NULL=не перевірено).
+  Інваріанти:
+  - **Цільовий товар — на рівні пошуку** (`searches.relevance_target`, порожній → `query`),
+    редагований у діалозі. Вердикт — на рівні оголошення (`ai_relevant`/`ai_relevant_reason`/
+    `ai_relevant_at`/`ai_relevant_source`).
+  - **Ніколи не авто** — лише вручну за кнопкою (не зі сканів/cron), як плюси/мінуси.
+  - **Ручний override** (бейдж у таблиці / `PATCH /api/listings/:id` з `ai_relevant`) ставить
+    `ai_relevant_source='manual'` і НЕ перетирається авто-прогоном (commit пропускає manual).
+  - **PII продавця в промпт не йде** (тільки `id/title/params/description`).
+  - **Евристичний пре-фільтр перед ШІ** (`prefilterCandidates`, ідея з Antigravity CLI): для
+    цілей «бренд + номер моделі» відсіює оголошення, де бренд і номер моделі НЕ поруч
+    (`RELEVANCE_PROXIMITY_WINDOW=4`; модель «5»/«5s», не «15»/«50») — у ШІ йдуть лише кандидати,
+    відсіяні одразу `relevant=false`. **Обережний:** ціль без номера моделі/бренду або «відкинуло
+    б усе» → всі до ШІ (краще false-positive у ШІ, ніж мовчазний false-negative). Відсіяні видно у
+    списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
+  - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
+    нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
+  - **Консистентність обсягу:** видимість рядка в таблиці й обсяг AI-аналізу (плюси/мінуси,
+    AI Picks) керуються ОДНИМ предикатом — `web/src/utils/listingVisibility.ts`
+    (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`). Scope майстра «Весь пошук»/«Таб»
+    = рівно стільки рядків, скільки в дужках вкладки (нерелевантні/відфільтровані виключені,
+    керується перемикачами над таблицею; «Вибрані» — точний ручний вибір, без фільтрів). Кандидати
+    AI Picks (`loadPickCandidates`, фронт `useAiPicksFlow`) теж виключають `ai_relevant=0`
+    (`ai_relevant IS NOT 0` — лишає 1 та NULL).
+  - **Ручний ZIP** (для агентного CLI типу Antigravity зі слабкою моделлю): крім `prompt.txt` +
+    `descriptions/chunk-NNN.json` (лише кандидати після пре-фільтра) кладе готові `merge.py`/
+    `verify.py` (`server/src/analysis/relevance_merge.py`/`relevance_verify.py`). Промпт —
+    жорстка покрокова процедура (класифікуй чанк → `classifications/result-NNN.json` → `merge.py`
+    → `verify.py`): обробка по чанку обходить ліміт відповіді, заборона власних скриптів усуває
+    «brain»-файли. `POST /relevance/preview` дає UI розбивку total/candidates/autoRejected.
+    Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
+    `web/src/components/analysis/RelevanceFilterDialog.tsx`.
 
 ## Команди
 

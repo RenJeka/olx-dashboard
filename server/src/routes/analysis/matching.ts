@@ -79,25 +79,24 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Ручний пакет для безкоштовного чату: ZIP з prompt.txt + descriptions/chunk-NNN.json.
-  app.get<{ Params: { id: string }; Querystring: { mode?: string; ids?: string } }>(
+  // POST (не GET): список ids може містити тисячі елементів — у query-рядку це
+  // перевищує ліміт довжини заголовків (431 Request Header Fields Too Large), тому передаємо тілом.
+  app.post<{ Params: { id: string }; Body: { mode?: string; ids?: number[] } }>(
     '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
       if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
-      if (!isMode(req.query.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
+      if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
-      const ids = (req.query.ids ?? '')
-        .split(',')
-        .map((s) => Number(s.trim()))
-        .filter(Number.isFinite);
+      const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
 
-      const criteria = getSavedCriteria(id)[req.query.mode];
+      const criteria = getSavedCriteria(id)[req.body.mode];
       if (criteria.length === 0) {
         return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
 
       const listings = loadListings(id, ids);
-      const mode = req.query.mode;
+      const mode = req.body.mode;
 
       const archive = new ZipArchive();
       archive.on('error', (err: Error) => req.log.error(err));

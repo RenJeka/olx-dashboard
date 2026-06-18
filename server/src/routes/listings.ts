@@ -16,6 +16,8 @@ const LISTING_COLUMNS = `id, olx_id, search_id, title, url, price, currency, cit
                 photo_url, description, seller_name, contact_name, olx_status,
                 status, status_source, note, pros, cons, filtered_out, miss_count,
                 analysis_at, analysis_source, analysis_model, analysis_stale,
+                ai_rank, ai_pick_reason, ai_ranked_at,
+                ai_relevant, ai_relevant_reason, ai_relevant_at, ai_relevant_source,
                 posted_at, first_seen_at, last_seen_at`;
 
 export async function listingsRoutes(app: FastifyInstance): Promise<void> {
@@ -48,7 +50,7 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       const existing = db.prepare('SELECT id FROM listings WHERE id = ?').get(id);
       if (!existing) return reply.code(404).send({ error: 'Оголошення не знайдено' });
 
-      const { status, note, pros, cons } = req.body;
+      const { status, note, pros, cons, ai_relevant } = req.body;
 
       if (status !== undefined && !LISTING_STATUSES.includes(status)) {
         return reply.code(400).send({ error: `Невідомий статус: ${status}` });
@@ -72,6 +74,15 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       if (cons !== undefined) {
         fields.push('cons = ?');
         values.push(cons);
+      }
+      // Ручний override семантичного фільтра: позначаємо source='manual', щоб авто-прогін не перетер.
+      if (ai_relevant !== undefined) {
+        fields.push(
+          'ai_relevant = ?',
+          "ai_relevant_source = 'manual'",
+          "ai_relevant_at = datetime('now')",
+        );
+        values.push(ai_relevant === null ? null : ai_relevant ? 1 : 0);
       }
 
       if (fields.length > 0) {

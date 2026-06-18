@@ -22,6 +22,10 @@ import type {
   AnalyzeResponse,
   AnalyzedListing,
   CommitItem,
+  PickItem,
+  PickResult,
+  RelevanceItem,
+  RelevanceResponse,
 } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -316,9 +320,12 @@ export async function fetchAnalyzePackageZip(
   mode: AnalysisMode,
   ids: number[],
 ): Promise<void> {
-  const q = new URLSearchParams({ mode });
-  if (ids.length > 0) q.set('ids', ids.join(','));
-  const res = await fetch(`/api/searches/${searchId}/analyze/package.zip?${q.toString()}`);
+  // POST (не GET): тисячі ids у query-рядку перевищують ліміт довжини заголовків (431).
+  const res = await fetch(`/api/searches/${searchId}/analyze/package.zip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, ids }),
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -388,6 +395,187 @@ export async function exportPreview(
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   downloadBlob(await res.blob(), `analysis-${mode}.${format}`);
+}
+
+// ── AI Вибір позицій ──────────────────────────────────────────────────────────
+
+/** Готовий промпт для ручного AI-ранжування. */
+export function fetchAiPicksPrompt(searchId: number): Promise<{ prompt: string }> {
+  return api<{ prompt: string }>(`/api/searches/${searchId}/ai-picks/prompt`);
+}
+
+/** ZIP-пакет ручного режиму для великих пулів (prompt.txt + candidates/chunk-NNN.json) через blob. */
+export async function fetchAiPicksPackageZip(searchId: number): Promise<void> {
+  const res = await fetch(`/api/searches/${searchId}/ai-picks/package.zip`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  downloadBlob(await res.blob(), `ai-picks-search-${searchId}.zip`);
+}
+
+/** Авто-ранжування через OpenRouter. НЕ пише в БД — повертає picks для перегляду. */
+export function useRunAiPicks() {
+  return useMutation({
+    mutationFn: ({ searchId, model }: { searchId: number; model?: string }) =>
+      api<PickResult>(`/api/searches/${searchId}/ai-picks/rank`, {
+        method: 'POST',
+        body: JSON.stringify({ model }),
+      }),
+  });
+}
+
+/** Парс ручної відповіді. НЕ пише в БД — повертає picks для перегляду. */
+export function useImportAiPicks() {
+  return useMutation({
+    mutationFn: ({ searchId, raw }: { searchId: number; raw: string }) =>
+      api<PickResult>(`/api/searches/${searchId}/ai-picks/import`, {
+        method: 'POST',
+        body: JSON.stringify({ raw }),
+      }),
+  });
+}
+
+/** Запис AI-picks у БД. Інвалідує кеш listings. */
+export function useCommitAiPicks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, picks }: { searchId: number; picks: PickItem[] }) =>
+      api<{ committed: number }>(`/api/searches/${searchId}/ai-picks/commit`, {
+        method: 'POST',
+        body: JSON.stringify({ picks }),
+      }),
+    onSuccess: (_data, { searchId }) =>
+      qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+  });
+}
+
+// ── Семантичний фільтр релевантності ─────────────────────────────────────────
+
+/** Цільовий товар фільтра (передзаповнюється query, якщо ще не збережений). */
+export function useRelevanceTarget(searchId: number | null) {
+  return useQuery({
+    queryKey: ['relevance-target', searchId],
+    queryFn: () => api<{ target: string }>(`/api/searches/${searchId}/relevance/target`),
+    enabled: searchId != null,
+  });
+}
+
+/** Зберегти цільовий товар на рівні пошуку. */
+export function useSaveRelevanceTarget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, target }: { searchId: number; target: string }) =>
+      api<{ target: string }>(`/api/searches/${searchId}/relevance/target`, {
+        method: 'PUT',
+        body: JSON.stringify({ target }),
+      }),
+    onSuccess: (_data, { searchId }) =>
+      qc.invalidateQueries({ queryKey: ['relevance-target', searchId] }),
+  });
+}
+
+/** Превʼю розбивки пре-фільтра: скільки піде в ШІ vs авто-відсіється (для UI перед запуском). */
+export function useRelevancePreview(
+  searchId: number,
+  target: string,
+  ids: number[],
+  enabled: boolean,
+) {
+  return useQuery({
+    // Ключ компактний: повний масив ids може бути великим — досить сигнатури scope.
+    queryKey: ['relevance-preview', searchId, target, ids.length, ids[0] ?? null, ids[ids.length - 1] ?? null],
+    queryFn: () =>
+      api<{ total: number; candidates: number; autoRejected: number }>(
+        `/api/searches/${searchId}/relevance/preview`,
+        { method: 'POST', body: JSON.stringify({ target, ids }) },
+      ),
+    enabled: enabled && target.trim().length > 0 && ids.length > 0,
+  });
+}
+
+/** Авто-класифікація релевантності через OpenRouter. НЕ пише в БД — повертає results для перегляду. */
+export function useRunRelevance() {
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      target,
+      ids,
+      model,
+    }: {
+      searchId: number;
+      target: string;
+      ids: number[];
+      model?: string;
+    }) =>
+      api<RelevanceResponse>(`/api/searches/${searchId}/relevance/analyze`, {
+        method: 'POST',
+        body: JSON.stringify({ target, ids, model }),
+      }),
+  });
+}
+
+/** Парс вставленої відповіді релевантності + мерж у накопичене. НЕ пише в БД. */
+export function useImportRelevance() {
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      raw,
+      accumulated,
+      ids,
+      target,
+    }: {
+      searchId: number;
+      raw: string;
+      accumulated: RelevanceItem[];
+      ids?: number[];
+      target?: string;
+    }) =>
+      api<RelevanceResponse>(`/api/searches/${searchId}/relevance/import`, {
+        method: 'POST',
+        body: JSON.stringify({ raw, accumulated, ids, target }),
+      }),
+  });
+}
+
+/** Запис результату класифікації у БД. Інвалідує кеш listings. */
+export function useCommitRelevance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      items,
+      source,
+    }: {
+      searchId: number;
+      items: RelevanceItem[];
+      source: 'api' | 'import';
+    }) =>
+      api<{ committed: number }>(`/api/searches/${searchId}/relevance/commit`, {
+        method: 'POST',
+        body: JSON.stringify({ items, source }),
+      }),
+    onSuccess: (_data, { searchId }) =>
+      qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+  });
+}
+
+/** Завантажує ZIP-пакет ручного режиму (prompt.txt + descriptions/chunk-NNN.json) через blob. */
+export async function fetchRelevancePackageZip(
+  searchId: number,
+  target: string,
+  ids: number[],
+): Promise<void> {
+  const res = await fetch(`/api/searches/${searchId}/relevance/package.zip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, ids }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  downloadBlob(await res.blob(), `relevance-search-${searchId}.zip`);
 }
 
 /** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */

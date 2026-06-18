@@ -1,4 +1,6 @@
 import { db } from '../db/db.js';
+import type { PickCandidate } from '../types.js';
+import { PICK_CANDIDATES_LIMIT } from './constants.js';
 
 export interface ListingRow {
   id: number;
@@ -25,6 +27,23 @@ export function getSavedCriteria(searchId: number): { cons: string[]; pros: stri
   }
 }
 
+/**
+ * Цільовий товар семантичного фільтра. Якщо relevance_target порожній — повертаємо query
+ * пошуку як передзаповнення (щоб перший прогін мав осмислену ціль).
+ */
+export function getRelevanceTarget(searchId: number): string {
+  const row = db.prepare('SELECT relevance_target, query FROM searches WHERE id = ?').get(searchId) as
+    | { relevance_target: string | null; query: string }
+    | undefined;
+  if (!row) return '';
+  return (row.relevance_target ?? '').trim() || row.query;
+}
+
+/** Зберігає цільовий товар на рівні пошуку (для повторних прогонів). */
+export function setRelevanceTarget(searchId: number, target: string): void {
+  db.prepare('UPDATE searches SET relevance_target = ? WHERE id = ?').run(target, searchId);
+}
+
 /** Завантажує оголошення за id (або всі пошуку, якщо ids порожній). */
 export function loadListings(searchId: number, ids: number[]): ListingRow[] {
   if (ids.length === 0) {
@@ -38,4 +57,23 @@ export function loadListings(searchId: number, ids: number[]): ListingRow[] {
       `SELECT id, title, description, params FROM listings WHERE search_id = ? AND id IN (${placeholders})`,
     )
     .all(searchId, ...ids) as ListingRow[];
+}
+
+/**
+ * Кандидати для AI-ранжування: без мінусів, активні, не відфільтровані, релевантні
+ * (`ai_relevant IS NOT 0` лишає 1 та NULL-«не перевірено», відсікає нерелевантні),
+ * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт PICK_CANDIDATES_LIMIT.
+ * Предикат збігається з вкладкою «Найкращі кандидати» в UI.
+ */
+export function loadPickCandidates(searchId: number): PickCandidate[] {
+  return db
+    .prepare(
+      `SELECT id, title, price, city, params, description, pros
+       FROM listings
+       WHERE search_id = ? AND cons = '' AND status NOT IN ('disabled','rejected')
+         AND filtered_out = 0 AND ai_relevant IS NOT 0
+       ORDER BY CASE WHEN price IS NULL THEN 1 ELSE 0 END, price ASC
+       LIMIT ?`,
+    )
+    .all(searchId, PICK_CANDIDATES_LIMIT) as PickCandidate[];
 }

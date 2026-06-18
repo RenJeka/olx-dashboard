@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Row } from '@tanstack/react-table';
 import {
   getCoreRowModel,
@@ -21,6 +21,7 @@ import { ListingsFilterBar } from '../components/table/topbar';
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
+import { isListingVisible } from '../utils/listingVisibility';
 import type { SearchScope } from '../components/table/topbar';
 import type { Listing } from '../types';
 
@@ -52,7 +53,7 @@ export function ListingsTable({
   const [descriptionListing, setDescriptionListing] = useState<Listing | null>(null);
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
-  const setShowFilteredOut = useListingsUiStore((s) => s.setShowFilteredOut);
+  const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
   const [searchText, setSearchText] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
 
@@ -74,14 +75,19 @@ export function ListingsTable({
 
   const rows = useMemo(() => data ?? [], [data]);
 
+  // Авто-показ/приховання колонки ai_rank та скидання сортування при переключенні табу.
+  useEffect(() => {
+    const isAiPicks = statusFilter === 'ai_picks';
+    onColumnVisibilityChange((prev) => ({ ...prev, ai_rank: isAiPicks }));
+    if (isAiPicks) {
+      setSorting([{ id: 'price', desc: false }]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
   const visibleRows = useMemo(
-    () =>
-      rows.filter(
-        (l) =>
-          (showFilteredOut || l.filtered_out === 0) &&
-          (statusFilter === 'all' || l.status === statusFilter),
-      ),
-    [rows, showFilteredOut, statusFilter],
+    () => rows.filter((l) => isListingVisible(l, statusFilter, showFilteredOut, showIrrelevant)),
+    [rows, showFilteredOut, showIrrelevant, statusFilter],
   );
 
   const table = useReactTable({

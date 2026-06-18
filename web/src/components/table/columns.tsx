@@ -8,12 +8,14 @@ import {
   LuImage,
   LuMapPin,
   LuNotebookPen,
+  LuSparkles,
   LuTag,
   LuThumbsDown,
   LuThumbsUp,
   LuUser,
 } from 'react-icons/lu';
 import { TbBrandDaysCounter } from 'react-icons/tb';
+import { Tooltip } from '../ui/tooltip';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml, countProsConsItems } from '../../utils/format';
@@ -230,6 +232,29 @@ export const columns = [
       countProsConsItems(a.original.cons) - countProsConsItems(b.original.cons),
     cell: (info) => <ProsConsCell listing={info.row.original} field="cons" />,
   }),
+  columnHelper.accessor('ai_rank', {
+    id: 'ai_rank',
+    header: () => <HeaderLabel icon={<LuSparkles />}>AI Ранг</HeaderLabel>,
+    size: 90,
+    minSize: 60,
+    maxSize: 120,
+    enableSorting: true,
+    sortDescFirst: false,
+    cell: (info) => {
+      const rank = info.getValue();
+      if (rank == null) return null;
+      const reason = info.row.original.ai_pick_reason ?? '';
+      // 1–10 зелений, 11–20 жовтий, 21+ помаранчевий (ближче до червоного).
+      const color = rank <= 10 ? 'green.500' : rank <= 20 ? 'yellow.500' : 'orange.600';
+      return (
+        <Tooltip content={reason} disabled={!reason}>
+          <Text fontSize="lg" fontWeight="bold" color={color} cursor={reason ? 'help' : 'default'}>
+            #{rank}
+          </Text>
+        </Tooltip>
+      );
+    },
+  }),
 ];
 
 export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
@@ -245,4 +270,5 @@ export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'note', label: 'Нотатка' },
   { id: 'pros', label: 'Плюси' },
   { id: 'cons', label: 'Мінуси' },
+  { id: 'ai_rank', label: 'AI Ранг' },
 ];

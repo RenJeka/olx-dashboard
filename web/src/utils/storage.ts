@@ -52,7 +52,7 @@ function saveSettings(patch: Partial<StoredSettings>): void {
 export function loadColumnVisibility(): VisibilityState {
   const saved = loadSettings().columnVisibility ?? {};
   // Нові колонки, яких ще немає у збереженому стані — приховані за замовчуванням
-  const defaults: VisibilityState = { pros: false, cons: false };
+  const defaults: VisibilityState = { pros: false, cons: false, ai_rank: false };
   return { ...defaults, ...saved };
 }
 

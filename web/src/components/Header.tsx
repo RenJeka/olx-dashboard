@@ -3,7 +3,9 @@ import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './SearchActionPanel';
-import { AnalysisWizardDialog } from './analysis/AnalysisWizardDialog';
+import { AnalysisWizardDialog } from './analysis/wizard/AnalysisWizardDialog';
+import { AiPicksDialog } from './analysis/ai-picks/AiPicksDialog';
+import { RelevanceFilterDialog } from './analysis/RelevanceFilterDialog';
 import { SettingsDrawer } from './settings/SettingsDrawer';
 import { Tooltip } from './ui/tooltip';
 import type { Search } from '../types';
@@ -90,7 +92,9 @@ export function Header({
             </Badge>
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
+          {selectedSearch && <RelevanceFilterDialog search={selectedSearch} selectedIds={selectedIds} />}
           {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
+          {selectedSearch && <AiPicksDialog search={selectedSearch} />}
           <SettingsDrawer
             columnVisibility={columnVisibility}
             onColumnVisibilityChange={onColumnVisibilityChange}

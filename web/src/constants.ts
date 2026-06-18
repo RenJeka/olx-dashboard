@@ -21,6 +21,16 @@ export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
 /** Позначка моделі для ручного імпорту. */
 export const MANUAL_MODEL = 'manual';
 
+// ── AI Вибір (ранжування) ──────────────────────────────────────────────────────
+/** Підпис псевдо-вкладки/scope «Найкращі кандидати» (ai_picks) — спільний для таблиці й майстра. */
+export const AI_PICKS_LABEL = 'Найкращі кандидати';
+/** Скільки кандидатів (без мінусів) максимум іде в промпт (дзеркалить PICK_CANDIDATES_LIMIT сервера). */
+export const PICK_CANDIDATES_LIMIT = 500;
+/** Скільки найкращих кандидатів LLM повертає (дзеркалить PICK_TOP_N сервера). */
+export const PICK_TOP_N = 30;
+/** Понад скільки кандидатів ручний режим перемикається з одного промпту на ZIP-пакет (дзеркалить MANUAL_PICKS_ZIP_CHUNK_SIZE сервера). */
+export const MANUAL_PICKS_ZIP_CHUNK_SIZE = 50;
+
 // ── Підсвітка (HighlightText) ─────────────────────────────────────────────────
 /** Мін. довжина одиночного запиту-фільтра для підсвітки. */
 export const HIGHLIGHT_SINGLE_MIN_LENGTH = 1;
