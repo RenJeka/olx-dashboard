@@ -27,6 +27,23 @@ export function getSavedCriteria(searchId: number): { cons: string[]; pros: stri
   }
 }
 
+/**
+ * Цільовий товар семантичного фільтра. Якщо relevance_target порожній — повертаємо query
+ * пошуку як передзаповнення (щоб перший прогін мав осмислену ціль).
+ */
+export function getRelevanceTarget(searchId: number): string {
+  const row = db.prepare('SELECT relevance_target, query FROM searches WHERE id = ?').get(searchId) as
+    | { relevance_target: string | null; query: string }
+    | undefined;
+  if (!row) return '';
+  return (row.relevance_target ?? '').trim() || row.query;
+}
+
+/** Зберігає цільовий товар на рівні пошуку (для повторних прогонів). */
+export function setRelevanceTarget(searchId: number, target: string): void {
+  db.prepare('UPDATE searches SET relevance_target = ? WHERE id = ?').run(target, searchId);
+}
+
 /** Завантажує оголошення за id (або всі пошуку, якщо ids порожній). */
 export function loadListings(searchId: number, ids: number[]): ListingRow[] {
   if (ids.length === 0) {

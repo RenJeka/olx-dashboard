@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS searches (
   visible_total_count INTEGER,       -- metadata.visible_total_count з останнього успішного скану (GraphQL)
   sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
+  relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -51,6 +52,10 @@ CREATE TABLE IF NOT EXISTS listings (
   ai_rank INTEGER,                   -- AI Вибір: ранг серед найкращих (NULL = не обрано)
   ai_pick_reason TEXT,               -- AI Вибір: пояснення чому оголошення обрано
   ai_ranked_at TEXT,                 -- AI Вибір: час останнього AI-ранжування
+  ai_relevant INTEGER,               -- Семантичний фільтр: NULL=не перевірено, 1=продає товар, 0=нерелевантне
+  ai_relevant_reason TEXT,           -- Семантичний фільтр: коротке пояснення вердикту AI
+  ai_relevant_at TEXT,               -- Семантичний фільтр: час останньої класифікації
+  ai_relevant_source TEXT,           -- Семантичний фільтр: api | import | manual (ручний override)
   first_seen_at TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );

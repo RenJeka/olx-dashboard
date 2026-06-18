@@ -24,6 +24,8 @@ import type {
   CommitItem,
   PickItem,
   PickResult,
+  RelevanceItem,
+  RelevanceResponse,
 } from '../types';
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -446,6 +448,111 @@ export function useCommitAiPicks() {
     onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),
   });
+}
+
+// ── Семантичний фільтр релевантності ─────────────────────────────────────────
+
+/** Цільовий товар фільтра (передзаповнюється query, якщо ще не збережений). */
+export function useRelevanceTarget(searchId: number | null) {
+  return useQuery({
+    queryKey: ['relevance-target', searchId],
+    queryFn: () => api<{ target: string }>(`/api/searches/${searchId}/relevance/target`),
+    enabled: searchId != null,
+  });
+}
+
+/** Зберегти цільовий товар на рівні пошуку. */
+export function useSaveRelevanceTarget() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, target }: { searchId: number; target: string }) =>
+      api<{ target: string }>(`/api/searches/${searchId}/relevance/target`, {
+        method: 'PUT',
+        body: JSON.stringify({ target }),
+      }),
+    onSuccess: (_data, { searchId }) =>
+      qc.invalidateQueries({ queryKey: ['relevance-target', searchId] }),
+  });
+}
+
+/** Авто-класифікація релевантності через OpenRouter. НЕ пише в БД — повертає results для перегляду. */
+export function useRunRelevance() {
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      target,
+      ids,
+      model,
+    }: {
+      searchId: number;
+      target: string;
+      ids: number[];
+      model?: string;
+    }) =>
+      api<RelevanceResponse>(`/api/searches/${searchId}/relevance/analyze`, {
+        method: 'POST',
+        body: JSON.stringify({ target, ids, model }),
+      }),
+  });
+}
+
+/** Парс вставленої відповіді релевантності + мерж у накопичене. НЕ пише в БД. */
+export function useImportRelevance() {
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      raw,
+      accumulated,
+    }: {
+      searchId: number;
+      raw: string;
+      accumulated: RelevanceItem[];
+    }) =>
+      api<RelevanceResponse>(`/api/searches/${searchId}/relevance/import`, {
+        method: 'POST',
+        body: JSON.stringify({ raw, accumulated }),
+      }),
+  });
+}
+
+/** Запис результату класифікації у БД. Інвалідує кеш listings. */
+export function useCommitRelevance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      items,
+      source,
+    }: {
+      searchId: number;
+      items: RelevanceItem[];
+      source: 'api' | 'import';
+    }) =>
+      api<{ committed: number }>(`/api/searches/${searchId}/relevance/commit`, {
+        method: 'POST',
+        body: JSON.stringify({ items, source }),
+      }),
+    onSuccess: (_data, { searchId }) =>
+      qc.invalidateQueries({ queryKey: ['listings', searchId] }),
+  });
+}
+
+/** Завантажує ZIP-пакет ручного режиму (prompt.txt + descriptions/chunk-NNN.json) через blob. */
+export async function fetchRelevancePackageZip(
+  searchId: number,
+  target: string,
+  ids: number[],
+): Promise<void> {
+  const res = await fetch(`/api/searches/${searchId}/relevance/package.zip`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target, ids }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  downloadBlob(await res.blob(), `relevance-search-${searchId}.zip`);
 }
 
 /** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */

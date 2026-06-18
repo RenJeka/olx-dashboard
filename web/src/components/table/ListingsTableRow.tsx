@@ -1,11 +1,12 @@
 import { memo, type ReactNode } from 'react';
 import { HStack, Table } from '@chakra-ui/react';
 import { flexRender, type Row } from '@tanstack/react-table';
-import { LuFilter } from 'react-icons/lu';
+import { LuFilter, LuScanSearch } from 'react-icons/lu';
 import type { Listing } from '../../types';
 import { DescriptionTooltip } from './DescriptionTooltip';
 import { Tooltip } from '../ui/tooltip';
 import { isMutedStatus } from '../../utils/status';
+import { useUpdateListing } from '../../api/client';
 
 interface ListingsTableRowProps {
   row: Row<Listing>;
@@ -24,6 +25,7 @@ function ListingsTableRowImpl({
   onOpenDescription,
   searchQuery,
 }: ListingsTableRowProps) {
+  const updateListing = useUpdateListing();
   return (
     <Table.Row
       opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}
@@ -56,6 +58,31 @@ function ListingsTableRowImpl({
               <Tooltip content="Приховано локальним фільтром">
                 <span>
                   <LuFilter color="var(--chakra-colors-orange-500)" />
+                </span>
+              </Tooltip>
+              {content}
+            </HStack>
+          );
+        }
+
+        if (cell.column.id === 'title' && row.original.ai_relevant === 0) {
+          const reason = row.original.ai_relevant_reason || 'AI: лот не продає цільовий товар';
+          content = (
+            <HStack gap={1}>
+              <Tooltip content={`${reason} — натисни, щоб позначити релевантним`}>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer', display: 'inline-flex' }}
+                  onClick={() =>
+                    updateListing.mutate({
+                      id: row.original.id,
+                      searchId: row.original.search_id,
+                      patch: { ai_relevant: 1 },
+                    })
+                  }
+                >
+                  <LuScanSearch color="var(--chakra-colors-cyan-500)" />
                 </span>
               </Tooltip>
               {content}

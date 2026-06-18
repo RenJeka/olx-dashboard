@@ -53,7 +53,8 @@ olx-dashboard/
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM + верифікація evidence (substring) + мерж результатів
 │       │   ├── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
-│       │   └── aiPicks.ts    # AI Вибір (план docs/plans/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (2-етапні map-reduce інструкції для ZIP ручного режиму)
+│       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (2-етапні map-reduce інструкції для ZIP ручного режиму)
+│       │   └── relevance.ts  # семантичний фільтр: buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (docs/plans/semantic-relevance-filter.md)
 │       ├── export/
 │       │   └── xlsx.ts       # buildXlsxBuffer (ExcelJS) — спільний Excel-експорт
 │       ├── scraper/
@@ -67,8 +68,9 @@ olx-dashboard/
 │       │   └── verifier.ts   # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + filter-options + stats + PATCH (filters)
-│           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка)
+│           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt + .../ai-picks/package.zip (ZIP map-reduce, пули >50) + POST .../ai-picks/rank(авто)/import(ручний)/commit
+│           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
 │               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import, GET .../prompt
@@ -96,7 +98,8 @@ olx-dashboard/
         │   │   ├── AnalysisWizardDialog.tsx # 4-етапний майстер «AI» (критерії→пошук→перевірка→вставка); крок 1 — вибір режиму cons/pros та scope (вибрані/вкладка/весь пошук); кроки 2–4 — read-only підсумок; прогрес зберігається між відкриттями (Zustand in-memory); закриття повз вікно заборонено
         │   │   ├── ManualAssistant.tsx      # бічна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь, опціональний emptyHint)
         │   │   ├── AiPicksDialog.tsx        # AI Вибір (план docs/plans/AI-auto-top.md): запуск/імпорт ранжування, ручний режим — один промпт (≤50 кандидатів) або ZIP-пакет map-reduce (>50, useZip), коміт результату
-        │   │   └── AiRankCard.tsx           # картка одного AI-обраного оголошення (rank/reason) у результаті AiPicksDialog
+        │   │   ├── AiRankCard.tsx           # картка одного AI-обраного оголошення (rank/reason) у результаті AiPicksDialog
+        │   │   └── RelevanceFilterDialog.tsx # діалог «AI Фільтр»: семантична класифікація «лот продає <товар>?» (авто+ручний ZIP), commit ai_relevant
         │   ├── settings/         # папка компонентів налаштувань
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
@@ -133,7 +136,7 @@ olx-dashboard/
         │       ├── checkbox.tsx
         │       └── close-button.tsx
         ├── stores/
-        │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці) — спільний стан між таблицею і AI-майстром
+        │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці), showFilteredOut, showIrrelevant — спільний стан між таблицею і AI-майстром
         │   └── analysisWizardStore.ts # useAnalysisWizardStore: прогрес AI-Flow (mode/scope/step/критерії/результати); bindSearch/reset
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
