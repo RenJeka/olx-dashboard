@@ -27,9 +27,11 @@ import {
   useImportAiPicks,
   useCommitAiPicks,
   fetchAiPicksPrompt,
+  fetchAiPicksPackageZip,
 } from '../../api/client';
 import { loadAnalysisModel } from '../../utils/storage';
 import { isMutedStatus } from '../../utils/status';
+import { MANUAL_PICKS_ZIP_CHUNK_SIZE, PICK_CANDIDATES_LIMIT, PICK_TOP_N } from '../../constants';
 import type { PickItem, PickResult, Search } from '../../types';
 
 interface Props {
@@ -46,6 +48,8 @@ export function AiPicksDialog({ search }: Props) {
   const [summary, setSummary] = useState('');
   const [prompt, setPrompt] = useState<string | null>(null);
   const [loadingPrompt, setLoadingPrompt] = useState(false);
+  const [zipDownloading, setZipDownloading] = useState(false);
+  const [zipDownloaded, setZipDownloaded] = useState(false);
 
   const runAiPicks = useRunAiPicks();
   const importAiPicks = useImportAiPicks();
@@ -54,6 +58,10 @@ export function AiPicksDialog({ search }: Props) {
   const candidateCount = (listings ?? []).filter(
     (l) => !l.cons && !isMutedStatus(l.status) && l.filtered_out === 0,
   ).length;
+  const promptCount = Math.min(candidateCount, PICK_CANDIDATES_LIMIT);
+  // Один промпт-текст стає завеликим для копіювання в чат — від цього порогу
+  // ручний режим перемикається на ZIP з map-reduce інструкціями (prompt.txt + чанки).
+  const useZip = promptCount > MANUAL_PICKS_ZIP_CHUNK_SIZE;
 
   function applyResult(result: PickResult) {
     setPendingPicks(result.picks);
@@ -120,11 +128,28 @@ export function AiPicksDialog({ search }: Props) {
     }
   }
 
+  async function downloadZipPackage() {
+    setZipDownloading(true);
+    try {
+      await fetchAiPicksPackageZip(search.id);
+      setZipDownloaded(true);
+    } catch (err) {
+      toaster.create({
+        type: 'error',
+        title: 'Не вдалося підготувати ZIP-пакет',
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setZipDownloading(false);
+    }
+  }
+
   function reset() {
     setStep('idle');
     setPendingPicks([]);
     setSummary('');
     setPrompt(null);
+    setZipDownloaded(false);
   }
 
   const listingsMap = new Map((listings ?? []).map((l) => [l.id, l]));
@@ -156,7 +181,9 @@ export function AiPicksDialog({ search }: Props) {
             <Stack gap={4}>
               <Text textStyle="sm" color="fg.muted">
                 Кандидати для ранжування: оголошення без мінусів, активні, не відфільтровані.
-                Знайдено <strong>{candidateCount}</strong> кандидатів.
+                Знайдено <strong>{candidateCount}</strong> кандидатів, у промпт піде{' '}
+                <strong>{promptCount}</strong> найдешевших (ліміт {PICK_CANDIDATES_LIMIT}).
+                AI обере та відсортує топ-{PICK_TOP_N} найкращих.
               </Text>
 
               <Button
@@ -173,28 +200,56 @@ export function AiPicksDialog({ search }: Props) {
                 <Text textStyle="xs" color="fg.muted" mb={2} fontWeight="semibold">
                   Ручний режим (без API-ключа)
                 </Text>
-                <ManualAssistant
-                  title="Скопіюй промпт та вставте відповідь"
-                  parts={
-                    prompt !== null
-                      ? [{ name: 'Промпт AI Вибір', content: prompt }]
-                      : []
-                  }
-                  pasteLabel="Застосувати відповідь"
-                  onSubmit={handleImport}
-                  submitting={importAiPicks.isPending}
-                  emptyHint={
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      loading={loadingPrompt}
-                      disabled={candidateCount === 0}
-                      onClick={loadPrompt}
-                    >
-                      Завантажити промпт
-                    </Button>
-                  }
-                />
+                {useZip ? (
+                  <ManualAssistant
+                    title="Завантаж ZIP-пакет та вставте фінальну відповідь"
+                    parts={[]}
+                    pasteLabel="Застосувати відповідь"
+                    onSubmit={handleImport}
+                    submitting={importAiPicks.isPending}
+                    emptyHint={
+                      zipDownloaded ? (
+                        <Text textStyle="xs" color="fg.muted">
+                          ZIP завантажено. Опрацюй усі candidates/chunk-NNN.json за 2-етапною
+                          інструкцією у prompt.txt і встав сюди лише ОДНУ фінальну JSON-відповідь.
+                        </Text>
+                      ) : (
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          loading={zipDownloading}
+                          disabled={candidateCount === 0}
+                          onClick={downloadZipPackage}
+                        >
+                          Завантажити ZIP-пакет
+                        </Button>
+                      )
+                    }
+                  />
+                ) : (
+                  <ManualAssistant
+                    title="Скопіюй промпт та вставте відповідь"
+                    parts={
+                      prompt !== null
+                        ? [{ name: 'Промпт AI Вибір', content: prompt }]
+                        : []
+                    }
+                    pasteLabel="Застосувати відповідь"
+                    onSubmit={handleImport}
+                    submitting={importAiPicks.isPending}
+                    emptyHint={
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        loading={loadingPrompt}
+                        disabled={candidateCount === 0}
+                        onClick={loadPrompt}
+                      >
+                        Завантажити промпт
+                      </Button>
+                    }
+                  />
+                )}
               </Box>
             </Stack>
           )}
@@ -202,7 +257,7 @@ export function AiPicksDialog({ search }: Props) {
           {step === 'running' && (
             <HStack gap={3} p={4} justify="center">
               <Spinner color="teal.500" />
-              <Text>Аналізую {candidateCount} оголошень…</Text>
+              <Text>Аналізую {promptCount} оголошень…</Text>
             </HStack>
           )}
 

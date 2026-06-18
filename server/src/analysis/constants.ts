@@ -29,6 +29,14 @@ export const MANUAL_ZIP_CHUNK_SIZE = 50;
 export const MAX_CRITERIA = 50;
 /** Розмір семпла описів для генерації критеріїв. */
 export const DEFAULT_SAMPLE_SIZE = 30;
+/** AI Вибір: скільки кандидатів (без мінусів) максимум кладеться в LLM-промпт. */
+export const PICK_CANDIDATES_LIMIT = 500;
+/** AI Вибір: скільки найкращих кандидатів LLM має повернути (топ-N замість 3-5). */
+export const PICK_TOP_N = 30;
+/** AI Вибір (ручний ZIP): скільки кандидатів кладеться в один файл candidates/chunk-NNN.json. */
+export const MANUAL_PICKS_ZIP_CHUNK_SIZE = 50;
+/** AI Вибір (ручний ZIP): скільки номінантів максимум LLM лишає з одного чанку (етап 1 map-reduce). */
+export const PICKS_NOMINEES_PER_CHUNK = 10;
 
 // ── Семпл / промпт ────────────────────────────────────────────────────────────
 /** Обрізання опису у промпті генерації критеріїв. */

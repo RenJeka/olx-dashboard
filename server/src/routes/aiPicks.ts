@@ -1,6 +1,21 @@
+import { ZipArchive } from 'archiver';
 import type { FastifyInstance } from 'fastify';
 import { hasApiKey } from '../analysis/config.js';
-import { buildPickPrompt, parsePickResponse, runAiPicks } from '../analysis/aiPicks.js';
+import {
+  buildPickManualZipInstructions,
+  buildPickPrompt,
+  parsePickResponse,
+  runAiPicks,
+  toPickItems,
+} from '../analysis/aiPicks.js';
+import {
+  JSON_EXPORT_INDENT,
+  MANUAL_PICKS_ZIP_CHUNK_SIZE,
+  MIME_ZIP,
+  PICK_TOP_N,
+  PICKS_NOMINEES_PER_CHUNK,
+} from '../analysis/constants.js';
+import { chunk } from '../analysis/promptData.js';
 import { loadPickCandidates, getSearch } from '../analysis/repo.js';
 import { db } from '../db/db.js';
 import type { PickItem, PickResult } from '../types.js';
@@ -23,6 +38,39 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
 
       const prompt = buildPickPrompt(candidates);
       return { prompt };
+    },
+  );
+
+  // ZIP-пакет ручного режиму для великих пулів кандидатів: prompt.txt (2-етапні
+  // map-reduce інструкції) + candidates/chunk-NNN.json. На відміну від matching
+  // тут немає детерміністичного скрипта — відбір завжди робить LLM/агент.
+  app.get<{ Params: { id: string } }>(
+    '/api/searches/:id/ai-picks/package.zip',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+
+      const candidates = loadPickCandidates(id);
+      if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
+
+      const chunks = chunk(candidates, MANUAL_PICKS_ZIP_CHUNK_SIZE);
+
+      const archive = new ZipArchive();
+      archive.on('error', (err: Error) => req.log.error(err));
+
+      archive.append(
+        buildPickManualZipInstructions(candidates.length, chunks.length, PICKS_NOMINEES_PER_CHUNK, PICK_TOP_N),
+        { name: 'prompt.txt' },
+      );
+      chunks.forEach((group, idx) => {
+        const name = `candidates/chunk-${String(idx + 1).padStart(3, '0')}.json`;
+        archive.append(JSON.stringify(toPickItems(group), null, JSON_EXPORT_INDENT), { name });
+      });
+      void archive.finalize();
+
+      reply.header('Content-Disposition', `attachment; filename="ai-picks-search-${id}.zip"`);
+      reply.type(MIME_ZIP);
+      return reply.send(archive);
     },
   );
 

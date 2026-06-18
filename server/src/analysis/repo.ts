@@ -1,5 +1,6 @@
 import { db } from '../db/db.js';
 import type { PickCandidate } from '../types.js';
+import { PICK_CANDIDATES_LIMIT } from './constants.js';
 
 export interface ListingRow {
   id: number;
@@ -43,7 +44,7 @@ export function loadListings(searchId: number, ids: number[]): ListingRow[] {
 
 /**
  * Кандидати для AI-ранжування: без мінусів, активні, не відфільтровані,
- * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт 30.
+ * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт PICK_CANDIDATES_LIMIT.
  */
 export function loadPickCandidates(searchId: number): PickCandidate[] {
   return db
@@ -53,7 +54,7 @@ export function loadPickCandidates(searchId: number): PickCandidate[] {
        WHERE search_id = ? AND cons = '' AND status NOT IN ('disabled','rejected')
          AND filtered_out = 0
        ORDER BY CASE WHEN price IS NULL THEN 1 ELSE 0 END, price ASC
-       LIMIT 30`,
+       LIMIT ?`,
     )
-    .all(searchId) as PickCandidate[];
+    .all(searchId, PICK_CANDIDATES_LIMIT) as PickCandidate[];
 }
