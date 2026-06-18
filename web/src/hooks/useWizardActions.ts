@@ -381,7 +381,8 @@ export function useWizardActions(search: Search, selectedIds: number[], open: bo
 
   const scopeLabel =
     scope === 'selected' ? 'Вибрані'
-    : scope === 'tab' && statusFilter !== 'all' && statusFilter !== 'ai_picks'
+    : scope === 'tab' && statusFilter === 'ai_picks' ? 'Найкращі кандидати'
+    : scope === 'tab' && statusFilter !== 'all'
       ? STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]
     : 'Весь пошук';
 

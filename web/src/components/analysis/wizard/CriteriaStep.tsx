@@ -70,7 +70,7 @@ export function CriteriaStep({ w }: Props) {
               colorPalette="blue"
               onClick={() => setScope('tab')}
             >
-              {statusFilter !== 'ai_picks' ? STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS] : 'Таб'} ({tabCount})
+              {statusFilter === 'ai_picks' ? 'Найкращі кандидати' : STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]} ({tabCount})
             </Button>
           )}
           <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
