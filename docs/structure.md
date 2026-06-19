@@ -115,7 +115,10 @@ olx-dashboard/
         │   │   ├── SearchRowMenu.tsx       # 3-dot меню рядка (редагувати/фільтри/варіанти/архів/видалення)
         │   │   ├── SearchDeleteDialog.tsx  # alert-діалог підтвердження видалення пошуку
         │   │   ├── SearchVariantsDialog.tsx # контрольований модал «Варіанти пошуку»: синоніми query (docs/plans/search-synonyms.md) — список + генерація авто/ручна (ManualAssistant)
-        │   │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку": local_filters (price_range, cities, sellers; стоп-слова/ranges закомментовано)
+        │   │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку" (обгортка)
+        │   │   ├── local-filters/          # компоненти локальних фільтрів
+        │   │   │   ├── PriceFilter.tsx     # фільтр діапазону цін
+        │   │   │   └── TagsFilter.tsx      # універсальний фільтр тегів (міста, продавці, плюси/мінуси)
         │   │   ├── SearchEditDialog.tsx    # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/search-row-edit.md)
         │   │   └── index.ts                # барель: export { Searches }
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
@@ -192,6 +195,7 @@ olx-dashboard/
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)
         │   ├── useRelevanceFlow.ts # логіка семантичної класифікації (AI Фільтр)
         │   ├── useNewSearchForm.ts # стан і сабміт форми створення нового пошуку (NewSearchForm)
+        │   ├── useLocalFiltersForm.ts # стан форми локальних фільтрів (SearchFiltersDrawer)
         │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
