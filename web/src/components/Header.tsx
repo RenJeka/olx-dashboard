@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
-import { SearchActionPanel } from './SearchActionPanel';
+import { SearchActionPanel } from './searches/SearchActionPanel';
 import { AnalysisWizardDialog } from './analysis/wizard/AnalysisWizardDialog';
 import { AiPicksDialog } from './analysis/ai-picks/AiPicksDialog';
 import { RelevanceFilterDialog } from './analysis/relevance/RelevanceFilterDialog';

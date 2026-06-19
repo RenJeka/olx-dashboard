@@ -148,7 +148,6 @@ olx-dashboard/
         │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, модель, reasoning, додаткові критерії)
         │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
-        │   ├── SearchActionPanel.tsx # модальне вікно (DialogRoot) дій активного пошуку (скан/verify, статистика)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
         │   ├── table/             # компоненти таблиці оголошень
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою

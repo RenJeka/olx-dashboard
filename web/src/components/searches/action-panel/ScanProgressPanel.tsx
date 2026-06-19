@@ -1,7 +1,6 @@
 import { Badge, Box, HStack, Progress, Stack, Text } from '@chakra-ui/react';
-import { SCAN_KIND_LABELS } from './SearchActionPanel';
-import type { ScanStatus } from '../types';
-
+import { SCAN_KIND_LABELS } from '../../../constants';
+import type { ScanStatus } from '../../../types';
 /** Сегменти показуємо лише до цієї кількості — більше (напр. до 40 цінових бакетів) злилося б у кашу. */
 const MAX_SEGMENTS = 16;
 

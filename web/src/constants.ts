@@ -60,3 +60,17 @@ export const LOCAL_FILTER_DESCRIPTIONS = {
     invert: 'Оголошення з обраними мінусами — будуть приховані. Необрані — показуються.',
   },
 } as const;
+
+// ── Сканування (SearchActionPanel) ──────────────────────────────────────────
+export const SCAN_KIND_LABELS: Record<string, string> = {
+  normal: 'швидкий',
+  deep: 'глибокий',
+  verify: 'перевірка',
+};
+
+export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+export const DEEP_SCAN_PAGE_LIMIT = 40;
+/** Межа вікна пагінації GraphQL OLX (offset ≤ 1000) — дзеркалить MAX_PAGES у graphqlOlxFetcher.ts. */
+export const DEEP_SCAN_MAX_PAGES = 26;
+/** Поріг розбиття по ціні (= вікно пагінації OLX) — дзеркалить SPLIT_THRESHOLD у graphqlOlxFetcher.ts. */
+export const DEEP_SCAN_SPLIT_THRESHOLD = 1000;
