@@ -7,7 +7,7 @@ import { SearchFiltersDrawer } from './SearchFiltersDrawer';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchEditDialog } from './SearchEditDialog';
 import { Tooltip } from '../ui/tooltip';
-import { useUpdateSearchSynonyms } from '../../api/client';
+import { useUpdateSearchSynonyms } from '../../api';
 import { useSearchRowActions } from '../../hooks/useSearchRowActions';
 import { formatPriceRange, parsePriceRange } from '../../utils/format';
 import { hasActiveLocalFilters } from '../../utils/localFilters';

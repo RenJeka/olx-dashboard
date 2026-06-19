@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useScan, useSearches } from '../api/client';
+import { useScan, useSearches } from '../api';
 import { toaster } from '../components/ui/toaster';
 
 const MIN_PAUSE_MS = 5000;

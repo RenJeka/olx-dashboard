@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useCreateSearch } from '../api/client';
+import { useCreateSearch } from '../api';
 
 export interface NewSearchFormState {
   name: string;

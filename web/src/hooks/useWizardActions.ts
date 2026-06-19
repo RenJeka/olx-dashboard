@@ -15,7 +15,7 @@ import {
   useCommitAnalysis,
   exportPreview,
   useListings,
-} from '../api/client';
+} from '../api';
 import {
   loadAnalysisModel,
   loadAnalysisReasoning,

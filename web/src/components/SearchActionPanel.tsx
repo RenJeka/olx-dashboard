@@ -16,7 +16,7 @@ import {
 import { Tooltip } from './ui/tooltip';
 import { toaster } from './ui/toaster';
 import { copyToClipboard } from '../utils/clipboard';
-import { useScan, useScanStatus, useSearchStats, useVerify } from '../api/client';
+import { useScan, useScanStatus, useSearchStats, useVerify } from '../api';
 import { formatRelativeTime } from '../utils/format';
 import { loadSkipDeepScanConfirm, saveSkipDeepScanConfirm } from '../utils/storage';
 import type { Search } from '../types';

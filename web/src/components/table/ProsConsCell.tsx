@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, HStack, Popover, Portal, Text, Textarea } from '@chakra-ui/react';
 import { LuSparkles, LuThumbsDown, LuThumbsUp, LuTriangleAlert } from 'react-icons/lu';
-import { useUpdateListing } from '../../api/client';
+import { useUpdateListing } from '../../api';
 import { Tooltip } from '../ui/tooltip';
 import { formatDate } from '../../utils/format';
 import { ANALYSIS_SOURCE } from '../../constants';

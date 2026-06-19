@@ -1,6 +1,6 @@
 import { Button, HStack, Menu, Portal, Text } from '@chakra-ui/react';
 import { LuChevronDown, LuX, LuCircleDot, LuHeart, LuMessageCircle, LuThumbsDown, LuEyeOff } from 'react-icons/lu';
-import { useUpdateListing } from '../../../api/client';
+import { useUpdateListing } from '../../../api';
 import { toaster } from '../../ui/toaster';
 import { LISTING_STATUSES, type ListingStatus } from '../../../types';
 import { STATUS_LABELS, STATUS_COLORS } from '../../../utils/status';

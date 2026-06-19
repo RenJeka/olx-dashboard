@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge, Heading, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
 import { LuSparkles } from 'react-icons/lu';
 import { Switch } from '../../ui/switch';
-import { useAnalysisStatus } from '../../../api/client';
+import { useAnalysisStatus } from '../../../api';
 import {
   loadAnalysisModel,
   saveAnalysisModel,

@@ -12,7 +12,7 @@ import {
 } from '../ui/drawer';
 import { Switch } from '../ui/switch';
 import { toaster } from '../ui/toaster';
-import { useFilterOptions, useUpdateSearchFilters } from '../../api/client';
+import { useFilterOptions, useUpdateSearchFilters } from '../../api';
 import { parseLocalFilters } from '../../utils/localFilters';
 import type { LocalFilters, Search } from '../../types';
 

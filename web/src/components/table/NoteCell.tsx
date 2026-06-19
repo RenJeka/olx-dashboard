@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, Button, Popover, Portal, Text, Textarea } from '@chakra-ui/react';
-import { useUpdateListing } from '../../api/client';
+import { useUpdateListing } from '../../api';
 import type { Listing } from '../../types';
 
 interface Props {

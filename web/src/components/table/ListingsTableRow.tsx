@@ -7,7 +7,7 @@ import { DescriptionTooltip } from './DescriptionTooltip';
 import { Tooltip } from '../ui/tooltip';
 import { isMutedStatus } from '../../utils/status';
 import { getDateCellStyle } from './columns';
-import { useUpdateListing } from '../../api/client';
+import { useUpdateListing } from '../../api';
 
 interface ListingsTableRowProps {
   row: Row<Listing>;

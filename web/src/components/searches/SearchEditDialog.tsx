@@ -13,7 +13,7 @@ import {
 } from '../ui/dialog';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { toaster } from '../ui/toaster';
-import { useUpdateSearch } from '../../api/client';
+import { useUpdateSearch } from '../../api';
 import { parsePriceRange } from '../../utils/format';
 import { parseSearchSynonyms } from '../../utils/searchSynonyms';
 import type { Search } from '../../types';

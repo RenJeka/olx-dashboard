@@ -10,7 +10,7 @@ import {
 } from '../ui/drawer';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchesPanel } from './SearchesPanel';
-import { useSearches } from '../../api/client';
+import { useSearches } from '../../api';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useNewSearchForm } from '../../hooks/useNewSearchForm';
 

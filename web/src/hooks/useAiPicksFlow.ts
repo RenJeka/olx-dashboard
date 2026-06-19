@@ -6,7 +6,7 @@ import {
   fetchAiPicksPrompt,
   fetchAiPicksPackageZip,
   useListings,
-} from '../api/client';
+} from '../api';
 import { loadAnalysisModel } from '../utils/storage';
 import { isAiPickCandidate } from '../utils/listingVisibility';
 import { showErrorToast } from '../utils/toast';

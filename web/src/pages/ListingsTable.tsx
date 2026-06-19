@@ -11,7 +11,7 @@ import {
   type VisibilityState,
 } from '@tanstack/react-table';
 import { Box, Flex, Spinner, Table, Text } from '@chakra-ui/react';
-import { useListings } from '../api/client';
+import { useListings } from '../api';
 import { useListingsTableState } from '../hooks/useListingsTableState';
 import { useListingsUiStore } from '../stores/listingsUiStore';
 import { columns } from '../components/table/columns';

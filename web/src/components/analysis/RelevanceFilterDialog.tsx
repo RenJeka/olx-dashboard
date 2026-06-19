@@ -32,7 +32,7 @@ import {
   useImportRelevance,
   useCommitRelevance,
   fetchRelevancePackageZip,
-} from '../../api/client';
+} from '../../api';
 import { useListingsUiStore } from '../../stores/listingsUiStore';
 import { loadAnalysisModel } from '../../utils/storage';
 import { showErrorToast } from '../../utils/toast';

@@ -17,7 +17,7 @@ import {
   useGenerateSynonyms,
   useImportSynonyms,
   fetchSynonymsPrompt,
-} from '../../api/client';
+} from '../../api';
 import { showErrorToast } from '../../utils/toast';
 import { sortAlpha } from '../../utils/sort';
 

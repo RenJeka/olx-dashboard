@@ -1,4 +1,4 @@
-import { useArchiveSearch, useDeleteSearch, useReorderSearches } from '../api/client';
+import { useArchiveSearch, useDeleteSearch, useReorderSearches } from '../api';
 import { toaster } from '../components/ui/toaster';
 import { showErrorToast } from '../utils/toast';
 import type { Search } from '../types';

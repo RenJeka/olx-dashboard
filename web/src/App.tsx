@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Flex } from '@chakra-ui/react';
 import type { RowSelectionState, VisibilityState } from '@tanstack/react-table';
-import { useSearches } from './api/client';
+import { useSearches } from './api';
 import { Header } from './components/Header';
 import { Toaster } from './components/ui/toaster';
 import { useAutoRefresh } from './hooks/useAutoRefresh';

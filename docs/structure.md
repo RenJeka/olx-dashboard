@@ -21,10 +21,8 @@ olx-dashboard/
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
-│   └── plans/
-│       ├── initial-mvp.md            # план Етапу 1 із чекбоксами прогресу
-│       ├── graphql-migration.md      # план міграції збору на GraphQL (інструкція виконавцю)
-│       ├── graphql-offset-window.md  # план: вікно пагінації GraphQL (offset≤1000), частковий успіх, нормалізація posted_at
+│   └── plans/                        # плани реалізації
+│       ├── old/                      # старі плани
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
@@ -92,8 +90,15 @@ olx-dashboard/
         │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
         ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
         ├── api/
-        │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/verify/scan-status, статуси/нотатки/масові
-        │                      #   дії, filters/filter-options/stats; DTO-типи з web/src/types)
+        │   ├── index.ts      # барель-експорт усіх API хуків
+        │   ├── base.ts       # fetch-обгортка api<T>
+        │   ├── searches.ts   # CRUD пошуків, статистика
+        │   ├── listings.ts   # оголошення, фільтри
+        │   ├── scanner.ts    # скан, verify, прогрес сканування
+        │   ├── analysis.ts   # LLM-аналіз (мінуси/плюси)
+        │   ├── aiPicks.ts    # AI Вибір
+        │   ├── relevance.ts  # семантичний фільтр
+        │   └── synonyms.ts   # синоніми пошукового запиту
         ├── components/
         │   ├── searches/         # бічна панель «Пошуки» (акордеон + архів + форма створення), розбита на дрібні компоненти
         │   │   ├── Searches.tsx           # точка входу: mobile (Drawer) / desktop (aside), useNewSearchForm + SearchVariantsDialog для нового пошуку
@@ -202,7 +207,7 @@ olx-dashboard/
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
 | Доменні типи | `server/src/types.ts` (бек), `web/src/types/index.ts` (фронт) |
-| Запити з фронту | `web/src/api/client.ts` |
+| Запити з фронту | `web/src/api/*` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
