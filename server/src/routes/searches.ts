@@ -57,8 +57,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const info = db
       .prepare(
-        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -69,6 +69,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         req.body.cron_enabled ?? 0,
         sortOrder,
         toJsonText(req.body.query_synonyms, '[]'),
+        req.body.archived ? 1 : 0,
       );
 
     return reply
