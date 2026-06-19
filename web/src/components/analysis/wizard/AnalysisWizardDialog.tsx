@@ -15,7 +15,7 @@ import {
 import { ConfirmActionDialog } from '../../ConfirmActionDialog';
 import { DescriptionDialog } from '../../DescriptionDialog';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-import { useWizardActions } from '../../../hooks/analysis/useWizardActions';
+import { useWizard } from '../../../hooks/analysis/useWizard';
 import { WizardStepper } from './WizardStepper';
 import { CriteriaStep } from './CriteriaStep';
 import { MatchingStep } from './MatchingStep';
@@ -32,7 +32,7 @@ interface Props {
 export function AnalysisWizardDialog({ search, selectedIds }: Props) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
-  const w = useWizardActions(search, selectedIds, open);
+  const w = useWizard(search, selectedIds, open);
 
   // Завантажуємо критерії лише при першому відкритті або зміні режиму на кроці 1.
   useEffect(() => {

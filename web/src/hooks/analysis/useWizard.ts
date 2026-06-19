@@ -14,7 +14,7 @@ import type { Search } from '../../types';
  * Об'єднує всі доменні хуки (scope, criteria, matching, review, commit)
  * в один об'єкт для зворотної сумісності з компонентами майстра.
  */
-export function useWizardActions(search: Search, selectedIds: number[], open: boolean) {
+export function useWizard(search: Search, selectedIds: number[], open: boolean) {
   const store = useAnalysisWizardStore();
   const { mode } = store;
 

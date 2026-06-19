@@ -13,19 +13,21 @@ import { useListings } from '../api';
 import { useListingsTableState } from '../hooks/useListingsTableState';
 import { useListingsUiStore } from '../stores/listingsUiStore';
 import { useSettingsStore } from '../stores/settingsStore';
-import { columns } from '../components/table/columns';
-import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
-import { ListingsTableBody } from '../components/table/ListingsTableBody';
-import { ListingsFilterBar } from '../components/table/topbar';
-import { TablePagination } from '../components/table/TablePagination';
+import {
+  columns,
+  ListingsTableHeader,
+  ListingsTableBody,
+  ListingsFilterBar,
+  TablePagination,
+} from '../components/table';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
 import { matchesQuery } from '../utils/search';
 import { isListingVisible } from '../utils/listingVisibility';
-import type { SearchScope } from '../components/table/topbar';
+import type { SearchScope } from '../components/table';
 import type { Listing } from '../types';
 
-export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
+export { TOGGLEABLE_COLUMNS } from '../components/table';
 
 export function ListingsTable() {
   const searchId = useSettingsStore((s) => s.selectedSearchId);

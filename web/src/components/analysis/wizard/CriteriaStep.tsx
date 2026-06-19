@@ -17,9 +17,9 @@ import { Tooltip } from '../../ui/tooltip';
 import { STATUS_LABELS } from '../../../utils/status';
 import { sortAlpha } from '../../../utils/sort';
 import { AI_PICKS_LABEL } from '../../../constants';
-import type { useWizardActions } from '../../../hooks/analysis/useWizardActions';
+import type { useWizard } from '../../../hooks/analysis/useWizard';
 
-type Actions = ReturnType<typeof useWizardActions>;
+type Actions = ReturnType<typeof useWizard>;
 
 interface Props {
   w: Actions;

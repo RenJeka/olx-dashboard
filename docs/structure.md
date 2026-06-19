@@ -123,6 +123,7 @@ olx-dashboard/
         │   │   └── index.ts                # барель: export { Searches }
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
+        │   │   ├── index.ts                 # барель-експорт головних діалогів (AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog)
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
         │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
         │   │   ├── relevance/               # workflow «Семантична класифікація (AI Фільтр)»
@@ -141,6 +142,7 @@ olx-dashboard/
         │   │       ├── ReviewStep.tsx       # крок 3: перевірка (таблиця desktop / картки mobile)
         │   │       └── CommitStep.tsx       # крок 4: merge mode + запис у БД
         │   ├── settings/         # папка компонентів налаштувань
+        │   │   ├── index.ts           # барель: export { SettingsDrawer }
         │   │   ├── SettingsDrawer.tsx # Drawer "Налаштування", об'єднує секції з sections/
         │   │   └── sections/
         │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
@@ -150,6 +152,7 @@ olx-dashboard/
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
         │   ├── table/             # компоненти таблиці оголошень
+        │   │   ├── index.ts       # барель-експорт основних частин таблиці (Header, Body, Pagination, FilterBar)
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
         │   │   ├── columns.tsx     # опис колонок (TanStack Table), колонка select, TOGGLEABLE_COLUMNS
         │   │   ├── ListingsTableHeader.tsx # заголовок таблиці з ресайзером (onEnd)
@@ -186,7 +189,7 @@ olx-dashboard/
         │   ├── useZipDownload.ts  # хук для паттерну «завантажити ZIP» (downloading/downloaded/download)
         │   ├── useAiPicksFlow.ts  # бізнес-логіка AI Вибір (стан step/picks, handleRun/Import/Commit)
         │   ├── analysis/          # AI-аналіз логіка (кроки майстра)
-        │   │   ├── useWizardActions.ts # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
+        │   │   ├── useWizard.ts        # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
         │   │   ├── useAnalysisScope.ts # обчислення множин ID для аналізу (allIds, tabIds, effectiveIds)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (генерація/імпорт/вибір критеріїв)
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)

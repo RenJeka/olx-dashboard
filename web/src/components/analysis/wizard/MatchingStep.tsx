@@ -8,9 +8,9 @@ import {
 } from '@chakra-ui/react';
 import { LuSearch, LuDownload } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
-import type { useWizardActions } from '../../../hooks/analysis/useWizardActions';
+import type { useWizard } from '../../../hooks/analysis/useWizard';
 
-type Actions = ReturnType<typeof useWizardActions>;
+type Actions = ReturnType<typeof useWizard>;
 
 interface Props {
   w: Actions;
