@@ -17,6 +17,7 @@ import { ActionPanelStats } from './action-panel/ActionPanelStats';
 import { ActionPanelLastScan } from './action-panel/ActionPanelLastScan';
 import { ActionPanelButtons } from './action-panel/ActionPanelButtons';
 import { ScanProgressPanel } from './action-panel/ScanProgressPanel';
+import { ScanPlanReportDialog } from './action-panel/ScanPlanReportDialog';
 import { useSearchActionPanel } from '../../hooks/useSearchActionPanel';
 import { DEEP_SCAN_SECONDS_PER_REQUEST } from '../../constants';
 import type { Search } from '../../types';
@@ -35,6 +36,9 @@ export function SearchActionPanel({ search }: Props) {
     setConfirmDeepOpen,
     scanKind,
     isScanning,
+    scanPlan,
+    reportOpen,
+    setReportOpen,
     stats,
     status,
     lastScan,
@@ -47,6 +51,8 @@ export function SearchActionPanel({ search }: Props) {
     startDeepScan,
     runScan,
     runVerifyPass,
+    startAnalysis,
+    runPlan,
   } = useSearchActionPanel(search);
 
   return (
@@ -98,6 +104,7 @@ export function SearchActionPanel({ search }: Props) {
               onRunQuickScan={() => runScan(false)}
               onStartDeepScan={startDeepScan}
               onRunVerifyPass={runVerifyPass}
+              onStartAnalysis={startAnalysis}
             />
           </Stack>
         </DialogBody>
@@ -117,6 +124,13 @@ export function SearchActionPanel({ search }: Props) {
           if (skipNextTime) useSettingsStore.getState().setSkipDeepScanConfirm(true);
           runScan(true);
         }}
+      />
+
+      <ScanPlanReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        plan={scanPlan}
+        onConfirm={runPlan}
       />
     </DialogRoot>
   );

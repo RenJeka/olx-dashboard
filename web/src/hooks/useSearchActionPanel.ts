@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useScan, useVerify, useSearchStats, useScanStatus } from '../api';
+import { useScan, useVerify, useSearchStats, useScanStatus, useAnalyzeScan, useRunScanPlan } from '../api';
 import { toaster } from '../components/ui/toaster';
 import { useSettingsStore } from '../stores/settingsStore';
 import {
@@ -8,18 +8,23 @@ import {
   DEEP_SCAN_MAX_PAGES,
   DEEP_SCAN_SECONDS_PER_REQUEST,
 } from '../constants';
-import type { Search } from '../types';
+import type { Search, ScanPlan } from '../types';
 
 /**
- * Хук керування станом та логікою панелі дій пошуку (сканування, перевірка неактивних).
+ * Хук керування станом та логікою панелі дій пошуку (сканування, перевірка неактивних,
+ * двофазний глибокий скан — аналіз → звіт → підтверджений запуск, docs/plans/two-phase-deep-scan.md).
  */
 export function useSearchActionPanel(search: Search) {
-  const [scanKind, setScanKind] = useState<'normal' | 'deep' | 'verify' | null>(null);
+  const [scanKind, setScanKind] = useState<'normal' | 'deep' | 'verify' | 'analyze' | null>(null);
   const [confirmDeepOpen, setConfirmDeepOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [scanPlan, setScanPlan] = useState<ScanPlan | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const scan = useScan();
   const verify = useVerify();
+  const analyze = useAnalyzeScan();
+  const runPlanMutation = useRunScanPlan();
   const { data: stats } = useSearchStats(search.id);
   const { data: status } = useScanStatus(search.id, scanKind != null);
 
@@ -102,6 +107,59 @@ export function useSearchActionPanel(search: Search) {
     });
   }
 
+  /** Аналітична фаза: лише зондування + бісекція, без допагінації — відкриває звіт. */
+  function startAnalysis() {
+    setScanKind('analyze');
+    analyze.mutate(
+      { searchId: search.id, deep: true },
+      {
+        onSuccess: (plan) => {
+          setScanPlan(plan);
+          setReportOpen(true);
+        },
+        onError: (err) =>
+          toaster.create({
+            type: 'error',
+            title: 'Помилка аналізу',
+            description: err instanceof Error ? err.message : String(err),
+          }),
+        onSettled: () => setScanKind(null),
+      },
+    );
+  }
+
+  /** Запуск повного глибокого скану за зібраним планом (без повторного зондування). */
+  function runPlan() {
+    if (!scanPlan) return;
+    setScanKind('deep');
+    setReportOpen(false);
+    runPlanMutation.mutate(
+      { searchId: search.id, planToken: scanPlan.planToken },
+      {
+        onSuccess: (r) => {
+          const bucketsSuffix =
+            r.bucketsUsed != null && r.bucketsUsed > 1 ? ` · діапазонів ${r.bucketsUsed}` : '';
+          toaster.create({
+            type: 'success',
+            title: 'Глибокий скан завершено',
+            description: `${r.requestsUsed} запитів · знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}${bucketsSuffix}`,
+          });
+          setScanPlan(null);
+        },
+        onError: (err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          const isStale = message.includes('застарів');
+          toaster.create({
+            type: 'error',
+            title: isStale ? 'План застарів' : 'Помилка скану',
+            description: isStale ? 'Повторіть аналіз — план діє лише 15 хвилин.' : message,
+          });
+        },
+        onSettled: () => setScanKind(null),
+      },
+    );
+  }
+
   return {
     // Стан
     dialogOpen,
@@ -110,23 +168,28 @@ export function useSearchActionPanel(search: Search) {
     setConfirmDeepOpen,
     scanKind,
     isScanning,
-    
+    scanPlan,
+    reportOpen,
+    setReportOpen,
+
     // Дані
     stats,
     status,
     lastScan,
     verifyCandidates,
-    
+
     // Обчислення
     visibleTotal,
     willSplit,
     deepScanBuckets,
     deepScanRequests,
     deepScanMinutes,
-    
+
     // Дії
     startDeepScan,
     runScan,
     runVerifyPass,
+    startAnalysis,
+    runPlan,
   };
 }

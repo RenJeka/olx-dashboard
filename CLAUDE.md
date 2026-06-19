@@ -49,6 +49,23 @@
   відсортований глобально за refresh — `warning` робить скан `partial`). Реалізація —
   `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`); план/деталі —
   `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
+- **Двофазний глибокий скан — аналіз → звіт → підтверджений запуск (`docs/plans/two-phase-deep-scan.md`):**
+  окрема кнопка «Аналіз перед сканом» у UI (поруч зі «Глибокий скан», який лишається незмінним —
+  одноразовий безперервний прохід) запускає лише легку probe-фазу: `GraphqlOlxFetcher.analyzeSplit`
+  (root-запит + `probeMaxPrice` + бісекція на бакети) по основному `query` й кожному синоніму,
+  **без допагінації бакетів**. Результат — `ScanPlan` (DTO `server/src/types.ts`/`web/src/types/index.ts`):
+  розбивка по варіантах запиту, цінові бакети, ETA (`remainingRequests * DEEP_SCAN_SECONDS_PER_REQUEST`),
+  оцінка `estimatedNew` (вибіркова, з уже завантажених `page0`, проти БД через `selectKnownOlxIds`).
+  План кешується сервером у пам'яті (`Map<planToken, …>`, TTL 15 хв, `scanner.ts`) і повертається
+  фронту лише як токен — підтверджений запуск зі звіту (`POST /scan/run-plan` →
+  `runDeepScanFromPlan`) **перевикористовує** вже зібрані межі бакетів/`page0` через
+  `GraphqlOlxFetcher.scanFromPlan`, без повторного зондування. Прострочений/невідомий токен →
+  зрозуміла помилка («План застарів — повторіть аналіз»), без 500. Аналітичні прогони
+  (`scan_runs.kind='analyze'`) виключені з банера `last_scan`. Реалізація —
+  `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts`
+  (`analyzeScan`/`runDeepScanFromPlan`),
+  `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` (звіт, сигнатурний елемент —
+  «ціновий спектр»).
 - Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`, `fetchSearch(search, options?: FetchOptions)`);
   подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.

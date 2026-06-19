@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS price_history (
 CREATE TABLE IF NOT EXISTS scan_runs (
   id INTEGER PRIMARY KEY,
   search_id INTEGER REFERENCES searches(id),
-  kind TEXT DEFAULT 'normal',        -- normal | deep | verify (Етап 2)
+  kind TEXT DEFAULT 'normal',        -- normal | deep | verify | analyze (двофазний deep-скан)
   started_at TEXT,
   finished_at TEXT,
   found INTEGER,

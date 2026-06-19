@@ -405,3 +405,49 @@ export interface FetchOptions {
 export interface OlxFetcher {
   fetchSearch(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult>;
 }
+
+// ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ───────────
+// (docs/plans/two-phase-deep-scan.md). DTO для фронта — без важких page0/RawListing[],
+// лише підсумки для звіту.
+
+/** Підсумок одного цінового бакету split-скану — для стрічки «ціновий спектр» у звіті. */
+export interface PriceBucketSummary {
+  from: number;
+  to: number | null;
+  count: number;
+}
+
+/** Підсумок аналітичної фази для одного варіанта запиту (основний query або синонім). */
+export interface ScanPlanQuery {
+  query: string;
+  /** visible_total_count кореневого запиту цього варіанта; null — якщо OLX не повернув метадані. */
+  rootCount: number | null;
+  buckets: PriceBucketSummary[];
+  /** Розбиття не було (малий пошук) або неможливе (немає верхньої межі ціни). */
+  noSplit: boolean;
+  /** Чому noSplit=true без природньої малості — показується у звіті як попередження. */
+  fallbackReason?: string;
+  /** Скільки запитів допагінації лишилось для цього варіанта (без уже витрачених на аналіз). */
+  remainingRequests: number;
+}
+
+/** Звіт аналітичної фази глибокого скану — DTO для ScanPlanReportDialog. */
+export interface ScanPlan {
+  /** Токен для POST /scan/run-plan; план кешується на сервері (TTL), повторний probe не потрібен. */
+  planToken: string;
+  perQuery: ScanPlanQuery[];
+  /** Сума rootCount по всіх варіантах (грубо — може містити дублікати між синонімами). */
+  totalListings: number;
+  totalBuckets: number;
+  /** Сума remainingRequests по всіх варіантах — скільки запитів лишилось до повного скану. */
+  remainingRequests: number;
+  /** Оцінка тривалості повного скану (remainingRequests × секунд/запит, з урахуванням пауз батчів). */
+  estimatedDurationSec: number;
+  /** Оцінка нових (відсутніх у БД) оголошень за семплом 0-х сторінок бакетів; null — немає семпла. */
+  estimatedNew: number | null;
+  /** true — estimatedNew рахується лише за першими сторінками бакетів, не повною видачею. */
+  estimatedNewIsSample: boolean;
+  /** >1 варіант (синоніми) або є split — вікно покриття пропускається при повному скані. */
+  partial: boolean;
+  warnings: string[];
+}

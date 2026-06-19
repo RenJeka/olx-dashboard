@@ -1,7 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { db } from './db/db.js';
 import { GraphqlOlxFetcher } from './scraper/graphql/index.js';
+import { estimatePages } from './scraper/graphql/fetcher.js';
+import type { SplitPlan } from './scraper/graphql/types.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
-import { upsertListings } from './scraper/normalizer.js';
+import { upsertListings, selectKnownOlxIds } from './scraper/normalizer.js';
 import { applyScanStatuses } from './scraper/statusEngine.js';
 import { probeListingPage } from './scraper/verifier.js';
 import { sleep, randomDelayMs } from './scraper/utils.js';
@@ -10,6 +13,7 @@ import {
   BATCH_PAUSE_MAX_MS,
   MIN_DELAY_MS,
   MAX_DELAY_MS,
+  DEEP_SCAN_SECONDS_PER_REQUEST,
 } from './scraper/constants.js';
 import type {
   SearchConfig,
@@ -19,6 +23,9 @@ import type {
   FetchOptions,
   ScanProgress,
   VerifyResult,
+  ScanPlan,
+  ScanPlanQuery,
+  PriceBucketSummary,
 } from './types.js';
 
 const graphqlFetcher = new GraphqlOlxFetcher();
@@ -325,6 +332,354 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       result.new_count,
       result.disabled_count,
       note,
+      runId,
+    );
+
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    db.prepare(
+      `UPDATE scan_runs SET finished_at = ?, error = ?,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
+    ).run(new Date().toISOString(), message, runId);
+    throw err;
+  }
+}
+
+// ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ────────────
+// (docs/plans/two-phase-deep-scan.md). Аналітична фаза (analyzeScan) виконує лише probe
+// (root + межі ціни + бісекція) і кешує SplitPlan-и на сервері — runDeepScanFromPlan
+// довершує збір за тим самим планом, не повторюючи жодного probe-запиту.
+
+interface CachedPlan {
+  searchId: number;
+  plans: { query: string; plan: SplitPlan }[];
+  createdAt: number;
+}
+
+/** Single-user локальний застосунок — in-memory кеш планів допустимий (без Redis/БД). */
+const PLAN_TTL_MS = 15 * 60 * 1000;
+const planCache = new Map<string, CachedPlan>();
+
+function cleanupExpiredPlans(): void {
+  const now = Date.now();
+  for (const [token, cached] of planCache) {
+    if (now - cached.createdAt > PLAN_TTL_MS) planCache.delete(token);
+  }
+}
+
+/**
+ * Аналітична (probe) фаза глибокого скану: для основного query + кожного синоніма викликає
+ * `GraphqlOlxFetcher.analyzeSplit` (root-зондування + межі ціни + бісекція — БЕЗ допагінації
+ * листів), агрегує підсумок у `ScanPlan` (звіт ScanPlanReportDialog) і кешує `SplitPlan`-и під
+ * `planToken` (TTL), щоб `runDeepScanFromPlan` міг довершити збір без повторного зондування.
+ * GraphQL-збій під час аналізу одного варіанта — НЕ валить увесь аналіз: варіант позначається
+ * `noSplit` + `fallbackReason`, а HTML-fallback (як і для звичайного скану) спрацьовує пізніше,
+ * на стадії `runDeepScanFromPlan`, якщо повторна спроба теж впаде.
+ */
+export async function analyzeScan(searchId: number, options?: { deep?: boolean }): Promise<ScanPlan> {
+  const search = loadSearch(searchId);
+  if (!search) {
+    throw new Error(`Search ${searchId} не знайдено`);
+  }
+
+  cleanupExpiredPlans();
+
+  const variants = dedupeQueries([search.query, ...(search.querySynonyms ?? [])]);
+
+  const runId = Number(
+    db
+      .prepare('INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)')
+      .run(searchId, new Date().toISOString(), 'analyze').lastInsertRowid,
+  );
+
+  const onProgress = (p: ScanProgress): void => {
+    db.prepare(
+      `UPDATE scan_runs SET
+         requests_done = ?,
+         requests_total = COALESCE(?, requests_total),
+         stage = ?,
+         sub_done = COALESCE(?, sub_done),
+         sub_total = COALESCE(?, sub_total)
+       WHERE id = ?`,
+    ).run(p.done, p.total ?? null, p.stage ?? null, p.subDone ?? null, p.subTotal ?? null, runId);
+  };
+
+  try {
+    const perQuery: ScanPlanQuery[] = [];
+    const plans: { query: string; plan: SplitPlan }[] = [];
+    let requestsUsed = 0;
+    let totalListings = 0;
+    let totalBuckets = 0;
+    let remainingRequests = 0;
+    let knownSampleCount = 0;
+    let sampleTotal = 0;
+    let hasSample = false;
+    const warnings: string[] = [];
+
+    for (let vi = 0; vi < variants.length; vi++) {
+      const variant = variants[vi] as string;
+      const variantSearch: SearchConfig = { ...search, query: variant };
+      const onVariantProgress: FetchOptions['onProgress'] = (p) =>
+        onProgress({
+          done: requestsUsed + p.done,
+          stage: `Аналіз «${variant}» (${vi + 1}/${variants.length})${p.stage ? ` · ${p.stage}` : ''}`,
+          subDone: vi + 1,
+          subTotal: variants.length,
+        });
+
+      let plan: SplitPlan;
+      try {
+        plan = await graphqlFetcher.analyzeSplit(variantSearch, { onProgress: onVariantProgress });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        warnings.push(`«${variant}»: аналіз GraphQL не вдався (${message}) — повний скан спробує ще раз і перейде на HTML, якщо потрібно`);
+        plan = {
+          rootCount: null,
+          buckets: [],
+          rootItems: [],
+          requestsUsed: 0,
+          noSplit: true,
+          fallbackReason: `graphql analyze failed: ${message}`,
+        };
+      }
+      plans.push({ query: variant, plan });
+      requestsUsed += plan.requestsUsed;
+
+      const bucketSummaries: PriceBucketSummary[] = plan.buckets.map((b) => ({
+        from: b.from,
+        to: b.to,
+        count: b.count,
+      }));
+
+      // Запитів допагінації лишилось: бакети/корінь мінус уже завантажена 0-а сторінка кожного.
+      const variantRemaining = plan.noSplit
+        ? plan.rootCount != null
+          ? Math.max(0, estimatePages(plan.rootCount) - 1)
+          : 0
+        : plan.buckets.reduce((sum, b) => sum + Math.max(0, estimatePages(b.count) - 1), 0);
+
+      perQuery.push({
+        query: variant,
+        rootCount: plan.rootCount,
+        buckets: bucketSummaries,
+        noSplit: plan.noSplit,
+        fallbackReason: plan.fallbackReason,
+        remainingRequests: variantRemaining,
+      });
+
+      if (plan.rootCount != null) totalListings += plan.rootCount;
+      totalBuckets += plan.buckets.length;
+      remainingRequests += variantRemaining;
+
+      // Семпл «~нових»: 0-і сторінки бакетів (split) або rootItems (noSplit, успішний аналіз).
+      const sampleItems = plan.noSplit ? plan.rootItems : plan.buckets.flatMap((b) => b.page0);
+      if (sampleItems.length > 0) {
+        hasSample = true;
+        const known = selectKnownOlxIds(sampleItems.map((it) => it.olxId));
+        knownSampleCount += known.size;
+        sampleTotal += sampleItems.length;
+      }
+
+      if (vi < variants.length - 1) {
+        const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
+        onProgress({
+          done: requestsUsed,
+          stage: `Пауза між варіантами ~${Math.round(delay / 1000)}с`,
+          subDone: vi + 1,
+          subTotal: variants.length,
+        });
+        await sleep(delay);
+      }
+    }
+
+    const planToken = randomUUID();
+    planCache.set(planToken, { searchId, plans, createdAt: Date.now() });
+
+    const estimatedNew = hasSample && sampleTotal > 0
+      ? Math.round(((sampleTotal - knownSampleCount) / sampleTotal) * totalListings)
+      : null;
+
+    const partial =
+      variants.length > 1 ||
+      totalBuckets > 0 ||
+      perQuery.some((q) => q.fallbackReason != null);
+    if (variants.length > 1) warnings.push('вікно покриття буде пропущено (union кількох видач)');
+
+    const scanPlan: ScanPlan = {
+      planToken,
+      perQuery,
+      totalListings,
+      totalBuckets,
+      remainingRequests,
+      estimatedDurationSec: remainingRequests * DEEP_SCAN_SECONDS_PER_REQUEST,
+      estimatedNew,
+      estimatedNewIsSample: true,
+      partial,
+      warnings,
+    };
+
+    db.prepare(
+      `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, error = NULL,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
+    ).run(new Date().toISOString(), warnings.length > 0 ? warnings.join('; ') : null, runId);
+
+    return scanPlan;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    db.prepare(
+      `UPDATE scan_runs SET finished_at = ?, error = ?,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
+    ).run(new Date().toISOString(), message, runId);
+    throw err;
+  }
+}
+
+/**
+ * Довершує глибокий скан за раніше зібраним планом (`analyzeScan`): для кожного варіанта query
+ * викликає `GraphqlOlxFetcher.scanFromPlan` (жодного повторного probe-запиту), зливає по
+ * `olxId`, далі стандартний хвіст `runScan` (upsert, `applyScanStatuses` лише для повного
+ * успішного single-query GraphQL, оновлення `visible_total_count`, фіналізація `scan_runs` з
+ * `kind='deep'`). GraphQL-збій під час самого допагінування — fallback на HTML (як `fetchWithFallback`).
+ * Прострочений/невідомий токен — зрозуміла помилка (план одноразовий: видаляється після запуску).
+ */
+export async function runDeepScanFromPlan(searchId: number, planToken: string): Promise<ScanResult> {
+  cleanupExpiredPlans();
+  const cached = planCache.get(planToken);
+  if (!cached || cached.searchId !== searchId) {
+    throw new Error('План застарів або не знайдено — повторіть аналіз');
+  }
+  planCache.delete(planToken); // одноразовий — повторний запуск вимагає нового аналізу
+
+  const search = loadSearch(searchId);
+  if (!search) {
+    throw new Error(`Search ${searchId} не знайдено`);
+  }
+
+  const runId = Number(
+    db
+      .prepare('INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)')
+      .run(searchId, new Date().toISOString(), 'deep').lastInsertRowid,
+  );
+
+  const onProgress = (p: ScanProgress): void => {
+    db.prepare(
+      `UPDATE scan_runs SET
+         requests_done = ?,
+         requests_total = COALESCE(?, requests_total),
+         fetch_method = COALESCE(?, fetch_method),
+         stage = ?,
+         sub_done = COALESCE(?, sub_done),
+         sub_total = COALESCE(?, sub_total)
+       WHERE id = ?`,
+    ).run(
+      p.done,
+      p.total ?? null,
+      p.method ?? null,
+      p.stage ?? null,
+      p.subDone ?? null,
+      p.subTotal ?? null,
+      runId,
+    );
+  };
+
+  try {
+    const variants = cached.plans;
+    const merged = new Map<number, RawListing>();
+    let requestsUsed = 0;
+    let usedGraphql = true;
+    let allExhausted = true;
+    let bucketsUsed = 0;
+    let visibleTotalCount: number | null = null;
+    let partial = variants.length > 1;
+    const notes: string[] = variants.length > 1
+      ? [`multi-query: ${variants.length} варіантів запиту змерджено`]
+      : [];
+
+    for (let vi = 0; vi < variants.length; vi++) {
+      const entry = variants[vi] as { query: string; plan: SplitPlan };
+      const variant = entry.query;
+      const variantSearch: SearchConfig = { ...search, query: variant };
+      const onVariantProgress: FetchOptions['onProgress'] = (p) =>
+        onProgress({
+          done: requestsUsed + p.done,
+          total: p.total,
+          method: p.method ?? 'GraphQL',
+          stage:
+            variants.length > 1
+              ? `Синонім «${variant}» (${vi + 1}/${variants.length})${p.stage ? ` · ${p.stage}` : ''}`
+              : p.stage,
+          subDone: variants.length > 1 ? vi + 1 : p.subDone,
+          subTotal: variants.length > 1 ? variants.length : p.subTotal,
+        });
+
+      let raw: RawListing[];
+      let result: { visibleTotalCount: number | null; requestsUsed: number; exhausted: boolean; warning?: string; bucketsUsed?: number };
+      try {
+        const splitResult = await graphqlFetcher.scanFromPlan(variantSearch, entry.plan, {
+          onProgress: onVariantProgress,
+        });
+        raw = splitResult.listings;
+        result = splitResult;
+      } catch (graphqlErr) {
+        const graphqlMessage = graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
+        const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
+          onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
+        });
+        raw = htmlResult.listings;
+        result = { ...htmlResult, warning: [`graphql failed: ${graphqlMessage}; fallback html OK`, htmlResult.warning].filter(Boolean).join('; ') };
+        usedGraphql = false;
+      }
+
+      for (const item of raw) merged.set(item.olxId, item);
+      requestsUsed += result.requestsUsed;
+      if (!result.exhausted) allExhausted = false;
+      if (result.bucketsUsed) bucketsUsed += result.bucketsUsed;
+      if (result.warning) {
+        notes.push(variants.length > 1 ? `«${variant}»: ${result.warning}` : result.warning);
+        if (variants.length === 1) partial = true;
+      }
+      if (variants.length === 1) visibleTotalCount = result.visibleTotalCount;
+
+      if (vi < variants.length - 1) {
+        const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
+        onProgress({
+          done: requestsUsed,
+          stage: `Пауза між синонімами ~${Math.round(delay / 1000)}с`,
+          subDone: vi + 1,
+          subTotal: variants.length,
+        });
+        await sleep(delay);
+      }
+    }
+
+    if (variants.length > 1) notes.push('вікно покриття пропущено (union кількох видач)');
+
+    const raw = [...merged.values()];
+    const upsertResult = upsertListings(searchId, raw);
+
+    const { disabled_count } = usedGraphql && !partial
+      ? applyScanStatuses(searchId, raw, allExhausted, 1) // план завжди походить від глибокого скану
+      : { disabled_count: 0 };
+
+    const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count, bucketsUsed };
+
+    if (visibleTotalCount != null) {
+      db.prepare('UPDATE searches SET visible_total_count = ? WHERE id = ?').run(
+        visibleTotalCount,
+        searchId,
+      );
+    }
+
+    db.prepare(
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, warning = ?, error = NULL,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
+    ).run(
+      new Date().toISOString(),
+      result.found,
+      result.new_count,
+      result.disabled_count,
+      notes.length > 0 ? notes.join('; ') : null,
       runId,
     );
 

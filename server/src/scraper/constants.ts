@@ -21,6 +21,13 @@ export const BATCH_PAUSE_MIN_MS = 3000;
 /** Максимальна пауза між батчами у глибокому скані (мс). */
 export const BATCH_PAUSE_MAX_MS = 6000;
 
+/**
+ * Оцінка секунд на запит для ETA глибокого скану (докладніше — звичайна затримка +
+ * частка батч-пауз). Дзеркало web/src/constants.ts DEEP_SCAN_SECONDS_PER_REQUEST — тримати
+ * синхронізованим (docs/plans/two-phase-deep-scan.md, звіт аналітичної фази).
+ */
+export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+
 // ── HTTP ─────────────────────────────────────────────────────────────────────
 
 export const USER_AGENT =

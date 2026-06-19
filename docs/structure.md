@@ -62,18 +62,18 @@ olx-dashboard/
 │       │   ├── utils.ts        # спільні утиліти (sleep, randomDelayMs, slugify)
 │       │   ├── graphql/        # GraphQL-збирач (основний метод збору)
 │       │   │   ├── index.ts    # реекспорт GraphqlOlxFetcher
-│       │   │   ├── fetcher.ts  # GraphqlOlxFetcher: fetchSearch/fetchSearchSplit/probeMaxPrice, exhausted-флаг
+│       │   │   ├── fetcher.ts  # GraphqlOlxFetcher: fetchSearch/fetchSearchSplit/probeMaxPrice, exhausted-флаг; analyzeSplit/scanFromPlan (двофазний deep-скан, docs/plans/two-phase-deep-scan.md)
 │       │   │   ├── constants.ts # GraphQL-специфічні: URL, ліміти, query, split-пороги
 │       │   │   └── types.ts    # типи відповіді GraphQL API (SearchParameter, GraphqlListing, PriceBucket)
 │       │   ├── selectors.ts    # OLX-селектори + заголовки HTML-запиту (fallback)
 │       │   ├── olxFetcher.ts   # HtmlOlxFetcher: URL-білдер, fetch, cheerio (fallback)
 │       │   ├── dateParser.ts   # parseOlxDate(): текстові дати HTML-fallback → ISO ("Сьогодні/Вчора о HH:MM", "D <місяць> YYYY р.")
-│       │   ├── normalizer.ts   # upsert по olx_id; olx_status auto-disable; filtered_out; postedAt HTML-fallback через parseOlxDate
+│       │   ├── normalizer.ts   # upsert по olx_id; olx_status auto-disable; filtered_out; postedAt HTML-fallback через parseOlxDate; selectKnownOlxIds (для оцінки ~нових у двофазному deep-скані)
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
 │       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/verify + scan-status + move + param-keys + filter-options + stats + PATCH (filters, query_synonyms)
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move + param-keys + filter-options + stats + PATCH (filters, query_synonyms)
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt + .../ai-picks/package.zip (ZIP map-reduce, пули >50) + POST .../ai-picks/rank(авто)/import(ручний)/commit
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
@@ -100,7 +100,7 @@ olx-dashboard/
         │   ├── base.ts       # fetch-обгортка api<T>
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── listings.ts   # оголошення, фільтри
-        │   ├── scanner.ts    # скан, verify, прогрес сканування
+        │   ├── scanner.ts    # скан, verify, прогрес сканування, useAnalyzeScan/useRunScanPlan (двофазний deep-скан)
         │   ├── analysis.ts   # LLM-аналіз (мінуси/плюси)
         │   ├── aiPicks.ts    # AI Вибір
         │   ├── relevance.ts  # семантичний фільтр
@@ -120,6 +120,14 @@ olx-dashboard/
         │   │   │   ├── PriceFilter.tsx     # фільтр діапазону цін
         │   │   │   └── TagsFilter.tsx      # універсальний фільтр тегів (міста, продавці, плюси/мінуси)
         │   │   ├── SearchEditDialog.tsx    # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/search-row-edit.md)
+        │   │   ├── SearchActionPanel.tsx   # модалка «Сканування та статистика»: стати + ScanProgressPanel + ActionPanelButtons + ConfirmActionDialog + ScanPlanReportDialog
+        │   │   ├── action-panel/           # дрібні компоненти панелі дій (стан — useSearchActionPanel.ts)
+        │   │   │   ├── ActionPanelStats.tsx      # картки лічильників (у БД / застарілі / verify-кандидати)
+        │   │   │   ├── ActionPanelLastScan.tsx   # банер останнього скану (помилка/попередження, ScanWarningSummary)
+        │   │   │   ├── ScanWarningSummary.tsx    # людино-зрозуміле зведення scan_runs.warning (стат-чипи + акордеон нотаток)
+        │   │   │   ├── ActionPanelButtons.tsx    # 4 картки-кнопки: швидкий/глибокий скан, аналіз перед сканом, перевірка неактивних
+        │   │   │   ├── ScanProgressPanel.tsx     # деталізований прогрес скану (сегментована смуга + ETA)
+        │   │   │   └── ScanPlanReportDialog.tsx  # звіт двофазного deep-скану (docs/plans/two-phase-deep-scan.md): ціновий спектр + ETA + розбивка по синонімах
         │   │   └── index.ts                # барель: export { Searches }
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
@@ -185,6 +193,7 @@ olx-dashboard/
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         │   ├── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
+        │   ├── useSearchActionPanel.ts # стан панелі дій пошуку: швидкий/глибокий скан, verify, двофазний deep-скан (аналіз → звіт → запуск)
         │   ├── useIsMobile.ts    # useBreakpointValue < md (768px) — для responsive JS-розгалужень
         │   ├── useListingsMap.ts  # мемоїзована Map<id, Listing> з масиву listings (спільний для AI-діалогів)
         │   ├── useZipDownload.ts  # хук для паттерну «завантажити ZIP» (downloading/downloaded/download)
@@ -239,9 +248,10 @@ olx-dashboard/
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
 | Локальні фільтри (`price_range`, `cities`, `sellers`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx`, `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
-| Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
+| Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
+| Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/two-phase-deep-scan.md` |
 | Попередження vs помилка скану + людино-зрозуміле зведення warning | `scan_runs.warning` (окремо від `error`) — `server/src/scanner.ts`, `server/src/db/{schema.sql,db.ts}`; UI: `web/src/utils/scanWarning.ts` (парсер), `web/src/components/searches/action-panel/{ScanWarningSummary,ActionPanelLastScan}.tsx` |
-| Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
+| Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/searches/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphql/fetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |

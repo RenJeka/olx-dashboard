@@ -239,3 +239,16 @@ export function upsertListings(
 
   return { found: raw.length, new_count: newCount };
 }
+
+/**
+ * Які з переданих olx_id уже є в БД — для оцінки «~нових» у звіті аналітичної фази
+ * глибокого скану (docs/plans/two-phase-deep-scan.md). Батч одним запитом замість N окремих.
+ */
+export function selectKnownOlxIds(olxIds: number[]): Set<number> {
+  if (olxIds.length === 0) return new Set();
+  const placeholders = olxIds.map(() => '?').join(', ');
+  const rows = db
+    .prepare(`SELECT olx_id FROM listings WHERE olx_id IN (${placeholders})`)
+    .all(...olxIds) as { olx_id: number }[];
+  return new Set(rows.map((r) => r.olx_id));
+}

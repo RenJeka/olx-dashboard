@@ -66,6 +66,7 @@ export const SCAN_KIND_LABELS: Record<string, string> = {
   normal: 'швидкий',
   deep: 'глибокий',
   verify: 'перевірка',
+  analyze: 'аналіз',
 };
 
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;

@@ -1,6 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
-import { runScan, runVerify, countVerifyCandidates } from '../scanner.js';
+import {
+  runScan,
+  runVerify,
+  countVerifyCandidates,
+  analyzeScan,
+  runDeepScanFromPlan,
+} from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
 import type { FilterOptions, LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
@@ -260,6 +266,43 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Аналітична (probe) фаза двофазного глибокого скану (docs/plans/two-phase-deep-scan.md):
+  // root + межі ціни + бісекція по кожному варіанту query, БЕЗ допагінації листів. Повертає
+  // звіт ScanPlan для ScanPlanReportDialog; план кешується на сервері під planToken.
+  app.post<{ Params: { id: string }; Querystring: { deep?: string } }>(
+    '/api/searches/:id/scan/analyze',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      try {
+        const plan = await analyzeScan(id, { deep: req.query.deep === 'true' });
+        return plan;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        app.log.error({ err }, 'Помилка аналітичної фази глибокого скану');
+        return reply.code(500).send({ error: message });
+      }
+    },
+  );
+
+  // Запуск повного глибокого скану за раніше зібраним планом (без повторного зондування).
+  app.post<{ Params: { id: string }; Body: { planToken?: string } }>(
+    '/api/searches/:id/scan/run-plan',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const planToken = req.body.planToken;
+      if (!planToken) return reply.code(400).send({ error: 'planToken обовʼязковий' });
+      try {
+        const result = await runDeepScanFromPlan(id, planToken);
+        return result;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isStale = message.includes('застарів');
+        app.log.error({ err }, 'Помилка запуску скану за планом');
+        return reply.code(isStale ? 410 : 500).send({ error: message });
+      }
+    },
+  );
+
   // Verify-прохід (A3): перевірка живості давно не бачених + дозаповнення опису/продавця.
   app.post<{ Params: { id: string } }>('/api/searches/:id/verify', async (req, reply) => {
     const id = Number(req.params.id);
@@ -380,7 +423,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     const lastScan = db
       .prepare(
         `SELECT kind, started_at, finished_at, found, new_count, disabled_count, error, warning
-         FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
+         FROM scan_runs WHERE search_id = ? AND kind != 'analyze' ORDER BY id DESC LIMIT 1`,
       )
       .get(id) as SearchStats['last_scan'] | undefined;
 

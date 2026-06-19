@@ -5,7 +5,7 @@ import type { ScanStatus } from '../../../types';
 const MAX_SEGMENTS = 16;
 
 interface Props {
-  scanKind: 'normal' | 'deep' | 'verify';
+  scanKind: 'normal' | 'deep' | 'verify' | 'analyze';
   status: ScanStatus;
   /** Секунд на один запит — для оцінки "Залишилось: ~N с" (узгоджено з SearchActionPanel). */
   secondsPerRequest: number;

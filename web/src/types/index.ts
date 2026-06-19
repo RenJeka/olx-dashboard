@@ -255,6 +255,44 @@ export interface SearchStats {
   last_scan: LastScanInfo | null;
 }
 
+// ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ───────────
+// (docs/plans/two-phase-deep-scan.md). Дзеркало DTO server/src/types.ts.
+
+/** Підсумок одного цінового бакету split-скану — для стрічки «ціновий спектр» у звіті. */
+export interface PriceBucketSummary {
+  from: number;
+  to: number | null;
+  count: number;
+}
+
+/** Підсумок аналітичної фази для одного варіанта запиту (основний query або синонім). */
+export interface ScanPlanQuery {
+  query: string;
+  rootCount: number | null;
+  buckets: PriceBucketSummary[];
+  noSplit: boolean;
+  fallbackReason?: string;
+  remainingRequests: number;
+}
+
+/** Звіт аналітичної фази глибокого скану (POST /scan/analyze) — дані для ScanPlanReportDialog. */
+export interface ScanPlan {
+  /** Токен для POST /scan/run-plan; план кешується на сервері (TTL), повторний probe не потрібен. */
+  planToken: string;
+  perQuery: ScanPlanQuery[];
+  totalListings: number;
+  totalBuckets: number;
+  remainingRequests: number;
+  estimatedDurationSec: number;
+  /** Оцінка нових (відсутніх у БД) оголошень за семплом 0-х сторінок бакетів; null — немає семпла. */
+  estimatedNew: number | null;
+  /** true — estimatedNew рахується лише за першими сторінками бакетів, не повною видачею. */
+  estimatedNewIsSample: boolean;
+  /** >1 варіант (синоніми) або є split — вікно покриття пропускається при повному скані. */
+  partial: boolean;
+  warnings: string[];
+}
+
 export interface NewSearchInput {
   name: string;
   query: string;
