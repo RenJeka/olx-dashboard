@@ -387,7 +387,7 @@ export async function exportPreview(
   searchId: number,
   mode: AnalysisMode,
   format: 'xlsx' | 'json',
-  rows: { title: string; description: string; criteria: string[] }[],
+  rows: { id: number; criteria: string[] }[],
 ): Promise<void> {
   const res = await fetch(`/api/searches/${searchId}/analyze/export`, {
     method: 'POST',

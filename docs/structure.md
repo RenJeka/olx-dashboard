@@ -171,7 +171,9 @@ olx-dashboard/
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
             ├── download.ts       # downloadBlob()/downloadText() — завантаження файлів (експорт, ручний пакет)
-            └── clipboard.ts      # copyToClipboard() — копіювання + toast «Скопійовано»
+            ├── clipboard.ts      # copyToClipboard() — копіювання + toast «Скопійовано»
+            ├── sort.ts           # sortAlpha() — алфавітне сортування (укр. колація, латиниця в кінці) для синонімів і критеріїв AI
+            └── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
 ```
 
 ## Орієнтири «куди дивитись»

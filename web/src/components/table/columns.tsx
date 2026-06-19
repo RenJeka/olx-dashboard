@@ -23,9 +23,37 @@ import { StatusCell } from './StatusCell';
 import { NoteCell } from './NoteCell';
 import { ProsConsCell } from './ProsConsCell';
 import { HighlightText } from './HighlightText';
+import { toHighlightQuery } from '../../utils/search';
 import { Checkbox } from '../ui/checkbox';
 
 const columnHelper = createColumnHelper<Listing>();
+
+/**
+ * Яскрава палітра для колонки «Дата»: чим свіжіше підняте оголошення (за днями від
+ * сьогодні), тим насиченіший фон. Повертає {bg, color} для заливки всієї комірки
+ * (застосовується на рівні <Table.Cell>, щоб колір покривав і паддинги).
+ * `color` задаємо лише для темних фонів (сьогодні/вчора), де потрібен світлий текст.
+ */
+const DATE_CELL_STYLES: { bg: string; color?: string }[] = [
+  { bg: 'blue.500', color: 'white' }, // сьогодні
+  { bg: 'blue.400', color: 'white' }, // вчора
+  { bg: 'blue.300', color: 'gray.900' },
+  { bg: 'blue.200', color: 'gray.900' },
+  { bg: 'blue.100', color: 'gray.900' },
+  { bg: 'blue.50', color: 'gray.900' },
+  { bg: 'blue.50/60', color: 'gray.900' },
+];
+
+export function getDateCellStyle(value: string | null | undefined): { bg?: string; color?: string } {
+  if (!value) return {};
+  const posted = new Date(value);
+  const today = new Date();
+  posted.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((today.getTime() - posted.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0 || diffDays >= DATE_CELL_STYLES.length) return {};
+  return DATE_CELL_STYLES[diffDays] ?? {};
+}
 
 export const columns = [
   columnHelper.display({
@@ -79,7 +107,7 @@ export const columns = [
     cell: (info) => {
       const url = info.row.original.url;
       const title = info.getValue() ?? '—';
-      const query = String(info.table.getState().globalFilter ?? '');
+      const query = toHighlightQuery(String(info.table.getState().globalFilter ?? ''));
       const content = <HighlightText text={title} query={query} />;
       return url ? (
         <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
@@ -102,7 +130,7 @@ export const columns = [
     cell: (info) => {
       const text = stripDescriptionHtml(info.getValue());
       if (!text) return '—';
-      const query = String(info.table.getState().globalFilter ?? '');
+      const query = toHighlightQuery(String(info.table.getState().globalFilter ?? ''));
       return (
         <Text whiteSpace="pre-line" lineClamp={3}>
           <HighlightText text={text} query={query} />
@@ -134,37 +162,26 @@ export const columns = [
       const d = formatDate(value);
       if (!d || !value) return '—';
 
-      let bg: string | undefined = undefined;
+      // Заливка всієї комірки винесена на <Table.Cell> (getDateCellStyle) —
+      // тут лише вміст: для «сьогодні» додаємо значок-маркер інлайн.
       const posted = new Date(value);
       const today = new Date();
       posted.setHours(0, 0, 0, 0);
       today.setHours(0, 0, 0, 0);
       const diffDays = Math.floor((today.getTime() - posted.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) bg = "blue.subtle";
-      else if (diffDays === 1) bg = "blue.subtle/70";
-      else if (diffDays === 2) bg = "blue.subtle/50";
-      else if (diffDays === 3) bg = "blue.subtle/30";
-      else if (diffDays === 4) bg = "blue.subtle/15";
-      else if (diffDays === 5) bg = "blue.subtle/10";
-      else if (diffDays === 6) bg = "blue.subtle/5";
 
-      const content = (
-        <Text as="span" cursor="default" title={d.full}>
-          {d.short}
-        </Text>
-      );
-
-      return bg ? (
-        <Box as="span" px={1.5} py={0.5} rounded="sm" bg={bg} display="inline-block" position="relative">
+      return (
+        <HStack as="span" gap={1} display="inline-flex">
           {diffDays === 0 && (
-            <Box position="absolute" top="-1.5" left="-2" color="blue.fg" bg="bg.panel" rounded="full" title="Сьогодні">
+            <Box as="span" display="inline-flex" title="Сьогодні">
               <TbBrandDaysCounter size={14} />
             </Box>
           )}
-          {content}
-        </Box>
-      ) : content;
+          <Text as="span" cursor="default" title={d.full}>
+            {d.short}
+          </Text>
+        </HStack>
+      );
     },
   }),
   columnHelper.accessor((row) => row.contact_name ?? row.seller_name ?? null, {

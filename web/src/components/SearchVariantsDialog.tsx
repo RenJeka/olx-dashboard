@@ -19,23 +19,7 @@ import {
   fetchSynonymsPrompt,
 } from '../api/client';
 import { showErrorToast } from '../utils/toast';
-
-const CYRILLIC_RE = /[Ѐ-ӿ]/;
-
-/** Латиниця — рядки без кириличних символів (інші алфавіти/цифри теж вважаються "не латиницею"). */
-function isLatinScript(s: string): boolean {
-  return !CYRILLIC_RE.test(s) && /[a-z]/i.test(s);
-}
-
-/** Алфавітом (укр. колація); рядки латиницею — у кінець списку, теж алфавітом між собою. */
-function sortSynonyms(list: string[]): string[] {
-  return [...list].sort((a, b) => {
-    const aLatin = isLatinScript(a);
-    const bLatin = isLatinScript(b);
-    if (aLatin !== bLatin) return aLatin ? 1 : -1;
-    return a.localeCompare(b, 'uk', { sensitivity: 'base' });
-  });
-}
+import { sortAlpha } from '../utils/sort';
 
 interface Props {
   open: boolean;
@@ -155,7 +139,7 @@ export function SearchVariantsDialog({ open, onOpenChange, query, value, onChang
               </Text>
             ) : (
               <SimpleGrid columns={{ base: 2, sm: 3 }} gap={2}>
-                {sortSynonyms(draft).map((s) => (
+                {sortAlpha(draft).map((s) => (
                   <Tooltip key={s} content={s}>
                     <HStack
                       justify="space-between"

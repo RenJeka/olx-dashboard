@@ -21,6 +21,7 @@ import { ListingsFilterBar } from '../components/table/topbar';
 import { TablePagination } from '../components/table/TablePagination';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
+import { matchesQuery } from '../utils/search';
 import { isListingVisible } from '../utils/listingVisibility';
 import type { SearchScope } from '../components/table/topbar';
 import type { Listing } from '../types';
@@ -61,14 +62,15 @@ export function ListingsTable({
   // внутрішні мемо TanStack на кожен рендер.
   const globalFilterFn = useCallback(
     (row: Row<Listing>, _columnId: string, filterValue: unknown) => {
-      const query = String(filterValue).trim().toLowerCase();
+      const query = String(filterValue).trim();
       if (!query) return true;
-      const titleMatch =
-        searchScope.inTitle && (row.original.title ?? '').toLowerCase().includes(query);
-      const descMatch =
-        searchScope.inDescription &&
-        stripDescriptionHtml(row.original.description).toLowerCase().includes(query);
-      return titleMatch || descMatch;
+      // Поле(я) для пошуку зливаємо в один haystack — терми (&&/||/!) працюють крізь
+      // назву й опис разом.
+      const parts: string[] = [];
+      if (searchScope.inTitle) parts.push((row.original.title ?? '').toLowerCase());
+      if (searchScope.inDescription) parts.push(stripDescriptionHtml(row.original.description).toLowerCase());
+      if (parts.length === 0) return false;
+      return matchesQuery(parts.join('\n'), query);
     },
     [searchScope],
   );
@@ -148,6 +150,18 @@ export function ListingsTable({
   }
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id);
+  // «Вибрати всі у вкладці»: всі рядки поточного табу + пошуку (всі сторінки), не лише видима сторінка.
+  const filteredRows = table.getFilteredRowModel().rows;
+  const allTabSelected = filteredRows.length > 0 && filteredRows.every((r) => r.getIsSelected());
+  const toggleSelectAllInTab = () => {
+    if (allTabSelected) {
+      onRowSelectionChange({});
+      return;
+    }
+    const next: RowSelectionState = {};
+    for (const r of filteredRows) next[r.id] = true;
+    onRowSelectionChange(next);
+  };
   // Підпис видимих колонок (порядок + видимість) — інвалідує memo-рядки при reorder/toggle.
   const columnLayoutKey = table.getVisibleLeafColumns().map((c) => c.id).join(',');
 
@@ -162,6 +176,9 @@ export function ListingsTable({
         searchId={searchId ?? undefined}
         selectedIds={selectedIds}
         onClearSelection={() => onRowSelectionChange({})}
+        tabSelectableCount={filteredRows.length}
+        allTabSelected={allTabSelected}
+        onToggleSelectAllInTab={toggleSelectAllInTab}
       />
       <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
