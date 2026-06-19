@@ -327,7 +327,10 @@ export interface LastScanInfo {
   found: number | null;
   new_count: number | null;
   disabled_count: number | null;
+  /** Реальний збій скану (обидві стратегії впали). */
   error: string | null;
+  /** Попередження часткового успіху (скан вдався, але з застереженням) — не помилка. */
+  warning: string | null;
 }
 
 /** Відповідь GET /api/searches/:id/stats — для панелі дій (Етап 2). */

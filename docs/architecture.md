@@ -69,11 +69,11 @@ flowchart LR
    `RawListing[]` (ціна числом, ISO-дати, `params`) + `exhausted` (остання сторінка `< 40`).
    Якщо GraphQL упав — scanner автоматично повторює скан через `HtmlOlxFetcher`
    (cheerio-парсинг сторінки пошуку, `exhausted` завжди `false`) і фіксує позначку fallback
-   у `scan_runs.error`. При `options.deep` — батчі по 3 запити з паузою 3–6 с,
+   у `scan_runs.warning`. При `options.deep` — батчі по 3 запити з паузою 3–6 с,
    ціль `min(26, ceil(visible_total_count/40))` (26 = межа вікна пагінації GraphQL OLX,
    `offset ≤ 1000`; деталі — `olx-api.md` §2.9). Якщо GraphQL вперся у це вікно посеред
    скану (`ListingError` на `offset > 0` з уже зібраними оголошеннями) — скан завершується
-   **частковим успіхом** (`exhausted=false`, `warning` записується у `scan_runs.error`),
+   **частковим успіхом** (`exhausted=false`, `warning` записується у `scan_runs.warning`),
    HTML-fallback не запускається. Після кожного запиту/сторінки викликається
    `options.onProgress(done, total)`, який scanner записує у
    `scan_runs.requests_done`/`requests_total`.
@@ -91,9 +91,12 @@ flowchart LR
    глибокий → `1`, звичайний → `2` (`scanner.ts`: `options.deep ? 1 : 2`); при disable
    також пишеться `olx_status='inactive'` — щоб колонка «Активність» була чесною
    (`docs/plans/honest-olx-status.md`).
-6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`); падіння
-   обох стратегій → `scan_runs.error`, виняток прокидається в роут (HTTP 500), **процес не
-   падає**.
+6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`). Розрізнення
+   **частковий успіх vs збій**: успішний скан (навіть з застереженням — multi-query/split/
+   HTML-fallback) пише застереження у `scan_runs.warning`, а `error` лишає `NULL`; падіння
+   **обох** стратегій → `scan_runs.error`, виняток прокидається в роут (HTTP 500), **процес не
+   падає**. UI (`ActionPanelLastScan`) показує `error` як червону «Помилку», `warning` — як
+   amber «Попередження».
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
 > **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
@@ -422,14 +425,19 @@ flowchart LR
 - Ланцюжок стратегій: **GraphQL → HTML (автоматично в scanner) → `__NEXT_DATA__` →
   headed Playwright** (останні два не реалізовані — рішення людини).
 - GraphQL-помилки (HTTP ≠ 200, `errors[]`, `ListingError`) → виняток → scanner пробує
-  `HtmlOlxFetcher`; при успіху fallback скан вважається успішним, але в `scan_runs.error`
+  `HtmlOlxFetcher`; при успіху fallback скан вважається успішним, а в `scan_runs.warning`
   пишеться позначка `graphql failed: ...; fallback html OK`.
-- Падіння обох стратегій не валить процес: повна помилка у `scan_runs.error`, скан failed,
-  попередні дані лишаються.
+- Падіння обох стратегій не валить процес: повна помилка у `scan_runs.error` (поле `warning`
+  лишається `NULL`), скан failed, попередні дані лишаються.
 - Частковий успіх GraphQL (вікно пагінації `offset≤1000` вичерпано посеред скану,
   `docs/plans/graphql-offset-window.md`) — скан вважається успішним, зібрані дані
   зберігаються, `warning` (`graphql window cap hit at offset=<N>`) пишеться у
-  `scan_runs.error`.
+  `scan_runs.warning`.
+- **Розрізнення `error` vs `warning`:** `scan_runs.error` — ТІЛЬКИ реальний збій (обидві
+  стратегії впали); частковий успіх (multi-query синоніми, price-split, HTML-fallback, window
+  cap) → `scan_runs.warning`. UI показує перше червоним («Помилка»), друге — amber
+  («Попередження»). Старі рядки до міграції можуть мати warning-текст у `error` — виправиться
+  наступним сканом.
 - Якщо HTML-сторінка не дала карток і немає `empty-state` — `HtmlOlxFetcher` **кидає виняток із
   зразком HTML** і ознакою наявності `__NEXT_DATA__`, а не переходить на браузер автоматично.
 - Діагностика поломок — чекліст [`olx-api.md` §5](./olx-api.md).

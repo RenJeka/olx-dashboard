@@ -313,8 +313,11 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       );
     }
 
+    // Скан вдався: `note` — це попередження часткового успіху (multi-query/split/HTML-fallback),
+    // НЕ помилка → колонка `warning`, `error` лишається NULL (UI показує amber «Попередження»,
+    // а не червону «Помилку»).
     db.prepare(
-      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?,
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, warning = ?, error = NULL,
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(
       new Date().toISOString(),

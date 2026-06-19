@@ -47,6 +47,8 @@ addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
 addColumnIfMissing('scan_runs', 'fetch_method', 'TEXT');
 addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
+// Попередження часткового успіху окремо від реальної помилки (щоб UI не показував warning як «Помилку»).
+addColumnIfMissing('scan_runs', 'warning', 'TEXT');
 
 // Деталізований прогрес сканування (docs/plans/scan-progress-detail.md).
 addColumnIfMissing('scan_runs', 'stage', 'TEXT');

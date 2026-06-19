@@ -240,6 +240,7 @@ olx-dashboard/
 | Локальні фільтри (`price_range`, `cities`, `sellers`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx`, `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
+| Попередження vs помилка скану + людино-зрозуміле зведення warning | `scan_runs.warning` (окремо від `error`) — `server/src/scanner.ts`, `server/src/db/{schema.sql,db.ts}`; UI: `web/src/utils/scanWarning.ts` (парсер), `web/src/components/searches/action-panel/{ScanWarningSummary,ActionPanelLastScan}.tsx` |
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphql/fetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |

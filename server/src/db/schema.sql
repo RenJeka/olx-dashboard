@@ -81,7 +81,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   found INTEGER,
   new_count INTEGER,
   disabled_count INTEGER,
-  error TEXT,
+  error TEXT,                        -- ТІЛЬКИ реальний збій скану (обидві стратегії впали)
+  warning TEXT,                      -- частковий успіх (multi-query/split/HTML-fallback): скан вдався, але з застереженням; НЕ помилка
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
   requests_total INTEGER,            -- прогрес глибокого скану: ціль (NULL поки невідома)
   fetch_method TEXT,                 -- GraphQL | HTML

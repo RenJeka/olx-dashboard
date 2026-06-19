@@ -379,7 +379,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const lastScan = db
       .prepare(
-        `SELECT kind, started_at, finished_at, found, new_count, disabled_count, error
+        `SELECT kind, started_at, finished_at, found, new_count, disabled_count, error, warning
          FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
       )
       .get(id) as SearchStats['last_scan'] | undefined;

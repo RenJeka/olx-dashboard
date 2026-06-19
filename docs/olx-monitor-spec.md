@@ -209,7 +209,8 @@ CREATE TABLE scan_runs (
   kind TEXT DEFAULT 'normal',        -- normal | deep | verify (Етап 2)
   started_at TEXT, finished_at TEXT,
   found INTEGER, new_count INTEGER, disabled_count INTEGER,
-  error TEXT,
+  error TEXT,                        -- ТІЛЬКИ реальний збій (обидві стратегії впали)
+  warning TEXT,                      -- частковий успіх (multi-query/split/HTML-fallback) — не помилка
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
   requests_total INTEGER             -- прогрес глибокого скану: ціль (NULL поки невідома)
 );

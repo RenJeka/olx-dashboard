@@ -53,7 +53,7 @@ export function SearchActionPanel({ search }: Props) {
     <DialogRoot
       open={dialogOpen}
       onOpenChange={(details) => setDialogOpen(details.open)}
-      size="md"
+      size="lg"
       placement="center"
     >
       <DialogTrigger asChild>
@@ -76,7 +76,7 @@ export function SearchActionPanel({ search }: Props) {
           <Stack gap={5}>
             <ActionPanelStats visibleTotal={visibleTotal} stats={stats} />
             
-            <ActionPanelLastScan lastScan={lastScan} />
+            <ActionPanelLastScan lastScan={lastScan} verifyCandidates={verifyCandidates} />
 
             {/* Деталізований прогрес сканування (docs/plans/scan-progress-detail.md) */}
             {isScanning && status && scanKind && (
