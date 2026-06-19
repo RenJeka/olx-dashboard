@@ -5,7 +5,7 @@ import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './SearchActionPanel';
 import { AnalysisWizardDialog } from './analysis/wizard/AnalysisWizardDialog';
 import { AiPicksDialog } from './analysis/ai-picks/AiPicksDialog';
-import { RelevanceFilterDialog } from './analysis/RelevanceFilterDialog';
+import { RelevanceFilterDialog } from './analysis/relevance/RelevanceFilterDialog';
 import { SettingsDrawer } from './settings/SettingsDrawer';
 import { Tooltip } from './ui/tooltip';
 import type { Search } from '../types';

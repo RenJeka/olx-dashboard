@@ -122,7 +122,10 @@ olx-dashboard/
         │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
         │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
-        │   │   ├── RelevanceFilterDialog.tsx # діалог «AI Фільтр»: семантична класифікація (авто+ручний ZIP), commit ai_relevant
+        │   │   ├── relevance/               # workflow «Семантична класифікація (AI Фільтр)»
+│   │   │   ├── RelevanceFilterDialog.tsx # оболонка діалогу (DialogRoot)
+│   │   │   ├── RelevanceSetupForm.tsx    # форма запуску (авто + ручний ZIP)
+│   │   │   └── RelevanceResultsList.tsx  # список результатів з ручним коригуванням
         │   │   ├── ai-picks/               # workflow «AI Вибір» (план docs/plans/AI-auto-top.md)
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
@@ -186,6 +189,7 @@ olx-dashboard/
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)
+        │   ├── useRelevanceFlow.ts # логіка семантичної класифікації (AI Фільтр)
         │   ├── useNewSearchForm.ts # стан і сабміт форми створення нового пошуку (NewSearchForm)
         │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/
@@ -205,6 +209,7 @@ olx-dashboard/
             ├── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
             ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
             ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
+            ├── relevance.ts      # чисті функції для AI-фільтра (getEffectiveRelevanceIds, getRelevanceStats)
             └── analysis.ts       # чисті функції для AI-аналізу (isIncludedFn, computeDefaultScope, buildScopeLabel)
 ```
 
