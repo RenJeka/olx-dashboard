@@ -82,6 +82,8 @@ export interface ListingPatch {
   cons?: string;
   /** Ручний override семантичного фільтра: 1=релевантне, 0=нерелевантне, null=скинути. */
   ai_relevant?: number | null;
+  /** Ручний override «Активності» (разова підказка): 'active'|'inactive'|'removed' або null. */
+  olx_status?: string | null;
 }
 
 export interface Listing {

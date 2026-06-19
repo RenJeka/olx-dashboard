@@ -1,5 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
-import { Badge, Box, HStack, Link, Text } from '@chakra-ui/react';
+import { Box, HStack, Link, Text } from '@chakra-ui/react';
 import {
   LuCalendar,
   LuCircleCheck,
@@ -20,6 +20,7 @@ import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml, countProsConsItems } from '../../utils/format';
 import { StatusCell } from './StatusCell';
+import { ActivityCell } from './ActivityCell';
 import { NoteCell } from './NoteCell';
 import { PhotoCell } from './PhotoCell';
 import { ProsConsCell } from './ProsConsCell';
@@ -188,16 +189,12 @@ export const columns = [
     cell: (info) => info.getValue() ?? '—',
   }),
   columnHelper.accessor('olx_status', {
-    header: () => <HeaderLabel icon={<LuCircleCheck />}>Статус OLX</HeaderLabel>,
+    header: () => <HeaderLabel icon={<LuCircleCheck />}>Активність</HeaderLabel>,
     size: 110,
     minSize: 90,
     maxSize: 160,
     enableSorting: false,
-    cell: (info) => {
-      const value = info.getValue();
-      if (!value) return '—';
-      return <Badge colorPalette={value === 'active' ? 'green' : 'gray'}>{value}</Badge>;
-    },
+    cell: (info) => <ActivityCell listing={info.row.original} />,
   }),
   columnHelper.accessor('status', {
     id: 'status',
@@ -276,7 +273,7 @@ export const TOGGLEABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'city', label: 'Місто' },
   { id: 'posted_at', label: 'Дата' },
   { id: 'seller', label: 'Продавець' },
-  { id: 'olx_status', label: 'Статус OLX' },
+  { id: 'olx_status', label: 'Активність' },
   { id: 'status', label: 'Статус' },
   { id: 'note', label: 'Нотатка' },
   { id: 'pros', label: 'Плюси' },

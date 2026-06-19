@@ -83,11 +83,14 @@ flowchart LR
    миттєвий `olx_status`-disable/reactivate.
 5. Якщо фетчер був GraphQL (не fallback), скан успішний і **повний** (без warning часткового
    результату — напр. «window cap hit») — `statusEngine.applyScanStatuses(searchId,
-   fetched, exhausted)` застосовує вікно покриття (`miss_count`/disable, §6.1
+   fetched, exhausted, threshold)` застосовує вікно покриття (`miss_count`/disable, §6.1
    [`olx-monitor-spec.md`](./olx-monitor-spec.md)) і повертає `disabled_count`. Вісь вікна —
    `last_refresh_at` (дата підняття; запити збору передають `sort_by=created_at:desc`,
    фактичний порядок видачі — `last_refresh_time DESC` — `olx-api.md` §2.5,
-   `docs/plans/coverage-window-fix.md`).
+   `docs/plans/coverage-window-fix.md`). **`threshold`** пропорційний надійності скану:
+   глибокий → `1`, звичайний → `2` (`scanner.ts`: `options.deep ? 1 : 2`); при disable
+   також пишеться `olx_status='inactive'` — щоб колонка «Активність» була чесною
+   (`docs/plans/honest-olx-status.md`).
 6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`); падіння
    обох стратегій → `scan_runs.error`, виняток прокидається в роут (HTTP 500), **процес не
    падає**.
@@ -110,9 +113,9 @@ flowchart LR
 > `ORDER BY posted_at DESC`. Для кожного — `probeListingPage(url)` (батч-патерн deep scan:
 > 3 запити, пауза 1–2с усередині, 3–6с між батчами). `dead` (`410`/`404`) →
 > `status='disabled'` + позначка `auto-disabled: verify http=<код>` у `note` (лише
-> auto/rejected); `alive` → `last_seen_at`/`miss_count=0`, auto-reactivate `disabled→new`
-> (якщо `status_source='auto'`), backfill `description`/`seller_name` лише якщо `NULL`;
-> `unknown` → без змін. Прогрес і підсумок — той самий механізм `scan_runs`
+> auto/rejected, також `olx_status='removed'`); `alive` → `last_seen_at`/`miss_count=0`,
+> auto-reactivate `disabled→new` (якщо `status_source='auto'`, також `olx_status='active'`),
+> backfill `description`/`seller_name` лише якщо `NULL`; `unknown` → без змін. Прогрес і підсумок — той самий механізм `scan_runs`
 > (`requests_done/requests_total`, `found=checked`, `new_count=reactivated`,
 > `disabled_count`). Деталі — `docs/plans/verify-pass.md`, маркер — `olx-api.md` §3.4.
 
@@ -133,7 +136,7 @@ flowchart LR
 | `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
 | `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
 | `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`; PATCH `archived` → архів/розархів, `plans/archive-searches.md`) + `POST /:id/move` (сусід лише серед `archived = 0`) + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
-| `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?, pros?, cons?, ai_relevant?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'`, ручний override семантичного фільтра). |
+| `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?, pros?, cons?, ai_relevant?, olx_status?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'`, ручний override семантичного фільтра; `olx_status` (`active`/`inactive`/`removed`/`null`) — ручна «Активність», разова підказка без source-захисту). |
 | `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`, доповнено `plans/analysis-wizard-review-rework.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_ZIP_CHUNK_SIZE=50`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки, `MIME_ZIP`), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample`/`buildManualZipInstructions`/`buildChunkListings`/`PATTERNS_EXAMPLE_JSON` для авто Й ручного), `analyze.py` (готовий детермінований Python-движок для ZIP-пакета: regex-матчинг критеріїв з клауза-скоуп запереченнями, морфологічними стемами, дослівним evidence; читається з диску як `schema.sql` і кладеться в ZIP), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
 | `export/xlsx.ts` | `buildXlsxBuffer(sheet, columns, rows)` на **ExcelJS** — спільний Excel-експорт (превʼю аналізу + майбутній експорт усієї таблиці): заголовки/ширини, заморожений рядок заголовків, перенос тексту. |
 | `routes/analysis/*` | Ендпойнти LLM-аналізу (нижче §6), розбиті по файлах: `index.ts` (реєстрація + `GET /api/analysis/status`), `criteria.ts` (генерація/імпорт критеріїв), `matching.ts` (`analyze`/`package.zip`/`import`/`export`), `commit.ts` (запис у БД). Критерії читаються/пишуться у `searches.analysis_criteria`; commit пише `pros`/`cons` + `analysis_at/source/model`, `analysis_stale=0`. |
@@ -182,7 +185,7 @@ flowchart LR
 | `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів (UI закомментовано, заплановано на майбутнє) |
 | `GET` | `/api/searches/:id/filter-options` | ✅ Етап 2 — `{cities, sellers}` (DISTINCT непорожні значення цього пошуку) для дропдаунів Drawer'а локальних фільтрів |
 | `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку (`verify_candidates` = P1+P2, лічильник кнопки «Перевірити неактивні») |
-| `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?, ai_relevant?}`; зміна `status` → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'` (ручний override семантичного фільтра) |
+| `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?, ai_relevant?, olx_status?}`; зміна `status` → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'` (ручний override семантичного фільтра); `olx_status` (`active`/`inactive`/`removed`/`null`) — ручна «Активність» (разова підказка, без source-захисту) |
 | `GET` | `/api/analysis/status` | ✅ LLM-аналіз — `{apiAvailable, defaultModel}` (наявність `OPENROUTER_API_KEY`) |
 | `GET/PUT` | `/api/searches/:id/criteria` | ✅ — читання/збереження `searches.analysis_criteria` (`{cons[], pros[]}`) |
 | `POST` | `/api/searches/:id/criteria/generate` | ✅ — авто-генерація критеріїв (OpenRouter), без ключа → 409 |

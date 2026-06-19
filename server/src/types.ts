@@ -165,6 +165,12 @@ export interface ListingPatch {
   cons?: string;
   /** Ручний override семантичного фільтра: 1=релевантне, 0=нерелевантне, null=скинути. */
   ai_relevant?: number | null;
+  /**
+   * Ручний override «Активності» (olx_status). Разова підказка БЕЗ захисту: наступний
+   * GraphQL-скан/verify, що побачить оголошення, перепише реальним значенням від OLX.
+   * Дозволено: 'active'|'inactive'|'removed' або null («невідоме»).
+   */
+  olx_status?: string | null;
 }
 
 /** Рядок listings для віддачі у API/UI. */

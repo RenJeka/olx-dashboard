@@ -466,6 +466,27 @@ GET <listing.url>
 > рядки трапляються навіть у JS-бандлах живої сторінки. Детект ТІЛЬКИ за HTTP-кодом +
 > наявністю `ad_description`.
 
+**Значення `listings.olx_status` (колонка «Активність» у UI).** OLX у GraphQL присилає
+сирий статус лише для оголошень, що ще є у видачі (`'active'` тощо); для зниклих —
+нічого. Тож «смерть» ми **виводимо самі** й записуємо синтетичне значення (колонка
+`TEXT` без CHECK — вільні значення):
+
+| Значення | Джерело | Певність |
+| --- | --- | --- |
+| `active` | GraphQL-скан бачив оголошення живим (або verify-проба 200+опис при реактивації) | підтверджено |
+| `inactive` | вікно покриття: оголошення зникло з видачі (`miss_count >= threshold`) | інферовано |
+| `removed` | verify-проба: HTTP `410`/`404` | підтверджено |
+| `<сире>` | миттєвий `olx_status`-disable: GraphQL повернув статус ≠ `active` | від OLX |
+| `NULL` | зібрано лише HTML-fallback (без GraphQL) або до міграції колонки; UI рендерить outline-бейдж «невідоме» | не визначено |
+
+> verify-вердикт `unknown` (200 без `ad_description`, 3xx, мережева помилка) `olx_status`
+> **НЕ змінює** — щоб не затирати останнє відоме значення гіршим. Слід спроби — у `note`/`last_seen_at`.
+
+Self-healing: повернення оголошення у GraphQL-видачу живим перезаписує `inactive`/`removed`
+назад на `active` (`normalizer.ts`, `olx_status = COALESCE(excluded.olx_status, olx_status)`)
++ auto-reactivate. Точна причина disable завжди є в `note` (`coverage miss_count=N` /
+`verify http=410` / `olx_status=<значення>`).
+
 **Парсинг живої сторінки (cheerio, `selectors.ts`):**
 
 | Поле | Селектор | Примітка |

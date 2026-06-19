@@ -50,10 +50,19 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       const existing = db.prepare('SELECT id FROM listings WHERE id = ?').get(id);
       if (!existing) return reply.code(404).send({ error: 'Оголошення не знайдено' });
 
-      const { status, note, pros, cons, ai_relevant } = req.body;
+      const { status, note, pros, cons, ai_relevant, olx_status } = req.body;
 
       if (status !== undefined && !LISTING_STATUSES.includes(status)) {
         return reply.code(400).send({ error: `Невідомий статус: ${status}` });
+      }
+
+      // Ручний override «Активності» — лише фіксований набір або null («невідоме»).
+      if (
+        olx_status !== undefined &&
+        olx_status !== null &&
+        !['active', 'inactive', 'removed'].includes(olx_status)
+      ) {
+        return reply.code(400).send({ error: `Невідоме значення olx_status: ${olx_status}` });
       }
 
       const fields: string[] = [];
@@ -83,6 +92,11 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
           "ai_relevant_at = datetime('now')",
         );
         values.push(ai_relevant === null ? null : ai_relevant ? 1 : 0);
+      }
+      // Разова підказка — БЕЗ source-захисту (скан/verify перепише, коли побачить оголошення).
+      if (olx_status !== undefined) {
+        fields.push('olx_status = ?');
+        values.push(olx_status);
       }
 
       if (fields.length > 0) {

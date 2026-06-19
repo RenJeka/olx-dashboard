@@ -298,8 +298,10 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
     // не часткових (частковий deep із «window cap hit») і НЕ split (union кількох діапазонів
     // не відсортований глобально за refresh — вісь windowFloor невалідна). Усі три випадки
     // ставлять warning → partial=true → coverage пропускається.
+    // Поріг disable пропорційний надійності скану: глибокий бачить усю видачу → 1 промах;
+    // звичайний (верхівка) → 2 (docs/plans/honest-olx-status.md).
     const { disabled_count } = usedGraphql && !partial
-      ? applyScanStatuses(searchId, raw, exhausted)
+      ? applyScanStatuses(searchId, raw, exhausted, options?.deep ? 1 : 2)
       : { disabled_count: 0 };
 
     const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count, bucketsUsed };
@@ -408,13 +410,19 @@ function appendVerifyNote(note: string, marker: string): string {
   return note === '' ? marker : `${note}\n${marker}`;
 }
 
-const updateDeadStmt = db.prepare(`UPDATE listings SET status = 'disabled', note = ? WHERE id = ?`);
+// dead → olx_status='removed' (підтверджено прямою пробою 410/404 — точніше за coverage 'inactive').
+const updateDeadStmt = db.prepare(
+  `UPDATE listings SET status = 'disabled', note = ?, olx_status = 'removed' WHERE id = ?`,
+);
 
+// alive: при реактивації (disabled→new) сторінка живою підтверджена (200+опис) → olx_status='active';
+// без реактивації olx_status не чіпаємо (probe — HTML, сирого статусу OLX не дає).
 const updateAliveStmt = db.prepare(`
   UPDATE listings SET
     last_seen_at = datetime('now'),
     miss_count = 0,
     status = @status,
+    olx_status = CASE WHEN @reactivate = 1 THEN 'active' ELSE olx_status END,
     description = COALESCE(description, @description),
     seller_name = COALESCE(seller_name, @seller_name)
   WHERE id = @id
@@ -489,6 +497,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
         updateAliveStmt.run({
           id: candidate.id,
           status: reactivate ? 'new' : candidate.status,
+          reactivate: reactivate ? 1 : 0,
           description: probe.description,
           seller_name: probe.sellerName,
         });

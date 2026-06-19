@@ -159,6 +159,7 @@ olx-dashboard/
         │   │   ├── ListingsTableBody.tsx # тіло таблиці (відображення рядків)
         │   │   ├── ListingsTableRow.tsx # рядок таблиці (React.memo), приглушений стиль для disabled/rejected
         │   │   ├── StatusCell.tsx # інлайн-едіт статусу (NativeSelect) + status_source
+        │   │   ├── ActivityCell.tsx # інлайн-едіт «Активності» (olx_status, NativeSelect) — разова підказка без захисту (docs/plans/honest-olx-status.md)
         │   │   ├── NoteCell.tsx   # інлайн-едіт нотатки (Popover + textarea)
         │   │   ├── PhotoCell.tsx  # мініатюра фото + Tooltip-галерея (збільшення при наведенні, photo_urls)
         │   │   ├── ProsConsCell.tsx # інлайн-едіт плюсів/мінусів (Popover + textarea)
@@ -244,4 +245,5 @@ olx-dashboard/
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
 | Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
+| Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner.ts` (виклик `deep?1:2`, verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
 | Скрипти/воркспейси | кореневий `package.json` |
