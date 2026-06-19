@@ -1,5 +1,5 @@
-import { Box, HStack, SegmentGroup, Stack, Text, Icon } from '@chakra-ui/react';
-import { LuInfo } from 'react-icons/lu';
+import { Box, Button, HStack, SegmentGroup, Stack, Text, Icon } from '@chakra-ui/react';
+import { LuInfo, LuListChecks } from 'react-icons/lu';
 import { PiFolderSimpleStarThin } from 'react-icons/pi';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
@@ -21,6 +21,10 @@ interface Props {
   searchId?: number;
   selectedIds?: number[];
   onClearSelection?: () => void;
+  // «Вибрати всі у вкладці» (всі сторінки поточного табу + пошуку)
+  tabSelectableCount?: number;
+  allTabSelected?: boolean;
+  onToggleSelectAllInTab?: () => void;
 }
 
 /** Панель над таблицею: фільтр за статусом (з лічильниками), toggle filtered_out, пошук. */
@@ -33,6 +37,9 @@ export function ListingsFilterBar({
   searchId,
   selectedIds,
   onClearSelection,
+  tabSelectableCount = 0,
+  allTabSelected = false,
+  onToggleSelectAllInTab,
 }: Props) {
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const setStatusFilter = useListingsUiStore((s) => s.setStatusFilter);
@@ -162,6 +169,17 @@ export function ListingsFilterBar({
           scope={searchScope}
           onScopeChange={onSearchScopeChange}
         />
+        {onToggleSelectAllInTab && tabSelectableCount > 0 && (
+          <Button
+            size="sm"
+            variant={allTabSelected ? 'subtle' : 'outline'}
+            colorPalette="blue"
+            onClick={onToggleSelectAllInTab}
+          >
+            <LuListChecks />
+            {allTabSelected ? 'Зняти вибір' : `Вибрати всі у вкладці (${tabSelectableCount})`}
+          </Button>
+        )}
         {selectedIds && selectedIds.length > 0 && searchId != null && onClearSelection && (
           <BulkActionBar
             searchId={searchId}

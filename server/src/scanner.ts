@@ -1,15 +1,23 @@
 import { db } from './db/db.js';
-import { GraphqlOlxFetcher } from './scraper/graphqlOlxFetcher.js';
+import { GraphqlOlxFetcher } from './scraper/graphql/index.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings } from './scraper/normalizer.js';
 import { applyScanStatuses } from './scraper/statusEngine.js';
 import { probeListingPage } from './scraper/verifier.js';
+import { sleep, randomDelayMs } from './scraper/utils.js';
+import {
+  BATCH_PAUSE_MIN_MS,
+  BATCH_PAUSE_MAX_MS,
+  MIN_DELAY_MS,
+  MAX_DELAY_MS,
+} from './scraper/constants.js';
 import type {
   SearchConfig,
   ScanResult,
   ApiFilters,
   RawListing,
   FetchOptions,
+  ScanProgress,
   VerifyResult,
 } from './types.js';
 
@@ -18,27 +26,8 @@ const htmlFetcher = new HtmlOlxFetcher();
 
 /** Сторінок за один verify-прохід (P1+P2 разом) — той самий порядок, що DEEP_SAFETY_CAP. */
 const VERIFY_PAGE_CAP = 50;
-/** Розмір батчу — як у фетчерах (graphqlOlxFetcher.ts/olxFetcher.ts). */
+/** Розмір батчу — як у фетчерах (graphql/fetcher.ts, olxFetcher.ts). */
 const VERIFY_BATCH_SIZE = 3;
-const VERIFY_MIN_DELAY_MS = 1000;
-const VERIFY_MAX_DELAY_MS = 2000;
-const VERIFY_BATCH_PAUSE_MIN_MS = 3000;
-const VERIFY_BATCH_PAUSE_MAX_MS = 6000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function randomDelay(): number {
-  return VERIFY_MIN_DELAY_MS + Math.floor(Math.random() * (VERIFY_MAX_DELAY_MS - VERIFY_MIN_DELAY_MS));
-}
-
-function batchPauseDelay(): number {
-  return (
-    VERIFY_BATCH_PAUSE_MIN_MS +
-    Math.floor(Math.random() * (VERIFY_BATCH_PAUSE_MAX_MS - VERIFY_BATCH_PAUSE_MIN_MS))
-  );
-}
 
 interface SearchRow {
   id: number;
@@ -46,11 +35,12 @@ interface SearchRow {
   query: string;
   category_id: number | null;
   api_filters: string;
+  query_synonyms: string;
 }
 
 function loadSearch(id: number): SearchConfig | null {
   const row = db
-    .prepare('SELECT id, name, query, category_id, api_filters FROM searches WHERE id = ?')
+    .prepare('SELECT id, name, query, category_id, api_filters, query_synonyms FROM searches WHERE id = ?')
     .get(id) as SearchRow | undefined;
 
   if (!row) return null;
@@ -62,13 +52,37 @@ function loadSearch(id: number): SearchConfig | null {
     apiFilters = {};
   }
 
+  let querySynonyms: string[] = [];
+  try {
+    const parsed = JSON.parse(row.query_synonyms || '[]');
+    if (Array.isArray(parsed)) querySynonyms = parsed.filter((v): v is string => typeof v === 'string');
+  } catch {
+    querySynonyms = [];
+  }
+
   return {
     id: row.id,
     name: row.name,
     query: row.query,
     categoryId: row.category_id,
     apiFilters,
+    querySynonyms,
   };
+}
+
+/** Дедуплікація варіантів query (case-insensitive), порожні відкидаються. */
+function dedupeQueries(queries: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const q of queries) {
+    const trimmed = q.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
 }
 
 /**
@@ -94,7 +108,7 @@ async function fetchWithFallback(
     // Глибокий скан — оркестратор із авто-розбиттям по ціні (docs/plans/price-range-split.md);
     // звичайний — один прохід. HTML-fallback не розбивається (немає visible_total_count).
     const onGraphqlProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
-      ? (d, t) => options.onProgress!(d, t, 'GraphQL')
+      ? (p: ScanProgress) => options.onProgress!({ ...p, method: p.method ?? 'GraphQL' })
       : undefined;
     const result = options?.deep
       ? await graphqlFetcher.fetchSearchSplit(search, { ...options, onProgress: onGraphqlProgress })
@@ -116,7 +130,9 @@ async function fetchWithFallback(
     try {
       const result = await htmlFetcher.fetchSearch(search, {
         ...options,
-        onProgress: options?.onProgress ? (d, t) => options.onProgress!(d, t, 'HTML') : undefined,
+        onProgress: options?.onProgress
+          ? (p: ScanProgress) => options.onProgress!({ ...p, method: 'HTML' })
+          : undefined,
       });
       const notes = [`graphql failed: ${graphqlMessage}; fallback html OK`];
       if (result.warning) notes.push(result.warning);
@@ -136,6 +152,91 @@ async function fetchWithFallback(
       );
     }
   }
+}
+
+/**
+ * Сканує основний query + усі синоніми (docs/plans/search-synonyms.md), зливає видачі по
+ * olxId. 1 query (без синонімів) — без змін поведінки, делегує fetchWithFallback напряму.
+ * >1 query — завжди partial=true: union кількох незалежних видач не відсортований глобально
+ * за last_refresh, тож вікно покриття statusEngine (CLAUDE.md) застосовувати небезпечно —
+ * той самий принцип, що й у split-скані (graphqlOlxFetcher.fetchSearchSplit).
+ */
+async function fetchAllQueries(
+  search: SearchConfig,
+  options?: FetchOptions,
+): ReturnType<typeof fetchWithFallback> {
+  const variants = dedupeQueries([search.query, ...(search.querySynonyms ?? [])]);
+
+  if (variants.length <= 1) {
+    return fetchWithFallback(search, options);
+  }
+
+  const merged = new Map<number, RawListing>();
+  let requestsUsed = 0;
+  let usedGraphql = true;
+  let allExhausted = true;
+  let bucketsUsed = 0;
+  const notes: string[] = [`multi-query: ${variants.length} варіантів запиту змерджено`];
+
+  // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів,
+  // але прогрес-бар лишається монотонним і орієнтовним).
+  let doneOffset = 0;
+  let totalOffset = 0;
+
+  for (let vi = 0; vi < variants.length; vi++) {
+    const variant = variants[vi] as string;
+    const variantSearch: SearchConfig = { ...search, query: variant };
+    const onVariantProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
+      ? (p: ScanProgress) =>
+          options.onProgress!({
+            done: doneOffset + p.done,
+            total: p.total != null ? totalOffset + p.total : undefined,
+            method: p.method,
+            stage: `Синонім «${variant}» (${vi + 1}/${variants.length})${p.stage ? ` · ${p.stage}` : ''}`,
+            subDone: vi + 1,
+            subTotal: variants.length,
+          })
+      : undefined;
+
+    const result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
+
+    for (const item of result.raw) merged.set(item.olxId, item);
+    requestsUsed += result.requestsUsed;
+    if (!result.usedGraphql) usedGraphql = false;
+    if (!result.exhausted) allExhausted = false;
+    if (result.bucketsUsed) bucketsUsed += result.bucketsUsed;
+    if (result.note) notes.push(`«${variant}»: ${result.note}`);
+
+    doneOffset += result.requestsUsed;
+    totalOffset += Math.max(result.requestsUsed, 1);
+
+    // Ввічливість між варіантами синонімів — як пауза між батчами глибокого скану.
+    if (vi < variants.length - 1) {
+      const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
+      options?.onProgress?.({
+        done: doneOffset,
+        stage: `Пауза між синонімами ~${Math.round(delay / 1000)}с`,
+        subDone: vi + 1,
+        subTotal: variants.length,
+      });
+      await sleep(delay);
+    }
+  }
+
+  notes.push('вікно покриття пропущено (union кількох видач)');
+
+  return {
+    raw: [...merged.values()],
+    // Об'єднана видача кількох незалежних запитів — visible_total_count окремого
+    // запиту тут не репрезентативний (перетин/розбіжність неконтрольована).
+    visibleTotalCount: null,
+    note: notes.join('; '),
+    requestsUsed,
+    exhausted: allExhausted,
+    usedGraphql,
+    partial: true,
+    bucketsUsed: bucketsUsed > 0 ? bucketsUsed : undefined,
+  };
 }
 
 /**
@@ -161,26 +262,33 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       .run(searchId, new Date().toISOString(), kind).lastInsertRowid,
   );
 
-  const onProgress = (done: number, total: number, method?: string): void => {
-    if (method) {
-      db.prepare('UPDATE scan_runs SET requests_done = ?, requests_total = ?, fetch_method = ? WHERE id = ?').run(
-        done,
-        total,
-        method,
-        runId,
-      );
-    } else {
-      db.prepare('UPDATE scan_runs SET requests_done = ?, requests_total = ? WHERE id = ?').run(
-        done,
-        total,
-        runId,
-      );
-    }
+  // `stage` перезаписується завжди (транзієнтний текст, у т.ч. під час пауз). Решта — через
+  // COALESCE, щоб транзієнтні оновлення (напр. лише stage під час паузи) не затирали
+  // requests_total/fetch_method/sub_done/sub_total попереднім NULL (docs/plans/scan-progress-detail.md).
+  const onProgress = (p: ScanProgress): void => {
+    db.prepare(
+      `UPDATE scan_runs SET
+         requests_done = ?,
+         requests_total = COALESCE(?, requests_total),
+         fetch_method = COALESCE(?, fetch_method),
+         stage = ?,
+         sub_done = COALESCE(?, sub_done),
+         sub_total = COALESCE(?, sub_total)
+       WHERE id = ?`,
+    ).run(
+      p.done,
+      p.total ?? null,
+      p.method ?? null,
+      p.stage ?? null,
+      p.subDone ?? null,
+      p.subTotal ?? null,
+      runId,
+    );
   };
 
   try {
     const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed } =
-      await fetchWithFallback(search, {
+      await fetchAllQueries(search, {
         deep: options?.deep,
         onProgress,
       });
@@ -204,7 +312,8 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
     }
 
     db.prepare(
-      'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ? WHERE id = ?',
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(
       new Date().toISOString(),
       result.found,
@@ -218,7 +327,8 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     db.prepare(
-      'UPDATE scan_runs SET finished_at = ?, error = ? WHERE id = ?',
+      `UPDATE scan_runs SET finished_at = ?, error = ?,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(new Date().toISOString(), message, runId);
     throw err;
   }
@@ -254,8 +364,12 @@ const P2_CONDITION = `
 
 /**
  * Кандидати verify-проходу (≤ cap, P1 спершу). Реалізація — `docs/plans/verify-pass.md` групи B1.
+ * `p1Count` — межа фаз (P1 живість / P2 дозаповнення) для прогресу (docs/plans/scan-progress-detail.md).
  */
-function loadVerifyCandidates(searchId: number, cap: number): VerifyCandidateRow[] {
+function loadVerifyCandidates(
+  searchId: number,
+  cap: number,
+): { candidates: VerifyCandidateRow[]; p1Count: number } {
   const columns = 'id, olx_id, url, status, status_source, note, description, seller_name';
 
   const p1 = db
@@ -264,7 +378,7 @@ function loadVerifyCandidates(searchId: number, cap: number): VerifyCandidateRow
     )
     .all(searchId, cap) as VerifyCandidateRow[];
 
-  if (p1.length >= cap) return p1;
+  if (p1.length >= cap) return { candidates: p1, p1Count: p1.length };
 
   const p2 = db
     .prepare(
@@ -272,7 +386,7 @@ function loadVerifyCandidates(searchId: number, cap: number): VerifyCandidateRow
     )
     .all(searchId, cap - p1.length) as VerifyCandidateRow[];
 
-  return [...p1, ...p2];
+  return { candidates: [...p1, ...p2], p1Count: p1.length };
 }
 
 /** Загальна кількість кандидатів verify-проходу (P1+P2, без перетину) — для /stats. */
@@ -328,8 +442,12 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
       .run(searchId, new Date().toISOString(), 'verify').lastInsertRowid,
   );
 
-  const candidates = loadVerifyCandidates(searchId, VERIFY_PAGE_CAP);
+  const { candidates, p1Count } = loadVerifyCandidates(searchId, VERIFY_PAGE_CAP);
   const total = candidates.length;
+  const p2Count = total - p1Count;
+  // Сегментована смуга прогресу має сенс лише коли ОБИДВІ фази мають кандидатів — інакше
+  // прохід однофазний і sub_total лишаємо NULL (docs/plans/scan-progress-detail.md).
+  const hasTwoPhases = p1Count > 0 && p2Count > 0;
   db.prepare('UPDATE scan_runs SET requests_done = 0, requests_total = ? WHERE id = ?').run(
     total,
     runId,
@@ -381,13 +499,23 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
         );
       }
 
-      db.prepare('UPDATE scan_runs SET requests_done = ? WHERE id = ?').run(i + 1, runId);
+      const phase = i < p1Count ? 'Перевірка живості' : 'Перевірка опису';
+      const stage = `${phase} · #${candidate.olx_id} · живих ${result.alive} · мертвих ${result.dead}`;
+      db.prepare(
+        `UPDATE scan_runs SET requests_done = ?, stage = ?, sub_done = ?, sub_total = ? WHERE id = ?`,
+      ).run(
+        i + 1,
+        stage,
+        hasTwoPhases ? (i < p1Count ? 1 : 2) : null,
+        hasTwoPhases ? 2 : null,
+        runId,
+      );
 
       if (i < candidates.length - 1) {
         if ((i + 1) % VERIFY_BATCH_SIZE === 0) {
-          await sleep(batchPauseDelay());
+          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
         } else {
-          await sleep(randomDelay());
+          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
         }
       }
     }
@@ -395,7 +523,8 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     const error = unknownIssues.length > 0 ? `verify unknown: ${unknownIssues.join('; ')}` : null;
 
     db.prepare(
-      'UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ? WHERE id = ?',
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(
       new Date().toISOString(),
       result.checked,
@@ -408,11 +537,10 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    db.prepare('UPDATE scan_runs SET finished_at = ?, error = ? WHERE id = ?').run(
-      new Date().toISOString(),
-      message,
-      runId,
-    );
+    db.prepare(
+      `UPDATE scan_runs SET finished_at = ?, error = ?,
+         stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
+    ).run(new Date().toISOString(), message, runId);
     throw err;
   }
 }

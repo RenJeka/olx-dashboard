@@ -12,6 +12,10 @@ interface SearchBody {
   api_filters?: unknown;
   local_filters?: unknown;
   cron_enabled?: number;
+  /** Синоніми query (docs/plans/search-synonyms.md). */
+  query_synonyms?: string[];
+  /** Архів пошуку (docs/plans/archive-searches.md): 1 — в архіві. */
+  archived?: number;
 }
 
 /** api_filters/local_filters приймаємо як обʼєкт або рядок → зберігаємо як JSON-рядок. */
@@ -53,8 +57,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const info = db
       .prepare(
-        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -64,6 +68,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         toJsonText(req.body.local_filters),
         req.body.cron_enabled ?? 0,
         sortOrder,
+        toJsonText(req.body.query_synonyms, '[]'),
+        req.body.archived ? 1 : 0,
       );
 
     return reply
@@ -109,6 +115,14 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       if (req.body.cron_enabled !== undefined) {
         fields.push('cron_enabled = ?');
         values.push(req.body.cron_enabled);
+      }
+      if (req.body.query_synonyms !== undefined) {
+        fields.push('query_synonyms = ?');
+        values.push(toJsonText(req.body.query_synonyms, '[]'));
+      }
+      if (req.body.archived !== undefined) {
+        fields.push('archived = ?');
+        values.push(req.body.archived ? 1 : 0);
       }
 
       if (fields.length > 0) {
@@ -203,13 +217,14 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         | undefined;
       if (!current) return reply.code(404).send({ error: 'Пошук не знайдено' });
 
+      // Реордер лише серед активних (не архівних) — сусіда шукаємо з archived = 0.
       const neighbor = (
         direction === 'up'
           ? db.prepare(
-              'SELECT id, sort_order FROM searches WHERE sort_order < ? ORDER BY sort_order DESC LIMIT 1',
+              'SELECT id, sort_order FROM searches WHERE sort_order < ? AND archived = 0 ORDER BY sort_order DESC LIMIT 1',
             )
           : db.prepare(
-              'SELECT id, sort_order FROM searches WHERE sort_order > ? ORDER BY sort_order ASC LIMIT 1',
+              'SELECT id, sort_order FROM searches WHERE sort_order > ? AND archived = 0 ORDER BY sort_order ASC LIMIT 1',
             )
       ).get(current.sort_order) as { id: number; sort_order: number } | undefined;
 
@@ -267,7 +282,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       const row = db
         .prepare(
-          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total
+          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total,
+                  fetch_method, kind, stage, sub_done, sub_total
            FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
         )
         .get(id);

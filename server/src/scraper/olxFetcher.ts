@@ -7,34 +7,15 @@ import type {
   FetchOptions,
 } from '../types.js';
 import { SELECTORS, OLX_BASE_URL, REQUEST_HEADERS } from './selectors.js';
-
-/** Розмір батчу сторінок — ліміт звичайного скану і крок паузи у глибокому. */
-const BATCH_SIZE = 3;
-/** Абсолютний запобіжник для глибокого скану (HTML не дає visible_total_count). */
-const DEEP_SAFETY_CAP = 50;
-const MIN_DELAY_MS = 1000;
-const MAX_DELAY_MS = 2000;
-/** Пауза між батчами у глибокому скані — щоб не «DDoS»-ити OLX. */
-const BATCH_PAUSE_MIN_MS = 3000;
-const BATCH_PAUSE_MAX_MS = 6000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function randomDelay(): number {
-  return MIN_DELAY_MS + Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS));
-}
-
-function batchPauseDelay(): number {
-  return BATCH_PAUSE_MIN_MS + Math.floor(Math.random() * (BATCH_PAUSE_MAX_MS - BATCH_PAUSE_MIN_MS));
-}
-
-/** Слаг для сегмента q-<...> у шляху пошуку. */
-function slugify(query: string): string {
-  const slug = query.trim().toLowerCase().replace(/\s+/g, '-');
-  return encodeURIComponent(slug);
-}
+import { sleep, randomDelayMs, slugify } from './utils.js';
+import {
+  BATCH_SIZE,
+  DEEP_SAFETY_CAP,
+  MIN_DELAY_MS,
+  MAX_DELAY_MS,
+  BATCH_PAUSE_MIN_MS,
+  BATCH_PAUSE_MAX_MS,
+} from './constants.js';
 
 /**
  * Збирач OLX через звичайний fetch + парсинг server-rendered HTML (cheerio).
@@ -107,7 +88,7 @@ export class HtmlOlxFetcher implements OlxFetcher {
 
       const html = await res.text();
       requestsUsed = page;
-      options?.onProgress?.(requestsUsed, target);
+      options?.onProgress?.({ done: requestsUsed, total: target });
 
       const listings = this.parseList(html);
 
@@ -135,9 +116,9 @@ export class HtmlOlxFetcher implements OlxFetcher {
 
       if (page < target) {
         if (deep && page % BATCH_SIZE === 0) {
-          await sleep(batchPauseDelay());
+          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
         } else {
-          await sleep(randomDelay());
+          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
         }
       }
     }

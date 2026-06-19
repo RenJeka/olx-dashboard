@@ -1,5 +1,5 @@
 import { NativeSelect } from '@chakra-ui/react';
-import { useUpdateListing } from '../../api/client';
+import { useUpdateListing } from '../../api';
 import { LISTING_STATUSES, type Listing, type ListingStatus } from '../../types';
 import { STATUS_COLORS, STATUS_LABELS } from '../../utils/status';
 

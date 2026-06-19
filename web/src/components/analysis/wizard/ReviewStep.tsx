@@ -15,10 +15,10 @@ import { HighlightText } from '../../table/HighlightText';
 import { Tooltip } from '../../ui/tooltip';
 import { stripDescriptionHtml } from '../../../utils/format';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-import type { useWizardActions } from '../../../hooks/useWizardActions';
+import type { useWizard } from '../../../hooks/analysis/useWizard';
 import type { AnalyzedListing, Listing } from '../../../types';
 
-type Actions = ReturnType<typeof useWizardActions>;
+type Actions = ReturnType<typeof useWizard>;
 
 interface Props {
   w: Actions;

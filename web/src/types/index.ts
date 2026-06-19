@@ -8,6 +8,10 @@ export interface Search {
   local_filters: string;
   visible_total_count: number | null;
   sort_order: number;
+  /** JSON-масив альтернативних пошукових запитів (синоніми query, docs/plans/search-synonyms.md). */
+  query_synonyms: string;
+  /** 1 — пошук в архіві (docs/plans/archive-searches.md). */
+  archived: number;
   created_at: string;
 }
 
@@ -90,6 +94,8 @@ export interface Listing {
   currency: string;
   city: string | null;
   photo_url: string | null;
+  /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
+  photo_urls: string | null;
   description: string | null;
   seller_name: string | null;
   contact_name: string | null;
@@ -214,6 +220,13 @@ export interface ScanStatus {
   requests_done: number | null;
   requests_total: number | null;
   fetch_method: string | null;
+  kind: string | null;
+  /** Людиномовний поточний етап (docs/plans/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
+  stage: string | null;
+  /** Позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify. */
+  sub_done: number | null;
+  /** Загальна кількість підпослідовності — керує сегментованою смугою прогресу. */
+  sub_total: number | null;
 }
 
 /** Останній скан пошуку — частина відповіді GET /api/searches/:id/stats. */
@@ -242,6 +255,7 @@ export interface NewSearchInput {
   query: string;
   priceFrom?: number;
   priceTo?: number;
+  querySynonyms?: string[];
 }
 
 export interface StoredTableState {

@@ -39,7 +39,7 @@ flowchart LR
         R1[routes/searches.ts<br/>CRUD + /scan]
         R2[routes/listings.ts<br/>GET listings]
         SC[scanner.ts<br/>runScan]
-        GQ[scraper/graphqlOlxFetcher.ts<br/>GraphqlOlxFetcher — основний]
+        GQ[scraper/graphql/<br/>GraphqlOlxFetcher — основний]
         FE[scraper/olxFetcher.ts<br/>HtmlOlxFetcher — fallback]
         NR[scraper/normalizer.ts<br/>parse + upsert]
         DB[(db/db.ts<br/>better-sqlite3)]
@@ -93,6 +93,16 @@ flowchart LR
    падає**.
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
+> **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
+> непорожній, `scanner.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
+> крок 3, послідовно з паузою 3–6с між варіантами) і зливає видачі по `olxId` в один
+> `search_id`. >1 варіант запиту → крок 5 (вікно покриття) **завжди пропускається**
+> (`partial=true`) — union кількох незалежних видач не відсортований глобально за
+> `last_refresh_at`, той самий принцип, що й у split-скані (deep). Синоніми також передаються
+> як alias-назви товару в AI-фільтр релевантності (`relevance.ts`, `getRelevanceAliases`).
+> Генерація синонімів — окремі stateless-ендпойнти `routes/searchSynonyms.ts` (промпт/авто
+> OpenRouter/парс вставки), UI — `web/src/components/searches/SearchVariantsDialog.tsx`.
+
 > **Verify-сценарій (реалізовано, A3):** `runVerify(searchId)` — окремий `kind='verify'`
 > прохід без фетчера видачі. Кандидати (≤`VERIFY_PAGE_CAP=50`): P1 — `last_seen_at` старше
 > 3 днів і (`status_source='auto'` АБО `status='rejected'`), включно з `disabled` для
@@ -113,7 +123,7 @@ flowchart LR
 | `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
 | `db/schema.sql` | Канонічна схема (4 таблиці). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`). Без `any`. |
-| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний). `fetchPage(search, offset, referer, opts?)` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина). `fetchSearch` — звичайний/глибокий прохід одного діапазону (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`, обмежена `MAX_PAGES=26` — вікно `offset≤1000`); `ListingError` на `offset>0` з даними → частковий успіх (`warning`). `fetchSearchSplit` — глибокий скан із авто-розбиттям по ціні: якщо `visible_total_count > SPLIT_THRESHOLD(1000)`, адаптивна бісекція діапазону на бакети ≤ вікна, скан кожного, злиття дедупом `olxId`; інакше делегує `fetchSearch`. `probeMaxPrice` — зондування верхньої межі ціною спадно (самоперевірка впорядкованості; сортування за ціною не верифіковане live → `null`-fallback). Запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
+| `scraper/graphql/` | `GraphqlOlxFetcher implements OlxFetcher` (основний). Модуль розбитий на: `constants.ts` (URL, ліміти, GraphQL query, split-пороги), `types.ts` (типи відповіді GraphQL API, PriceBucket), `fetcher.ts` (клас), `index.ts` (реекспорт). `fetchPage(search, offset, referer, opts?)` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина). `fetchSearch` — звичайний/глибокий прохід одного діапазону; `fetchSearchSplit` — глибокий скан з авто-розбиттям по ціні (бісекція розбита на `bisectPriceRange`/`scanBuckets`/`resolveUpperPriceBound`). `probeMaxPrice` — зондування верхньої межі. Запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
 | `scraper/selectors.ts` | Усі OLX-селектори + заголовки HTML-запиту в одному місці (для fallback). |
 | `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. Той самий `FetchOptions`/глибокий режим (без уточнення цілі за `visible_total_count` — одразу `DEEP_SAFETY_CAP`); `exhausted` завжди `false`. |
 | `scraper/dateParser.ts` | `parseOlxDate(raw, now?) → string \| null` — текстові дати HTML-fallback («Сьогодні/Вчора о HH:MM», «D <місяць_родовий> YYYY р.») → ISO (`YYYY-MM-DD[THH:MM:00]`), сумісний з ISO-датами GraphQL для коректного порівняння у `statusEngine.ts`. Нерозпізнане → `null`. |
@@ -122,7 +132,7 @@ flowchart LR
 | `scraper/localFilters.ts` | `evaluateFilteredOut(filters, listing) → boolean` (Етап 2, A4) — стоп-слова (case-insensitive підрядок у title+description) і числові діапазони по `params[key]` (перше число в label). Чиста функція, використовується `normalizer.ts` і `routes/searches.ts` (ретроактивний перерахунок). |
 | `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
 | `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. |
-| `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`) + `POST /:id/move` + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
+| `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`; PATCH `archived` → архів/розархів, `plans/archive-searches.md`) + `POST /:id/move` (сусід лише серед `archived = 0`) + `POST /:id/scan` (`?deep=true`) + `GET /:id/scan-status` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?, pros?, cons?, ai_relevant?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'`, ручний override семантичного фільтра). |
 | `analysis/*` | **LLM-аналіз** (план `plans/llm-analysis.md`, доповнено `plans/analysis-wizard-review-rework.md`): `constants.ts` (ЄДИНЕ джерело magic-значень: модель, `AUTO_CHUNK_SIZE=12`, `MANUAL_ZIP_CHUNK_SIZE=50`, `MAX_ANALYZE_IDS=200`, мапи режиму, scaffold, повідомлення про помилки, `MIME_ZIP`), `config.ts` (лише завантаження `server/.env` через `process.loadEnvFile` + `hasApiKey`/`getApiKey`), `prompts.ts` (єдине джерело промптів `buildCriteriaPrompt`/`buildMatchingPrompt`/`pickSample`/`buildManualZipInstructions`/`buildChunkListings`/`PATTERNS_EXAMPLE_JSON` для авто Й ручного), `analyze.py` (готовий детермінований Python-движок для ZIP-пакета: regex-матчинг критеріїв з клауза-скоуп запереченнями, морфологічними стемами, дослівним evidence; читається з диску як `schema.sql` і кладеться в ZIP), `openrouter.ts` (`chat()` — POST `/chat/completions`, `response_format:json_object`, ретрай, зняття code-fence), `parse.ts` (парс відповідей критеріїв/matching + верифікація `evidence` як підрядок опису + мерж кількох вставок), `text.ts` (`stripHtml`/`normalizeForMatch`/`evidenceConfirmed`). PII продавця в промпт не йде; `evidence` у БД не зберігається. |
 | `export/xlsx.ts` | `buildXlsxBuffer(sheet, columns, rows)` на **ExcelJS** — спільний Excel-експорт (превʼю аналізу + майбутній експорт усієї таблиці): заголовки/ширини, заморожений рядок заголовків, перенос тексту. |
@@ -230,11 +240,8 @@ flowchart LR
   `LastScanInfo`, `SearchStats`, `Search` (включно з `sort_order`, `visible_total_count`,
   `local_filters`), `NewSearchInput`, `StoredTableState` тощо — дзеркало відповідних типів
   `server/src/types.ts`.
-- `utils/storage.ts` — хелпери для взаємодії з `localStorage`: загальні `loadSettings`/`saveSettings`
-  над одним обʼєктом `SETTINGS_STORAGE_KEY` (поля `columnVisibility`, `descriptionExpandEnabled`
-  (дефолт `true`), `autoRefreshEnabled`/`autoRefreshIntervalMin` (дефолт `false`/`30`),
-  `skipDeepScanConfirm`) + окремо стан таблиці `TABLE_STORAGE_KEY` (сортування/розміри
-  колонок/`pageSize`, дефолт `DEFAULT_PAGE_SIZE = 50`).
+- `stores/settingsStore.ts` — глобальний Zustand-стор (`useSettingsStore`) з `persist` middleware: зберігає налаштування інтерфейсу (`columnVisibility`, `columnOrder`, `descriptionExpandEnabled`, `searchesVisible`), налаштування автооновлення (`autoRefreshEnabled`, `autoRefreshIntervalMin`), параметри AI (`analysisModel`, `analysisReasoning`, `analysisExtraCriteria`) у `localStorage`. Також містить ефемерний стан вибраного пошуку (`selectedSearchId`) та виділених рядків таблиці (`rowSelection`).
+- `utils/storage.ts` — хелпери для `localStorage` виключно для специфічного стану таблиці `TABLE_STORAGE_KEY` (сортування, розміри колонок).
 - `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати
   (`formatDate`), відносного часу (`formatRelativeTime`, напр. «3 год тому» — для рядка
   стану панелі дій) та чистки HTML-опису (`stripDescriptionHtml`).
@@ -244,7 +251,7 @@ flowchart LR
 - `stores/listingsUiStore.ts` — Zustand-стор `useListingsUiStore`: `statusFilter: ListingStatus | 'all' | 'ai_picks'`
   (дефолт `'all'`), `showFilteredOut`, `showIrrelevant` + сетери. Спільний in-memory стан фільтрів
   списку, що читається і в `ListingsTable` (видимі рядки), і в `ListingsFilterBar` (`SegmentGroup` +
-  перемикачі шуму), і в `useWizardActions` (обсяг AI-аналізу). Жодного persist (in-memory).
+  перемикачі шуму), і в `useAnalysisScope` (обсяг AI-аналізу). Жодного persist (in-memory).
 - `utils/listingVisibility.ts` — ЄДИНЕ джерело правди видимості рядка: `passesNoiseFilters` (перемикачі
   відфільтрованих/нерелевантних), `isAiPickCandidate` (предикат вкладки «Найкращі кандидати»),
   `isListingVisible` (вкладка + шум). Цим самим предикатом керується і таблиця, і лічильники вкладок,
@@ -316,22 +323,40 @@ flowchart LR
   (статистика бази, останній скан), прогрес-бар поточного скану та три кнопки дій:
   «Швидкий скан» / «Глибокий скан» / «Перевірити неактивні (N)». Глибокий скан відкриває
   додатковий `ConfirmActionDialog`. Усі кнопки блокуються під час активного скану.
-- `components/SearchFiltersDrawer.tsx` — Drawer редактора `local_filters` (відкривається з
-  3-dot меню пошуку → «Фільтри»): діапазон цін (`Input` мін/макс), місто і продавець —
-  `NativeSelect` (варіанти з `useFilterOptions`) + `Tag.Root` chips з видаленням. «Зберегти»
-  → `useUpdateSearchFilters()` → toast з `filtered_out_count`. Стоп-слова й діапазони
-  params — закомментовано, заплановано на майбутнє.
 - `components/ConfirmActionDialog.tsx` — спільний діалог підтвердження довгої дії
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
   для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. На мобільному (`useIsMobile()`) той самий вміст рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом `visible`/`onVisibleChange` з `App.tsx`); вибір пошуку (`SearchRow`) на мобільному автоматично закриває drawer. На desktop — без змін (постійна панель `w="80"`). Кожен `SearchRow`:
-  - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
-    disabled на краях списку;
-  - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Фільтри» (`LuFilter`, відкриває
-    `SearchFiltersDrawer`), розділювач, «Видалити» (`LuTrash2`, `color="fg.error"`,
-    відкриває `DialogRoot role="alertdialog"` із підтвердженням і каскадно видаляє пошук
+- `components/searches/` — бічна панель (sidebar), розбита на дрібні компоненти (рефакторинг,
+  раніше — один файл `Searches.tsx`):
+  - `Searches.tsx` — точка входу: на мобільному (`useIsMobile()`) вміст (`SearchesPanel`)
+    рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом
+    `visible`/`onVisibleChange` з `App.tsx`); на desktop — постійна панель `w="80"`. Тримає
+    `useNewSearchForm()` і рендерить його `SearchVariantsDialog` окремо від акордеону (Dialog
+    через Portal, незалежно від Drawer/aside-обгортки).
+  - `SearchesPanel.tsx` — `Accordion.Root`: секції «Пошуки»/«Архів» (`SearchGroupAccordionItem`,
+    спільний для обох) + `NewSearchForm`.
+  - `SearchGroupAccordionItem.tsx` — список `SearchRow` з `isFirst`/`isLast` за індексом
+    (стрілки реордеру `LuChevronUp`/`LuChevronDown`, `useReorderSearches`, disabled на краях —
+    лише для активних, архівні їх не показують).
+  - `NewSearchForm.tsx` — презентаційна форма створення пошуку; увесь стан і `submit` —
+    у хуку `hooks/useNewSearchForm.ts`.
+  - `SearchRow.tsx` — назва/запит/ціна, бейдж синонімів (тултіп зі списком), крапка-індикатор
+    активних `local_filters`; мутації архівування/видалення/реордеру — хук
+    `hooks/useSearchRowActions.ts`.
+  - `SearchRowMenu.tsx` — 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Редагувати»/
+    «Фільтри» (`LuFilter`, відкриває `SearchFiltersDrawer`)/«Варіанти пошуку»/«Архівувати»/
+    «Видалити» (`LuTrash2`, `color="fg.error"`).
+  - `SearchDeleteDialog.tsx` — `DialogRoot role="alertdialog"` підтвердження видалення (каскадно
     через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).
+  - `SearchFiltersDrawer.tsx` — Drawer редактора `local_filters`: діапазон цін (`Input` мін/макс),
+    місто і продавець — `NativeSelect` (варіанти з `useFilterOptions`) + `Tag.Root` chips з
+    видаленням. «Зберегти» → `useUpdateSearchFilters()` → toast з `filtered_out_count`.
+    Стоп-слова й діапазони params — закомментовано, заплановано на майбутнє.
+  - `SearchVariantsDialog.tsx`, `SearchEditDialog.tsx` — без змін логіки, лише перенесені сюди.
+  - Спільні парсери `searches.local_filters`/`query_synonyms` винесено в
+    `utils/localFilters.ts` (`parseLocalFilters`/`hasActiveLocalFilters`) і
+    `utils/searchSynonyms.ts` (`parseSearchSynonyms`) — раніше дублювались у кількох файлах.
 - `pages/ListingsTable.tsx` — відображення списку оголошень: збирає разом
   `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу з `useListingsUiStore` +
   toggle filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),

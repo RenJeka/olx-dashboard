@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useScan, useSearches } from '../api/client';
+import { useScan, useSearches } from '../api';
 import { toaster } from '../components/ui/toaster';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const MIN_PAUSE_MS = 5000;
 const MAX_PAUSE_MS = 10000;
@@ -16,7 +17,10 @@ function sleep(ms: number): Promise<void> {
  * якщо вкладка прихована або вже триває будь-який скан (ручний чи попередній тік).
  * Глибокий скан і перевірку це автооновлення ніколи не запускає.
  */
-export function useAutoRefresh(enabled: boolean, intervalMin: number): void {
+export function useAutoRefresh(): void {
+  const enabled = useSettingsStore((s) => s.autoRefreshEnabled);
+  const intervalMin = useSettingsStore((s) => s.autoRefreshIntervalMin);
+  
   const { data: searches } = useSearches();
   const scan = useScan();
   const queryClient = useQueryClient();

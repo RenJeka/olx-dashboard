@@ -36,3 +36,41 @@ export const MANUAL_PICKS_ZIP_CHUNK_SIZE = 50;
 export const HIGHLIGHT_SINGLE_MIN_LENGTH = 1;
 /** Мін. довжина фрагмента evidence у мульти-підсвітці (захист від шуму). */
 export const HIGHLIGHT_MULTI_MIN_LENGTH = 3;
+
+// ── Описи локальних фільтрів (SearchFiltersDrawer) ────────────────────────────
+export const LOCAL_FILTER_DESCRIPTIONS = {
+  price: {
+    normal: 'Оголошення з ціною поза межами діапазону — будуть приховані. Оголошення без ціни цим правилом не приховуються.',
+    invert: 'Оголошення з ціною в межах діапазону — будуть приховані. Оголошення без ціни цим правилом не приховуються.',
+  },
+  cities: {
+    normal: 'Якщо обрано хоча б одне місто — показуються лише оголошення з цих міст.',
+    invert: 'Оголошення з обраних міст — будуть приховані.',
+  },
+  sellers: {
+    normal: 'Якщо обрано хоча б одного продавця — показуються лише оголошення цих продавців.',
+    invert: 'Оголошення обраних продавців — будуть приховані.',
+  },
+  pros: {
+    normal: 'Показуються лише оголошення з обраними плюсами. Необрані — приховуються.',
+    invert: 'Оголошення з обраними плюсами — будуть приховані. Необрані — показуються.',
+  },
+  cons: {
+    normal: 'Показуються лише оголошення з обраними мінусами. Необрані — приховуються.',
+    invert: 'Оголошення з обраними мінусами — будуть приховані. Необрані — показуються.',
+  },
+} as const;
+
+// ── Сканування (SearchActionPanel) ──────────────────────────────────────────
+export const SCAN_KIND_LABELS: Record<string, string> = {
+  normal: 'швидкий',
+  deep: 'глибокий',
+  verify: 'перевірка',
+};
+
+export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+export const DEEP_SCAN_PAGE_LIMIT = 40;
+/** Межа вікна пагінації GraphQL OLX (offset ≤ 1000) — дзеркалить MAX_PAGES у graphqlOlxFetcher.ts. */
+export const DEEP_SCAN_MAX_PAGES = 26;
+/** Поріг розбиття по ціні (= вікно пагінації OLX) — дзеркалить SPLIT_THRESHOLD у graphqlOlxFetcher.ts. */
+export const DEEP_SCAN_SPLIT_THRESHOLD = 1000;

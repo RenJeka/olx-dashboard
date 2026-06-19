@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS searches (
   sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
+  query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
+  archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -29,6 +31,7 @@ CREATE TABLE IF NOT EXISTS listings (
   district TEXT,
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
   photo_url TEXT,
+  photo_urls TEXT,                   -- JSON-масив прев'ю-лінків усіх фото (галерея), NULL до re-scan
   seller_type TEXT,                  -- private | business
   description TEXT,                  -- HTML-опис з OLX (з <br /> тегами)
   seller_name TEXT,                  -- user.name з GraphQL
@@ -81,5 +84,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   error TEXT,
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
   requests_total INTEGER,            -- прогрес глибокого скану: ціль (NULL поки невідома)
-  fetch_method TEXT                  -- GraphQL | HTML
+  fetch_method TEXT,                 -- GraphQL | HTML
+  stage TEXT,                        -- людиномовний поточний етап (транзієнтний текст, docs/plans/scan-progress-detail.md)
+  sub_done INTEGER,                  -- позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify
+  sub_total INTEGER                  -- загальна кількість підпослідовності
 );

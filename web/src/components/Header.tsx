@@ -1,48 +1,35 @@
+import { useMemo } from 'react';
 import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
-import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
-import { SearchActionPanel } from './SearchActionPanel';
-import { AnalysisWizardDialog } from './analysis/wizard/AnalysisWizardDialog';
-import { AiPicksDialog } from './analysis/ai-picks/AiPicksDialog';
-import { RelevanceFilterDialog } from './analysis/RelevanceFilterDialog';
-import { SettingsDrawer } from './settings/SettingsDrawer';
+import { SearchActionPanel } from './searches/SearchActionPanel';
+import { AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog } from './analysis';
+import { SettingsDrawer } from './settings';
 import { Tooltip } from './ui/tooltip';
-import type { Search } from '../types';
+import { useSearches } from '../api';
+import { useSettingsStore } from '../stores/settingsStore';
 
-interface HeaderProps {
-  searchesVisible: boolean;
-  onSearchesVisibleChange: (visible: boolean) => void;
-  selectedSearch: Search | undefined;
-  selectedIds: number[];
-  autoRefreshEnabled: boolean;
-  onAutoRefreshEnabledChange: (enabled: boolean) => void;
-  autoRefreshIntervalMin: number;
-  onAutoRefreshIntervalMinChange: (interval: number) => void;
-  columnVisibility: VisibilityState;
-  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
-  columnOrder: string[];
-  onColumnOrderChange: (order: string[]) => void;
-  descriptionExpandEnabled: boolean;
-  onDescriptionExpandEnabledChange: (enabled: boolean) => void;
-}
+export function Header() {
+  const { data: searches } = useSearches();
+  
+  const searchesVisible = useSettingsStore((s) => s.searchesVisible);
+  const setSearchesVisible = useSettingsStore((s) => s.setSearchesVisible);
+  
+  const selectedSearchId = useSettingsStore((s) => s.selectedSearchId);
+  const selectedSearch = searches?.find((s) => s.id === selectedSearchId);
+  
+  const rowSelection = useSettingsStore((s) => s.rowSelection);
+  const selectedIds = useMemo(
+    () =>
+      Object.entries(rowSelection)
+        .filter(([, v]) => v)
+        .map(([k]) => Number(k)),
+    [rowSelection],
+  );
 
-export function Header({
-  searchesVisible,
-  onSearchesVisibleChange,
-  selectedSearch,
-  selectedIds,
-  autoRefreshEnabled,
-  onAutoRefreshEnabledChange,
-  autoRefreshIntervalMin,
-  onAutoRefreshIntervalMinChange,
-  columnVisibility,
-  onColumnVisibilityChange,
-  columnOrder,
-  onColumnOrderChange,
-  descriptionExpandEnabled,
-  onDescriptionExpandEnabledChange,
-}: HeaderProps) {
+  const autoRefreshEnabled = useSettingsStore((s) => s.autoRefreshEnabled);
+  const autoRefreshIntervalMin = useSettingsStore((s) => s.autoRefreshIntervalMin);
+
   return (
     <Box as="header" borderBottomWidth="1px" borderColor="border.subtle" px={4} py={3} bg="bg.panel">
       <HStack justify="space-between" wrap="wrap" rowGap={2}>
@@ -52,7 +39,7 @@ export function Header({
               aria-label="Toggle Sidebar"
               variant="ghost"
               size="sm"
-              onClick={() => onSearchesVisibleChange(!searchesVisible)}
+              onClick={() => setSearchesVisible(!searchesVisible)}
             >
               {searchesVisible ? <LuChevronLeft /> : <LuMenu />}
             </IconButton>
@@ -95,18 +82,7 @@ export function Header({
           {selectedSearch && <RelevanceFilterDialog search={selectedSearch} selectedIds={selectedIds} />}
           {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
           {selectedSearch && <AiPicksDialog search={selectedSearch} />}
-          <SettingsDrawer
-            columnVisibility={columnVisibility}
-            onColumnVisibilityChange={onColumnVisibilityChange}
-            columnOrder={columnOrder}
-            onColumnOrderChange={onColumnOrderChange}
-            descriptionExpandEnabled={descriptionExpandEnabled}
-            onDescriptionExpandEnabledChange={onDescriptionExpandEnabledChange}
-            autoRefreshEnabled={autoRefreshEnabled}
-            onAutoRefreshEnabledChange={onAutoRefreshEnabledChange}
-            autoRefreshIntervalMin={autoRefreshIntervalMin}
-            onAutoRefreshIntervalMinChange={onAutoRefreshIntervalMinChange}
-          />
+          <SettingsDrawer />
         </HStack>
       </HStack>
     </Box>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Box, Button, HStack, Popover, Portal, Text, Textarea } from '@chakra-ui/react';
-import { LuThumbsDown, LuThumbsUp, LuTriangleAlert } from 'react-icons/lu';
-import { useUpdateListing } from '../../api/client';
+import { LuSparkles, LuThumbsDown, LuThumbsUp, LuTriangleAlert } from 'react-icons/lu';
+import { useUpdateListing } from '../../api';
 import { Tooltip } from '../ui/tooltip';
 import { formatDate } from '../../utils/format';
 import { ANALYSIS_SOURCE } from '../../constants';
@@ -51,14 +51,16 @@ export function ProsConsCell({ listing, field }: Props) {
     setOpen(false);
   };
 
-  // Індикація аналізу: бейдж «застарілий» + tooltip із моделлю/датою (план B6).
+  // Індикація AI-аналізу: значок ШІ + tooltip «згенеровано автоматично» з моделлю/датою
+  // (план B6). `import` — вставлено з ШІ-чату вручну, решта — авто через OpenRouter.
+  const analyzedAt = listing.analysis_at != null
+    ? formatDate(listing.analysis_at)?.short ?? listing.analysis_at
+    : null;
   const analysisInfo =
     listing.analysis_at != null
-      ? `Аналіз: ${
-          listing.analysis_source === ANALYSIS_SOURCE.IMPORT
-            ? 'ручний імпорт'
-            : listing.analysis_model ?? 'API'
-        }, ${formatDate(listing.analysis_at)?.short ?? listing.analysis_at}`
+      ? listing.analysis_source === ANALYSIS_SOURCE.IMPORT
+        ? `Згенеровано ШІ (ручний імпорт), ${analyzedAt}`
+        : `Згенеровано автоматично (ШІ${listing.analysis_model ? `: ${listing.analysis_model}` : ''}), ${analyzedAt}`
       : null;
 
   const label = listing[field] ? (
@@ -78,8 +80,8 @@ export function ProsConsCell({ listing, field }: Props) {
       )}
       {analysisInfo && listing.analysis_stale !== 1 && (
         <Tooltip content={analysisInfo}>
-          <Box color="fg.subtle" flexShrink={0} mt="3px" fontSize="2xs">
-            ⓘ
+          <Box color="purple.fg" flexShrink={0} mt="2px" aria-label="Згенеровано штучним інтелектом">
+            <LuSparkles size={13} />
           </Box>
         </Tooltip>
       )}

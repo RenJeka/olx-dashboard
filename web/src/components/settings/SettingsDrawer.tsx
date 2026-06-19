@@ -1,5 +1,4 @@
 import { IconButton, Separator, Stack } from '@chakra-ui/react';
-import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuSettings } from 'react-icons/lu';
 import {
   DrawerBackdrop,
@@ -17,31 +16,7 @@ import { AutoRefreshSection } from './sections/AutoRefreshSection';
 import { ColumnsSection } from './sections/ColumnsSection';
 import { AnalysisSection } from './sections/AnalysisSection';
 
-interface Props {
-  columnVisibility: VisibilityState;
-  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
-  columnOrder: string[];
-  onColumnOrderChange: (order: string[]) => void;
-  descriptionExpandEnabled: boolean;
-  onDescriptionExpandEnabledChange: (value: boolean) => void;
-  autoRefreshEnabled: boolean;
-  onAutoRefreshEnabledChange: (value: boolean) => void;
-  autoRefreshIntervalMin: number;
-  onAutoRefreshIntervalMinChange: (value: number) => void;
-}
-
-export function SettingsDrawer({
-  columnVisibility,
-  onColumnVisibilityChange,
-  columnOrder,
-  onColumnOrderChange,
-  descriptionExpandEnabled,
-  onDescriptionExpandEnabledChange,
-  autoRefreshEnabled,
-  onAutoRefreshEnabledChange,
-  autoRefreshIntervalMin,
-  onAutoRefreshIntervalMinChange,
-}: Props) {
+export function SettingsDrawer() {
   return (
     <DrawerRoot size="sm">
       <Tooltip content="Налаштування">
@@ -61,26 +36,13 @@ export function SettingsDrawer({
         <Separator />
         <DrawerBody mt="4">
           <Stack gap={8}>
-            <VisualSection
-              descriptionExpandEnabled={descriptionExpandEnabled}
-              onDescriptionExpandEnabledChange={onDescriptionExpandEnabledChange}
-            />
+            <VisualSection />
             <Separator width="80%" alignSelf="center" />
-            <AutoRefreshSection
-              autoRefreshEnabled={autoRefreshEnabled}
-              onAutoRefreshEnabledChange={onAutoRefreshEnabledChange}
-              autoRefreshIntervalMin={autoRefreshIntervalMin}
-              onAutoRefreshIntervalMinChange={onAutoRefreshIntervalMinChange}
-            />
+            <AutoRefreshSection />
             <Separator width="80%" alignSelf="center" />
             <AnalysisSection />
             <Separator width="80%" alignSelf="center" />
-            <ColumnsSection
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={onColumnVisibilityChange}
-              columnOrder={columnOrder}
-              onColumnOrderChange={onColumnOrderChange}
-            />
+            <ColumnsSection />
           </Stack>
         </DrawerBody>
       </DrawerContent>

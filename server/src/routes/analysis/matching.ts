@@ -144,21 +144,38 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     return response;
   });
 
-  // Експорт превʼю (крок 3): xlsx | json.
+  // Експорт превʼю (крок 3): xlsx | json. Клієнт шле лише {id, criteria} — назву/опис
+  // сервер бере з БД (повні описи в body розпухали б за межу bodyLimit і давали 413).
   app.post<{
     Params: { id: string };
-    Body: { format?: string; mode?: string; rows?: { title?: string; description?: string; criteria?: string[] }[] };
+    Body: { format?: string; mode?: string; rows?: { id?: number; criteria?: string[] }[] };
   }>('/api/searches/:id/analyze/export', async (req, reply) => {
     const id = Number(req.params.id);
     if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     const mode: AnalysisMode = isMode(req.body.mode) ? req.body.mode : 'cons';
-    const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+    const reqRows = Array.isArray(req.body.rows) ? req.body.rows : [];
     const label = MODE_LABEL[mode];
+
+    // Підтягуємо назву/опис з БД за id (зберігаючи порядок та критерії з запиту).
+    const ids = reqRows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
+    const byId = new Map(loadListings(id, ids).map((l) => [l.id, l]));
+    const rows = reqRows.map((r) => {
+      const l = byId.get(Number(r.id));
+      return {
+        title: l?.title ?? '',
+        description: l?.description ?? '',
+        criteria: Array.isArray(r.criteria) ? r.criteria : [],
+      };
+    });
 
     if (req.body.format === 'json') {
       reply.header('Content-Disposition', `attachment; filename="analysis-${mode}.json"`);
       reply.type(MIME_JSON);
-      return JSON.stringify(rows, null, JSON_EXPORT_INDENT);
+      return JSON.stringify(
+        rows.map((r) => ({ title: r.title, description: stripHtml(r.description), criteria: r.criteria })),
+        null,
+        JSON_EXPORT_INDENT,
+      );
     }
 
     const buffer = await buildXlsxBuffer(
@@ -169,9 +186,9 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
         { header: label, key: 'criteria', width: PREVIEW_XLSX_WIDTHS.criteria },
       ],
       rows.map((r) => ({
-        title: r.title ?? '',
-        description: stripHtml(r.description ?? ''),
-        criteria: (r.criteria ?? []).map((c) => `${BULLET_PREFIX}${c}`).join('\n'),
+        title: r.title,
+        description: stripHtml(r.description),
+        criteria: r.criteria.map((c) => `${BULLET_PREFIX}${c}`).join('\n'),
       })),
     );
 

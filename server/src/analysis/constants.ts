@@ -33,6 +33,8 @@ export const MAX_ANALYZE_IDS = 200;
 export const MANUAL_ZIP_CHUNK_SIZE = 50;
 /** Ліміт критеріїв (узгоджено з промптом). */
 export const MAX_CRITERIA = 50;
+/** Ліміт синонімів пошукового запиту (docs/plans/search-synonyms.md, узгоджено з промптом). */
+export const MAX_SYNONYMS = 15;
 /** Розмір семпла описів для генерації критеріїв. */
 export const DEFAULT_SAMPLE_SIZE = 30;
 /** AI Вибір: скільки кандидатів (без мінусів) максимум кладеться в LLM-промпт. */

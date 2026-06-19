@@ -1,0 +1,1 @@
+export { Searches } from './Searches';

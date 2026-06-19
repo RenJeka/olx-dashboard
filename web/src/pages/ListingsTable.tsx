@@ -6,47 +6,37 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type OnChangeFn,
   type RowSelectionState,
-  type VisibilityState,
 } from '@tanstack/react-table';
 import { Box, Flex, Spinner, Table, Text } from '@chakra-ui/react';
-import { useListings } from '../api/client';
+import { useListings } from '../api';
 import { useListingsTableState } from '../hooks/useListingsTableState';
 import { useListingsUiStore } from '../stores/listingsUiStore';
-import { columns } from '../components/table/columns';
-import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
-import { ListingsTableBody } from '../components/table/ListingsTableBody';
-import { ListingsFilterBar } from '../components/table/topbar';
-import { TablePagination } from '../components/table/TablePagination';
+import { useSettingsStore } from '../stores/settingsStore';
+import {
+  columns,
+  ListingsTableHeader,
+  ListingsTableBody,
+  ListingsFilterBar,
+  TablePagination,
+} from '../components/table';
 import { DescriptionDialog } from '../components/DescriptionDialog';
 import { stripDescriptionHtml } from '../utils/format';
+import { matchesQuery } from '../utils/search';
 import { isListingVisible } from '../utils/listingVisibility';
-import type { SearchScope } from '../components/table/topbar';
+import type { SearchScope } from '../components/table';
 import type { Listing } from '../types';
 
-export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
+export { TOGGLEABLE_COLUMNS } from '../components/table';
 
-interface Props {
-  searchId: number | null;
-  columnVisibility: VisibilityState;
-  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
-  columnOrder: string[];
-  onColumnOrderChange: (order: string[]) => void;
-  descriptionExpandEnabled: boolean;
-  rowSelection: RowSelectionState;
-  onRowSelectionChange: OnChangeFn<RowSelectionState>;
-}
-
-export function ListingsTable({
-  searchId,
-  columnVisibility,
-  onColumnVisibilityChange,
-  columnOrder,
-  descriptionExpandEnabled,
-  rowSelection,
-  onRowSelectionChange,
-}: Props) {
+export function ListingsTable() {
+  const searchId = useSettingsStore((s) => s.selectedSearchId);
+  const columnVisibility = useSettingsStore((s) => s.columnVisibility);
+  const setColumnVisibility = useSettingsStore((s) => s.setColumnVisibility);
+  const columnOrder = useSettingsStore((s) => s.columnOrder);
+  const descriptionExpandEnabled = useSettingsStore((s) => s.descriptionExpandEnabled);
+  const rowSelection = useSettingsStore((s) => s.rowSelection);
+  const setRowSelection = useSettingsStore((s) => s.setRowSelection);
   const { data, isLoading } = useListings(searchId);
   const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
     useListingsTableState();
@@ -61,14 +51,15 @@ export function ListingsTable({
   // внутрішні мемо TanStack на кожен рендер.
   const globalFilterFn = useCallback(
     (row: Row<Listing>, _columnId: string, filterValue: unknown) => {
-      const query = String(filterValue).trim().toLowerCase();
+      const query = String(filterValue).trim();
       if (!query) return true;
-      const titleMatch =
-        searchScope.inTitle && (row.original.title ?? '').toLowerCase().includes(query);
-      const descMatch =
-        searchScope.inDescription &&
-        stripDescriptionHtml(row.original.description).toLowerCase().includes(query);
-      return titleMatch || descMatch;
+      // Поле(я) для пошуку зливаємо в один haystack — терми (&&/||/!) працюють крізь
+      // назву й опис разом.
+      const parts: string[] = [];
+      if (searchScope.inTitle) parts.push((row.original.title ?? '').toLowerCase());
+      if (searchScope.inDescription) parts.push(stripDescriptionHtml(row.original.description).toLowerCase());
+      if (parts.length === 0) return false;
+      return matchesQuery(parts.join('\n'), query);
     },
     [searchScope],
   );
@@ -78,7 +69,7 @@ export function ListingsTable({
   // Авто-показ/приховання колонки ai_rank та скидання сортування при переключенні табу.
   useEffect(() => {
     const isAiPicks = statusFilter === 'ai_picks';
-    onColumnVisibilityChange((prev) => ({ ...prev, ai_rank: isAiPicks }));
+    setColumnVisibility((prev) => ({ ...prev, ai_rank: isAiPicks }));
     if (isAiPicks) {
       setSorting([{ id: 'price', desc: false }]);
     }
@@ -109,10 +100,10 @@ export function ListingsTable({
     // повертає на 1-шу сторінку й користувач втрачає позицію.
     autoResetPageIndex: false,
     enableRowSelection: true,
-    onRowSelectionChange: onRowSelectionChange,
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnSizingChange: setColumnSizing,
-    onColumnVisibilityChange: onColumnVisibilityChange,
+    onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     onGlobalFilterChange: setSearchText,
     globalFilterFn,
@@ -148,6 +139,18 @@ export function ListingsTable({
   }
 
   const selectedIds = table.getSelectedRowModel().rows.map((row) => row.original.id);
+  // «Вибрати всі у вкладці»: всі рядки поточного табу + пошуку (всі сторінки), не лише видима сторінка.
+  const filteredRows = table.getFilteredRowModel().rows;
+  const allTabSelected = filteredRows.length > 0 && filteredRows.every((r) => r.getIsSelected());
+  const toggleSelectAllInTab = () => {
+    if (allTabSelected) {
+      setRowSelection({});
+      return;
+    }
+    const next: RowSelectionState = {};
+    for (const r of filteredRows) next[r.id] = true;
+    setRowSelection(next);
+  };
   // Підпис видимих колонок (порядок + видимість) — інвалідує memo-рядки при reorder/toggle.
   const columnLayoutKey = table.getVisibleLeafColumns().map((c) => c.id).join(',');
 
@@ -161,7 +164,10 @@ export function ListingsTable({
         onSearchScopeChange={setSearchScope}
         searchId={searchId ?? undefined}
         selectedIds={selectedIds}
-        onClearSelection={() => onRowSelectionChange({})}
+        onClearSelection={() => setRowSelection({})}
+        tabSelectableCount={filteredRows.length}
+        allTabSelected={allTabSelected}
+        onToggleSelectAllInTab={toggleSelectAllInTab}
       />
       <Box flex="1" overflow="auto" px={4} pb={4}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>

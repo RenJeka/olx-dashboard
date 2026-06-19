@@ -49,6 +49,8 @@ export interface SearchConfig {
   query: string;
   categoryId?: number | null;
   apiFilters: ApiFilters;
+  /** Синоніми query (docs/plans/search-synonyms.md) — скануються разом, видача зливається по olx_id. */
+  querySynonyms?: string[];
 }
 
 /** Сире оголошення зі сторінки пошуку (до нормалізації). */
@@ -60,6 +62,8 @@ export interface RawListing {
   /** Абсолютний URL оголошення. */
   url: string;
   photoUrl?: string;
+  /** Прев'ю-лінки всіх фото оголошення (галерея, GraphQL: photos[].link). */
+  photoUrls?: string[];
   /** Сирий текст блоку дата/локація, напр. "Київ - Сьогодні о 12:00". */
   locationDate?: string;
 
@@ -132,6 +136,14 @@ export interface ScanStatus {
   requests_done: number | null;
   requests_total: number | null;
   fetch_method: string | null;
+  /** normal | deep | verify. */
+  kind: string | null;
+  /** Людиномовний поточний етап (docs/plans/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
+  stage: string | null;
+  /** Позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify. */
+  sub_done: number | null;
+  /** Загальна кількість підпослідовності — керує сегментованою смугою прогресу. */
+  sub_total: number | null;
 }
 
 /** Статус оголошення в моніторингу (ручний/auto-цикл, Етап 2). */
@@ -348,6 +360,23 @@ export interface FetchSearchResult {
   bucketsUsed?: number;
 }
 
+/**
+ * Знімок прогресу скану (docs/plans/scan-progress-detail.md). `total` відсутній під час
+ * indeterminate-фаз (зондування/бісекція deep-split) — UI показує «Підготовка…». `stage` —
+ * короткий людиномовний опис поточної дії (транзієнтний текст, перезаписується щотику,
+ * у т.ч. під час пауз). `subDone`/`subTotal` — позиція в реальній підпослідовності роботи
+ * (варіант синоніма / ціновий бакет / фаза verify P1↔P2) для сегментованої смуги прогресу;
+ * відсутні під час пауз (writer на бекенді зберігає попереднє значення через COALESCE).
+ */
+export interface ScanProgress {
+  done: number;
+  total?: number;
+  method?: string;
+  stage?: string;
+  subDone?: number;
+  subTotal?: number;
+}
+
 /** Опції одного скану. */
 export interface FetchOptions {
   /**
@@ -356,8 +385,8 @@ export interface FetchOptions {
    * За замовчуванням (false/відсутнє) — звичайний скан, ≤BATCH_SIZE запитів.
    */
   deep?: boolean;
-  /** Викликається після кожного запиту/сторінки: (done, total, method). */
-  onProgress?: (done: number, total: number, method?: string) => void;
+  /** Викликається після кожного запиту/сторінки (і на ключових проміжних етапах). */
+  onProgress?: (progress: ScanProgress) => void;
 }
 
 /**

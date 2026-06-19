@@ -1,24 +1,15 @@
 import { useRef, useState } from 'react';
 import { Box, HStack, Stack, Text } from '@chakra-ui/react';
-import type { OnChangeFn, VisibilityState } from '@tanstack/react-table';
 import { LuGripVertical } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { getOrderedColumns } from '../../../utils/columns';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
-interface ColumnsSectionProps {
-  columnVisibility: VisibilityState;
-  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
-  columnOrder: string[];
-  onColumnOrderChange: (order: string[]) => void;
-}
-
-
-export function ColumnsSection({
-  columnVisibility,
-  onColumnVisibilityChange,
-  columnOrder,
-  onColumnOrderChange,
-}: ColumnsSectionProps) {
+export function ColumnsSection() {
+  const columnVisibility = useSettingsStore((s) => s.columnVisibility);
+  const setColumnVisibility = useSettingsStore((s) => s.setColumnVisibility);
+  const columnOrder = useSettingsStore((s) => s.columnOrder);
+  const setColumnOrder = useSettingsStore((s) => s.setColumnOrder);
   const orderedCols = getOrderedColumns(columnOrder);
 
   const dragSrcIndex = useRef<number | null>(null);
@@ -43,7 +34,7 @@ export function ColumnsSection({
     const moved = newOrder.splice(src, 1)[0];
     if (moved === undefined) return;
     newOrder.splice(targetIndex, 0, moved);
-    onColumnOrderChange(newOrder);
+    setColumnOrder(newOrder);
     dragSrcIndex.current = null;
     setDragOverIndex(null);
   }
@@ -96,7 +87,7 @@ export function ColumnsSection({
                   flex="1"
                   checked={columnVisibility[col.id] !== false}
                   onCheckedChange={(details) =>
-                    onColumnVisibilityChange((prev) => ({
+                    setColumnVisibility((prev) => ({
                       ...prev,
                       [col.id]: details.checked === true,
                     }))

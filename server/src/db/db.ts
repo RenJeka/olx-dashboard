@@ -47,6 +47,11 @@ addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
 addColumnIfMissing('scan_runs', 'fetch_method', 'TEXT');
 addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
+
+// Деталізований прогрес сканування (docs/plans/scan-progress-detail.md).
+addColumnIfMissing('scan_runs', 'stage', 'TEXT');
+addColumnIfMissing('scan_runs', 'sub_done', 'INTEGER');
+addColumnIfMissing('scan_runs', 'sub_total', 'INTEGER');
 addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
 addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 
@@ -55,6 +60,12 @@ addColumnIfMissing('searches', 'analysis_criteria', "TEXT DEFAULT '{}'");
 
 // Семантичний фільтр релевантності — цільовий товар на рівні пошуку.
 addColumnIfMissing('searches', 'relevance_target', "TEXT DEFAULT ''");
+
+// Синоніми пошукового запиту (docs/plans/search-synonyms.md) — JSON-масив рядків.
+addColumnIfMissing('searches', 'query_synonyms', "TEXT DEFAULT '[]'");
+
+// Архів пошуків (docs/plans/archive-searches.md) — прапорець прихованих зі списку.
+addColumnIfMissing('searches', 'archived', 'INTEGER DEFAULT 0');
 
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
@@ -147,6 +158,9 @@ addColumnIfMissing('listings', 'ai_relevant', 'INTEGER');
 addColumnIfMissing('listings', 'ai_relevant_reason', 'TEXT');
 addColumnIfMissing('listings', 'ai_relevant_at', 'TEXT');
 addColumnIfMissing('listings', 'ai_relevant_source', 'TEXT');
+
+// Галерея фото (docs/plans/photo-gallery.md) — JSON-масив прев'ю-лінків усіх фото.
+addColumnIfMissing('listings', 'photo_urls', 'TEXT');
 
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).

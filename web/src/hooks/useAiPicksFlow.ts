@@ -6,8 +6,8 @@ import {
   fetchAiPicksPrompt,
   fetchAiPicksPackageZip,
   useListings,
-} from '../api/client';
-import { loadAnalysisModel } from '../utils/storage';
+} from '../api';
+import { useSettingsStore } from '../stores/settingsStore';
 import { isAiPickCandidate } from '../utils/listingVisibility';
 import { showErrorToast } from '../utils/toast';
 import { toaster } from '../components/ui/toaster';
@@ -52,7 +52,7 @@ export function useAiPicksFlow(search: Search) {
     try {
       const result = await runAiPicks.mutateAsync({
         searchId: search.id,
-        model: loadAnalysisModel(),
+        model: useSettingsStore.getState().analysisModel,
       });
       applyResult(result);
     } catch (err) {

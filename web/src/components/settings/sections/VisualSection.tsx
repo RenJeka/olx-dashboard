@@ -2,16 +2,11 @@ import { Heading, HStack, Stack, Text } from '@chakra-ui/react';
 import { LuFileText, LuMoon, LuSun } from 'react-icons/lu';
 import { Switch } from '../../ui/switch';
 import { useColorMode } from '../../ui/color-mode';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
-interface VisualSectionProps {
-  descriptionExpandEnabled: boolean;
-  onDescriptionExpandEnabledChange: (value: boolean) => void;
-}
-
-export function VisualSection({
-  descriptionExpandEnabled,
-  onDescriptionExpandEnabledChange,
-}: VisualSectionProps) {
+export function VisualSection() {
+  const descriptionExpandEnabled = useSettingsStore((s) => s.descriptionExpandEnabled);
+  const setDescriptionExpandEnabled = useSettingsStore((s) => s.setDescriptionExpandEnabled);
   const { colorMode, toggleColorMode } = useColorMode();
 
   return (
@@ -25,7 +20,7 @@ export function VisualSection({
       </Switch>
       <Switch
         checked={descriptionExpandEnabled}
-        onCheckedChange={(details) => onDescriptionExpandEnabledChange(details.checked)}
+        onCheckedChange={(details) => setDescriptionExpandEnabled(details.checked)}
       >
         <HStack gap={1}>
           <LuFileText />
