@@ -95,9 +95,18 @@ olx-dashboard/
         │   └── client.ts     # fetch-обгортка + TanStack Query хуки (CRUD, scan(+deep)/verify/scan-status, статуси/нотатки/масові
         │                      #   дії, filters/filter-options/stats; DTO-типи з web/src/types)
         ├── components/
-        │   ├── Searches.tsx      # бічна панель (акордеон пошуків + архів), діапазон цін/бейдж синонімів у рядку, сортування ↑/↓, 3-dot меню (редагувати/фільтри/варіанти/архів/видалення)
-        │   ├── SearchVariantsDialog.tsx # контрольований модал «Варіанти пошуку»: синоніми query (docs/plans/search-synonyms.md) — список + генерація авто/ручна (ManualAssistant)
-        │   ├── SearchEditDialog.tsx # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/search-row-edit.md)
+        │   ├── searches/         # бічна панель «Пошуки» (акордеон + архів + форма створення), розбита на дрібні компоненти
+        │   │   ├── Searches.tsx           # точка входу: mobile (Drawer) / desktop (aside), useNewSearchForm + SearchVariantsDialog для нового пошуку
+        │   │   ├── SearchesPanel.tsx       # Accordion.Root: секції «Пошуки»/«Архів» + NewSearchForm
+        │   │   ├── SearchGroupAccordionItem.tsx # спільна секція акордеону зі списком SearchRow (активні/архівовані)
+        │   │   ├── NewSearchForm.tsx       # акордеон-секція форми створення пошуку (презентаційний, стан — useNewSearchForm)
+        │   │   ├── SearchRow.tsx           # рядок пошуку: назва/запит/ціна, бейдж синонімів, реордер ↑/↓, SearchRowMenu
+        │   │   ├── SearchRowMenu.tsx       # 3-dot меню рядка (редагувати/фільтри/варіанти/архів/видалення)
+        │   │   ├── SearchDeleteDialog.tsx  # alert-діалог підтвердження видалення пошуку
+        │   │   ├── SearchVariantsDialog.tsx # контрольований модал «Варіанти пошуку»: синоніми query (docs/plans/search-synonyms.md) — список + генерація авто/ручна (ManualAssistant)
+        │   │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку": local_filters (price_range, cities, sellers; стоп-слова/ranges закомментовано)
+        │   │   ├── SearchEditDialog.tsx    # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/search-row-edit.md)
+        │   │   └── index.ts                # барель: export { Searches }
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
@@ -123,7 +132,6 @@ olx-dashboard/
         │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── SearchActionPanel.tsx # модальне вікно (DialogRoot) дій активного пошуку (скан/verify, статистика)
-        │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку": local_filters (price_range, cities, sellers; стоп-слова/ranges закомментовано)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
         │   ├── table/             # компоненти таблиці оголошень
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
@@ -160,7 +168,9 @@ olx-dashboard/
         │   ├── useListingsMap.ts  # мемоїзована Map<id, Listing> з масиву listings (спільний для AI-діалогів)
         │   ├── useZipDownload.ts  # хук для паттерну «завантажити ZIP» (downloading/downloaded/download)
         │   ├── useAiPicksFlow.ts  # бізнес-логіка AI Вибір (стан step/picks, handleRun/Import/Commit)
-        │   └── useWizardActions.ts # бізнес-логіка AI-аналізу (критерії, аналіз, перевірка, запис)
+        │   ├── useWizardActions.ts # бізнес-логіка AI-аналізу (критерії, аналіз, перевірка, запис)
+        │   ├── useNewSearchForm.ts # стан і сабміт форми створення нового пошуку (NewSearchForm)
+        │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
         ├── types/
@@ -175,7 +185,9 @@ olx-dashboard/
             ├── download.ts       # downloadBlob()/downloadText() — завантаження файлів (експорт, ручний пакет)
             ├── clipboard.ts      # copyToClipboard() — копіювання + toast «Скопійовано»
             ├── sort.ts           # sortAlpha() — алфавітне сортування (укр. колація, латиниця в кінці) для синонімів і критеріїв AI
-            └── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
+            ├── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
+            ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
+            └── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
 ```
 
 ## Орієнтири «куди дивитись»
@@ -194,12 +206,12 @@ olx-dashboard/
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
-| Локальні фільтри (`price_range`, `cities`, `sellers`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/SearchFiltersDrawer.tsx`, `GET /api/searches/:id/filter-options` |
+| Локальні фільтри (`price_range`, `cities`, `sellers`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx`, `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphqlOlxFetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
-| Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
+| Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

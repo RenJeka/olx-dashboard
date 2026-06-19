@@ -101,7 +101,7 @@ flowchart LR
 > `last_refresh_at`, той самий принцип, що й у split-скані (deep). Синоніми також передаються
 > як alias-назви товару в AI-фільтр релевантності (`relevance.ts`, `getRelevanceAliases`).
 > Генерація синонімів — окремі stateless-ендпойнти `routes/searchSynonyms.ts` (промпт/авто
-> OpenRouter/парс вставки), UI — `web/src/components/SearchVariantsDialog.tsx`.
+> OpenRouter/парс вставки), UI — `web/src/components/searches/SearchVariantsDialog.tsx`.
 
 > **Verify-сценарій (реалізовано, A3):** `runVerify(searchId)` — окремий `kind='verify'`
 > прохід без фетчера видачі. Кандидати (≤`VERIFY_PAGE_CAP=50`): P1 — `last_seen_at` старше
@@ -326,22 +326,40 @@ flowchart LR
   (статистика бази, останній скан), прогрес-бар поточного скану та три кнопки дій:
   «Швидкий скан» / «Глибокий скан» / «Перевірити неактивні (N)». Глибокий скан відкриває
   додатковий `ConfirmActionDialog`. Усі кнопки блокуються під час активного скану.
-- `components/SearchFiltersDrawer.tsx` — Drawer редактора `local_filters` (відкривається з
-  3-dot меню пошуку → «Фільтри»): діапазон цін (`Input` мін/макс), місто і продавець —
-  `NativeSelect` (варіанти з `useFilterOptions`) + `Tag.Root` chips з видаленням. «Зберегти»
-  → `useUpdateSearchFilters()` → toast з `filtered_out_count`. Стоп-слова й діапазони
-  params — закомментовано, заплановано на майбутнє.
 - `components/ConfirmActionDialog.tsx` — спільний діалог підтвердження довгої дії
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
   для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `components/Searches.tsx` — бічна панель (sidebar), містить акордеон («Пошуки» / «Новий пошук»), форму створення. Може бути згорнутою (collapsible) для розширення простору таблиці. На мобільному (`useIsMobile()`) той самий вміст рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом `visible`/`onVisibleChange` з `App.tsx`); вибір пошуку (`SearchRow`) на мобільному автоматично закриває drawer. На desktop — без змін (постійна панель `w="80"`). Кожен `SearchRow`:
-  - кнопки `LuChevronUp`/`LuChevronDown` для ручного сортування (`useReorderSearches`),
-    disabled на краях списку;
-  - 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Фільтри» (`LuFilter`, відкриває
-    `SearchFiltersDrawer`), розділювач, «Видалити» (`LuTrash2`, `color="fg.error"`,
-    відкриває `DialogRoot role="alertdialog"` із підтвердженням і каскадно видаляє пошук
+- `components/searches/` — бічна панель (sidebar), розбита на дрібні компоненти (рефакторинг,
+  раніше — один файл `Searches.tsx`):
+  - `Searches.tsx` — точка входу: на мобільному (`useIsMobile()`) вміст (`SearchesPanel`)
+    рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом
+    `visible`/`onVisibleChange` з `App.tsx`); на desktop — постійна панель `w="80"`. Тримає
+    `useNewSearchForm()` і рендерить його `SearchVariantsDialog` окремо від акордеону (Dialog
+    через Portal, незалежно від Drawer/aside-обгортки).
+  - `SearchesPanel.tsx` — `Accordion.Root`: секції «Пошуки»/«Архів» (`SearchGroupAccordionItem`,
+    спільний для обох) + `NewSearchForm`.
+  - `SearchGroupAccordionItem.tsx` — список `SearchRow` з `isFirst`/`isLast` за індексом
+    (стрілки реордеру `LuChevronUp`/`LuChevronDown`, `useReorderSearches`, disabled на краях —
+    лише для активних, архівні їх не показують).
+  - `NewSearchForm.tsx` — презентаційна форма створення пошуку; увесь стан і `submit` —
+    у хуку `hooks/useNewSearchForm.ts`.
+  - `SearchRow.tsx` — назва/запит/ціна, бейдж синонімів (тултіп зі списком), крапка-індикатор
+    активних `local_filters`; мутації архівування/видалення/реордеру — хук
+    `hooks/useSearchRowActions.ts`.
+  - `SearchRowMenu.tsx` — 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Редагувати»/
+    «Фільтри» (`LuFilter`, відкриває `SearchFiltersDrawer`)/«Варіанти пошуку»/«Архівувати»/
+    «Видалити» (`LuTrash2`, `color="fg.error"`).
+  - `SearchDeleteDialog.tsx` — `DialogRoot role="alertdialog"` підтвердження видалення (каскадно
     через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).
+  - `SearchFiltersDrawer.tsx` — Drawer редактора `local_filters`: діапазон цін (`Input` мін/макс),
+    місто і продавець — `NativeSelect` (варіанти з `useFilterOptions`) + `Tag.Root` chips з
+    видаленням. «Зберегти» → `useUpdateSearchFilters()` → toast з `filtered_out_count`.
+    Стоп-слова й діапазони params — закомментовано, заплановано на майбутнє.
+  - `SearchVariantsDialog.tsx`, `SearchEditDialog.tsx` — без змін логіки, лише перенесені сюди.
+  - Спільні парсери `searches.local_filters`/`query_synonyms` винесено в
+    `utils/localFilters.ts` (`parseLocalFilters`/`hasActiveLocalFilters`) і
+    `utils/searchSynonyms.ts` (`parseSearchSynonyms`) — раніше дублювались у кількох файлах.
 - `pages/ListingsTable.tsx` — відображення списку оголошень: збирає разом
   `useListingsTableState`, колонки, `ListingsFilterBar` (фільтр статусу з `useListingsUiStore` +
   toggle filtered_out + текстовий пошук → `globalFilter`/`globalFilterFn` по title+description),

@@ -5,7 +5,7 @@ import { useSearches } from './api/client';
 import { Header } from './components/Header';
 import { Toaster } from './components/ui/toaster';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
-import { Searches } from './components/Searches';
+import { Searches } from './components/searches';
 import { ListingsTable } from './pages/ListingsTable';
 import {
   loadColumnVisibility,

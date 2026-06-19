@@ -9,24 +9,17 @@ import {
   DrawerHeader,
   DrawerRoot,
   DrawerTitle,
-} from './ui/drawer';
-import { Switch } from './ui/switch';
-import { toaster } from './ui/toaster';
-import { useFilterOptions, useUpdateSearchFilters } from '../api/client';
-import type { LocalFilters, Search } from '../types';
+} from '../ui/drawer';
+import { Switch } from '../ui/switch';
+import { toaster } from '../ui/toaster';
+import { useFilterOptions, useUpdateSearchFilters } from '../../api/client';
+import { parseLocalFilters } from '../../utils/localFilters';
+import type { LocalFilters, Search } from '../../types';
 
 interface Props {
   search: Search;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function parseLocalFilters(raw: string): LocalFilters {
-  try {
-    return JSON.parse(raw || '{}') as LocalFilters;
-  } catch {
-    return {};
-  }
 }
 
 /** Drawer редактора локальних фільтрів пошуку: ціна / місто / продавець / плюси / мінуси. */

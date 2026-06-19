@@ -10,26 +10,18 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from './ui/dialog';
+} from '../ui/dialog';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
-import { toaster } from './ui/toaster';
-import { useUpdateSearch } from '../api/client';
-import { parsePriceRange } from '../utils/format';
-import type { Search } from '../types';
+import { toaster } from '../ui/toaster';
+import { useUpdateSearch } from '../../api/client';
+import { parsePriceRange } from '../../utils/format';
+import { parseSearchSynonyms } from '../../utils/searchSynonyms';
+import type { Search } from '../../types';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   search: Search;
-}
-
-function parseSynonyms(raw: string): string[] {
-  try {
-    const parsed = JSON.parse(raw || '[]');
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : [];
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -54,7 +46,7 @@ export function SearchEditDialog({ open, onOpenChange, search }: Props) {
     const range = parsePriceRange(search.api_filters);
     setPriceFrom(range?.from != null ? String(range.from) : '');
     setPriceTo(range?.to != null ? String(range.to) : '');
-    setSynonyms(parseSynonyms(search.query_synonyms));
+    setSynonyms(parseSearchSynonyms(search.query_synonyms));
   }, [open, search]);
 
   function handleSave() {

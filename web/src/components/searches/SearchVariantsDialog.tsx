@@ -9,17 +9,17 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-} from './ui/dialog';
-import { Tooltip } from './ui/tooltip';
-import { ManualAssistant } from './analysis/ManualAssistant';
+} from '../ui/dialog';
+import { Tooltip } from '../ui/tooltip';
+import { ManualAssistant } from '../analysis/ManualAssistant';
 import {
   useAnalysisStatus,
   useGenerateSynonyms,
   useImportSynonyms,
   fetchSynonymsPrompt,
-} from '../api/client';
-import { showErrorToast } from '../utils/toast';
-import { sortAlpha } from '../utils/sort';
+} from '../../api/client';
+import { showErrorToast } from '../../utils/toast';
+import { sortAlpha } from '../../utils/sort';
 
 interface Props {
   open: boolean;
