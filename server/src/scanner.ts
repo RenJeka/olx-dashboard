@@ -1,9 +1,16 @@
 import { db } from './db/db.js';
-import { GraphqlOlxFetcher } from './scraper/graphqlOlxFetcher.js';
+import { GraphqlOlxFetcher } from './scraper/graphql/index.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings } from './scraper/normalizer.js';
 import { applyScanStatuses } from './scraper/statusEngine.js';
 import { probeListingPage } from './scraper/verifier.js';
+import { sleep, randomDelayMs } from './scraper/utils.js';
+import {
+  BATCH_PAUSE_MIN_MS,
+  BATCH_PAUSE_MAX_MS,
+  MIN_DELAY_MS,
+  MAX_DELAY_MS,
+} from './scraper/constants.js';
 import type {
   SearchConfig,
   ScanResult,
@@ -19,27 +26,8 @@ const htmlFetcher = new HtmlOlxFetcher();
 
 /** Сторінок за один verify-прохід (P1+P2 разом) — той самий порядок, що DEEP_SAFETY_CAP. */
 const VERIFY_PAGE_CAP = 50;
-/** Розмір батчу — як у фетчерах (graphqlOlxFetcher.ts/olxFetcher.ts). */
+/** Розмір батчу — як у фетчерах (graphql/fetcher.ts, olxFetcher.ts). */
 const VERIFY_BATCH_SIZE = 3;
-const VERIFY_MIN_DELAY_MS = 1000;
-const VERIFY_MAX_DELAY_MS = 2000;
-const VERIFY_BATCH_PAUSE_MIN_MS = 3000;
-const VERIFY_BATCH_PAUSE_MAX_MS = 6000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function randomDelay(): number {
-  return VERIFY_MIN_DELAY_MS + Math.floor(Math.random() * (VERIFY_MAX_DELAY_MS - VERIFY_MIN_DELAY_MS));
-}
-
-function batchPauseDelay(): number {
-  return (
-    VERIFY_BATCH_PAUSE_MIN_MS +
-    Math.floor(Math.random() * (VERIFY_BATCH_PAUSE_MAX_MS - VERIFY_BATCH_PAUSE_MIN_MS))
-  );
-}
 
 interface SearchRow {
   id: number;
@@ -224,7 +212,7 @@ async function fetchAllQueries(
 
     // Ввічливість між варіантами синонімів — як пауза між батчами глибокого скану.
     if (vi < variants.length - 1) {
-      const delay = batchPauseDelay();
+      const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
       options?.onProgress?.({
         done: doneOffset,
         stage: `Пауза між синонімами ~${Math.round(delay / 1000)}с`,
@@ -525,9 +513,9 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
 
       if (i < candidates.length - 1) {
         if ((i + 1) % VERIFY_BATCH_SIZE === 0) {
-          await sleep(batchPauseDelay());
+          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
         } else {
-          await sleep(randomDelay());
+          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
         }
       }
     }

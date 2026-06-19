@@ -39,7 +39,7 @@ flowchart LR
         R1[routes/searches.ts<br/>CRUD + /scan]
         R2[routes/listings.ts<br/>GET listings]
         SC[scanner.ts<br/>runScan]
-        GQ[scraper/graphqlOlxFetcher.ts<br/>GraphqlOlxFetcher — основний]
+        GQ[scraper/graphql/<br/>GraphqlOlxFetcher — основний]
         FE[scraper/olxFetcher.ts<br/>HtmlOlxFetcher — fallback]
         NR[scraper/normalizer.ts<br/>parse + upsert]
         DB[(db/db.ts<br/>better-sqlite3)]
@@ -123,7 +123,7 @@ flowchart LR
 | `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
 | `db/schema.sql` | Канонічна схема (4 таблиці). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`). Без `any`. |
-| `scraper/graphqlOlxFetcher.ts` | `GraphqlOlxFetcher implements OlxFetcher` (основний). `fetchPage(search, offset, referer, opts?)` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина). `fetchSearch` — звичайний/глибокий прохід одного діапазону (батчі по 3 з паузами 3–6с, ціль за `visible_total_count`, обмежена `MAX_PAGES=26` — вікно `offset≤1000`); `ListingError` на `offset>0` з даними → частковий успіх (`warning`). `fetchSearchSplit` — глибокий скан із авто-розбиттям по ціні: якщо `visible_total_count > SPLIT_THRESHOLD(1000)`, адаптивна бісекція діапазону на бакети ≤ вікна, скан кожного, злиття дедупом `olxId`; інакше делегує `fetchSearch`. `probeMaxPrice` — зондування верхньої межі ціною спадно (самоперевірка впорядкованості; сортування за ціною не верифіковане live → `null`-fallback). Запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
+| `scraper/graphql/` | `GraphqlOlxFetcher implements OlxFetcher` (основний). Модуль розбитий на: `constants.ts` (URL, ліміти, GraphQL query, split-пороги), `types.ts` (типи відповіді GraphQL API, PriceBucket), `fetcher.ts` (клас), `index.ts` (реекспорт). `fetchPage(search, offset, referer, opts?)` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина). `fetchSearch` — звичайний/глибокий прохід одного діапазону; `fetchSearchSplit` — глибокий скан з авто-розбиттям по ціні (бісекція розбита на `bisectPriceRange`/`scanBuckets`/`resolveUpperPriceBound`). `probeMaxPrice` — зондування верхньої межі. Запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
 | `scraper/selectors.ts` | Усі OLX-селектори + заголовки HTML-запиту в одному місці (для fallback). |
 | `scraper/olxFetcher.ts` | `HtmlOlxFetcher implements OlxFetcher` (fallback №1): побудова URL, fetch, cheerio-парсинг, guard на JS-only сторінку. Той самий `FetchOptions`/глибокий режим (без уточнення цілі за `visible_total_count` — одразу `DEEP_SAFETY_CAP`); `exhausted` завжди `false`. |
 | `scraper/dateParser.ts` | `parseOlxDate(raw, now?) → string \| null` — текстові дати HTML-fallback («Сьогодні/Вчора о HH:MM», «D <місяць_родовий> YYYY р.») → ISO (`YYYY-MM-DD[THH:MM:00]`), сумісний з ISO-датами GraphQL для коректного порівняння у `statusEngine.ts`. Нерозпізнане → `null`. |

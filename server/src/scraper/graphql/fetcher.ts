@@ -1,172 +1,63 @@
+/**
+ * Збирач OLX через GraphQL-ендпойнт фронтенду (`/apigateway/graphql`).
+ * Без кукі/auth (docs/olx-api.md §2). Стратегія за інтерфейсом OlxFetcher.
+ *
+ * Константи — ./constants.ts, типи відповіді — ./types.ts,
+ * спільні утиліти (sleep, delay, slugify) — ../utils.ts.
+ */
+
 import type {
   OlxFetcher,
   SearchConfig,
   RawListing,
   FetchSearchResult,
   FetchOptions,
-} from '../types.js';
+} from '../../types.js';
 
-const GRAPHQL_URL = 'https://www.olx.ua/apigateway/graphql';
-const PAGE_LIMIT = 40;
-/** Розмір батчу запитів — ліміт звичайного скану і крок паузи у глибокому. */
-const BATCH_SIZE = 3;
-/** Абсолютний запобіжник для глибокого скану (на випадок аномального visible_total_count). */
-const DEEP_SAFETY_CAP = 50;
-/**
- * Максимальний валідний offset GraphQL OLX (верифіковано живими запитами 2026-06-12:
- * offset=1000 → OK, offset=1040 → ListingError 400 "Data validation error occurred").
- */
-const MAX_OFFSET = 1000;
-/** Кількість запитів від offset=0 до offset=MAX_OFFSET включно. */
-const MAX_PAGES = MAX_OFFSET / PAGE_LIMIT + 1;
+import { sleep, randomDelayMs, slugify } from '../utils.js';
+import {
+  BATCH_SIZE,
+  DEEP_SAFETY_CAP,
+  MIN_DELAY_MS,
+  MAX_DELAY_MS,
+  BATCH_PAUSE_MIN_MS,
+  BATCH_PAUSE_MAX_MS,
+  USER_AGENT,
+} from '../constants.js';
+import {
+  GRAPHQL_URL,
+  PAGE_LIMIT,
+  MAX_OFFSET,
+  MAX_PAGES,
+  SPLIT_THRESHOLD,
+  MIN_PRICE_WIDTH,
+  MAX_BUCKETS,
+  MAX_TOTAL_REQUESTS,
+  PRICE_SORT_CANDIDATES,
+  LISTING_SEARCH_QUERY,
+} from './constants.js';
+import type {
+  SearchParameter,
+  GraphqlListing,
+  ListingError,
+  GraphqlResponse,
+  PriceBucket,
+} from './types.js';
 
-// ── Авто-розбиття глибокого скану по цінових діапазонах (docs/plans/price-range-split.md) ──
-/** Поріг visible_total_count, за яким бакет ще ділиться (= вікно пагінації OLX). */
-const SPLIT_THRESHOLD = MAX_OFFSET;
-/** Мінімальна ширина цінового діапазону (грн) — вужче ділити немає сенсу. */
-const MIN_PRICE_WIDTH = 1;
-/** Глобальний запобіжник: максимум листів-бакетів (проти лавини запитів). */
-const MAX_BUCKETS = 40;
-/** Глобальний запобіжник: максимум HTTP-запитів на весь split-скан. */
-const MAX_TOTAL_REQUESTS = 200;
-/**
- * Кандидати `sort_by` для зондування максимальної ціни (probeMaxPrice). OLX може приймати
- * не всі — probe сам валідовує результат (сторінка має бути впорядкована за ціною спадно),
- * тож хибний/проігнорований ключ безпечно дасть `null` (fallback на звичайний deep).
- * ⚠️ Live-верифікація сортування за ціною не виконана у build-середовищі (мережа до OLX
- * заблокована); probe самоперевіряється у рантаймі — деталі у docs/olx-api.md §2.9.
- */
-const PRICE_SORT_CANDIDATES = ['filter_float_price:desc', 'price:desc'];
-const MIN_DELAY_MS = 1000;
-const MAX_DELAY_MS = 2000;
-/** Пауза між батчами у глибокому скані — щоб не «DDoS»-ити OLX. */
-const BATCH_PAUSE_MIN_MS = 3000;
-const BATCH_PAUSE_MAX_MS = 6000;
-
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36';
-
-// Скорочений query (дослівно з docs/olx-api.md §2.4) — лише поля, які нам потрібні.
-const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
-  clientCompatibleListings(searchParameters: $searchParameters) {
-    __typename
-    ... on ListingSuccess {
-      data {
-        id
-        title
-        url
-        status
-        created_time
-        last_refresh_time
-        business
-        location {
-          city { name }
-          district { name }
-        }
-        photos { link }
-        params {
-          key
-          name
-          type
-          value {
-            __typename
-            ... on PriceParam { value currency negotiable label }
-            ... on GenericParam { key label }
-          }
-        }
-        description
-        user { name }
-        contact { name }
-      }
-      metadata { total_elements visible_total_count }
-    }
-    ... on ListingError {
-      error { code title detail status }
-    }
-  }
-}`;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Опції побудови searchParameters (перевизначення sort/limit/price для probe та split). */
+interface BuildParamsOptions {
+  sortBy?: string;
+  limit?: number;
+  priceRange?: { from?: number; to?: number };
 }
 
-function randomDelay(): number {
-  return MIN_DELAY_MS + Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS));
+/** Результат одного POST до GraphQL (fetchPage). */
+interface PageResult {
+  items: RawListing[];
+  visibleTotalCount: number | null;
+  listingError: ListingError['error'] | null;
 }
 
-function batchPauseDelay(): number {
-  return BATCH_PAUSE_MIN_MS + Math.floor(Math.random() * (BATCH_PAUSE_MAX_MS - BATCH_PAUSE_MIN_MS));
-}
-
-/** Слаг для Referer (формат `q-<...>`, як у HtmlOlxFetcher). */
-function slugify(query: string): string {
-  const slug = query.trim().toLowerCase().replace(/\s+/g, '-');
-  return encodeURIComponent(slug);
-}
-
-interface SearchParameter {
-  key: string;
-  value: string;
-}
-
-/** Значення параметра оголошення. Поля заповнені залежно від __typename (PriceParam/GenericParam/інше). */
-interface GraphqlParamValue {
-  __typename: string;
-  value?: number;
-  currency?: string;
-  negotiable?: boolean;
-  label?: string;
-  key?: string;
-}
-
-interface GraphqlParam {
-  key: string;
-  name: string;
-  type: string;
-  value: GraphqlParamValue;
-}
-
-interface GraphqlListing {
-  id: number;
-  title: string;
-  url: string;
-  status: string;
-  created_time: string;
-  last_refresh_time: string;
-  business: boolean;
-  location?: {
-    city?: { name: string } | null;
-    district?: { name: string } | null;
-  } | null;
-  photos?: Array<{ link: string }>;
-  params?: GraphqlParam[];
-  description?: string | null;
-  user?: { name?: string | null } | null;
-  contact?: { name?: string | null } | null;
-}
-
-interface ListingSuccess {
-  __typename: 'ListingSuccess';
-  data: GraphqlListing[];
-  metadata?: { total_elements: number; visible_total_count: number };
-}
-
-interface ListingError {
-  __typename: 'ListingError';
-  error: { code?: string; title?: string; detail?: string; status?: number };
-}
-
-interface GraphqlResponse {
-  data?: {
-    clientCompatibleListings?: ListingSuccess | ListingError;
-  };
-  errors?: Array<{ message: string }>;
-}
-
-/**
- * Збирач OLX через GraphQL-ендпойнт фронтенду (`/apigateway/graphql`).
- * Без кукі/auth (docs/olx-api.md §2). Стратегія за інтерфейсом OlxFetcher.
- */
 export class GraphqlOlxFetcher implements OlxFetcher {
   /**
    * Будує searchParameters для одного запиту (мапінг — docs/olx-api.md §2.2/§2.5).
@@ -176,7 +67,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
   buildSearchParameters(
     search: SearchConfig,
     offset: number,
-    opts?: { sortBy?: string; limit?: number; priceRange?: { from?: number; to?: number } },
+    opts?: BuildParamsOptions,
   ): SearchParameter[] {
     const params: SearchParameter[] = [
       { key: 'query', value: search.query },
@@ -237,12 +128,8 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     search: SearchConfig,
     offset: number,
     referer: string,
-    opts?: { sortBy?: string; limit?: number; priceRange?: { from?: number; to?: number } },
-  ): Promise<{
-    items: RawListing[];
-    visibleTotalCount: number | null;
-    listingError: ListingError['error'] | null;
-  }> {
+    opts?: BuildParamsOptions,
+  ): Promise<PageResult> {
     const searchParameters = this.buildSearchParameters(search, offset, opts);
 
     const res = await fetch(GRAPHQL_URL, {
@@ -300,10 +187,12 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     );
   }
 
+  // ── Звичайний / глибокий скан (без split) ────────────────────────────────────
+
   async fetchSearch(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult> {
     const all: RawListing[] = [];
     const seen = new Set<number>();
-    const referer = `https://www.olx.ua/uk/list/q-${slugify(search.query)}/`;
+    const referer = this.buildReferer(search.query);
     let visibleTotalCount: number | null = null;
     const deep = options?.deep ?? false;
     // Глибокий: ціль уточнюється після 1-го запиту за visible_total_count (або лишається DEEP_SAFETY_CAP),
@@ -334,9 +223,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         }
       }
 
-      const items = page.items;
-
-      for (const item of items) {
+      for (const item of page.items) {
         if (seen.has(item.olxId)) continue;
         seen.add(item.olxId);
         all.push(item);
@@ -345,22 +232,24 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       requestsUsed = i + 1;
       options?.onProgress?.({ done: requestsUsed, total: target });
 
-      if (items.length < PAGE_LIMIT) {
+      if (page.items.length < PAGE_LIMIT) {
         exhausted = true;
         break;
       }
 
       if (i < target - 1) {
         if (deep && requestsUsed % BATCH_SIZE === 0) {
-          await sleep(batchPauseDelay());
+          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
         } else {
-          await sleep(randomDelay());
+          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
         }
       }
     }
 
     return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning };
   }
+
+  // ── Probe максимальної ціни ──────────────────────────────────────────────────
 
   /**
    * Зондує максимальну ціну видачі одним запитом із сортуванням за ціною спадно.
@@ -371,10 +260,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
    * до OLX заблокована); деталі — docs/olx-api.md §2.9.
    */
   async probeMaxPrice(search: SearchConfig): Promise<number | null> {
-    const referer = `https://www.olx.ua/uk/list/q-${slugify(search.query)}/`;
+    const referer = this.buildReferer(search.query);
 
     for (const sortBy of PRICE_SORT_CANDIDATES) {
-      let page: Awaited<ReturnType<GraphqlOlxFetcher['fetchPage']>>;
+      let page: PageResult;
       try {
         page = await this.fetchPage(search, 0, referer, { sortBy, limit: PAGE_LIMIT });
       } catch {
@@ -395,6 +284,8 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     return null;
   }
 
+  // ── Глибокий скан із авто-розбиттям по ціні (split) ──────────────────────────
+
   /**
    * Глибокий скан із авто-розбиттям по ціні (docs/plans/price-range-split.md).
    * Якщо `visible_total_count > SPLIT_THRESHOLD`, ділить ціновий діапазон бісекцією на
@@ -402,7 +293,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
    * дедуп `olxId`. Малі пошуки (≤ вікна) делегуються звичайному `fetchSearch`.
    */
   async fetchSearchSplit(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult> {
-    const referer = `https://www.olx.ua/uk/list/q-${slugify(search.query)}/`;
+    const referer = this.buildReferer(search.query);
     const onProgress = options?.onProgress;
     let requestsUsed = 0;
 
@@ -422,33 +313,93 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     }
 
     // 2. Визначаємо межі діапазону. Верхня: явна `to` або probe максимальної ціни.
+    const hi = await this.resolveUpperPriceBound(search, options, requestsUsed);
+    requestsUsed = hi.requestsUsed;
+    if (hi.fallbackResult) return hi.fallbackResult;
+
+    const lo = search.apiFilters.ranges?.price?.from ?? 0;
+
+    // 3. Фаза бісекції: черга інтервалів → листи-бакети, що влазять у вікно пагінації.
+    const bisection = await this.bisectPriceRange(search, referer, lo, hi.upperBound!, requestsUsed, onProgress);
+    requestsUsed = bisection.requestsUsed;
+
+    // 4. Фаза сканування листів: допагінація кожного бакету + злиття.
+    const scanResult = await this.scanBuckets(
+      search, referer, rootPage.items, bisection.buckets, requestsUsed, onProgress,
+    );
+
+    const warnings = [`split: ${bisection.buckets.length} price buckets; coverage window skipped`];
+    if (scanResult.capHit) warnings.push('some buckets hit pagination/request cap');
+
+    return {
+      listings: scanResult.listings,
+      visibleTotalCount: rootCount,
+      requestsUsed: scanResult.requestsUsed,
+      exhausted: scanResult.allExhausted && !scanResult.capHit,
+      warning: warnings.join('; '),
+      bucketsUsed: bisection.buckets.length,
+    };
+  }
+
+  // ── Приватні хелпери split-скану ─────────────────────────────────────────────
+
+  /**
+   * Визначає верхню межу ціни для split-скану: явна `to` з apiFilters або probe.
+   * Якщо probe невдалий — повертає fallbackResult (звичайний deep + попередження).
+   */
+  private async resolveUpperPriceBound(
+    search: SearchConfig,
+    options: FetchOptions | undefined,
+    startRequestsUsed: number,
+  ): Promise<{
+    upperBound: number | null;
+    requestsUsed: number;
+    fallbackResult?: FetchSearchResult;
+  }> {
+    let requestsUsed = startRequestsUsed;
     const priceRange = search.apiFilters.ranges?.price;
-    const lo = priceRange?.from ?? 0;
-    let hi: number | null = priceRange?.to ?? null;
-    if (hi == null) {
-      onProgress?.({ done: requestsUsed, stage: 'Зондування максимальної ціни' });
-      hi = await this.probeMaxPrice(search);
-      requestsUsed += PRICE_SORT_CANDIDATES.length; // верхня оцінка probe-запитів
-      if (hi == null) {
-        // Probe не дав надійної верхньої межі — звичайний deep + попередження.
-        const res = await this.fetchSearch(search, options);
-        return {
+    const explicitTo = priceRange?.to ?? null;
+
+    if (explicitTo != null) {
+      return { upperBound: explicitTo, requestsUsed };
+    }
+
+    options?.onProgress?.({ done: requestsUsed, stage: 'Зондування максимальної ціни' });
+    const maxPrice = await this.probeMaxPrice(search);
+    requestsUsed += PRICE_SORT_CANDIDATES.length; // верхня оцінка probe-запитів
+
+    if (maxPrice == null) {
+      // Probe не дав надійної верхньої межі — звичайний deep + попередження.
+      const res = await this.fetchSearch(search, options);
+      return {
+        upperBound: null,
+        requestsUsed,
+        fallbackResult: {
           ...res,
           warning: [res.warning, 'split skipped: no upper price bound']
             .filter(Boolean)
             .join('; '),
-        };
-      }
+        },
+      };
     }
 
-    // 3. Фаза бісекції (probe): черга інтервалів, кожен «лист» влазить у вікно.
-    interface Bucket {
-      from: number;
-      to: number;
-      count: number;
-      page0: RawListing[];
-    }
-    const buckets: Bucket[] = [];
+    return { upperBound: maxPrice, requestsUsed };
+  }
+
+  /**
+   * Фаза бісекції: ділить [lo, hi] на бакети, кожен з visible_total_count ≤ SPLIT_THRESHOLD.
+   * Черга BFS — інтервали, що не вмістились, діляться навпіл.
+   */
+  private async bisectPriceRange(
+    search: SearchConfig,
+    referer: string,
+    lo: number,
+    hi: number,
+    startRequestsUsed: number,
+    onProgress?: FetchOptions['onProgress'],
+  ): Promise<{ buckets: PriceBucket[]; requestsUsed: number }> {
+    let requestsUsed = startRequestsUsed;
+    const buckets: PriceBucket[] = [];
     const queue: Array<{ from: number; to: number }> = [{ from: lo, to: hi }];
 
     while (queue.length > 0) {
@@ -458,9 +409,8 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         priceRange: { from: interval.from, to: interval.to },
       });
       requestsUsed++;
-      // Під час бісекції onProgress НЕ викликаємо: scan_runs.requests_total лишається NULL →
-      // фронтенд показує індетермінований стан «Підготовка…» (визначений total знаємо лише
-      // після формування листів-бакетів, у фазі скану нижче).
+      // Під час бісекції onProgress НЕ передає total: scan_runs.requests_total лишається NULL →
+      // фронтенд показує індетермінований стан «Підготовка…».
 
       const count = page.listingError ? 0 : page.visibleTotalCount ?? 0;
       const width = interval.to - interval.from;
@@ -483,18 +433,36 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
     }
 
-    // 4. Оцінка загальної кількості запитів (probe-фаза вже зроблена + допагінація листів).
-    const pagesForBucket = (count: number): number =>
-      Math.min(MAX_PAGES, Math.max(1, Math.ceil(count / PAGE_LIMIT)));
+    return { buckets, requestsUsed };
+  }
+
+  /**
+   * Фаза сканування бакетів: допагінація кожного бакету від offset=PAGE_LIMIT, злиття у Map.
+   * rootItems — оголошення з 0-ї сторінки кореневого запиту (вже завантажені).
+   */
+  private async scanBuckets(
+    search: SearchConfig,
+    referer: string,
+    rootItems: RawListing[],
+    buckets: PriceBucket[],
+    startRequestsUsed: number,
+    onProgress?: FetchOptions['onProgress'],
+  ): Promise<{
+    listings: RawListing[];
+    requestsUsed: number;
+    allExhausted: boolean;
+    capHit: boolean;
+  }> {
+    let requestsUsed = startRequestsUsed;
+    const merged = new Map<number, RawListing>();
+    for (const item of rootItems) merged.set(item.olxId, item);
+
+    // Оцінка загальної кількості запитів (probe-фаза вже зроблена + допагінація листів).
     const remainingEstimate = buckets.reduce(
-      (sum, b) => sum + Math.max(0, pagesForBucket(b.count) - 1),
+      (sum, b) => sum + Math.max(0, estimatePages(b.count) - 1),
       0,
     );
     const totalEstimate = requestsUsed + remainingEstimate;
-
-    // 5. Фаза скану листів: допагінація від offset=PAGE_LIMIT, злиття у спільний Map (дедуп).
-    const merged = new Map<number, RawListing>();
-    for (const item of rootPage.items) merged.set(item.olxId, item);
 
     let allExhausted = true;
     let capHit = false;
@@ -508,7 +476,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         continue;
       }
 
-      const pages = pagesForBucket(bucket.count);
+      const pages = estimatePages(bucket.count);
       let bucketExhausted = false;
 
       for (let p = 1; p < pages; p++) {
@@ -531,7 +499,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         });
 
         if (page.listingError) {
-          // Бакет усе одно вперся у вікно пагінації — частковий результат, без падіння.
+          // Бакет вперся у вікно пагінації — частковий результат, без падіння.
           capHit = true;
           break;
         }
@@ -544,11 +512,11 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         }
 
         if (requestsUsed % BATCH_SIZE === 0) {
-          const delay = batchPauseDelay();
+          const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
           onProgress?.({ done: requestsUsed, stage: `Пауза ~${Math.round(delay / 1000)}с` });
           await sleep(delay);
         } else {
-          await sleep(randomDelay());
+          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
         }
       }
 
@@ -560,24 +528,16 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
       // Пауза між бакетами (ввічливість — як між батчами).
       if (bi < buckets.length - 1) {
-        const delay = batchPauseDelay();
+        const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
         onProgress?.({ done: requestsUsed, stage: `Пауза перед наступним бакетом ~${Math.round(delay / 1000)}с` });
         await sleep(delay);
       }
     }
 
-    const warnings = [`split: ${buckets.length} price buckets; coverage window skipped`];
-    if (capHit) warnings.push('some buckets hit pagination/request cap');
-
-    return {
-      listings: [...merged.values()],
-      visibleTotalCount: rootCount,
-      requestsUsed,
-      exhausted: allExhausted && !capHit,
-      warning: warnings.join('; '),
-      bucketsUsed: buckets.length,
-    };
+    return { listings: [...merged.values()], requestsUsed, allExhausted, capHit };
   }
+
+  // ── Маппінг і хелпери ────────────────────────────────────────────────────────
 
   /** Мапить GraphQL-оголошення у RawListing (мапінг полів — docs/olx-api.md §2.7). */
   private mapListing(item: GraphqlListing): RawListing {
@@ -626,4 +586,17 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       olxStatus: item.status,
     };
   }
+
+  /** Будує Referer-заголовок для запитів до OLX. */
+  private buildReferer(query: string): string {
+    return `https://www.olx.ua/uk/list/q-${slugify(query)}/`;
+  }
+}
+
+/**
+ * Оцінює кількість сторінок для бакету з `count` оголошень
+ * (обмежено MAX_PAGES — вікном пагінації GraphQL OLX).
+ */
+function estimatePages(count: number): number {
+  return Math.min(MAX_PAGES, Math.max(1, Math.ceil(count / PAGE_LIMIT)));
 }
