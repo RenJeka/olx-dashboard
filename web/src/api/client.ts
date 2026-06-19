@@ -624,6 +624,31 @@ export function useUpdateSearchSynonyms() {
   });
 }
 
+/** Загальне редагування пошуку (назва/запит/api_filters/синоніми) — docs/plans/search-row-edit.md. */
+export function useUpdateSearch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      name,
+      query,
+      api_filters,
+      query_synonyms,
+    }: {
+      searchId: number;
+      name?: string;
+      query?: string;
+      api_filters?: unknown;
+      query_synonyms?: string[];
+    }) =>
+      api<Search>(`/api/searches/${searchId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, query, api_filters, query_synonyms }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
+  });
+}
+
 /** Архівувати/розархівувати пошук (docs/plans/archive-searches.md). */
 export function useArchiveSearch() {
   const qc = useQueryClient();

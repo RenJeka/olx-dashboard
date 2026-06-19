@@ -23,11 +23,13 @@ import {
   LuFilter,
   LuLayers,
   LuListChecks,
+  LuPencil,
   LuPlus,
   LuTrash2,
 } from 'react-icons/lu';
 import { SearchFiltersDrawer } from './SearchFiltersDrawer';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
+import { SearchEditDialog } from './SearchEditDialog';
 import {
   DialogBackdrop,
   DialogBody,
@@ -58,6 +60,8 @@ import {
   useArchiveSearch,
 } from '../api/client';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { parsePriceRange, formatPriceRange } from '../utils/format';
+import { sortAlpha } from '../utils/sort';
 import type { Search } from '../types';
 
 interface Props {
@@ -367,12 +371,14 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [variantsOpen, setVariantsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const deleteSearch = useDeleteSearch();
   const reorderSearch = useReorderSearches();
   const updateSynonyms = useUpdateSearchSynonyms();
   const archiveSearch = useArchiveSearch();
   const synonyms = parseSynonyms(search.query_synonyms);
   const isArchived = search.archived === 1;
+  const priceRange = parsePriceRange(search.api_filters);
 
   function handleArchiveToggle() {
     archiveSearch.mutate(
@@ -433,6 +439,33 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
             <Text textStyle="sm" fontWeight="medium" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" flex="1">
               {search.name}
             </Text>
+            {synonyms.length > 0 && (
+              <Tooltip
+                content={
+                  <Stack gap={0.5} maxW="220px">
+                    <Text fontWeight="semibold" fontSize="xs">
+                      Додаткові варіанти пошуку:
+                    </Text>
+                    {sortAlpha(synonyms).map((s) => (
+                      <Text key={s} fontSize="xs">
+                        • {s}
+                      </Text>
+                    ))}
+                  </Stack>
+                }
+              >
+                <Badge
+                  size="xs"
+                  colorPalette="blue"
+                  variant="solid"
+                  rounded="full"
+                  flexShrink={0}
+                  cursor="default"
+                >
+                  +{synonyms.length}
+                </Badge>
+              </Tooltip>
+            )}
             {hasActiveLocalFilters(search.local_filters) && (
               <Tooltip content="Застосований фільтр">
                 <Box w="2" h="2" bg="orange.500" rounded="full" flexShrink={0} cursor="default" />
@@ -442,6 +475,18 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
           <Text textStyle="xs" color="fg.muted" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
             {search.query}
           </Text>
+          {priceRange && (
+            <Text
+              textStyle="xs"
+              color="orange.500"
+              fontWeight="medium"
+              overflow="hidden"
+              textOverflow="ellipsis"
+              whiteSpace="nowrap"
+            >
+              {formatPriceRange(priceRange.from, priceRange.to)}
+            </Text>
+          )}
         </Box>
         {!isArchived && (
           <>
@@ -489,6 +534,11 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
           <Portal>
             <Menu.Positioner>
               <Menu.Content onClick={(e) => e.stopPropagation()}>
+                <Menu.Item value="edit" onSelect={() => setEditOpen(true)}>
+                  <HStack gap={2}>
+                    <LuPencil /> <Text>Редагувати</Text>
+                  </HStack>
+                </Menu.Item>
                 <Menu.Item value="filters" onSelect={() => setFiltersOpen(true)}>
                   <HStack gap={2}>
                     <LuFilter /> <Text>Фільтри</Text>
@@ -516,6 +566,7 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
           </Portal>
         </Menu.Root>
       </HStack>
+      <SearchEditDialog search={search} open={editOpen} onOpenChange={setEditOpen} />
       <SearchFiltersDrawer search={search} open={filtersOpen} onOpenChange={setFiltersOpen} />
       <SearchVariantsDialog
         open={variantsOpen}
