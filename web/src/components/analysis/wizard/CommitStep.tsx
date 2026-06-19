@@ -5,7 +5,7 @@ import {
   Stack,
   Text,
 } from '@chakra-ui/react';
-import type { useWizardActions } from '../../../hooks/useWizardActions';
+import type { useWizardActions } from '../../../hooks/analysis/useWizardActions';
 
 type Actions = ReturnType<typeof useWizardActions>;
 

@@ -15,7 +15,7 @@ import { HighlightText } from '../../table/HighlightText';
 import { Tooltip } from '../../ui/tooltip';
 import { stripDescriptionHtml } from '../../../utils/format';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-import type { useWizardActions } from '../../../hooks/useWizardActions';
+import type { useWizardActions } from '../../../hooks/analysis/useWizardActions';
 import type { AnalyzedListing, Listing } from '../../../types';
 
 type Actions = ReturnType<typeof useWizardActions>;

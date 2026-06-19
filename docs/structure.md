@@ -179,7 +179,13 @@ olx-dashboard/
         │   ├── useListingsMap.ts  # мемоїзована Map<id, Listing> з масиву listings (спільний для AI-діалогів)
         │   ├── useZipDownload.ts  # хук для паттерну «завантажити ZIP» (downloading/downloaded/download)
         │   ├── useAiPicksFlow.ts  # бізнес-логіка AI Вибір (стан step/picks, handleRun/Import/Commit)
-        │   ├── useWizardActions.ts # бізнес-логіка AI-аналізу (критерії, аналіз, перевірка, запис)
+        │   ├── analysis/          # AI-аналіз логіка (кроки майстра)
+        │   │   ├── useWizardActions.ts # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
+        │   │   ├── useAnalysisScope.ts # обчислення множин ID для аналізу (allIds, tabIds, effectiveIds)
+        │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (генерація/імпорт/вибір критеріїв)
+        │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
+        │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
+        │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)
         │   ├── useNewSearchForm.ts # стан і сабміт форми створення нового пошуку (NewSearchForm)
         │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/
@@ -198,7 +204,8 @@ olx-dashboard/
             ├── sort.ts           # sortAlpha() — алфавітне сортування (укр. колація, латиниця в кінці) для синонімів і критеріїв AI
             ├── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
             ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
-            └── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
+            ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
+            └── analysis.ts       # чисті функції для AI-аналізу (isIncludedFn, computeDefaultScope, buildScopeLabel)
 ```
 
 ## Орієнтири «куди дивитись»
