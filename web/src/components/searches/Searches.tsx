@@ -13,16 +13,15 @@ import { SearchesPanel } from './SearchesPanel';
 import { useSearches } from '../../api';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useNewSearchForm } from '../../hooks/useNewSearchForm';
-
-interface Props {
-  selectedId: number | null;
-  onSelect: (id: number | null) => void;
-  visible?: boolean;
-  onVisibleChange?: (visible: boolean) => void;
-}
+import { useSettingsStore } from '../../stores/settingsStore';
 
 /** Бічна панель «Пошуки»: акордеон активних/архівованих пошуків + форма створення нового. */
-export function Searches({ selectedId, onSelect, visible = true, onVisibleChange }: Props) {
+export function Searches() {
+  const selectedId = useSettingsStore((s) => s.selectedSearchId);
+  const onSelect = useSettingsStore((s) => s.setSelectedSearchId);
+  const visible = useSettingsStore((s) => s.searchesVisible);
+  const onVisibleChange = useSettingsStore((s) => s.setSearchesVisible);
+  
   const isMobile = useIsMobile();
   const { data: searches, isLoading } = useSearches();
   const newSearchForm = useNewSearchForm();

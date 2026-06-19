@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
 import { useGenerateCriteria, fetchCriteriaPrompt, useImportCriteria, useSaveCriteria } from '../../api';
-import { loadAnalysisModel, loadAnalysisReasoning, loadAnalysisExtraCriteria } from '../../utils/storage';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { showErrorToast } from '../../utils/toast';
 import { toaster } from '../../components/ui/toaster';
 import type { AnalysisMode, PackagePart } from '../../types';
@@ -27,9 +27,9 @@ export function useAnalysisCriteria(searchId: number) {
   const importCriteria = useImportCriteria();
   const saveCriteria = useSaveCriteria();
 
-  const model = loadAnalysisModel();
-  const reasoning = loadAnalysisReasoning();
-  const extra = loadAnalysisExtraCriteria();
+  const model = useSettingsStore.getState().analysisModel;
+  const reasoning = useSettingsStore.getState().analysisReasoning;
+  const extra = useSettingsStore.getState().analysisExtraCriteria;
 
   function mergeCriteria(incoming: string[]) {
     setAvailable((prev) => {

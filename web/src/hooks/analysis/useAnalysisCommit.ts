@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
 import { useCommitAnalysis } from '../../api';
-import { loadAnalysisModel } from '../../utils/storage';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { showErrorToast } from '../../utils/toast';
 import { toaster } from '../../components/ui/toaster';
 import { chunk } from '../../utils/array';
@@ -26,7 +26,7 @@ export function useAnalysisCommit(
   const [mergeMode, setMergeMode] = useState<'append' | 'replace'>('append');
 
   const commit = useCommitAnalysis();
-  const model = loadAnalysisModel();
+  const model = useSettingsStore.getState().analysisModel;
 
   async function doCommit(closeDialog: () => void) {
     setCommitProgress({ done: 0, total: commitItems.length });

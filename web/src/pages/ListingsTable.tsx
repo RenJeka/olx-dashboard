@@ -6,14 +6,13 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type OnChangeFn,
   type RowSelectionState,
-  type VisibilityState,
 } from '@tanstack/react-table';
 import { Box, Flex, Spinner, Table, Text } from '@chakra-ui/react';
 import { useListings } from '../api';
 import { useListingsTableState } from '../hooks/useListingsTableState';
 import { useListingsUiStore } from '../stores/listingsUiStore';
+import { useSettingsStore } from '../stores/settingsStore';
 import { columns } from '../components/table/columns';
 import { ListingsTableHeader } from '../components/table/ListingsTableHeader';
 import { ListingsTableBody } from '../components/table/ListingsTableBody';
@@ -28,26 +27,14 @@ import type { Listing } from '../types';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table/columns';
 
-interface Props {
-  searchId: number | null;
-  columnVisibility: VisibilityState;
-  onColumnVisibilityChange: OnChangeFn<VisibilityState>;
-  columnOrder: string[];
-  onColumnOrderChange: (order: string[]) => void;
-  descriptionExpandEnabled: boolean;
-  rowSelection: RowSelectionState;
-  onRowSelectionChange: OnChangeFn<RowSelectionState>;
-}
-
-export function ListingsTable({
-  searchId,
-  columnVisibility,
-  onColumnVisibilityChange,
-  columnOrder,
-  descriptionExpandEnabled,
-  rowSelection,
-  onRowSelectionChange,
-}: Props) {
+export function ListingsTable() {
+  const searchId = useSettingsStore((s) => s.selectedSearchId);
+  const columnVisibility = useSettingsStore((s) => s.columnVisibility);
+  const setColumnVisibility = useSettingsStore((s) => s.setColumnVisibility);
+  const columnOrder = useSettingsStore((s) => s.columnOrder);
+  const descriptionExpandEnabled = useSettingsStore((s) => s.descriptionExpandEnabled);
+  const rowSelection = useSettingsStore((s) => s.rowSelection);
+  const setRowSelection = useSettingsStore((s) => s.setRowSelection);
   const { data, isLoading } = useListings(searchId);
   const { sorting, setSorting, columnSizing, setColumnSizing, pagination, setPagination } =
     useListingsTableState();
@@ -80,7 +67,7 @@ export function ListingsTable({
   // Авто-показ/приховання колонки ai_rank та скидання сортування при переключенні табу.
   useEffect(() => {
     const isAiPicks = statusFilter === 'ai_picks';
-    onColumnVisibilityChange((prev) => ({ ...prev, ai_rank: isAiPicks }));
+    setColumnVisibility((prev) => ({ ...prev, ai_rank: isAiPicks }));
     if (isAiPicks) {
       setSorting([{ id: 'price', desc: false }]);
     }
@@ -111,10 +98,10 @@ export function ListingsTable({
     // повертає на 1-шу сторінку й користувач втрачає позицію.
     autoResetPageIndex: false,
     enableRowSelection: true,
-    onRowSelectionChange: onRowSelectionChange,
+    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnSizingChange: setColumnSizing,
-    onColumnVisibilityChange: onColumnVisibilityChange,
+    onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     onGlobalFilterChange: setSearchText,
     globalFilterFn,
@@ -155,12 +142,12 @@ export function ListingsTable({
   const allTabSelected = filteredRows.length > 0 && filteredRows.every((r) => r.getIsSelected());
   const toggleSelectAllInTab = () => {
     if (allTabSelected) {
-      onRowSelectionChange({});
+      setRowSelection({});
       return;
     }
     const next: RowSelectionState = {};
     for (const r of filteredRows) next[r.id] = true;
-    onRowSelectionChange(next);
+    setRowSelection(next);
   };
   // Підпис видимих колонок (порядок + видимість) — інвалідує memo-рядки при reorder/toggle.
   const columnLayoutKey = table.getVisibleLeafColumns().map((c) => c.id).join(',');
@@ -175,7 +162,7 @@ export function ListingsTable({
         onSearchScopeChange={setSearchScope}
         searchId={searchId ?? undefined}
         selectedIds={selectedIds}
-        onClearSelection={() => onRowSelectionChange({})}
+        onClearSelection={() => setRowSelection({})}
         tabSelectableCount={filteredRows.length}
         allTabSelected={allTabSelected}
         onToggleSelectAllInTab={toggleSelectAllInTab}

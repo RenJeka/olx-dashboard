@@ -3,21 +3,20 @@ import { Badge, Heading, HStack, Input, Stack, Text, Textarea } from '@chakra-ui
 import { LuSparkles } from 'react-icons/lu';
 import { Switch } from '../../ui/switch';
 import { useAnalysisStatus } from '../../../api';
-import {
-  loadAnalysisModel,
-  saveAnalysisModel,
-  loadAnalysisReasoning,
-  saveAnalysisReasoning,
-  loadAnalysisExtraCriteria,
-  saveAnalysisExtraCriteria,
-} from '../../../utils/storage';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
 /** Секція налаштувань «AI-аналіз»: статус ключа, модель, reasoning, додаткові критерії. */
 export function AnalysisSection() {
   const { data: status } = useAnalysisStatus();
-  const [model, setModel] = useState(() => loadAnalysisModel());
-  const [reasoning, setReasoning] = useState(() => loadAnalysisReasoning());
-  const [extra, setExtra] = useState(() => loadAnalysisExtraCriteria());
+  const analysisModel = useSettingsStore((s) => s.analysisModel);
+  const setAnalysisModel = useSettingsStore((s) => s.setAnalysisModel);
+  const analysisReasoning = useSettingsStore((s) => s.analysisReasoning);
+  const setAnalysisReasoning = useSettingsStore((s) => s.setAnalysisReasoning);
+  const analysisExtraCriteria = useSettingsStore((s) => s.analysisExtraCriteria);
+  const setAnalysisExtraCriteria = useSettingsStore((s) => s.setAnalysisExtraCriteria);
+  
+  const [localModel, setLocalModel] = useState(analysisModel);
+  const [localExtra, setLocalExtra] = useState(analysisExtraCriteria);
 
   return (
     <Stack gap={3}>
@@ -38,19 +37,16 @@ export function AnalysisSection() {
         </Text>
         <Input
           size="sm"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          onBlur={() => saveAnalysisModel(model)}
+          value={localModel}
+          onChange={(e) => setLocalModel(e.target.value)}
+          onBlur={() => setAnalysisModel(localModel)}
           placeholder="google/gemini-2.5-flash-lite"
         />
       </Stack>
 
       <Switch
-        checked={reasoning}
-        onCheckedChange={(d) => {
-          setReasoning(d.checked);
-          saveAnalysisReasoning(d.checked);
-        }}
+        checked={analysisReasoning}
+        onCheckedChange={(d) => setAnalysisReasoning(d.checked)}
       >
         <Text>reasoning для пошуку (повільніше, точніше)</Text>
       </Switch>
@@ -62,9 +58,9 @@ export function AnalysisSection() {
         <Textarea
           size="sm"
           rows={2}
-          value={extra}
-          onChange={(e) => setExtra(e.target.value)}
-          onBlur={() => saveAnalysisExtraCriteria(extra)}
+          value={localExtra}
+          onChange={(e) => setLocalExtra(e.target.value)}
+          onBlur={() => setAnalysisExtraCriteria(localExtra)}
           placeholder="Напр.: звертай увагу на стан акумулятора, гарантію…"
         />
       </Stack>

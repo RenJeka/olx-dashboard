@@ -18,7 +18,7 @@ import { toaster } from './ui/toaster';
 import { copyToClipboard } from '../utils/clipboard';
 import { useScan, useScanStatus, useSearchStats, useVerify } from '../api';
 import { formatRelativeTime } from '../utils/format';
-import { loadSkipDeepScanConfirm, saveSkipDeepScanConfirm } from '../utils/storage';
+import { useSettingsStore } from '../stores/settingsStore';
 import type { Search } from '../types';
 
 export const SCAN_KIND_LABELS: Record<string, string> = {
@@ -72,7 +72,7 @@ export function SearchActionPanel({ search }: Props) {
   );
 
   function startDeepScan() {
-    if (loadSkipDeepScanConfirm()) {
+    if (useSettingsStore.getState().skipDeepScanConfirm) {
       runScan(true);
     } else {
       setConfirmDeepOpen(true);
@@ -383,7 +383,7 @@ export function SearchActionPanel({ search }: Props) {
         }
         confirmLabel="Сканувати"
         onConfirm={(skipNextTime) => {
-          if (skipNextTime) saveSkipDeepScanConfirm(true);
+          if (skipNextTime) useSettingsStore.getState().setSkipDeepScanConfirm(true);
           runScan(true);
         }}
       />

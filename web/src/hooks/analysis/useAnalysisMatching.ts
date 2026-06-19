@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
 import { useAnalyze, fetchAnalyzePackageZip, useImportAnalysis } from '../../api';
-import { loadAnalysisModel, loadAnalysisReasoning } from '../../utils/storage';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { showErrorToast } from '../../utils/toast';
 import { toaster } from '../../components/ui/toaster';
 import { chunk } from '../../utils/array';
@@ -23,8 +23,8 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
   const analyze = useAnalyze();
   const importAnalysis = useImportAnalysis();
 
-  const model = loadAnalysisModel();
-  const reasoning = loadAnalysisReasoning();
+  const model = useSettingsStore.getState().analysisModel;
+  const reasoning = useSettingsStore.getState().analysisReasoning;
 
   async function runAutoAnalyze() {
     if (effectiveIds.length === 0) {

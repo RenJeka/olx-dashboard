@@ -240,11 +240,8 @@ flowchart LR
   `LastScanInfo`, `SearchStats`, `Search` (включно з `sort_order`, `visible_total_count`,
   `local_filters`), `NewSearchInput`, `StoredTableState` тощо — дзеркало відповідних типів
   `server/src/types.ts`.
-- `utils/storage.ts` — хелпери для взаємодії з `localStorage`: загальні `loadSettings`/`saveSettings`
-  над одним обʼєктом `SETTINGS_STORAGE_KEY` (поля `columnVisibility`, `descriptionExpandEnabled`
-  (дефолт `true`), `autoRefreshEnabled`/`autoRefreshIntervalMin` (дефолт `false`/`30`),
-  `skipDeepScanConfirm`) + окремо стан таблиці `TABLE_STORAGE_KEY` (сортування/розміри
-  колонок/`pageSize`, дефолт `DEFAULT_PAGE_SIZE = 50`).
+- `stores/settingsStore.ts` — глобальний Zustand-стор (`useSettingsStore`) з `persist` middleware: зберігає налаштування інтерфейсу (`columnVisibility`, `columnOrder`, `descriptionExpandEnabled`, `searchesVisible`), налаштування автооновлення (`autoRefreshEnabled`, `autoRefreshIntervalMin`), параметри AI (`analysisModel`, `analysisReasoning`, `analysisExtraCriteria`) у `localStorage`. Також містить ефемерний стан вибраного пошуку (`selectedSearchId`) та виділених рядків таблиці (`rowSelection`).
+- `utils/storage.ts` — хелпери для `localStorage` виключно для специфічного стану таблиці `TABLE_STORAGE_KEY` (сортування, розміри колонок).
 - `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати
   (`formatDate`), відносного часу (`formatRelativeTime`, напр. «3 год тому» — для рядка
   стану панелі дій) та чистки HTML-опису (`stripDescriptionHtml`).

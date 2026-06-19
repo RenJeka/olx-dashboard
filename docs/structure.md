@@ -173,6 +173,7 @@ olx-dashboard/
         │       ├── checkbox.tsx
         │       └── close-button.tsx
         ├── stores/
+        │   ├── settingsStore.ts       # useSettingsStore: глобальне сховище UI-налаштувань та опцій AI (Zustand + persist)
         │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці), showFilteredOut, showIrrelevant — спільний стан між таблицею і AI-майстром
         │   └── analysisWizardStore.ts # useAnalysisWizardStore: прогрес AI-Flow (mode/scope/step/критерії/результати); bindSearch/reset
         ├── hooks/
@@ -200,7 +201,7 @@ olx-dashboard/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS/STATUS_COLORS, isMutedStatus()
             ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
-            ├── storage.ts        # збереження/завантаження налаштувань (columnVisibility, tableState, автооновлення, AI-аналіз) у localStorage
+            ├── storage.ts        # збереження/завантаження стану сортування та розмірів колонок таблиці у localStorage
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
             ├── download.ts       # downloadBlob()/downloadText() — завантаження файлів (експорт, ручний пакет)

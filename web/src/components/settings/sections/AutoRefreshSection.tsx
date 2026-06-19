@@ -1,26 +1,19 @@
 import { Heading, HStack, NativeSelect, Stack, Text } from '@chakra-ui/react';
 import { LuTimer } from 'react-icons/lu';
 import { Switch } from '../../ui/switch';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
-interface AutoRefreshSectionProps {
-  autoRefreshEnabled: boolean;
-  onAutoRefreshEnabledChange: (value: boolean) => void;
-  autoRefreshIntervalMin: number;
-  onAutoRefreshIntervalMinChange: (value: number) => void;
-}
-
-export function AutoRefreshSection({
-  autoRefreshEnabled,
-  onAutoRefreshEnabledChange,
-  autoRefreshIntervalMin,
-  onAutoRefreshIntervalMinChange,
-}: AutoRefreshSectionProps) {
+export function AutoRefreshSection() {
+  const autoRefreshEnabled = useSettingsStore((s) => s.autoRefreshEnabled);
+  const setAutoRefreshEnabled = useSettingsStore((s) => s.setAutoRefreshEnabled);
+  const autoRefreshIntervalMin = useSettingsStore((s) => s.autoRefreshIntervalMin);
+  const setAutoRefreshIntervalMin = useSettingsStore((s) => s.setAutoRefreshIntervalMin);
   return (
     <Stack gap={3}>
       <Heading size="sm">Автооновлення</Heading>
       <Switch
         checked={autoRefreshEnabled}
-        onCheckedChange={(details) => onAutoRefreshEnabledChange(details.checked)}
+        onCheckedChange={(details) => setAutoRefreshEnabled(details.checked)}
       >
         <HStack gap={1}>
           <LuTimer />
@@ -30,7 +23,7 @@ export function AutoRefreshSection({
       <NativeSelect.Root size="sm" w="40" disabled={!autoRefreshEnabled}>
         <NativeSelect.Field
           value={String(autoRefreshIntervalMin)}
-          onChange={(e) => onAutoRefreshIntervalMinChange(Number(e.target.value))}
+          onChange={(e) => setAutoRefreshIntervalMin(Number(e.target.value))}
           cursor={autoRefreshEnabled ? 'pointer' : undefined}
         >
           <option value="15">Кожні 15 хв</option>

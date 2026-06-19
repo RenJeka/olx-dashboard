@@ -12,7 +12,7 @@ import {
   fetchRelevancePackageZip,
 } from '../api';
 import { useListingsUiStore } from '../stores/listingsUiStore';
-import { loadAnalysisModel } from '../utils/storage';
+import { useSettingsStore } from '../stores/settingsStore';
 import { showErrorToast } from '../utils/toast';
 import { useListingsMap } from './useListingsMap';
 import { chunk } from '../utils/array';
@@ -87,7 +87,7 @@ export function useRelevanceFlow({ search, selectedIds }: UseRelevanceFlowProps)
           searchId: search.id,
           target: target.trim(),
           ids: batch,
-          model: loadAnalysisModel(),
+          model: useSettingsStore.getState().analysisModel,
         });
         acc.push(...res.results);
         setProgress((p) => (p ? { ...p, done: p.done + batch.length } : p));
