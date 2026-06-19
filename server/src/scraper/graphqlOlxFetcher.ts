@@ -600,6 +600,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
     const rawPhoto = item.photos?.[0]?.link;
     const photoUrl = rawPhoto?.replace('{width}x{height}', '400x300');
+    // Усі фото у прев'ю-розмірі для галереї при наведенні (більший за мініатюру).
+    const photoUrls = (item.photos ?? [])
+      .map((p) => p.link?.replace('{width}x{height}', '600x450'))
+      .filter((link): link is string => Boolean(link));
 
     return {
       olxId: item.id,
@@ -607,6 +611,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       rawPrice: '',
       url: item.url,
       photoUrl,
+      photoUrls,
       price,
       currency,
       createdAt: item.created_time,

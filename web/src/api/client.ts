@@ -624,6 +624,19 @@ export function useUpdateSearchSynonyms() {
   });
 }
 
+/** Архівувати/розархівувати пошук (docs/plans/archive-searches.md). */
+export function useArchiveSearch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ searchId, archived }: { searchId: number; archived: boolean }) =>
+      api<Search>(`/api/searches/${searchId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ archived: archived ? 1 : 0 }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
+  });
+}
+
 /** PATCH local_filters → ретроактивний перерахунок filtered_out (повертає filtered_out_count). */
 export function useUpdateSearchFilters() {
   const qc = useQueryClient();

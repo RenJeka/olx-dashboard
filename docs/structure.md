@@ -132,6 +132,7 @@ olx-dashboard/
         │   │   ├── ListingsTableRow.tsx # рядок таблиці (React.memo), приглушений стиль для disabled/rejected
         │   │   ├── StatusCell.tsx # інлайн-едіт статусу (NativeSelect) + status_source
         │   │   ├── NoteCell.tsx   # інлайн-едіт нотатки (Popover + textarea)
+        │   │   ├── PhotoCell.tsx  # мініатюра фото + Tooltip-галерея (збільшення при наведенні, photo_urls)
         │   │   ├── ProsConsCell.tsx # інлайн-едіт плюсів/мінусів (Popover + textarea)
         │   │   ├── HighlightText.tsx # підсвітка збігів пошукового запиту (Mark)
         │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup з useListingsUiStore), "показати filtered_out", пошук

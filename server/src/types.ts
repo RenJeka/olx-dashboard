@@ -62,6 +62,8 @@ export interface RawListing {
   /** Абсолютний URL оголошення. */
   url: string;
   photoUrl?: string;
+  /** Прев'ю-лінки всіх фото оголошення (галерея, GraphQL: photos[].link). */
+  photoUrls?: string[];
   /** Сирий текст блоку дата/локація, напр. "Київ - Сьогодні о 12:00". */
   locationDate?: string;
 

@@ -15,6 +15,8 @@ import {
   Text,
 } from '@chakra-ui/react';
 import {
+  LuArchive,
+  LuArchiveRestore,
   LuChevronDown,
   LuChevronUp,
   LuEllipsisVertical,
@@ -53,6 +55,7 @@ import {
   useDeleteSearch,
   useReorderSearches,
   useUpdateSearchSynonyms,
+  useArchiveSearch,
 } from '../api/client';
 import { useIsMobile } from '../hooks/useIsMobile';
 import type { Search } from '../types';
@@ -104,6 +107,9 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
     if (isMobile) onVisibleChange?.(false);
   }
 
+  const activeSearches = searches?.filter((s) => s.archived !== 1) ?? [];
+  const archivedSearches = searches?.filter((s) => s.archived === 1) ?? [];
+
   const content = (
     <Accordion.Root multiple defaultValue={['searches']} variant="plain">
       <Accordion.Item value="searches" borderBottomWidth="1px" borderColor="border.subtle">
@@ -111,9 +117,9 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
           <HStack flex="1" gap={2} fontWeight="semibold">
             <LuListChecks />
             <Text>Пошуки</Text>
-            {searches && searches.length > 0 && (
+            {activeSearches.length > 0 && (
               <Badge colorPalette="blue" variant="subtle" rounded="full">
-                {searches.length}
+                {activeSearches.length}
               </Badge>
             )}
           </HStack>
@@ -126,19 +132,19 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
                 Завантаження…
               </Text>
             )}
-            {!isLoading && (!searches || searches.length === 0) && (
+            {!isLoading && activeSearches.length === 0 && (
               <Text textStyle="sm" color="fg.muted" px={2}>
                 Поки що порожньо — додай перший пошук нижче.
               </Text>
             )}
             <Stack gap="0.5">
-              {searches?.map((s, index) => (
+              {activeSearches.map((s, index) => (
                 <SearchRow
                   key={s.id}
                   search={s}
                   selected={selectedId === s.id}
                   isFirst={index === 0}
-                  isLast={index === searches.length - 1}
+                  isLast={index === activeSearches.length - 1}
                   onSelect={() => handleSelect(s.id)}
                   onDeleted={() => {
                     if (selectedId === s.id) onSelect(null);
@@ -149,6 +155,40 @@ export function Searches({ selectedId, onSelect, visible = true, onVisibleChange
           </Accordion.ItemBody>
         </Accordion.ItemContent>
       </Accordion.Item>
+
+      {archivedSearches.length > 0 && (
+        <Accordion.Item value="archive" borderBottomWidth="1px" borderColor="border.subtle">
+          <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
+            <HStack flex="1" gap={2} fontWeight="semibold">
+              <LuArchive />
+              <Text>Архів</Text>
+              <Badge colorPalette="gray" variant="subtle" rounded="full">
+                {archivedSearches.length}
+              </Badge>
+            </HStack>
+            <Accordion.ItemIndicator />
+          </Accordion.ItemTrigger>
+          <Accordion.ItemContent>
+            <Accordion.ItemBody px={2} pt={0} pb={2}>
+              <Stack gap="0.5">
+                {archivedSearches.map((s) => (
+                  <SearchRow
+                    key={s.id}
+                    search={s}
+                    selected={selectedId === s.id}
+                    isFirst
+                    isLast
+                    onSelect={() => handleSelect(s.id)}
+                    onDeleted={() => {
+                      if (selectedId === s.id) onSelect(null);
+                    }}
+                  />
+                ))}
+              </Stack>
+            </Accordion.ItemBody>
+          </Accordion.ItemContent>
+        </Accordion.Item>
+      )}
 
       <Accordion.Item value="new" borderBottomWidth="1px" borderColor="border.subtle">
         <Accordion.ItemTrigger px={4} py={3} cursor="pointer" _hover={{ bg: 'bg.muted' }}>
@@ -330,7 +370,29 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
   const deleteSearch = useDeleteSearch();
   const reorderSearch = useReorderSearches();
   const updateSynonyms = useUpdateSearchSynonyms();
+  const archiveSearch = useArchiveSearch();
   const synonyms = parseSynonyms(search.query_synonyms);
+  const isArchived = search.archived === 1;
+
+  function handleArchiveToggle() {
+    archiveSearch.mutate(
+      { searchId: search.id, archived: !isArchived },
+      {
+        onSuccess: () =>
+          toaster.create({
+            type: 'success',
+            title: isArchived ? 'Повернено з архіву' : 'Додано в архів',
+            description: search.name,
+          }),
+        onError: (err) =>
+          toaster.create({
+            type: 'error',
+            title: 'Помилка',
+            description: err instanceof Error ? err.message : String(err),
+          }),
+      },
+    );
+  }
 
   function handleDelete() {
     deleteSearch.mutate(search.id, {
@@ -381,34 +443,38 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
             {search.query}
           </Text>
         </Box>
-        <Tooltip content="Пересунути вгору">
-          <IconButton
-            aria-label="Пересунути вгору"
-            size="2xs"
-            variant="ghost"
-            disabled={isFirst || reorderSearch.isPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMove('up');
-            }}
-          >
-            <LuChevronUp />
-          </IconButton>
-        </Tooltip>
-        <Tooltip content="Пересунути вниз">
-          <IconButton
-            aria-label="Пересунути вниз"
-            size="2xs"
-            variant="ghost"
-            disabled={isLast || reorderSearch.isPending}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMove('down');
-            }}
-          >
-            <LuChevronDown />
-          </IconButton>
-        </Tooltip>
+        {!isArchived && (
+          <>
+            <Tooltip content="Пересунути вгору">
+              <IconButton
+                aria-label="Пересунути вгору"
+                size="2xs"
+                variant="ghost"
+                disabled={isFirst || reorderSearch.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMove('up');
+                }}
+              >
+                <LuChevronUp />
+              </IconButton>
+            </Tooltip>
+            <Tooltip content="Пересунути вниз">
+              <IconButton
+                aria-label="Пересунути вниз"
+                size="2xs"
+                variant="ghost"
+                disabled={isLast || reorderSearch.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMove('down');
+                }}
+              >
+                <LuChevronDown />
+              </IconButton>
+            </Tooltip>
+          </>
+        )}
         <Menu.Root positioning={{ placement: 'bottom-end' }}>
           <Menu.Trigger asChild>
             <IconButton
@@ -431,6 +497,12 @@ function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: S
                 <Menu.Item value="variants" onSelect={() => setVariantsOpen(true)}>
                   <HStack gap={2}>
                     <LuLayers /> <Text>Варіанти пошуку{synonyms.length > 0 ? ` (${synonyms.length})` : ''}</Text>
+                  </HStack>
+                </Menu.Item>
+                <Menu.Item value="archive" onSelect={handleArchiveToggle}>
+                  <HStack gap={2}>
+                    {isArchived ? <LuArchiveRestore /> : <LuArchive />}{' '}
+                    <Text>{isArchived ? 'Повернути з архіву' : 'Архівувати'}</Text>
                   </HStack>
                 </Menu.Item>
                 <Menu.Separator />

@@ -1,5 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
-import { Badge, Box, HStack, Image, Link, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Link, Text } from '@chakra-ui/react';
 import {
   LuCalendar,
   LuCircleCheck,
@@ -21,6 +21,7 @@ import { HeaderLabel } from './HeaderLabel';
 import { formatPrice, formatDate, stripDescriptionHtml, countProsConsItems } from '../../utils/format';
 import { StatusCell } from './StatusCell';
 import { NoteCell } from './NoteCell';
+import { PhotoCell } from './PhotoCell';
 import { ProsConsCell } from './ProsConsCell';
 import { HighlightText } from './HighlightText';
 import { toHighlightQuery } from '../../utils/search';
@@ -91,14 +92,7 @@ export const columns = [
     size: 72,
     minSize: 56,
     maxSize: 200,
-    cell: (info) => {
-      const src = info.getValue();
-      return src ? (
-        <Image src={src} alt="" boxSize={12} rounded="md" objectFit="cover" loading="lazy" />
-      ) : (
-        <Box boxSize={12} rounded="md" bg="bg.muted" />
-      );
-    },
+    cell: (info) => <PhotoCell listing={info.row.original} />,
   }),
   columnHelper.accessor('title', {
     header: 'Назва',
