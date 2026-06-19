@@ -8,6 +8,39 @@ export function formatPrice(l: Listing): string {
   return `${l.price.toLocaleString('uk-UA')} ${l.currency}`;
 }
 
+/**
+ * Витягує діапазон цін із `search.api_filters` (`{ ranges: { price: { from, to } } }`).
+ * Повертає `null`, якщо діапазону немає або обидві межі порожні.
+ */
+export function parsePriceRange(apiFiltersRaw: string): { from?: number; to?: number } | null {
+  try {
+    const parsed = JSON.parse(apiFiltersRaw || '{}') as {
+      ranges?: { price?: { from?: number; to?: number } };
+    };
+    const price = parsed.ranges?.price;
+    if (!price) return null;
+    if (price.from == null && price.to == null) return null;
+    return price;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Форматує діапазон цін для відображення (валюта не зберігається → «грн»):
+ *   обидві межі → «1 000 – 5 000 грн», лише from → «від 1 000 грн»,
+ *   лише to → «до 5 000 грн», порожньо → `null`.
+ */
+export function formatPriceRange(from?: number | null, to?: number | null): string | null {
+  const hasFrom = from != null;
+  const hasTo = to != null;
+  if (!hasFrom && !hasTo) return null;
+  const fmt = (n: number) => n.toLocaleString('uk-UA');
+  if (hasFrom && hasTo) return `${fmt(from)} – ${fmt(to)} грн`;
+  if (hasFrom) return `від ${fmt(from)} грн`;
+  return `до ${fmt(to as number)} грн`;
+}
+
 const KY_LOCALE = 'uk-UA';
 const KY_TZ = 'Europe/Kyiv';
 

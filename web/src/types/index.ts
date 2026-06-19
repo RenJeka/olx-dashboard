@@ -10,6 +10,8 @@ export interface Search {
   sort_order: number;
   /** JSON-масив альтернативних пошукових запитів (синоніми query, docs/plans/search-synonyms.md). */
   query_synonyms: string;
+  /** 1 — пошук в архіві (docs/plans/archive-searches.md). */
+  archived: number;
   created_at: string;
 }
 
@@ -92,6 +94,8 @@ export interface Listing {
   currency: string;
   city: string | null;
   photo_url: string | null;
+  /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
+  photo_urls: string | null;
   description: string | null;
   seller_name: string | null;
   contact_name: string | null;

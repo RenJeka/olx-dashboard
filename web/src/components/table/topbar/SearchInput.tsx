@@ -1,6 +1,7 @@
-import { Box, Checkbox, HStack, Input, Text } from '@chakra-ui/react';
+import { Box, Checkbox, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
-import { LuX } from 'react-icons/lu';
+import { LuInfo, LuX } from 'react-icons/lu';
+import { Tooltip } from '../../ui/tooltip';
 
 export interface SearchScope {
   inTitle: boolean;
@@ -38,6 +39,25 @@ export function SearchInput({ value, onChange, scope, onScopeChange }: Props) {
 
   const noneSelected = !scope.inTitle && !scope.inDescription;
   const placeholder = buildPlaceholder(scope);
+
+  const operatorsHint = (
+    <Stack gap={1.5} maxW="280px" py={1} px={1} fontSize="xs">
+      <Text fontWeight="semibold" color="fg.default">
+        Спецсимволи пошуку:
+      </Text>
+      <Box as="ul" pl={4} color="fg.muted" css={{ '& li': { mb: 0.5 } }}>
+        <li>
+          <strong>&&</strong> — ТА (всі слова). Напр. <em>коляска && зима</em>
+        </li>
+        <li>
+          <strong>||</strong> — АБО (хоч одне). Напр. <em>біговел || велобіг</em>
+        </li>
+        <li>
+          <strong>!</strong> — НЕ (виключити). Напр. <em>коляска && !chicco</em>
+        </li>
+      </Box>
+    </Stack>
+  );
 
   return (
     <Box position="relative" display="inline-flex">
@@ -125,6 +145,16 @@ export function SearchInput({ value, onChange, scope, onScopeChange }: Props) {
               Обери хоча б одне поле
             </Text>
           )}
+
+          {/* Підказка зі спецсимволами (&& || !) */}
+          <Tooltip content={operatorsHint} positioning={{ placement: 'top' }} showArrow openDelay={150}>
+            <HStack as="span" gap={1} color="fg.muted" cursor="help" flexShrink={0}>
+              <LuInfo />
+              <Text as="span" textStyle="xs" display={{ base: 'none', md: 'inline' }}>
+                && || !
+              </Text>
+            </HStack>
+          </Tooltip>
         </HStack>
       </HStack>
     </Box>

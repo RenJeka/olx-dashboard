@@ -359,14 +359,12 @@ export function useWizardActions(search: Search, selectedIds: number[], open: bo
   }
 
   async function handleExport(format: 'xlsx' | 'json') {
-    const rows = accumulated.map((r) => {
-      const l = listingById.get(r.id);
-      return {
-        title: l?.title ?? '',
-        description: l?.description ?? '',
-        criteria: r.items.filter((it) => isIncluded(r.id, it)).map((it) => it.criterion),
-      };
-    });
+    // Шлемо лише id + обрані критерії — назву/опис сервер бере з БД (повні описи
+    // в body розпухали б за межу bodyLimit і давали 413).
+    const rows = accumulated.map((r) => ({
+      id: r.id,
+      criteria: r.items.filter((it) => isIncluded(r.id, it)).map((it) => it.criterion),
+    }));
     try {
       await exportPreview(search.id, mode, format, rows);
     } catch (err) {

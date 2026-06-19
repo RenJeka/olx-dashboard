@@ -64,6 +64,9 @@ addColumnIfMissing('searches', 'relevance_target', "TEXT DEFAULT ''");
 // Синоніми пошукового запиту (docs/plans/search-synonyms.md) — JSON-масив рядків.
 addColumnIfMissing('searches', 'query_synonyms', "TEXT DEFAULT '[]'");
 
+// Архів пошуків (docs/plans/archive-searches.md) — прапорець прихованих зі списку.
+addColumnIfMissing('searches', 'archived', 'INTEGER DEFAULT 0');
+
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
  * miss_count. ALTER TABLE не міняє CHECK-констрейнти, тому потрібен повний rebuild
@@ -155,6 +158,9 @@ addColumnIfMissing('listings', 'ai_relevant', 'INTEGER');
 addColumnIfMissing('listings', 'ai_relevant_reason', 'TEXT');
 addColumnIfMissing('listings', 'ai_relevant_at', 'TEXT');
 addColumnIfMissing('listings', 'ai_relevant_source', 'TEXT');
+
+// Галерея фото (docs/plans/photo-gallery.md) — JSON-масив прев'ю-лінків усіх фото.
+addColumnIfMissing('listings', 'photo_urls', 'TEXT');
 
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).

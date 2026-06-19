@@ -6,6 +6,7 @@ import type { Listing } from '../../types';
 import { DescriptionTooltip } from './DescriptionTooltip';
 import { Tooltip } from '../ui/tooltip';
 import { isMutedStatus } from '../../utils/status';
+import { getDateCellStyle } from './columns';
 import { useUpdateListing } from '../../api/client';
 
 interface ListingsTableRowProps {
@@ -90,6 +91,10 @@ function ListingsTableRowImpl({
           );
         }
 
+        // Колонка «Дата»: заливаємо ВСЮ комірку (з паддингами) яскравим фоном за свіжістю.
+        const dateStyle =
+          cell.column.id === 'posted_at' ? getDateCellStyle(row.original.posted_at) : null;
+
         return (
           <Table.Cell
             key={cell.id}
@@ -98,6 +103,8 @@ function ListingsTableRowImpl({
             whiteSpace={isWideText ? 'normal' : 'nowrap'}
             overflow={isWideText ? undefined : 'hidden'}
             textOverflow={isWideText ? undefined : 'ellipsis'}
+            bg={dateStyle?.bg}
+            color={dateStyle?.color}
           >
             {content}
           </Table.Cell>

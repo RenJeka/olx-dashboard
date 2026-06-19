@@ -13,7 +13,9 @@ import {
   LuPlus,
 } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
+import { Tooltip } from '../../ui/tooltip';
 import { STATUS_LABELS } from '../../../utils/status';
+import { sortAlpha } from '../../../utils/sort';
 import { AI_PICKS_LABEL } from '../../../constants';
 import type { useWizardActions } from '../../../hooks/useWizardActions';
 
@@ -91,16 +93,20 @@ export function CriteriaStep({ w }: Props) {
         Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
       </Text>
       <Wrap gap={2}>
-        {available.map((c) => (
-          <Button
-            key={c}
-            size="xs"
-            variant={selected.has(c) ? 'solid' : 'outline'}
-            colorPalette={mode === 'cons' ? 'red' : 'green'}
-            onClick={() => toggleCriterion(c)}
-          >
-            {c}
-          </Button>
+        {sortAlpha(available).map((c) => (
+          <Tooltip key={c} content={c} openDelay={300}>
+            <Button
+              size="xs"
+              variant={selected.has(c) ? 'solid' : 'outline'}
+              colorPalette={mode === 'cons' ? 'red' : 'green'}
+              onClick={() => toggleCriterion(c)}
+              maxW="260px"
+            >
+              <Text as="span" lineClamp={1}>
+                {c}
+              </Text>
+            </Button>
+          </Tooltip>
         ))}
         {available.length === 0 && (
           <Text textStyle="sm" color="fg.muted">

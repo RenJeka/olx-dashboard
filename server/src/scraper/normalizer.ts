@@ -64,12 +64,12 @@ const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? W
 const upsertStmt = db.prepare(`
   INSERT INTO listings (
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
-    photo_url, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
+    photo_url, photo_urls, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
     last_seen_at, status, note
   )
   VALUES (
     @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
-    COALESCE(@params, '{}'), @photo_url, @description, @seller_name, @contact_name, @olx_status,
+    COALESCE(@params, '{}'), @photo_url, @photo_urls, @description, @seller_name, @contact_name, @olx_status,
     @posted_at, @last_refresh_at, datetime('now'),
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN 'disabled' ELSE 'new' END,
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END
@@ -84,6 +84,7 @@ const upsertStmt = db.prepare(`
     seller_type   = COALESCE(excluded.seller_type, seller_type),
     params        = COALESCE(@params, params, '{}'),
     photo_url     = excluded.photo_url,
+    photo_urls    = COALESCE(excluded.photo_urls, photo_urls),
     description   = COALESCE(excluded.description, description),
     seller_name   = COALESCE(excluded.seller_name, seller_name),
     contact_name  = COALESCE(excluded.contact_name, contact_name),
@@ -201,6 +202,8 @@ export function upsertListings(
         seller_type: sellerType,
         params,
         photo_url: item.photoUrl ?? null,
+        photo_urls:
+          item.photoUrls && item.photoUrls.length > 0 ? JSON.stringify(item.photoUrls) : null,
         description,
         seller_name: sellerName,
         contact_name: contactName,

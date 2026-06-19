@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS searches (
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
+  archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS listings (
   district TEXT,
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
   photo_url TEXT,
+  photo_urls TEXT,                   -- JSON-масив прев'ю-лінків усіх фото (галерея), NULL до re-scan
   seller_type TEXT,                  -- private | business
   description TEXT,                  -- HTML-опис з OLX (з <br /> тегами)
   seller_name TEXT,                  -- user.name з GraphQL
