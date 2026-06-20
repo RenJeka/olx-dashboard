@@ -19,8 +19,8 @@ export interface NewSearchFormState {
   createSearch: ReturnType<typeof useCreateSearch>;
 }
 
-/** Стан і сабміт форми створення нового пошуку (акордеон-секція «Новий пошук»). */
-export function useNewSearchForm(): NewSearchFormState {
+/** Стан і сабміт форми створення нового пошуку (модалка «Новий пошук»). */
+export function useNewSearchForm(onCreated?: () => void): NewSearchFormState {
   const createSearch = useCreateSearch();
   const [name, setName] = useState('');
   const [query, setQuery] = useState('');
@@ -47,6 +47,7 @@ export function useNewSearchForm(): NewSearchFormState {
           setPriceFrom('');
           setPriceTo('');
           setSynonyms([]);
+          onCreated?.();
         },
       },
     );
