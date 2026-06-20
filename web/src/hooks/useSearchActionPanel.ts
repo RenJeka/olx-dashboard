@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { useScan, useVerify, useSearchStats, useScanStatus, useAnalyzeScan, useRunScanPlan } from '../api';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useScan,
+  useVerify,
+  useSearchStats,
+  useScanStatus,
+  useAnalyzeScan,
+  useRunScanPlan,
+  useStopScan,
+  useLastAnalysis,
+} from '../api';
 import { toaster } from '../components/ui/toaster';
 import { useSettingsStore } from '../stores/settingsStore';
 import {
@@ -7,8 +17,30 @@ import {
   DEEP_SCAN_PAGE_LIMIT,
   DEEP_SCAN_MAX_PAGES,
   DEEP_SCAN_SECONDS_PER_REQUEST,
+  SCAN_PLAN_TTL_MIN,
 } from '../constants';
-import type { Search, ScanPlan } from '../types';
+import type { Search, ScanPlan, ScanResult } from '../types';
+
+/**
+ * Опис результату скану для toast: дедуп між синонімами (сирих/злито дублів,
+ * docs/plans/deep-scan-stop-and-history.md) + позначка зупинки користувачем.
+ */
+function describeScanResult(r: ScanResult, deep: boolean): { title: string; description: string } {
+  const bucketsSuffix = r.bucketsUsed != null && r.bucketsUsed > 1 ? ` · діапазонів ${r.bucketsUsed}` : '';
+  const dedupSuffix =
+    r.rawFound != null && r.rawFound > r.found
+      ? ` · сирих ${r.rawFound} · злито дублів ${r.rawFound - r.found}`
+      : '';
+  const description = deep
+    ? `${r.requestsUsed} запитів · унікальних ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}${bucketsSuffix}${dedupSuffix}`
+    : `Унікальних ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}${dedupSuffix}`;
+  const title = r.stopped
+    ? 'Скан зупинено — збережено зібране'
+    : deep
+      ? 'Глибокий скан завершено'
+      : 'Скан завершено';
+  return { title, description };
+}
 
 /**
  * Хук керування станом та логікою панелі дій пошуку (сканування, перевірка неактивних,
@@ -20,15 +52,23 @@ export function useSearchActionPanel(search: Search) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [scanPlan, setScanPlan] = useState<ScanPlan | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  // Чи валідний planToken показуваного звіту (свіжий аналіз — true; історичний — з бекенду).
+  const [planValid, setPlanValid] = useState(true);
+  const [analyzedAt, setAnalyzedAt] = useState<string | null>(null);
 
+  const qc = useQueryClient();
   const scan = useScan();
   const verify = useVerify();
   const analyze = useAnalyzeScan();
   const runPlanMutation = useRunScanPlan();
+  const stopMutation = useStopScan();
   const { data: stats } = useSearchStats(search.id);
   const { data: status } = useScanStatus(search.id, scanKind != null);
+  // Останній збережений аналіз — підвантажуємо при відкритому діалозі (для перегляду без зондування).
+  const { data: lastAnalysis } = useLastAnalysis(search.id, dialogOpen);
 
   const isScanning = scanKind != null;
+  const isStopping = stopMutation.isPending;
   const lastScan = stats?.last_scan;
   const verifyCandidates = stats?.verify_candidates ?? 0;
 
@@ -65,16 +105,8 @@ export function useSearchActionPanel(search: Search) {
       { searchId: search.id, deep },
       {
         onSuccess: (r) => {
-          const bucketsSuffix =
-            r.bucketsUsed != null && r.bucketsUsed > 1 ? ` · діапазонів ${r.bucketsUsed}` : '';
-          const description = deep
-            ? `${r.requestsUsed} запитів · знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}${bucketsSuffix}`
-            : `Знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}`;
-          toaster.create({
-            type: 'success',
-            title: deep ? 'Глибокий скан завершено' : 'Скан завершено',
-            description,
-          });
+          const { title, description } = describeScanResult(r, deep);
+          toaster.create({ type: r.stopped ? 'info' : 'success', title, description });
         },
         onError: (err) =>
           toaster.create({
@@ -85,6 +117,19 @@ export function useSearchActionPanel(search: Search) {
         onSettled: () => setScanKind(null),
       },
     );
+  }
+
+  /** Зупинка активного скану: зібране буде збережено, скан завершиться частковим успіхом. */
+  function stopScan() {
+    if (!isScanning) return;
+    stopMutation.mutate(search.id, {
+      onError: (err) =>
+        toaster.create({
+          type: 'error',
+          title: 'Не вдалося зупинити',
+          description: err instanceof Error ? err.message : String(err),
+        }),
+    });
   }
 
   function runVerifyPass() {
@@ -107,15 +152,34 @@ export function useSearchActionPanel(search: Search) {
     });
   }
 
-  /** Аналітична фаза: лише зондування + бісекція, без допагінації — відкриває звіт. */
+  /**
+   * Кнопка «Аналіз перед сканом»: якщо є збережений аналіз — показуємо його (без повторного
+   * зондування) із кнопкою «Зробити новий аналіз»; інакше одразу запускаємо свіжий аналіз.
+   */
   function startAnalysis() {
+    if (lastAnalysis) {
+      setScanPlan(lastAnalysis.plan);
+      setPlanValid(lastAnalysis.planValid);
+      setAnalyzedAt(lastAnalysis.analyzedAt);
+      setReportOpen(true);
+      return;
+    }
+    startFreshAnalysis();
+  }
+
+  /** Свіжа аналітична фаза: зондування + бісекція, без допагінації — відкриває звіт. */
+  function startFreshAnalysis() {
     setScanKind('analyze');
+    setReportOpen(false); // сховати старий звіт, щоб було видно прогрес у панелі
     analyze.mutate(
       { searchId: search.id, deep: true },
       {
         onSuccess: (plan) => {
           setScanPlan(plan);
+          setPlanValid(true);
+          setAnalyzedAt(new Date().toISOString());
           setReportOpen(true);
+          qc.invalidateQueries({ queryKey: ['last-analysis', search.id] });
         },
         onError: (err) =>
           toaster.create({
@@ -137,14 +201,11 @@ export function useSearchActionPanel(search: Search) {
       { searchId: search.id, planToken: scanPlan.planToken },
       {
         onSuccess: (r) => {
-          const bucketsSuffix =
-            r.bucketsUsed != null && r.bucketsUsed > 1 ? ` · діапазонів ${r.bucketsUsed}` : '';
-          toaster.create({
-            type: 'success',
-            title: 'Глибокий скан завершено',
-            description: `${r.requestsUsed} запитів · знайдено ${r.found} · нових ${r.new_count} · вимкнено ${r.disabled_count}${bucketsSuffix}`,
-          });
+          const { title, description } = describeScanResult(r, true);
+          toaster.create({ type: r.stopped ? 'info' : 'success', title, description });
           setScanPlan(null);
+          // План одноразовий — після запуску збережений аналіз стає невалідним для повторного run.
+          qc.invalidateQueries({ queryKey: ['last-analysis', search.id] });
         },
         onError: (err) => {
           const message = err instanceof Error ? err.message : String(err);
@@ -152,8 +213,9 @@ export function useSearchActionPanel(search: Search) {
           toaster.create({
             type: 'error',
             title: isStale ? 'План застарів' : 'Помилка скану',
-            description: isStale ? 'Повторіть аналіз — план діє лише 15 хвилин.' : message,
+            description: isStale ? `Повторіть аналіз — план діє лише ${SCAN_PLAN_TTL_MIN} хвилин.` : message,
           });
+          if (isStale) setPlanValid(false);
         },
         onSettled: () => setScanKind(null),
       },
@@ -168,9 +230,12 @@ export function useSearchActionPanel(search: Search) {
     setConfirmDeepOpen,
     scanKind,
     isScanning,
+    isStopping,
     scanPlan,
     reportOpen,
     setReportOpen,
+    planValid,
+    analyzedAt,
 
     // Дані
     stats,
@@ -188,8 +253,10 @@ export function useSearchActionPanel(search: Search) {
     // Дії
     startDeepScan,
     runScan,
+    stopScan,
     runVerifyPass,
     startAnalysis,
+    startFreshAnalysis,
     runPlan,
   };
 }

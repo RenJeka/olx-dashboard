@@ -1,8 +1,7 @@
-import { Accordion } from '@chakra-ui/react';
-import { LuArchive, LuListChecks } from 'react-icons/lu';
+import { Accordion, HStack, IconButton } from '@chakra-ui/react';
+import { LuArchive, LuListChecks, LuPlus } from 'react-icons/lu';
 import { SearchGroupAccordionItem } from './SearchGroupAccordionItem';
-import { NewSearchForm } from './NewSearchForm';
-import type { NewSearchFormState } from '../../hooks/useNewSearchForm';
+import { Tooltip } from '../ui/tooltip';
 import type { Search } from '../../types';
 
 interface Props {
@@ -12,10 +11,10 @@ interface Props {
   selectedId: number | null;
   onSelect: (id: number) => void;
   onDeleted: (id: number) => void;
-  newSearchForm: NewSearchFormState;
+  onNewSearch: () => void;
 }
 
-/** Вміст бічної панелі: акордеон «Пошуки» / «Архів» (опц.) / «Новий пошук». */
+/** Вміст бічної панелі: кнопка «Новий пошук» + акордеон «Пошуки» / «Архів» (опц.). */
 export function SearchesPanel({
   isLoading,
   activeSearches,
@@ -23,37 +22,52 @@ export function SearchesPanel({
   selectedId,
   onSelect,
   onDeleted,
-  newSearchForm,
+  onNewSearch,
 }: Props) {
   return (
-    <Accordion.Root multiple defaultValue={['searches']} variant="plain">
-      <SearchGroupAccordionItem
-        value="searches"
-        icon={<LuListChecks />}
-        label="Пошуки"
-        badgeColorPalette="blue"
-        items={activeSearches}
-        selectedId={selectedId}
-        onSelect={onSelect}
-        onDeleted={onDeleted}
-        isLoading={isLoading}
-        emptyMessage="Поки що порожньо — додай перший пошук нижче."
-      />
-
-      {archivedSearches.length > 0 && (
+    <>
+      <HStack justify="flex-end" px={4} py={3}>
+        <Tooltip content="Новий пошук">
+          <IconButton
+            aria-label="Новий пошук"
+            rounded="full"
+            size="lg"
+            colorPalette="green"
+            variant="solid"
+            shadow="md"
+            onClick={onNewSearch}
+          >
+            <LuPlus />
+          </IconButton>
+        </Tooltip>
+      </HStack>
+      <Accordion.Root multiple defaultValue={['searches']} variant="plain">
         <SearchGroupAccordionItem
-          value="archive"
-          icon={<LuArchive />}
-          label="Архів"
-          badgeColorPalette="gray"
-          items={archivedSearches}
+          value="searches"
+          icon={<LuListChecks />}
+          label="Пошуки"
+          badgeColorPalette="blue"
+          items={activeSearches}
           selectedId={selectedId}
           onSelect={onSelect}
           onDeleted={onDeleted}
+          isLoading={isLoading}
+          emptyMessage="Поки що порожньо — додай перший пошук нижче."
         />
-      )}
 
-      <NewSearchForm form={newSearchForm} />
-    </Accordion.Root>
+        {archivedSearches.length > 0 && (
+          <SearchGroupAccordionItem
+            value="archive"
+            icon={<LuArchive />}
+            label="Архів"
+            badgeColorPalette="gray"
+            items={archivedSearches}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onDeleted={onDeleted}
+          />
+        )}
+      </Accordion.Root>
+    </>
   );
 }

@@ -62,7 +62,7 @@ Signature-елемент — **«ціновий спектр»**: горизон
 ### C. Backend — оркестрація (`scanner.ts`)
 - [x] `selectKnownOlxIds(ids)` у `normalizer.ts` — батч-перевірка, які `olx_id` вже в БД (для
   оцінки «~нових»).
-- [x] In-memory кеш планів (`Map<token, {searchId, deep, plans, createdAt}>`, TTL 15 хв).
+- [x] In-memory кеш планів (`Map<token, {searchId, deep, plans, createdAt}>`, TTL 30 хв).
 - [x] `analyzeScan(searchId, {deep})` — цикл по `dedupeQueries([query, ...synonyms])`,
   `graphqlFetcher.analyzeSplit` на кожен варіант, пауза між варіантами; агрегує `ScanPlan`,
   пише прогрес у `scan_runs` (`kind='analyze'`).
@@ -106,3 +106,15 @@ Signature-елемент — **«ціновий спектр»**: горизон
 5. Прострочений план: «Запустити повний скан» після TTL → зрозумілий тост, без 500.
 6. Банер `last_scan` не показує запис аналізу.
 7. Швидкий глибокий скан (без аналізу) — без регресій.
+
+## Доповнення — TTL 30 хв + часова валідність звіту (2026-06-20)
+
+- TTL кешу плану піднято 15→30 хв. Винесено в іменовані константи: `PLAN_TTL_MIN`
+  (`server/src/scanner.ts`) ↔ `SCAN_PLAN_TTL_MIN` (`web/src/constants.ts`, дзеркало для UI-тексту).
+- **Валідність звіту (`planValid`) тепер часова, а не від in-memory кешу.** Раніше
+  `GET /last-analysis` рахував `planValid = isPlanCached(token)` — план «застарівав» миттєво при
+  втраті кешу (перезапуск `tsx watch`, закриття діалогу після одноразового запуску). Тепер
+  `planValid = isAnalysisFresh(finished_at)` — true протягом TTL незалежно від кешу.
+- **Стійкий запуск:** якщо швидкого плану під токеном уже немає, але аналіз свіжий (≤ TTL),
+  `runDeepScanFromPlan` робить повний `runScan deep` (повторне зондування) замість помилки
+  «План застарів». Помилка лишається лише для справді протермінованого (> TTL) аналізу.

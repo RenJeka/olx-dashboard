@@ -202,8 +202,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     let requestsUsed = 0;
     let exhausted = false;
     let warning: string | undefined;
+    let aborted = false;
 
     for (let i = 0; i < target; i++) {
+      if (options?.shouldAbort?.()) {
+        aborted = true;
+        break;
+      }
       const offset = i * PAGE_LIMIT;
       const page = await this.fetchPage(search, offset, referer);
 
@@ -247,7 +252,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
     }
 
-    return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning };
+    return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning, aborted };
   }
 
   // ── Probe максимальної ціни ──────────────────────────────────────────────────
@@ -343,7 +348,9 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const lo = search.apiFilters.ranges?.price?.from ?? 0;
 
     // 3. Фаза бісекції: черга інтервалів → листи-бакети, що влазять у вікно пагінації.
-    const bisection = await this.bisectPriceRange(search, referer, lo, hi.upperBound, requestsUsed, onProgress);
+    const bisection = await this.bisectPriceRange(
+      search, referer, lo, hi.upperBound, requestsUsed, onProgress, options?.shouldAbort,
+    );
 
     return {
       rootCount,
@@ -375,11 +382,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const referer = this.buildReferer(search.query);
     const onProgress = options?.onProgress;
     const scanResult = await this.scanBuckets(
-      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress,
+      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress, options?.shouldAbort,
     );
 
     const warnings = [`split: ${plan.buckets.length} price buckets; coverage window skipped`];
-    if (scanResult.capHit) warnings.push('some buckets hit pagination/request cap');
+    if (scanResult.capHit) {
+      warnings.push('деякі діапазони вперлися в ліміт запитів — дані можуть бути неповними');
+    }
 
     return {
       listings: scanResult.listings,
@@ -388,6 +397,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       exhausted: scanResult.allExhausted && !scanResult.capHit,
       warning: warnings.join('; '),
       bucketsUsed: plan.buckets.length,
+      aborted: scanResult.aborted,
     };
   }
 
@@ -425,6 +435,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     hi: number,
     startRequestsUsed: number,
     onProgress?: FetchOptions['onProgress'],
+    shouldAbort?: () => boolean,
   ): Promise<{ buckets: PriceBucket[]; requestsUsed: number }> {
     let requestsUsed = startRequestsUsed;
     const buckets: PriceBucket[] = [];
@@ -432,6 +443,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
     while (queue.length > 0) {
       if (requestsUsed >= MAX_TOTAL_REQUESTS) break;
+      if (shouldAbort?.()) break;
       const interval = queue.shift()!;
       const page = await this.fetchPage(search, 0, referer, {
         priceRange: { from: interval.from, to: interval.to },
@@ -475,11 +487,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     buckets: PriceBucket[],
     startRequestsUsed: number,
     onProgress?: FetchOptions['onProgress'],
+    shouldAbort?: () => boolean,
   ): Promise<{
     listings: RawListing[];
     requestsUsed: number;
     allExhausted: boolean;
     capHit: boolean;
+    aborted: boolean;
   }> {
     let requestsUsed = startRequestsUsed;
     const merged = new Map<number, RawListing>();
@@ -494,8 +508,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
     let allExhausted = true;
     let capHit = false;
+    let aborted = false;
 
     for (let bi = 0; bi < buckets.length; bi++) {
+      if (shouldAbort?.()) {
+        aborted = true;
+        break;
+      }
       const bucket = buckets[bi]!;
       for (const item of bucket.page0) merged.set(item.olxId, item);
 
@@ -510,6 +529,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       for (let p = 1; p < pages; p++) {
         if (requestsUsed >= MAX_TOTAL_REQUESTS) {
           capHit = true;
+          break;
+        }
+        if (shouldAbort?.()) {
+          aborted = true;
           break;
         }
         const offset = p * PAGE_LIMIT;
@@ -548,6 +571,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         }
       }
 
+      if (aborted) break;
       if (!bucketExhausted) allExhausted = false;
       if (requestsUsed >= MAX_TOTAL_REQUESTS) {
         capHit = true;
@@ -562,7 +586,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       }
     }
 
-    return { listings: [...merged.values()], requestsUsed, allExhausted, capHit };
+    return { listings: [...merged.values()], requestsUsed, allExhausted, capHit, aborted };
   }
 
   // ── Маппінг і хелпери ────────────────────────────────────────────────────────

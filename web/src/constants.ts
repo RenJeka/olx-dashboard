@@ -70,6 +70,8 @@ export const SCAN_KIND_LABELS: Record<string, string> = {
 };
 
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+/** Скільки хвилин живе закешований план аналізу скану (дзеркалить PLAN_TTL_MIN у server/src/scanner.ts). */
+export const SCAN_PLAN_TTL_MIN = 30;
 export const DEEP_SCAN_PAGE_LIMIT = 40;
 /** Межа вікна пагінації GraphQL OLX (offset ≤ 1000) — дзеркалить MAX_PAGES у graphqlOlxFetcher.ts. */
 export const DEEP_SCAN_MAX_PAGES = 26;

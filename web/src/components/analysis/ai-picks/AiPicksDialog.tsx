@@ -1,6 +1,4 @@
-import { useState } from 'react';
-import { Button, HStack, Spinner, Text } from '@chakra-ui/react';
-import { LuSparkles } from 'react-icons/lu';
+import { HStack, Spinner, Text } from '@chakra-ui/react';
 import {
   DialogBackdrop,
   DialogBody,
@@ -9,7 +7,6 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-  DialogTrigger,
 } from '../../ui/dialog';
 import { useAiPicksFlow } from '../../../hooks/useAiPicksFlow';
 import { AiPicksIdleStep } from './AiPicksIdleStep';
@@ -18,28 +15,26 @@ import type { Search } from '../../../types';
 
 interface Props {
   search: Search;
+  open: boolean;
+  onClose: () => void;
 }
 
-export function AiPicksDialog({ search }: Props) {
-  const [open, setOpen] = useState(false);
+export function AiPicksDialog({ search, open, onClose }: Props) {
   const flow = useAiPicksFlow(search);
 
   return (
     <DialogRoot
       open={open}
       onOpenChange={(d) => {
-        setOpen(d.open);
-        if (!d.open) flow.reset();
+        if (!d.open) {
+          onClose();
+          flow.reset();
+        }
       }}
       size="lg"
       placement="center"
       scrollBehavior="inside"
     >
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" colorPalette="teal">
-          <LuSparkles /> AI Вибір
-        </Button>
-      </DialogTrigger>
       <DialogBackdrop />
       <DialogContent>
         <DialogCloseTrigger />
@@ -59,7 +54,7 @@ export function AiPicksDialog({ search }: Props) {
           {flow.step === 'done' && (
             <AiPicksResultStep
               flow={flow}
-              onCommit={() => flow.handleCommit(() => setOpen(false))}
+              onCommit={() => flow.handleCommit(onClose)}
             />
           )}
         </DialogBody>

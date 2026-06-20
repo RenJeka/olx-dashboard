@@ -25,18 +25,19 @@ export type RelevanceStep = 'idle' | 'running' | 'done';
 export interface UseRelevanceFlowProps {
   search: Search;
   selectedIds: number[];
+  open: boolean;
+  onClose: () => void;
 }
 
 /**
  * Хук для управління станом і логікою діалогу фільтрації релевантності.
  */
-export function useRelevanceFlow({ search, selectedIds }: UseRelevanceFlowProps) {
+export function useRelevanceFlow({ search, selectedIds, open, onClose }: UseRelevanceFlowProps) {
   const { data: listings } = useListings(search.id);
   const { data: status } = useAnalysisStatus();
   const { data: targetData } = useRelevanceTarget(search.id);
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
 
-  const [open, setOpen] = useState(false);
   const [step, setStep] = useState<RelevanceStep>('idle');
   const [target, setTarget] = useState('');
   const [scope, setScope] = useState<Scope>('all');
@@ -60,6 +61,12 @@ export function useRelevanceFlow({ search, selectedIds }: UseRelevanceFlowProps)
     if (!open) return;
     setScope(getDefaultScope(selectedIds, statusFilter));
   }, [open, selectedIds.length, statusFilter]);
+
+  useEffect(() => {
+    if (open) return;
+    reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const effectiveIds = getEffectiveRelevanceIds(scope, selectedIds, statusFilter, listings);
   const listingsMap = useListingsMap(listings);
@@ -149,7 +156,7 @@ export function useRelevanceFlow({ search, selectedIds }: UseRelevanceFlowProps)
         title: `Збережено ${committed} оголошень`,
         description: `Нерелевантних: ${irrelevant}`,
       });
-      setOpen(false);
+      onClose();
       reset();
     } catch (err) {
       showErrorToast('Помилка збереження', err);
@@ -158,7 +165,6 @@ export function useRelevanceFlow({ search, selectedIds }: UseRelevanceFlowProps)
 
   return {
     state: {
-      open,
       step,
       target,
       scope,
@@ -174,10 +180,6 @@ export function useRelevanceFlow({ search, selectedIds }: UseRelevanceFlowProps)
       search,
     },
     actions: {
-      setOpen: (o: boolean) => {
-        setOpen(o);
-        if (!o) reset();
-      },
       setTarget,
       setScope,
       reset,

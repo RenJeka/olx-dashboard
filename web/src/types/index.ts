@@ -192,12 +192,17 @@ export interface CommitItem {
 }
 
 export interface ScanResult {
+  /** Унікальних оголошень (після дедупу по olx_id між синонімами/бакетами). */
   found: number;
   new_count: number;
+  /** Сирих оголошень до cross-variant дедупу; `rawFound - found` = злито дублів між синонімами. */
+  rawFound?: number;
   requestsUsed: number;
   disabled_count: number;
   /** Кількість цінових бакетів глибокого скану з авто-розбиттям (>1 — діапазон ділився). */
   bucketsUsed?: number;
+  /** Скан зупинено користувачем — збережено частковий результат. */
+  stopped?: boolean;
 }
 
 /** Результат verify-проходу (POST /api/searches/:id/verify, Етап 2 A3). */
@@ -218,6 +223,8 @@ export interface ScanStatus {
   finished_at: string | null;
   found: number | null;
   new_count: number | null;
+  /** Сирих оголошень до дедупу між синонімами (NULL для старих сканів). */
+  raw_found: number | null;
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
@@ -238,6 +245,8 @@ export interface LastScanInfo {
   finished_at: string | null;
   found: number | null;
   new_count: number | null;
+  /** Сирих оголошень до дедупу між синонімами (NULL для старих сканів). */
+  raw_found: number | null;
   disabled_count: number | null;
   /** Реальний збій скану (обидві стратегії впали). */
   error: string | null;
@@ -291,6 +300,18 @@ export interface ScanPlan {
   /** >1 варіант (синоніми) або є split — вікно покриття пропускається при повному скані. */
   partial: boolean;
   warnings: string[];
+}
+
+/**
+ * Останній збережений аналіз (GET /api/searches/:id/last-analysis,
+ * docs/plans/deep-scan-stop-and-history.md). `planValid` — часова валідність (у межах TTL 30 хв
+ * за `finished_at`): true → звіт ще запускний (сервер за потреби перезондує); false →
+ * протермінований, потрібен новий аналіз.
+ */
+export interface LastAnalysis {
+  plan: ScanPlan;
+  analyzedAt: string | null;
+  planValid: boolean;
 }
 
 export interface NewSearchInput {

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Flex } from '@chakra-ui/react';
 import {
   DrawerBackdrop,
@@ -8,6 +9,7 @@ import {
   DrawerRoot,
   DrawerTitle,
 } from '../ui/drawer';
+import { SearchCreateDialog } from './SearchCreateDialog';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchesPanel } from './SearchesPanel';
 import { useSearches } from '../../api';
@@ -15,16 +17,17 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useNewSearchForm } from '../../hooks/useNewSearchForm';
 import { useSettingsStore } from '../../stores/settingsStore';
 
-/** Бічна панель «Пошуки»: акордеон активних/архівованих пошуків + форма створення нового. */
+/** Бічна панель «Пошуки»: акордеон активних/архівованих пошуків + кнопка «+» → модалка створення. */
 export function Searches() {
   const selectedId = useSettingsStore((s) => s.selectedSearchId);
   const onSelect = useSettingsStore((s) => s.setSelectedSearchId);
   const visible = useSettingsStore((s) => s.searchesVisible);
   const onVisibleChange = useSettingsStore((s) => s.setSearchesVisible);
-  
+
   const isMobile = useIsMobile();
   const { data: searches, isLoading } = useSearches();
-  const newSearchForm = useNewSearchForm();
+  const [createOpen, setCreateOpen] = useState(false);
+  const newSearchForm = useNewSearchForm(() => setCreateOpen(false));
 
   function handleSelect(id: number) {
     onSelect(id);
@@ -46,18 +49,25 @@ export function Searches() {
       selectedId={selectedId}
       onSelect={handleSelect}
       onDeleted={handleDeleted}
-      newSearchForm={newSearchForm}
+      onNewSearch={() => setCreateOpen(true)}
     />
   );
 
-  const variantsDialog = (
-    <SearchVariantsDialog
-      open={newSearchForm.variantsOpen}
-      onOpenChange={newSearchForm.setVariantsOpen}
-      query={newSearchForm.query}
-      value={newSearchForm.synonyms}
-      onChange={newSearchForm.setSynonyms}
-    />
+  const dialogs = (
+    <>
+      <SearchCreateDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        form={newSearchForm}
+      />
+      <SearchVariantsDialog
+        open={newSearchForm.variantsOpen}
+        onOpenChange={newSearchForm.setVariantsOpen}
+        query={newSearchForm.query}
+        value={newSearchForm.synonyms}
+        onChange={newSearchForm.setSynonyms}
+      />
+    </>
   );
 
   if (isMobile) {
@@ -78,7 +88,7 @@ export function Searches() {
             <DrawerBody px={0}>{panel}</DrawerBody>
           </DrawerContent>
         </DrawerRoot>
-        {variantsDialog}
+        {dialogs}
       </>
     );
   }
@@ -99,7 +109,7 @@ export function Searches() {
       >
         {panel}
       </Flex>
-      {variantsDialog}
+      {dialogs}
     </>
   );
 }

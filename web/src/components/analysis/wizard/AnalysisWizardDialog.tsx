@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAnalysisWizardStore } from '../../../stores/analysisWizardStore';
-import { Button, Stack } from '@chakra-ui/react';
-import { LuSparkles } from 'react-icons/lu';
+import { Stack } from '@chakra-ui/react';
 import {
   DialogBackdrop,
   DialogBody,
@@ -10,7 +9,6 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-  DialogTrigger,
 } from '../../ui/dialog';
 import { ConfirmActionDialog } from '../../ConfirmActionDialog';
 import { DescriptionDialog } from '../../DescriptionDialog';
@@ -27,11 +25,12 @@ interface Props {
   search: Search;
   /** Id вибраних рядків (чекбокси) — для режиму «вибрані». */
   selectedIds: number[];
+  open: boolean;
+  onClose: () => void;
 }
 
-export function AnalysisWizardDialog({ search, selectedIds }: Props) {
+export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Props) {
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
   const w = useWizard(search, selectedIds, open);
 
   // Завантажуємо критерії лише при першому відкритті або зміні режиму на кроці 1.
@@ -46,29 +45,28 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
     w.setCriteriaLoadedMode(w.mode);
   }, [open, w.mode, w.savedCriteria, w.step, w.criteriaLoadedMode]);
 
+  // Прив'язуємо стан майстра до пошуку при кожному відкритті діалогу.
+  useEffect(() => {
+    if (!open) return;
+    const prevBound = useAnalysisWizardStore.getState().boundSearchId;
+    w.bindSearch(search.id);
+    if (prevBound !== search.id) {
+      w.setScope(w.computeDefaultScope());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, search.id]);
+
   return (
     <DialogRoot
       open={open}
       onOpenChange={(d) => {
-        setOpen(d.open);
-        if (d.open) {
-          const prevBound = useAnalysisWizardStore.getState().boundSearchId;
-          w.bindSearch(search.id);
-          if (prevBound !== search.id) {
-            w.setScope(w.computeDefaultScope());
-          }
-        }
+        if (!d.open) onClose();
       }}
       size={isMobile ? 'full' : 'xl'}
       placement="center"
       scrollBehavior="inside"
       closeOnInteractOutside={false}
     >
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" colorPalette="purple">
-          <LuSparkles /> AI
-        </Button>
-      </DialogTrigger>
       <DialogBackdrop />
       <DialogContent>
         <DialogCloseTrigger />
@@ -88,7 +86,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
           {w.step === 1 && <CriteriaStep w={w} />}
           {w.step === 2 && <MatchingStep w={w} />}
           {w.step === 3 && <ReviewStep w={w} />}
-          {w.step === 4 && <CommitStep w={w} onClose={() => setOpen(false)} />}
+          {w.step === 4 && <CommitStep w={w} onClose={onClose} />}
         </DialogBody>
       </DialogContent>
 
@@ -98,7 +96,7 @@ export function AnalysisWizardDialog({ search, selectedIds }: Props) {
         title="Перезаписати наявні значення?"
         description={`У ${w.overwriteCount} оголошень поле «${w.modeLabel}» вже заповнене. Перезаписати результатами аналізу?`}
         confirmLabel="Перезаписати"
-        onConfirm={() => void w.doCommit(() => setOpen(false))}
+        onConfirm={() => void w.doCommit(onClose)}
       />
       <DescriptionDialog listing={w.openDescriptionListing} onClose={() => w.setOpenDescriptionListing(null)} />
     </DialogRoot>

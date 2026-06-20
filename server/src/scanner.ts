@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './db/db.js';
 import { GraphqlOlxFetcher } from './scraper/graphql/index.js';
 import { estimatePages } from './scraper/graphql/fetcher.js';
+import { MAX_PAGES } from './scraper/graphql/constants.js';
 import type { SplitPlan } from './scraper/graphql/types.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings, selectKnownOlxIds } from './scraper/normalizer.js';
@@ -30,6 +31,19 @@ import type {
 
 const graphqlFetcher = new GraphqlOlxFetcher();
 const htmlFetcher = new HtmlOlxFetcher();
+
+// ── Зупинка скану (docs/plans/deep-scan-stop-and-history.md) ──────────────────
+// Single-user локальний застосунок: один активний скан на пошук. Прапорець ставить
+// requestStopScan (роут POST /scan/stop), фетчери опитують його через FetchOptions.shouldAbort.
+// При зупинці зібране все одно зберігається (upsert), вікно покриття пропускається.
+const abortFlags = new Map<number, boolean>();
+
+/** Запит на зупинку активного скану пошуку. Повертає true, якщо скан справді виконувався. */
+export function requestStopScan(searchId: number): boolean {
+  if (!abortFlags.has(searchId)) return false;
+  abortFlags.set(searchId, true);
+  return true;
+}
 
 /** Сторінок за один verify-прохід (P1+P2 разом) — той самий порядок, що DEEP_SAFETY_CAP. */
 const VERIFY_PAGE_CAP = 50;
@@ -110,6 +124,10 @@ async function fetchWithFallback(
   partial: boolean;
   /** Кількість цінових бакетів split-скану (>1 — було розбиття); undefined для не-deep/HTML. */
   bucketsUsed?: number;
+  /** Сирих оголошень до cross-variant дедупу (для прозорості «злито дублів»). */
+  rawCount: number;
+  /** Скан перервано через FetchOptions.shouldAbort (кнопка «Зупинити»). */
+  aborted: boolean;
 }> {
   try {
     // Глибокий скан — оркестратор із авто-розбиттям по ціні (docs/plans/price-range-split.md);
@@ -129,6 +147,8 @@ async function fetchWithFallback(
       usedGraphql: true,
       partial: result.warning != null,
       bucketsUsed: result.bucketsUsed,
+      rawCount: result.listings.length,
+      aborted: result.aborted ?? false,
     };
   } catch (graphqlErr) {
     const graphqlMessage =
@@ -151,6 +171,8 @@ async function fetchWithFallback(
         exhausted: result.exhausted,
         usedGraphql: false,
         partial: result.warning != null,
+        rawCount: result.listings.length,
+        aborted: result.aborted ?? false,
       };
     } catch (htmlErr) {
       const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
@@ -183,32 +205,42 @@ async function fetchAllQueries(
   let usedGraphql = true;
   let allExhausted = true;
   let bucketsUsed = 0;
+  let rawTotal = 0;
+  let aborted = false;
   const notes: string[] = [`multi-query: ${variants.length} варіантів запиту змерджено`];
 
-  // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів,
-  // але прогрес-бар лишається монотонним і орієнтовним).
+  // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів).
+  // `maxTotal` тримаємо монотонно-незменшуваним і завжди ≥ `done`, щоб праве число лічильника
+  // не стрибало вниз і не опускалося нижче лівого, коли черговий варіант дрібний або фаза
+  // бісекції не дає `total` (інакше — баг «103/3», docs/plans/scan-progress-detail.md).
   let doneOffset = 0;
   let totalOffset = 0;
+  let maxTotal = 0;
 
   for (let vi = 0; vi < variants.length; vi++) {
     const variant = variants[vi] as string;
     const variantSearch: SearchConfig = { ...search, query: variant };
     const onVariantProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
-      ? (p: ScanProgress) =>
+      ? (p: ScanProgress) => {
+          const done = doneOffset + p.done;
+          const candidate = p.total != null ? totalOffset + p.total : 0;
+          maxTotal = Math.max(maxTotal, candidate, done);
           options.onProgress!({
-            done: doneOffset + p.done,
-            total: p.total != null ? totalOffset + p.total : undefined,
+            done,
+            total: maxTotal,
             method: p.method,
             stage: `Синонім «${variant}» (${vi + 1}/${variants.length})${p.stage ? ` · ${p.stage}` : ''}`,
             subDone: vi + 1,
             subTotal: variants.length,
-          })
+          });
+        }
       : undefined;
 
     const result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
 
     for (const item of result.raw) merged.set(item.olxId, item);
     requestsUsed += result.requestsUsed;
+    rawTotal += result.rawCount;
     if (!result.usedGraphql) usedGraphql = false;
     if (!result.exhausted) allExhausted = false;
     if (result.bucketsUsed) bucketsUsed += result.bucketsUsed;
@@ -216,6 +248,12 @@ async function fetchAllQueries(
 
     doneOffset += result.requestsUsed;
     totalOffset += Math.max(result.requestsUsed, 1);
+
+    // Зупинено користувачем — решту синонімів не скануємо, повертаємо вже зібране.
+    if (result.aborted) {
+      aborted = true;
+      break;
+    }
 
     // Ввічливість між варіантами синонімів — як пауза між батчами глибокого скану.
     if (vi < variants.length - 1) {
@@ -243,6 +281,8 @@ async function fetchAllQueries(
     usedGraphql,
     partial: true,
     bucketsUsed: bucketsUsed > 0 ? bucketsUsed : undefined,
+    rawCount: rawTotal,
+    aborted,
   };
 }
 
@@ -262,6 +302,9 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   }
 
   const kind = options?.deep ? 'deep' : 'normal';
+
+  abortFlags.set(searchId, false);
+  const shouldAbort = (): boolean => abortFlags.get(searchId) === true;
 
   const runId = Number(
     db
@@ -294,24 +337,37 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   };
 
   try {
-    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed } =
+    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed, rawCount, aborted } =
       await fetchAllQueries(search, {
         deep: options?.deep,
         onProgress,
+        shouldAbort,
       });
     const upsertResult = upsertListings(searchId, raw);
 
+    // Зупинка користувачем — зібране вже збережено вище, але покриття неповне:
+    // forced partial (вікно покриття пропускається), окрема нота, scan позначається stopped.
+    const stopped = aborted;
+    const effectivePartial = partial || stopped;
+
     // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів — не fallback,
-    // не часткових (частковий deep із «window cap hit») і НЕ split (union кількох діапазонів
-    // не відсортований глобально за refresh — вісь windowFloor невалідна). Усі три випадки
-    // ставлять warning → partial=true → coverage пропускається.
+    // не часткових (частковий deep із «window cap hit»/зупинка) і НЕ split (union кількох
+    // діапазонів не відсортований глобально за refresh — вісь windowFloor невалідна). Усі
+    // ці випадки ставлять warning → partial=true → coverage пропускається.
     // Поріг disable пропорційний надійності скану: глибокий бачить усю видачу → 1 промах;
     // звичайний (верхівка) → 2 (docs/plans/honest-olx-status.md).
-    const { disabled_count } = usedGraphql && !partial
+    const { disabled_count } = usedGraphql && !effectivePartial
       ? applyScanStatuses(searchId, raw, exhausted, options?.deep ? 1 : 2)
       : { disabled_count: 0 };
 
-    const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count, bucketsUsed };
+    const result: ScanResult = {
+      ...upsertResult,
+      rawFound: rawCount,
+      requestsUsed,
+      disabled_count,
+      bucketsUsed,
+      stopped,
+    };
 
     if (visibleTotalCount != null) {
       db.prepare('UPDATE searches SET visible_total_count = ? WHERE id = ?').run(
@@ -320,18 +376,23 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       );
     }
 
-    // Скан вдався: `note` — це попередження часткового успіху (multi-query/split/HTML-fallback),
-    // НЕ помилка → колонка `warning`, `error` лишається NULL (UI показує amber «Попередження»,
-    // а не червону «Помилку»).
+    const finalNote = stopped
+      ? [`Зупинено користувачем — збережено ${result.found} оголошень`, note].filter(Boolean).join('; ')
+      : note;
+
+    // Скан вдався: `note` — це попередження часткового успіху (multi-query/split/HTML-fallback/
+    // зупинка), НЕ помилка → колонка `warning`, `error` лишається NULL (UI показує amber
+    // «Попередження», а не червону «Помилку»).
     db.prepare(
-      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, warning = ?, error = NULL,
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, raw_found = ?, disabled_count = ?, warning = ?, error = NULL,
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(
       new Date().toISOString(),
       result.found,
       result.new_count,
+      result.rawFound,
       result.disabled_count,
-      note,
+      finalNote,
       runId,
     );
 
@@ -343,6 +404,8 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(new Date().toISOString(), message, runId);
     throw err;
+  } finally {
+    abortFlags.delete(searchId);
   }
 }
 
@@ -357,8 +420,10 @@ interface CachedPlan {
   createdAt: number;
 }
 
+/** Скільки хвилин живе закешований план аналізу (дзеркалить SCAN_PLAN_TTL_MIN у web/src/constants.ts). */
+const PLAN_TTL_MIN = 30;
 /** Single-user локальний застосунок — in-memory кеш планів допустимий (без Redis/БД). */
-const PLAN_TTL_MS = 15 * 60 * 1000;
+const PLAN_TTL_MS = PLAN_TTL_MIN * 60 * 1000;
 const planCache = new Map<string, CachedPlan>();
 
 function cleanupExpiredPlans(): void {
@@ -366,6 +431,28 @@ function cleanupExpiredPlans(): void {
   for (const [token, cached] of planCache) {
     if (now - cached.createdAt > PLAN_TTL_MS) planCache.delete(token);
   }
+}
+
+/**
+ * Чи ще є швидкий (in-memory) план під цим токеном — дозволяє `runDeepScanFromPlan` довершити
+ * скан БЕЗ повторного зондування. Кеш втрачається при перезапуску процесу й після одноразового
+ * запуску; валідність звіту для UI більше НЕ залежить від нього (див. `isAnalysisFresh`).
+ */
+export function isPlanCached(planToken: string): boolean {
+  cleanupExpiredPlans();
+  return planCache.has(planToken);
+}
+
+/**
+ * Чи аналіз ще «свіжий» за часом завершення (у межах TTL) — time-based валідність звіту для UI.
+ * НЕ прив'язана до in-memory кешу: звіт лишається запускним протягом TTL навіть після
+ * перезапуску сервера чи закриття діалогу — `runDeepScanFromPlan` за потреби перезондує
+ * (docs/plans/two-phase-deep-scan.md).
+ */
+export function isAnalysisFresh(finishedAt: string | null | undefined): boolean {
+  if (!finishedAt) return false;
+  const t = Date.parse(finishedAt);
+  return Number.isFinite(t) && Date.now() - t < PLAN_TTL_MS;
 }
 
 /**
@@ -384,6 +471,9 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
   }
 
   cleanupExpiredPlans();
+
+  abortFlags.set(searchId, false);
+  const shouldAbort = (): boolean => abortFlags.get(searchId) === true;
 
   const variants = dedupeQueries([search.query, ...(search.querySynonyms ?? [])]);
 
@@ -418,6 +508,9 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
     const warnings: string[] = [];
 
     for (let vi = 0; vi < variants.length; vi++) {
+      if (shouldAbort()) {
+        throw new Error('Аналіз зупинено користувачем');
+      }
       const variant = variants[vi] as string;
       const variantSearch: SearchConfig = { ...search, query: variant };
       const onVariantProgress: FetchOptions['onProgress'] = (p) =>
@@ -430,7 +523,7 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
 
       let plan: SplitPlan;
       try {
-        plan = await graphqlFetcher.analyzeSplit(variantSearch, { onProgress: onVariantProgress });
+        plan = await graphqlFetcher.analyzeSplit(variantSearch, { onProgress: onVariantProgress, shouldAbort });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         warnings.push(`«${variant}»: аналіз GraphQL не вдався (${message}) — повний скан спробує ще раз і перейде на HTML, якщо потрібно`);
@@ -519,10 +612,17 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
       warnings,
     };
 
+    // Зберігаємо повний ScanPlan у scan_runs.scan_plan — для перегляду останнього аналізу
+    // після закриття діалогу (GET /last-analysis, docs/plans/deep-scan-stop-and-history.md).
     db.prepare(
-      `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, error = NULL,
+      `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, scan_plan = ?, error = NULL,
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
-    ).run(new Date().toISOString(), warnings.length > 0 ? warnings.join('; ') : null, runId);
+    ).run(
+      new Date().toISOString(),
+      warnings.length > 0 ? warnings.join('; ') : null,
+      JSON.stringify(scanPlan),
+      runId,
+    );
 
     return scanPlan;
   } catch (err) {
@@ -532,7 +632,26 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(new Date().toISOString(), message, runId);
     throw err;
+  } finally {
+    abortFlags.delete(searchId);
   }
+}
+
+/**
+ * Стабільна оцінка кількості HTTP-запитів, які `scanFromPlan` зробить для одного варіанта
+ * (для наперед-порахованого `requests_total`, щоб лічильник не стрибав — bug «103/3»):
+ * - `noSplit` → `scanFromPlan` делегує `fetchSearch` (пагінація з 0-ї сторінки): `estimatePages(rootCount)`,
+ *   а без `rootCount` (аналіз варіанта впав) — `MAX_PAGES` як верхня межа;
+ * - split → probe вже зроблено (`plan.requestsUsed`) + допагінація бакетів (без уже завантажених 0-х сторінок).
+ */
+function estimateRunRequests(plan: SplitPlan): number {
+  if (plan.noSplit) {
+    return plan.rootCount != null ? estimatePages(plan.rootCount) : MAX_PAGES;
+  }
+  return (
+    plan.requestsUsed +
+    plan.buckets.reduce((sum, b) => sum + Math.max(0, estimatePages(b.count) - 1), 0)
+  );
 }
 
 /**
@@ -541,20 +660,39 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
  * `olxId`, далі стандартний хвіст `runScan` (upsert, `applyScanStatuses` лише для повного
  * успішного single-query GraphQL, оновлення `visible_total_count`, фіналізація `scan_runs` з
  * `kind='deep'`). GraphQL-збій під час самого допагінування — fallback на HTML (як `fetchWithFallback`).
- * Прострочений/невідомий токен — зрозуміла помилка (план одноразовий: видаляється після запуску).
+ *
+ * Якщо швидкого in-memory плану під токеном уже немає (TTL-edge, перезапуск сервера або повторний
+ * запуск), але аналіз ще «свіжий» за часом (`isAnalysisFresh`) — НЕ змушуємо повторювати аналіз
+ * вручну: робимо повний глибокий скан із повторним зондуванням (`runScan deep`). Результат той
+ * самий, лише дорожче на probe-запити. Тільки коли аналіз справді протермінований (> TTL) —
+ * зрозуміла помилка «повторіть аналіз».
  */
 export async function runDeepScanFromPlan(searchId: number, planToken: string): Promise<ScanResult> {
   cleanupExpiredPlans();
   const cached = planCache.get(planToken);
   if (!cached || cached.searchId !== searchId) {
+    const lastAnalyze = db
+      .prepare(
+        `SELECT finished_at FROM scan_runs
+         WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(searchId) as { finished_at: string | null } | undefined;
+    if (lastAnalyze && isAnalysisFresh(lastAnalyze.finished_at)) {
+      // Аналіз ще в межах TTL — перезондуємо повним глибоким сканом (стійко до втрати кешу).
+      return runScan(searchId, { deep: true });
+    }
     throw new Error('План застарів або не знайдено — повторіть аналіз');
   }
-  planCache.delete(planToken); // одноразовий — повторний запуск вимагає нового аналізу
+  planCache.delete(planToken); // швидкий план одноразовий; у межах TTL повторний запуск перезондує (вище)
 
   const search = loadSearch(searchId);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }
+
+  abortFlags.set(searchId, false);
+  const shouldAbort = (): boolean => abortFlags.get(searchId) === true;
 
   const runId = Number(
     db
@@ -590,20 +728,40 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
     let usedGraphql = true;
     let allExhausted = true;
     let bucketsUsed = 0;
+    let rawTotal = 0;
+    let aborted = false;
     let visibleTotalCount: number | null = null;
     let partial = variants.length > 1;
     const notes: string[] = variants.length > 1
       ? [`multi-query: ${variants.length} варіантів запиту змерджено`]
       : [];
 
+    // Стабільний орієнтовний total на весь скан — рахуємо наперед із кешованих планів, щоб
+    // `requests_total` не стрибав униз між варіантами (bug «103/3»). У `onVariantProgress`
+    // клампимо так, щоб total ніколи не був меншим за поточний `done`.
+    const plannedTotal = variants.reduce((sum, e) => sum + estimateRunRequests(e.plan), 0);
+    onProgress({
+      done: 0,
+      total: plannedTotal,
+      subTotal: variants.length,
+      stage: 'Підготовка…',
+    });
+
     for (let vi = 0; vi < variants.length; vi++) {
+      if (shouldAbort()) {
+        aborted = true;
+        break;
+      }
       const entry = variants[vi] as { query: string; plan: SplitPlan };
       const variant = entry.query;
       const variantSearch: SearchConfig = { ...search, query: variant };
-      const onVariantProgress: FetchOptions['onProgress'] = (p) =>
+      const onVariantProgress: FetchOptions['onProgress'] = (p) => {
+        const done = requestsUsed + p.done;
         onProgress({
-          done: requestsUsed + p.done,
-          total: p.total,
+          done,
+          // Стабільний наперед-порахований total; ніколи не нижче за поточний `done`
+          // (захист від розбіжності оцінки split vs noSplit) — bug «103/3».
+          total: Math.max(plannedTotal, done),
           method: p.method ?? 'GraphQL',
           stage:
             variants.length > 1
@@ -612,12 +770,14 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
           subDone: variants.length > 1 ? vi + 1 : p.subDone,
           subTotal: variants.length > 1 ? variants.length : p.subTotal,
         });
+      };
 
       let raw: RawListing[];
-      let result: { visibleTotalCount: number | null; requestsUsed: number; exhausted: boolean; warning?: string; bucketsUsed?: number };
+      let result: { visibleTotalCount: number | null; requestsUsed: number; exhausted: boolean; warning?: string; bucketsUsed?: number; aborted?: boolean };
       try {
         const splitResult = await graphqlFetcher.scanFromPlan(variantSearch, entry.plan, {
           onProgress: onVariantProgress,
+          shouldAbort,
         });
         raw = splitResult.listings;
         result = splitResult;
@@ -625,6 +785,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
         const graphqlMessage = graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
         const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
           onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
+          shouldAbort,
         });
         raw = htmlResult.listings;
         result = { ...htmlResult, warning: [`graphql failed: ${graphqlMessage}; fallback html OK`, htmlResult.warning].filter(Boolean).join('; ') };
@@ -633,6 +794,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
 
       for (const item of raw) merged.set(item.olxId, item);
       requestsUsed += result.requestsUsed;
+      rawTotal += raw.length;
       if (!result.exhausted) allExhausted = false;
       if (result.bucketsUsed) bucketsUsed += result.bucketsUsed;
       if (result.warning) {
@@ -640,6 +802,12 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
         if (variants.length === 1) partial = true;
       }
       if (variants.length === 1) visibleTotalCount = result.visibleTotalCount;
+
+      // Зупинено користувачем — решту варіантів не скануємо, повертаємо вже зібране.
+      if (result.aborted) {
+        aborted = true;
+        break;
+      }
 
       if (vi < variants.length - 1) {
         const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
@@ -658,11 +826,21 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
     const raw = [...merged.values()];
     const upsertResult = upsertListings(searchId, raw);
 
-    const { disabled_count } = usedGraphql && !partial
+    const stopped = aborted;
+    const effectivePartial = partial || stopped;
+
+    const { disabled_count } = usedGraphql && !effectivePartial
       ? applyScanStatuses(searchId, raw, allExhausted, 1) // план завжди походить від глибокого скану
       : { disabled_count: 0 };
 
-    const result: ScanResult = { ...upsertResult, requestsUsed, disabled_count, bucketsUsed };
+    const result: ScanResult = {
+      ...upsertResult,
+      rawFound: rawTotal,
+      requestsUsed,
+      disabled_count,
+      bucketsUsed,
+      stopped,
+    };
 
     if (visibleTotalCount != null) {
       db.prepare('UPDATE searches SET visible_total_count = ? WHERE id = ?').run(
@@ -671,13 +849,18 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       );
     }
 
+    if (stopped) {
+      notes.unshift(`Зупинено користувачем — збережено ${result.found} оголошень`);
+    }
+
     db.prepare(
-      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, warning = ?, error = NULL,
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, raw_found = ?, disabled_count = ?, warning = ?, error = NULL,
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(
       new Date().toISOString(),
       result.found,
       result.new_count,
+      result.rawFound,
       result.disabled_count,
       notes.length > 0 ? notes.join('; ') : null,
       runId,
@@ -691,6 +874,8 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(new Date().toISOString(), message, runId);
     throw err;
+  } finally {
+    abortFlags.delete(searchId);
   }
 }
 
@@ -802,6 +987,9 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     throw new Error(`Search ${searchId} не знайдено`);
   }
 
+  abortFlags.set(searchId, false);
+  const shouldAbort = (): boolean => abortFlags.get(searchId) === true;
+
   const runId = Number(
     db
       .prepare('INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)')
@@ -829,9 +1017,14 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     backfilled: 0,
   };
   const unknownIssues: string[] = [];
+  let aborted = false;
 
   try {
     for (let i = 0; i < candidates.length; i++) {
+      if (shouldAbort()) {
+        aborted = true;
+        break;
+      }
       const candidate = candidates[i] as VerifyCandidateRow;
       const probe = await probeListingPage(candidate.url);
       result.checked++;
@@ -888,9 +1081,10 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     }
 
     const error = unknownIssues.length > 0 ? `verify unknown: ${unknownIssues.join('; ')}` : null;
+    const warning = aborted ? `Зупинено користувачем — перевірено ${result.checked} з ${total}` : null;
 
     db.prepare(
-      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?,
+      `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?, warning = ?,
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(
       new Date().toISOString(),
@@ -898,6 +1092,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
       result.reactivated,
       result.disabled_count,
       error,
+      warning,
       runId,
     );
 
@@ -909,5 +1104,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
          stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
     ).run(new Date().toISOString(), message, runId);
     throw err;
+  } finally {
+    abortFlags.delete(searchId);
   }
 }

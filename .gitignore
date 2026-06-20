@@ -75,6 +75,9 @@ server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
 
+# Архіви локальних даних/бекапів (напр. server/data.zip)
+*.zip
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
