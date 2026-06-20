@@ -17,6 +17,7 @@ import { ActionPanelStats } from './action-panel/ActionPanelStats';
 import { ActionPanelLastScan } from './action-panel/ActionPanelLastScan';
 import { ActionPanelButtons } from './action-panel/ActionPanelButtons';
 import { ScanProgressPanel } from './action-panel/ScanProgressPanel';
+import { ScanStatusChip } from './action-panel/ScanStatusChip';
 import { ScanPlanReportDialog } from './action-panel/ScanPlanReportDialog';
 import { useSearchActionPanel } from '../../hooks/useSearchActionPanel';
 import { DEEP_SCAN_SECONDS_PER_REQUEST } from '../../constants';
@@ -61,12 +62,18 @@ export function SearchActionPanel({ search }: Props) {
   } = useSearchActionPanel(search);
 
   return (
-    <DialogRoot
-      open={dialogOpen}
-      onOpenChange={(details) => setDialogOpen(details.open)}
-      size="lg"
-      placement="center"
-    >
+    <>
+      {/* Згорнутий скан — індикатор у хедері повертає модалку (docs/plans/scan-progress-detail.md). */}
+      {isScanning && !dialogOpen && status && scanKind && (
+        <ScanStatusChip scanKind={scanKind} status={status} onClick={() => setDialogOpen(true)} />
+      )}
+      <DialogRoot
+        open={dialogOpen}
+        onOpenChange={(details) => setDialogOpen(details.open)}
+        size="lg"
+        placement="center"
+        closeOnInteractOutside={false}
+      >
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" colorPalette="blue">
           <Box as={LuRefreshCw} animation={isScanning ? 'spin 2s linear infinite' : undefined} />
@@ -142,6 +149,7 @@ export function SearchActionPanel({ search }: Props) {
         planValid={planValid}
         analyzedAt={analyzedAt}
       />
-    </DialogRoot>
+      </DialogRoot>
+    </>
   );
 }

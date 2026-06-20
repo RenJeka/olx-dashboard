@@ -10,6 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '../../ui/dialog';
+import { SCAN_PLAN_TTL_MIN } from '../../../constants';
 import type { ScanPlan, ScanPlanQuery } from '../../../types';
 
 interface Props {
@@ -247,7 +248,7 @@ export function ScanPlanReportDialog({
             <HStack gap={1.5} align="start">
               <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
               <Text fontSize="2xs" color="orange.fg" lineHeight="1.4">
-                План застарів (діє 15 хвилин і одноразовий) — щоб запустити скан, зробіть новий аналіз.
+                План застарів (діє {SCAN_PLAN_TTL_MIN} хвилин і одноразовий) — щоб запустити скан, зробіть новий аналіз.
               </Text>
             </HStack>
           )}

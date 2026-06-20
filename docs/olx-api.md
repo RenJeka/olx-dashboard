@@ -356,7 +356,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
   (`remainingRequests × DEEP_SCAN_SECONDS_PER_REQUEST`) і вибіркову оцінку `estimatedNew`
   (із `page0` кожного бакету проти БД, `normalizer.selectKnownOlxIds`).
 - **Кешування плану:** оскільки застосунок single-user/локальний, повний внутрішній
-  `SplitPlan[]` (з `page0`) кешується в пам'яті процесу (`Map<planToken, …>`, TTL 15 хв,
+  `SplitPlan[]` (з `page0`) кешується в пам'яті процесу (`Map<planToken, …>`, TTL 30 хв,
   `randomUUID()`) — фронту повертається лише легкий DTO з токеном. Прострочений/невідомий
   токен при спробі запуску → HTTP 410, зрозуміла помилка («План застарів — повторіть
   аналіз»), без падіння.

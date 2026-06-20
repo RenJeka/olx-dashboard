@@ -7,7 +7,7 @@ import {
   analyzeScan,
   runDeepScanFromPlan,
   requestStopScan,
-  isPlanCached,
+  isAnalysisFresh,
 } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
@@ -346,8 +346,9 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Останній збережений аналіз (kind='analyze') — для перегляду без повторного зондування
-  // (docs/plans/deep-scan-stop-and-history.md). planValid=false → план протермінований,
-  // можна лише переглянути, для запуску потрібен новий аналіз.
+  // (docs/plans/deep-scan-stop-and-history.md). planValid — часова валідність (у межах TTL за
+  // finished_at): true → звіт ще запускний (за потреби runDeepScanFromPlan перезондує);
+  // false → аналіз протермінований, потрібен новий.
   app.get<{ Params: { id: string } }>(
     '/api/searches/:id/last-analysis',
     async (req, reply) => {
@@ -372,7 +373,10 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       return {
         plan,
         analyzedAt: row.finished_at,
-        planValid: isPlanCached(plan.planToken),
+        // Валідність — часова (у межах TTL за finished_at), НЕ прив'язана до in-memory кешу:
+        // звіт лишається запускним протягом TTL навіть після закриття діалогу/перезапуску
+        // сервера (runDeepScanFromPlan за потреби перезондує).
+        planValid: isAnalysisFresh(row.finished_at),
       };
     },
   );

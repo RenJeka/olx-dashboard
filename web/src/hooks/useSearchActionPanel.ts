@@ -17,6 +17,7 @@ import {
   DEEP_SCAN_PAGE_LIMIT,
   DEEP_SCAN_MAX_PAGES,
   DEEP_SCAN_SECONDS_PER_REQUEST,
+  SCAN_PLAN_TTL_MIN,
 } from '../constants';
 import type { Search, ScanPlan, ScanResult } from '../types';
 
@@ -212,7 +213,7 @@ export function useSearchActionPanel(search: Search) {
           toaster.create({
             type: 'error',
             title: isStale ? 'План застарів' : 'Помилка скану',
-            description: isStale ? 'Повторіть аналіз — план діє лише 15 хвилин.' : message,
+            description: isStale ? `Повторіть аналіз — план діє лише ${SCAN_PLAN_TTL_MIN} хвилин.` : message,
           });
           if (isStale) setPlanValid(false);
         },

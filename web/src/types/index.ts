@@ -304,8 +304,9 @@ export interface ScanPlan {
 
 /**
  * Останній збережений аналіз (GET /api/searches/:id/last-analysis,
- * docs/plans/deep-scan-stop-and-history.md). `planValid=false` — план протермінований
- * (TTL 15 хв або вже запущений): можна лише переглянути, для запуску потрібен новий аналіз.
+ * docs/plans/deep-scan-stop-and-history.md). `planValid` — часова валідність (у межах TTL 30 хв
+ * за `finished_at`): true → звіт ще запускний (сервер за потреби перезондує); false →
+ * протермінований, потрібен новий аналіз.
  */
 export interface LastAnalysis {
   plan: ScanPlan;

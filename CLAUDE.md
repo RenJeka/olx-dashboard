@@ -58,11 +58,16 @@
   **без допагінації бакетів**. Результат — `ScanPlan` (DTO `server/src/types.ts`/`web/src/types/index.ts`):
   розбивка по варіантах запиту, цінові бакети, ETA (`remainingRequests * DEEP_SCAN_SECONDS_PER_REQUEST`),
   оцінка `estimatedNew` (вибіркова, з уже завантажених `page0`, проти БД через `selectKnownOlxIds`).
-  План кешується сервером у пам'яті (`Map<planToken, …>`, TTL 15 хв, `scanner.ts`) і повертається
-  фронту лише як токен — підтверджений запуск зі звіту (`POST /scan/run-plan` →
-  `runDeepScanFromPlan`) **перевикористовує** вже зібрані межі бакетів/`page0` через
-  `GraphqlOlxFetcher.scanFromPlan`, без повторного зондування. Прострочений/невідомий токен →
-  зрозуміла помилка («План застарів — повторіть аналіз»), без 500. Аналітичні прогони
+  План кешується сервером у пам'яті (`Map<planToken, …>`, TTL 30 хв — `PLAN_TTL_MIN`/`SCAN_PLAN_TTL_MIN`,
+  `scanner.ts`) і повертається фронту лише як токен — підтверджений запуск зі звіту
+  (`POST /scan/run-plan` → `runDeepScanFromPlan`) **перевикористовує** вже зібрані межі
+  бакетів/`page0` через `GraphqlOlxFetcher.scanFromPlan`, без повторного зондування.
+  **Валідність звіту для UI — часова, не прив'язана до in-memory кешу** (`isAnalysisFresh` за
+  `scan_runs.finished_at`): звіт лишається запускним протягом TTL навіть після закриття діалогу
+  чи перезапуску сервера. Якщо швидкий план із кешу зник (TTL-edge/рестарт/повторний запуск), а
+  аналіз ще свіжий — `runDeepScanFromPlan` робить повний глибокий скан із повторним зондуванням
+  (`runScan deep`) замість помилки; зрозуміла помилка («План застарів — повторіть аналіз», без
+  500) лишається лише для справді протермінованого (> TTL) аналізу. Аналітичні прогони
   (`scan_runs.kind='analyze'`) виключені з банера `last_scan`. Реалізація —
   `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts`
   (`analyzeScan`/`runDeepScanFromPlan`),

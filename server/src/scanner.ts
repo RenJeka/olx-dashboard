@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './db/db.js';
 import { GraphqlOlxFetcher } from './scraper/graphql/index.js';
 import { estimatePages } from './scraper/graphql/fetcher.js';
+import { MAX_PAGES } from './scraper/graphql/constants.js';
 import type { SplitPlan } from './scraper/graphql/types.js';
 import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings, selectKnownOlxIds } from './scraper/normalizer.js';
@@ -208,24 +209,31 @@ async function fetchAllQueries(
   let aborted = false;
   const notes: string[] = [`multi-query: ${variants.length} варіантів запиту змерджено`];
 
-  // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів,
-  // але прогрес-бар лишається монотонним і орієнтовним).
+  // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів).
+  // `maxTotal` тримаємо монотонно-незменшуваним і завжди ≥ `done`, щоб праве число лічильника
+  // не стрибало вниз і не опускалося нижче лівого, коли черговий варіант дрібний або фаза
+  // бісекції не дає `total` (інакше — баг «103/3», docs/plans/scan-progress-detail.md).
   let doneOffset = 0;
   let totalOffset = 0;
+  let maxTotal = 0;
 
   for (let vi = 0; vi < variants.length; vi++) {
     const variant = variants[vi] as string;
     const variantSearch: SearchConfig = { ...search, query: variant };
     const onVariantProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
-      ? (p: ScanProgress) =>
+      ? (p: ScanProgress) => {
+          const done = doneOffset + p.done;
+          const candidate = p.total != null ? totalOffset + p.total : 0;
+          maxTotal = Math.max(maxTotal, candidate, done);
           options.onProgress!({
-            done: doneOffset + p.done,
-            total: p.total != null ? totalOffset + p.total : undefined,
+            done,
+            total: maxTotal,
             method: p.method,
             stage: `Синонім «${variant}» (${vi + 1}/${variants.length})${p.stage ? ` · ${p.stage}` : ''}`,
             subDone: vi + 1,
             subTotal: variants.length,
-          })
+          });
+        }
       : undefined;
 
     const result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
@@ -412,8 +420,10 @@ interface CachedPlan {
   createdAt: number;
 }
 
+/** Скільки хвилин живе закешований план аналізу (дзеркалить SCAN_PLAN_TTL_MIN у web/src/constants.ts). */
+const PLAN_TTL_MIN = 30;
 /** Single-user локальний застосунок — in-memory кеш планів допустимий (без Redis/БД). */
-const PLAN_TTL_MS = 15 * 60 * 1000;
+const PLAN_TTL_MS = PLAN_TTL_MIN * 60 * 1000;
 const planCache = new Map<string, CachedPlan>();
 
 function cleanupExpiredPlans(): void {
@@ -424,13 +434,25 @@ function cleanupExpiredPlans(): void {
 }
 
 /**
- * Чи ще валідний (закешований) planToken — для перегляду історії аналізу
- * (docs/plans/deep-scan-stop-and-history.md). Якщо false — збережений звіт можна лише
- * переглянути, а для запуску потрібен новий аналіз (план одноразовий + TTL 15 хв).
+ * Чи ще є швидкий (in-memory) план під цим токеном — дозволяє `runDeepScanFromPlan` довершити
+ * скан БЕЗ повторного зондування. Кеш втрачається при перезапуску процесу й після одноразового
+ * запуску; валідність звіту для UI більше НЕ залежить від нього (див. `isAnalysisFresh`).
  */
 export function isPlanCached(planToken: string): boolean {
   cleanupExpiredPlans();
   return planCache.has(planToken);
+}
+
+/**
+ * Чи аналіз ще «свіжий» за часом завершення (у межах TTL) — time-based валідність звіту для UI.
+ * НЕ прив'язана до in-memory кешу: звіт лишається запускним протягом TTL навіть після
+ * перезапуску сервера чи закриття діалогу — `runDeepScanFromPlan` за потреби перезондує
+ * (docs/plans/two-phase-deep-scan.md).
+ */
+export function isAnalysisFresh(finishedAt: string | null | undefined): boolean {
+  if (!finishedAt) return false;
+  const t = Date.parse(finishedAt);
+  return Number.isFinite(t) && Date.now() - t < PLAN_TTL_MS;
 }
 
 /**
@@ -616,20 +638,53 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
 }
 
 /**
+ * Стабільна оцінка кількості HTTP-запитів, які `scanFromPlan` зробить для одного варіанта
+ * (для наперед-порахованого `requests_total`, щоб лічильник не стрибав — bug «103/3»):
+ * - `noSplit` → `scanFromPlan` делегує `fetchSearch` (пагінація з 0-ї сторінки): `estimatePages(rootCount)`,
+ *   а без `rootCount` (аналіз варіанта впав) — `MAX_PAGES` як верхня межа;
+ * - split → probe вже зроблено (`plan.requestsUsed`) + допагінація бакетів (без уже завантажених 0-х сторінок).
+ */
+function estimateRunRequests(plan: SplitPlan): number {
+  if (plan.noSplit) {
+    return plan.rootCount != null ? estimatePages(plan.rootCount) : MAX_PAGES;
+  }
+  return (
+    plan.requestsUsed +
+    plan.buckets.reduce((sum, b) => sum + Math.max(0, estimatePages(b.count) - 1), 0)
+  );
+}
+
+/**
  * Довершує глибокий скан за раніше зібраним планом (`analyzeScan`): для кожного варіанта query
  * викликає `GraphqlOlxFetcher.scanFromPlan` (жодного повторного probe-запиту), зливає по
  * `olxId`, далі стандартний хвіст `runScan` (upsert, `applyScanStatuses` лише для повного
  * успішного single-query GraphQL, оновлення `visible_total_count`, фіналізація `scan_runs` з
  * `kind='deep'`). GraphQL-збій під час самого допагінування — fallback на HTML (як `fetchWithFallback`).
- * Прострочений/невідомий токен — зрозуміла помилка (план одноразовий: видаляється після запуску).
+ *
+ * Якщо швидкого in-memory плану під токеном уже немає (TTL-edge, перезапуск сервера або повторний
+ * запуск), але аналіз ще «свіжий» за часом (`isAnalysisFresh`) — НЕ змушуємо повторювати аналіз
+ * вручну: робимо повний глибокий скан із повторним зондуванням (`runScan deep`). Результат той
+ * самий, лише дорожче на probe-запити. Тільки коли аналіз справді протермінований (> TTL) —
+ * зрозуміла помилка «повторіть аналіз».
  */
 export async function runDeepScanFromPlan(searchId: number, planToken: string): Promise<ScanResult> {
   cleanupExpiredPlans();
   const cached = planCache.get(planToken);
   if (!cached || cached.searchId !== searchId) {
+    const lastAnalyze = db
+      .prepare(
+        `SELECT finished_at FROM scan_runs
+         WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(searchId) as { finished_at: string | null } | undefined;
+    if (lastAnalyze && isAnalysisFresh(lastAnalyze.finished_at)) {
+      // Аналіз ще в межах TTL — перезондуємо повним глибоким сканом (стійко до втрати кешу).
+      return runScan(searchId, { deep: true });
+    }
     throw new Error('План застарів або не знайдено — повторіть аналіз');
   }
-  planCache.delete(planToken); // одноразовий — повторний запуск вимагає нового аналізу
+  planCache.delete(planToken); // швидкий план одноразовий; у межах TTL повторний запуск перезондує (вище)
 
   const search = loadSearch(searchId);
   if (!search) {
@@ -681,6 +736,17 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       ? [`multi-query: ${variants.length} варіантів запиту змерджено`]
       : [];
 
+    // Стабільний орієнтовний total на весь скан — рахуємо наперед із кешованих планів, щоб
+    // `requests_total` не стрибав униз між варіантами (bug «103/3»). У `onVariantProgress`
+    // клампимо так, щоб total ніколи не був меншим за поточний `done`.
+    const plannedTotal = variants.reduce((sum, e) => sum + estimateRunRequests(e.plan), 0);
+    onProgress({
+      done: 0,
+      total: plannedTotal,
+      subTotal: variants.length,
+      stage: 'Підготовка…',
+    });
+
     for (let vi = 0; vi < variants.length; vi++) {
       if (shouldAbort()) {
         aborted = true;
@@ -689,10 +755,13 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       const entry = variants[vi] as { query: string; plan: SplitPlan };
       const variant = entry.query;
       const variantSearch: SearchConfig = { ...search, query: variant };
-      const onVariantProgress: FetchOptions['onProgress'] = (p) =>
+      const onVariantProgress: FetchOptions['onProgress'] = (p) => {
+        const done = requestsUsed + p.done;
         onProgress({
-          done: requestsUsed + p.done,
-          total: p.total,
+          done,
+          // Стабільний наперед-порахований total; ніколи не нижче за поточний `done`
+          // (захист від розбіжності оцінки split vs noSplit) — bug «103/3».
+          total: Math.max(plannedTotal, done),
           method: p.method ?? 'GraphQL',
           stage:
             variants.length > 1
@@ -701,6 +770,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
           subDone: variants.length > 1 ? vi + 1 : p.subDone,
           subTotal: variants.length > 1 ? variants.length : p.subTotal,
         });
+      };
 
       let raw: RawListing[];
       let result: { visibleTotalCount: number | null; requestsUsed: number; exhausted: boolean; warning?: string; bucketsUsed?: number; aborted?: boolean };
