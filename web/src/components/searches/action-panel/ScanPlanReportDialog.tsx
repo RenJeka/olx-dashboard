@@ -17,6 +17,12 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   plan: ScanPlan | null;
   onConfirm: () => void;
+  /** Зробити новий аналіз (перезондувати) — замість показу збереженого. */
+  onNewAnalysis: () => void;
+  /** false — planToken протермінований: можна лише переглянути, запуск недоступний. */
+  planValid: boolean;
+  /** Коли цей аналіз зроблено (ISO) — показуємо для збереженого звіту. */
+  analyzedAt: string | null;
 }
 
 function formatNumber(n: number): string {
@@ -26,6 +32,15 @@ function formatNumber(n: number): string {
 function formatDuration(sec: number): string {
   if (sec < 60) return `~${Math.max(1, Math.round(sec))} с`;
   return `~${Math.round(sec / 60)} хв`;
+}
+
+function formatAnalyzedAt(iso: string): string {
+  return new Date(iso).toLocaleString('uk-UA', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /** Людиномовний переклад внутрішніх fallbackReason з аналітичної фази (scanner.ts/fetcher.ts). */
@@ -145,7 +160,15 @@ function QuerySection({ q, showLabel }: { q: ScanPlanQuery; showLabel: boolean }
  * нових, і ціновий спектр на кожен варіант запиту (основний query + синоніми). Жодного «Більше
  * не питати» — звіт інформативний, не повторюване підтвердження.
  */
-export function ScanPlanReportDialog({ open, onOpenChange, plan, onConfirm }: Props) {
+export function ScanPlanReportDialog({
+  open,
+  onOpenChange,
+  plan,
+  onConfirm,
+  onNewAnalysis,
+  planValid,
+  analyzedAt,
+}: Props) {
   if (!plan) return null;
 
   const multi = plan.perQuery.length > 1;
@@ -158,7 +181,9 @@ export function ScanPlanReportDialog({ open, onOpenChange, plan, onConfirm }: Pr
         <DialogHeader>
           <DialogTitle>Аналіз перед сканом</DialogTitle>
           <Text textStyle="xs" color="fg.muted" mt={1}>
-            Видачу й цінові діапазони вже зондовано — нижче точна картина перед повним сканом.
+            {analyzedAt
+              ? `Проаналізовано: ${formatAnalyzedAt(analyzedAt)} — нижче картина останнього аналізу.`
+              : 'Видачу й цінові діапазони вже зондовано — нижче точна картина перед повним сканом.'}
           </Text>
         </DialogHeader>
 
@@ -187,6 +212,12 @@ export function ScanPlanReportDialog({ open, onOpenChange, plan, onConfirm }: Pr
                   />
                 )}
               </HStack>
+              {multi && (
+                <Text textStyle="2xs" color="fg.muted">
+                  «Оголошень» — сума по варіантах запиту; дублі між синонімами не відняті, тож
+                  реально унікальних у базі буде менше.
+                </Text>
+              )}
             </Stack>
 
             {/* Розбивка по варіантах запиту (синоніми) — кожен зі своїм ціновим спектром */}
@@ -211,13 +242,23 @@ export function ScanPlanReportDialog({ open, onOpenChange, plan, onConfirm }: Pr
           </Stack>
         </DialogBody>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Скасувати
-          </Button>
-          <Button colorPalette="orange" onClick={onConfirm}>
-            Запустити повний скан
-          </Button>
+        <DialogFooter flexDirection="column" alignItems="stretch" gap={2}>
+          {!planValid && (
+            <HStack gap={1.5} align="start">
+              <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
+              <Text fontSize="2xs" color="orange.fg" lineHeight="1.4">
+                План застарів (діє 15 хвилин і одноразовий) — щоб запустити скан, зробіть новий аналіз.
+              </Text>
+            </HStack>
+          )}
+          <HStack justify="flex-end" gap={3}>
+            <Button variant="outline" onClick={onNewAnalysis}>
+              Зробити новий аналіз
+            </Button>
+            <Button colorPalette="orange" onClick={onConfirm} disabled={!planValid}>
+              Запустити повний скан
+            </Button>
+          </HStack>
         </DialogFooter>
       </DialogContent>
     </DialogRoot>

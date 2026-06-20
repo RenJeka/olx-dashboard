@@ -6,10 +6,12 @@ import {
   countVerifyCandidates,
   analyzeScan,
   runDeepScanFromPlan,
+  requestStopScan,
+  isPlanCached,
 } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
-import type { FilterOptions, LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
+import type { FilterOptions, LocalFilters, ParamKeyInfo, ScanPlan, SearchStats } from '../types.js';
 
 interface SearchBody {
   name?: string;
@@ -303,6 +305,14 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Зупинка активного скану (docs/plans/deep-scan-stop-and-history.md): ставить abort-прапорець,
+  // активний скан завершиться частковим успіхом і збереже вже зібране у БД.
+  app.post<{ Params: { id: string } }>('/api/searches/:id/scan/stop', async (req) => {
+    const id = Number(req.params.id);
+    const stopped = requestStopScan(id);
+    return { stopped };
+  });
+
   // Verify-прохід (A3): перевірка живості давно не бачених + дозаповнення опису/продавця.
   app.post<{ Params: { id: string } }>('/api/searches/:id/verify', async (req, reply) => {
     const id = Number(req.params.id);
@@ -325,13 +335,45 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       const row = db
         .prepare(
-          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total,
+          `SELECT id, started_at, finished_at, found, new_count, raw_found, error, requests_done, requests_total,
                   fetch_method, kind, stage, sub_done, sub_total
            FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
         )
         .get(id);
       if (!row) return reply.code(404).send({ error: 'Сканів ще не було' });
       return row;
+    },
+  );
+
+  // Останній збережений аналіз (kind='analyze') — для перегляду без повторного зондування
+  // (docs/plans/deep-scan-stop-and-history.md). planValid=false → план протермінований,
+  // можна лише переглянути, для запуску потрібен новий аналіз.
+  app.get<{ Params: { id: string } }>(
+    '/api/searches/:id/last-analysis',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const row = db
+        .prepare(
+          `SELECT finished_at, scan_plan FROM scan_runs
+           WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
+           ORDER BY id DESC LIMIT 1`,
+        )
+        .get(id) as { finished_at: string | null; scan_plan: string } | undefined;
+
+      if (!row) return reply.code(404).send({ error: 'Аналізів ще не було' });
+
+      let plan: ScanPlan;
+      try {
+        plan = JSON.parse(row.scan_plan) as ScanPlan;
+      } catch {
+        return reply.code(404).send({ error: 'Збережений аналіз пошкоджено' });
+      }
+
+      return {
+        plan,
+        analyzedAt: row.finished_at,
+        planValid: isPlanCached(plan.planToken),
+      };
     },
   );
 
@@ -422,7 +464,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const lastScan = db
       .prepare(
-        `SELECT kind, started_at, finished_at, found, new_count, disabled_count, error, warning
+        `SELECT kind, started_at, finished_at, found, new_count, raw_found, disabled_count, error, warning
          FROM scan_runs WHERE search_id = ? AND kind != 'analyze' ORDER BY id DESC LIMIT 1`,
       )
       .get(id) as SearchStats['last_scan'] | undefined;

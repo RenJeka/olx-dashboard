@@ -78,9 +78,11 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   kind TEXT DEFAULT 'normal',        -- normal | deep | verify | analyze (двофазний deep-скан)
   started_at TEXT,
   finished_at TEXT,
-  found INTEGER,
+  found INTEGER,                     -- унікальних оголошень (після дедупу по olx_id)
   new_count INTEGER,
+  raw_found INTEGER,                 -- сирих оголошень до дедупу між синонімами (raw_found - found = злито дублів)
   disabled_count INTEGER,
+  scan_plan TEXT,                    -- JSON ScanPlan для kind='analyze' (історія аналізу, перегляд останнього)
   error TEXT,                        -- ТІЛЬКИ реальний збій скану (обидві стратегії впали)
   warning TEXT,                      -- частковий успіх (multi-query/split/HTML-fallback): скан вдався, але з застереженням; НЕ помилка
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів

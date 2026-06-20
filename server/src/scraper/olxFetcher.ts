@@ -74,8 +74,13 @@ export class HtmlOlxFetcher implements OlxFetcher {
     // HTML не дає visible_total_count — для глибокого ціль одразу DEEP_SAFETY_CAP.
     const target = deep ? DEEP_SAFETY_CAP : BATCH_SIZE;
     let requestsUsed = 0;
+    let aborted = false;
 
     for (let page = 1; page <= target; page++) {
+      if (options?.shouldAbort?.()) {
+        aborted = true;
+        break;
+      }
       const url = this.buildUrl(search, page);
 
       const res = await fetch(url, {
@@ -125,7 +130,7 @@ export class HtmlOlxFetcher implements OlxFetcher {
 
     // HTML-сторінка пошуку не дає metadata.visible_total_count — лише GraphQL.
     // exhausted: false — statusEngine для fallback-сканів не викликається (CLAUDE.md).
-    return { listings: all, visibleTotalCount: null, requestsUsed, exhausted: false };
+    return { listings: all, visibleTotalCount: null, requestsUsed, exhausted: false, aborted };
   }
 
   /**

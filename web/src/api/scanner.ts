@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './base';
-import type { ScanResult, ScanStatus, VerifyResult, ScanPlan } from '../types';
+import type { ScanResult, ScanStatus, VerifyResult, ScanPlan, LastAnalysis } from '../types';
 
 export function useScan() {
   const qc = useQueryClient();
@@ -69,5 +69,32 @@ export function useScanStatus(searchId: number | null, enabled: boolean) {
     queryFn: () => api<ScanStatus>(`/api/searches/${searchId}/scan-status`),
     enabled: enabled && searchId != null,
     refetchInterval: 1500,
+  });
+}
+
+/** Зупинка активного скану (docs/plans/deep-scan-stop-and-history.md): зібране зберігається у БД. */
+export function useStopScan() {
+  return useMutation({
+    mutationKey: ['scan-stop'],
+    mutationFn: (searchId: number) =>
+      api<{ stopped: boolean }>(`/api/searches/${searchId}/scan/stop`, { method: 'POST' }),
+  });
+}
+
+/**
+ * Останній збережений аналіз пошуку (для перегляду без повторного зондування).
+ * 404 (аналізів ще не було) ловиться у queryFn → null. `enabled` лише при відкритому діалозі.
+ */
+export function useLastAnalysis(searchId: number | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['last-analysis', searchId],
+    queryFn: async (): Promise<LastAnalysis | null> => {
+      try {
+        return await api<LastAnalysis>(`/api/searches/${searchId}/last-analysis`);
+      } catch {
+        return null;
+      }
+    },
+    enabled: enabled && searchId != null,
   });
 }

@@ -54,6 +54,11 @@ addColumnIfMissing('scan_runs', 'warning', 'TEXT');
 addColumnIfMissing('scan_runs', 'stage', 'TEXT');
 addColumnIfMissing('scan_runs', 'sub_done', 'INTEGER');
 addColumnIfMissing('scan_runs', 'sub_total', 'INTEGER');
+
+// Прозорість дедупу + історія аналізу (docs/plans/deep-scan-stop-and-history.md):
+// raw_found — сирих до дедупу між синонімами; scan_plan — JSON ScanPlan для kind='analyze'.
+addColumnIfMissing('scan_runs', 'raw_found', 'INTEGER');
+addColumnIfMissing('scan_runs', 'scan_plan', 'TEXT');
 addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
 addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 

@@ -1,4 +1,5 @@
-import { Badge, Box, HStack, Progress, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
+import { LuCircleStop } from 'react-icons/lu';
 import { SCAN_KIND_LABELS } from '../../../constants';
 import type { ScanStatus } from '../../../types';
 /** Сегменти показуємо лише до цієї кількості — більше (напр. до 40 цінових бакетів) злилося б у кашу. */
@@ -9,6 +10,10 @@ interface Props {
   status: ScanStatus;
   /** Секунд на один запит — для оцінки "Залишилось: ~N с" (узгоджено з SearchActionPanel). */
   secondsPerRequest: number;
+  /** Зупинити скан — зібране збережеться (docs/plans/deep-scan-stop-and-history.md). */
+  onStop: () => void;
+  /** Запит на зупинку вже надіслано (кнопка показує «Зупиняється…»). */
+  isStopping: boolean;
 }
 
 /**
@@ -18,7 +23,7 @@ interface Props {
  * запитів + ETA. Сегменти/stage рендеряться лише коли є реальні дані з бекенду — для
  * простого однозапитового скану панель виглядає так само, як і раніше.
  */
-export function ScanProgressPanel({ scanKind, status, secondsPerRequest }: Props) {
+export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop, isStopping }: Props) {
   const showSegments = status.sub_total != null && status.sub_total > 1;
   const segmented = showSegments && status.sub_total! <= MAX_SEGMENTS;
 
@@ -102,6 +107,19 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest }: Props
           Залишилось: ~{Math.round((status.requests_total - (status.requests_done ?? 0)) * secondsPerRequest)} с
         </Text>
       )}
+
+      <Button
+        size="xs"
+        variant="outline"
+        colorPalette="red"
+        alignSelf="flex-end"
+        onClick={onStop}
+        disabled={isStopping}
+        loading={isStopping}
+        loadingText="Зупиняється…"
+      >
+        <LuCircleStop /> Зупинити
+      </Button>
     </Stack>
   );
 }

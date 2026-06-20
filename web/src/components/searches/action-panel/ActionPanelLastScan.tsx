@@ -38,6 +38,11 @@ export function ActionPanelLastScan({ lastScan, verifyCandidates }: Props) {
           <Text textStyle="xs" color="fg.default">
             Тип: {SCAN_KIND_LABELS[lastScan.kind] ?? lastScan.kind} • Знайдено: +{lastScan.new_count ?? 0} нових • Вимкнено: {lastScan.disabled_count ?? 0}
           </Text>
+          {lastScan.raw_found != null && lastScan.found != null && lastScan.raw_found > lastScan.found && (
+            <Text textStyle="2xs" color="fg.muted">
+              Унікальних: {lastScan.found} • сирих: {lastScan.raw_found} • злито дублів: {lastScan.raw_found - lastScan.found}
+            </Text>
+          )}
         </Stack>
         {lastScan.error && (
           <Badge colorPalette="red" variant="subtle">

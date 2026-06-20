@@ -36,9 +36,12 @@ export function SearchActionPanel({ search }: Props) {
     setConfirmDeepOpen,
     scanKind,
     isScanning,
+    isStopping,
     scanPlan,
     reportOpen,
     setReportOpen,
+    planValid,
+    analyzedAt,
     stats,
     status,
     lastScan,
@@ -50,8 +53,10 @@ export function SearchActionPanel({ search }: Props) {
     deepScanMinutes,
     startDeepScan,
     runScan,
+    stopScan,
     runVerifyPass,
     startAnalysis,
+    startFreshAnalysis,
     runPlan,
   } = useSearchActionPanel(search);
 
@@ -90,6 +95,8 @@ export function SearchActionPanel({ search }: Props) {
                 scanKind={scanKind}
                 status={status}
                 secondsPerRequest={DEEP_SCAN_SECONDS_PER_REQUEST}
+                onStop={stopScan}
+                isStopping={isStopping}
               />
             )}
 
@@ -131,6 +138,9 @@ export function SearchActionPanel({ search }: Props) {
         onOpenChange={setReportOpen}
         plan={scanPlan}
         onConfirm={runPlan}
+        onNewAnalysis={startFreshAnalysis}
+        planValid={planValid}
+        analyzedAt={analyzedAt}
       />
     </DialogRoot>
   );

@@ -115,14 +115,23 @@ export interface VerifyResult {
 
 /** Результат сканування (повертається з /scan та CLI). */
 export interface ScanResult {
+  /** Унікальних оголошень (після дедупу по olxId між синонімами/бакетами) — записано в БД. */
   found: number;
   new_count: number;
+  /**
+   * Сирих оголошень до cross-variant дедупу (сума по варіантах синонімів/бакетах).
+   * `rawFound - found` = скільки дублів злито між синонімами (docs/plans/deep-scan-stop-and-history.md).
+   * Для скану без синонімів дорівнює `found`.
+   */
+  rawFound?: number;
   /** Скільки HTTP-запитів реально зроблено (звичайний скан: ≤3, глибокий: до DEEP_SAFETY_CAP). */
   requestsUsed: number;
   /** Скільки оголошень переведено в disabled через statusEngine (лише GraphQL-скани). */
   disabled_count: number;
   /** Скільки цінових бакетів використав глибокий скан із авто-розбиттям (>1 — було розбиття). */
   bucketsUsed?: number;
+  /** Скан зупинено користувачем — у БД збережено частковий результат (вікно покриття пропущено). */
+  stopped?: boolean;
 }
 
 /** Останній запис scan_runs для пошуку — для ендпойнту прогресу глибокого скану. */
@@ -132,6 +141,8 @@ export interface ScanStatus {
   finished_at: string | null;
   found: number | null;
   new_count: number | null;
+  /** Сирих оголошень до дедупу між синонімами (NULL для старих сканів). */
+  raw_found: number | null;
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
@@ -326,6 +337,8 @@ export interface LastScanInfo {
   finished_at: string | null;
   found: number | null;
   new_count: number | null;
+  /** Сирих оголошень до дедупу між синонімами (NULL для старих сканів). */
+  raw_found: number | null;
   disabled_count: number | null;
   /** Реальний збій скану (обидві стратегії впали). */
   error: string | null;
@@ -367,6 +380,11 @@ export interface FetchSearchResult {
    * `1`/відсутнє — розбиття не було (звичайний deep). `>1` — діапазон ділився на під-діапазони.
    */
   bucketsUsed?: number;
+  /**
+   * Скан перервано через `FetchOptions.shouldAbort` (кнопка «Зупинити») — `listings`
+   * містить частково зібране, яке все одно треба зберегти (docs/plans/deep-scan-stop-and-history.md).
+   */
+  aborted?: boolean;
 }
 
 /**
@@ -396,6 +414,11 @@ export interface FetchOptions {
   deep?: boolean;
   /** Викликається після кожного запиту/сторінки (і на ключових проміжних етапах). */
   onProgress?: (progress: ScanProgress) => void;
+  /**
+   * Опитується фетчером перед кожним запитом/ітерацією. `true` → припинити збір і повернути
+   * вже зібране з `aborted: true` (кнопка «Зупинити», docs/plans/deep-scan-stop-and-history.md).
+   */
+  shouldAbort?: () => boolean;
 }
 
 /**

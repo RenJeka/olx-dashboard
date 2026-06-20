@@ -44,11 +44,13 @@
   на під-діапазони ≤ вікна, сканує кожен і зливає через дедуп `olx_id`. Верхня межа без явної
   `to` — `probeMaxPrice` (зондування ціною спадно, **самоперевіряється**: сортування за ціною
   в OLX GraphQL не верифіковане live; якщо не спрацювало — звичайний deep + попередження).
-  Запобіжники: `MAX_BUCKETS=40`, `MAX_TOTAL_REQUESTS=200`, паузи 3–6с між батчами/бакетами.
-  **Вікно покриття для split-скану НЕ запускається** (union кількох діапазонів не
-  відсортований глобально за refresh — `warning` робить скан `partial`). Реалізація —
-  `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`); план/деталі —
-  `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
+  Запобіжники: `MAX_BUCKETS=60`, `MAX_TOTAL_REQUESTS=400` (на варіант query; підняті з 40/200
+  для повного покриття дуже великих пошуків, `docs/plans/deep-scan-stop-and-history.md`),
+  паузи 3–6с між батчами/бакетами. Якщо ліміт усе одно впирається — `scanFromPlan` ставить
+  `warning` (capHit), скан `partial`. **Вікно покриття для split-скану НЕ запускається** (union
+  кількох діапазонів не відсортований глобально за refresh — `warning` робить скан `partial`).
+  Реалізація — `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`);
+  план/деталі — `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
 - **Двофазний глибокий скан — аналіз → звіт → підтверджений запуск (`docs/plans/two-phase-deep-scan.md`):**
   окрема кнопка «Аналіз перед сканом» у UI (поруч зі «Глибокий скан», який лишається незмінним —
   одноразовий безперервний прохід) запускає лише легку probe-фазу: `GraphqlOlxFetcher.analyzeSplit`
@@ -66,6 +68,17 @@
   (`analyzeScan`/`runDeepScanFromPlan`),
   `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` (звіт, сигнатурний елемент —
   «ціновий спектр»).
+- **Зупинка скану + прозорість дедупу + історія аналізу (`docs/plans/deep-scan-stop-and-history.md`):**
+  кнопка «Зупинити» у `ScanProgressPanel` (для всіх сканів) → `POST /scan/stop` →
+  `scanner.requestStopScan` ставить abort-прапорець (`Map<searchId>`), який фетчери опитують через
+  `FetchOptions.shouldAbort` перед кожним запитом. Зібране **все одно зберігається** (`upsert`),
+  скан стає `partial` (вікно покриття пропускається), `scan_runs.warning='Зупинено…'`,
+  `ScanResult.stopped=true`. **Прозорість дедупу:** `scan_runs.raw_found` (сирих до cross-variant
+  дедупу) + `ScanResult.rawFound`; UI показує «сирих / унікальних / злито дублів» — пояснює розрив
+  «N в аналізі → менше у скані» (аналіз сумує `visible_total_count` синонімів без зняття перетину).
+  **Історія:** `analyzeScan` зберігає повний `ScanPlan` у `scan_runs.scan_plan`; `GET /last-analysis`
+  (+`planValid` через `isPlanCached`) → фронт показує останній звіт при повторному заході в «Аналіз
+  перед сканом» із кнопкою «Зробити новий аналіз».
 - Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`, `fetchSearch(search, options?: FetchOptions)`);
   подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
