@@ -1,5 +1,3 @@
-import { Button } from '@chakra-ui/react';
-import { LuScanSearch } from 'react-icons/lu';
 import {
   DialogBackdrop,
   DialogBody,
@@ -8,7 +6,6 @@ import {
   DialogHeader,
   DialogRoot,
   DialogTitle,
-  DialogTrigger,
 } from '../../ui/dialog';
 import { useRelevanceFlow, UseRelevanceFlowProps } from '../../../hooks/useRelevanceFlow';
 import { RelevanceSetupForm } from './RelevanceSetupForm';
@@ -18,23 +15,20 @@ import { RelevanceResultsList } from './RelevanceResultsList';
  * Головний компонент діалогу AI-фільтрації релевантності.
  * Керує станом через useRelevanceFlow та відображає форму налаштування або результати.
  */
-export function RelevanceFilterDialog({ search, selectedIds }: UseRelevanceFlowProps) {
-  const flow = useRelevanceFlow({ search, selectedIds });
-  const { state, actions } = flow;
+export function RelevanceFilterDialog({ search, selectedIds, open, onClose }: UseRelevanceFlowProps) {
+  const flow = useRelevanceFlow({ search, selectedIds, open, onClose });
+  const { state } = flow;
 
   return (
     <DialogRoot
-      open={state.open}
-      onOpenChange={(d) => actions.setOpen(d.open)}
+      open={open}
+      onOpenChange={(d) => {
+        if (!d.open) onClose();
+      }}
       size="lg"
       placement="center"
       scrollBehavior="inside"
     >
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" colorPalette="cyan">
-          <LuScanSearch /> AI Фільтр
-        </Button>
-      </DialogTrigger>
       <DialogBackdrop />
       <DialogContent>
         <DialogCloseTrigger />

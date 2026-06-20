@@ -3,7 +3,7 @@ import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './searches/SearchActionPanel';
-import { AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog } from './analysis';
+import { AiToolsHub } from './analysis';
 import { SettingsDrawer } from './settings';
 import { Tooltip } from './ui/tooltip';
 import { useSearches } from '../api';
@@ -79,9 +79,7 @@ export function Header() {
             </Badge>
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
-          {selectedSearch && <RelevanceFilterDialog search={selectedSearch} selectedIds={selectedIds} />}
-          {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
-          {selectedSearch && <AiPicksDialog search={selectedSearch} />}
+          {selectedSearch && <AiToolsHub search={selectedSearch} selectedIds={selectedIds} />}
           <SettingsDrawer />
         </HStack>
       </HStack>
