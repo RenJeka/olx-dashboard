@@ -32,7 +32,7 @@ export function SearchesPanel({
             aria-label="Новий пошук"
             rounded="full"
             size="lg"
-            colorPalette="green"
+            colorPalette="success"
             variant="solid"
             shadow="md"
             onClick={onNewSearch}
@@ -46,7 +46,7 @@ export function SearchesPanel({
           value="searches"
           icon={<LuListChecks />}
           label="Пошуки"
-          badgeColorPalette="blue"
+          badgeColorPalette="accent"
           items={activeSearches}
           selectedId={selectedId}
           onSelect={onSelect}

@@ -12,6 +12,7 @@ import {
 } from '../../ui/dialog';
 import { Tooltip } from '../../ui/tooltip';
 import { SCAN_PLAN_TTL_MIN } from '../../../constants';
+import { DIALOG_SIZE } from '../../../theme';
 import type { ScanPlan, ScanPlanQuery } from '../../../types';
 
 interface Props {
@@ -70,11 +71,11 @@ function InfoTooltip({ content }: { content: React.ReactNode }) {
   );
 }
 
-/** Невелика статистична картка в стилі ScanWarningSummary (orange.subtle + мono-цифра). */
+/** Невелика статистична картка в стилі ScanWarningSummary (warning.subtle + мono-цифра). */
 function StatChip({ value, label }: { value: string; label: string }) {
   return (
-    <Stack gap={0} lineHeight="1.1" minW="20" px={3} py={2} rounded="md" bg="orange.subtle" borderWidth="1px" borderColor="orange.muted">
-      <Text fontSize="lg" fontWeight="bold" fontFamily="mono" color="orange.fg">
+    <Stack gap={0} lineHeight="1.1" minW="20" px={3} py={2} rounded="md" bg="warning.subtle" borderWidth="1px" borderColor="warning.muted">
+      <Text fontSize="lg" fontWeight="bold" fontFamily="mono" color="warning.fg">
         {value}
       </Text>
       <Text fontSize="2xs" color="fg.muted" textTransform="uppercase" letterSpacing="wide">
@@ -95,15 +96,15 @@ function PriceSpectrum({ q }: { q: ScanPlanQuery }) {
       <HStack
         h="28px"
         rounded="md"
-        bg="orange.subtle"
+        bg="warning.subtle"
         borderWidth="1px"
-        borderColor="orange.muted"
+        borderColor="warning.muted"
         px={3}
         role="img"
         aria-label={q.rootCount != null ? `Без розбиття: ${q.rootCount} оголошень` : 'Без розбиття на цінові діапазони'}
       >
         {q.rootCount != null && (
-          <Text fontSize="2xs" color="orange.fg" fontWeight="semibold">
+          <Text fontSize="2xs" color="warning.fg" fontWeight="semibold">
             {formatNumber(q.rootCount)} оголошень
           </Text>
         )}
@@ -132,7 +133,7 @@ function PriceSpectrum({ q }: { q: ScanPlanQuery }) {
             minW="3px"
             h="full"
             rounded="sm"
-            bg="orange.solid"
+            bg="warning.solid"
             opacity={intensity}
             title={`${rangeLabel}: ${formatNumber(b.count)} оголошень`}
             aria-label={`${rangeLabel}: ${formatNumber(b.count)} оголошень`}
@@ -165,8 +166,8 @@ function QuerySection({ q, showLabel }: { q: ScanPlanQuery; showLabel: boolean }
       )}
       {q.fallbackReason && (
         <HStack gap={1.5} align="start">
-          <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
-          <Text fontSize="2xs" color="orange.fg" lineHeight="1.4">
+          <Box as={LuTriangleAlert} color="warning.fg" fontSize="xs" mt="2px" flexShrink={0} />
+          <Text fontSize="2xs" color="warning.fg" lineHeight="1.4">
             {describeFallback(q.fallbackReason)}
           </Text>
         </HStack>
@@ -200,7 +201,7 @@ export function ScanPlanReportDialog({
     // hideOthers і ставить aria-hidden на модалку скану; при закритті звіту cleanup не знімає його —
     // модалка скану лишається inert і блокує всі кліки (не зупинити скан, не закрити). modal=false
     // не чіпає сусідню модалку, тож після закриття звіту скан повністю інтерактивний.
-    <DialogRoot open={open} onOpenChange={(d) => onOpenChange(d.open)} size="lg" placement="center" modal={false}>
+    <DialogRoot open={open} onOpenChange={(d) => onOpenChange(d.open)} size={DIALOG_SIZE.wide} placement="center" modal={false}>
       <DialogBackdrop />
       <DialogContent>
         <DialogCloseTrigger />
@@ -240,7 +241,7 @@ export function ScanPlanReportDialog({
             {/* Hero: ETA + опорні числа */}
             <Stack gap={3}>
               <Stack gap={0}>
-                <Text fontSize="4xl" fontWeight="bold" fontFamily="mono" color="orange.fg" lineHeight="1">
+                <Text fontSize="4xl" fontWeight="bold" fontFamily="mono" color="warning.fg" lineHeight="1">
                   {formatDuration(plan.estimatedDurationSec)}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
@@ -332,13 +333,13 @@ export function ScanPlanReportDialog({
             </Stack>
 
             {plan.warnings.length > 0 && (
-              <Stack gap={1.5} p={3} rounded="lg" bg="orange.subtle/40" borderWidth="1px" borderColor="orange.muted">
+              <Stack gap={1.5} p={3} rounded="lg" bg="warning.subtle/40" borderWidth="1px" borderColor="warning.muted">
                 {plan.warnings.map((w, idx) => {
                   const isCoverage = w.startsWith(COVERAGE_WARNING_PREFIX);
                   return (
                     <HStack key={idx} gap={1.5} align="start">
-                      <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
-                      <Text fontSize="xs" color="orange.fg" lineHeight="1.4">
+                      <Box as={LuTriangleAlert} color="warning.fg" fontSize="xs" mt="2px" flexShrink={0} />
+                      <Text fontSize="xs" color="warning.fg" lineHeight="1.4">
                         {isCoverage ? 'Вікно покриття пропущено.' : w}
                       </Text>
                       {isCoverage && (
@@ -359,8 +360,8 @@ export function ScanPlanReportDialog({
                 content={`План застарів (діє ${SCAN_PLAN_TTL_MIN} хвилин і одноразовий) — запуск повторно зробить аналіз.`}
               >
                 <HStack gap={1} cursor="help">
-                  <Box as={LuTriangleAlert} color="orange.fg" fontSize="sm" />
-                  <Text fontSize="2xs" color="orange.fg">
+                  <Box as={LuTriangleAlert} color="warning.fg" fontSize="sm" />
+                  <Text fontSize="2xs" color="warning.fg">
                     План застарів
                   </Text>
                 </HStack>
@@ -369,7 +370,7 @@ export function ScanPlanReportDialog({
             <Button variant="outline" onClick={onNewAnalysis}>
               Зробити новий аналіз
             </Button>
-            <Button colorPalette="orange" onClick={onConfirm}>
+            <Button colorPalette="warning" onClick={onConfirm}>
               Запустити повний скан
             </Button>
           </HStack>

@@ -53,10 +53,10 @@ export function Header() {
           {selectedSearch && (
             <HStack
               gap={1.5}
-              bg="green.subtle"
-              color="green.fg"
+              bg="success.subtle"
+              color="success.fg"
               borderWidth="1px"
-              borderColor="green.muted"
+              borderColor="success.muted"
               px={3}
               py={1.5}
               ml={{ base: 0, md: '80px' }}
@@ -74,7 +74,7 @@ export function Header() {
         </HStack>
         <HStack gap={2}>
           {autoRefreshEnabled && (
-            <Badge colorPalette="blue" variant="subtle" size="lg" px={2.5} py={1}>
+            <Badge colorPalette="accent" variant="subtle" size="lg" px={2.5} py={1}>
               <LuTimer /> авто: {autoRefreshIntervalMin} хв
             </Badge>
           )}

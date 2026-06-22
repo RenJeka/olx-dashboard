@@ -30,8 +30,8 @@ function ListingsTableRowImpl({
   return (
     <Table.Row
       opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}
-      bg={isSelected ? 'blue.50/60' : undefined}
-      _dark={isSelected ? { bg: 'blue.950/40' } : undefined}
+      bg={isSelected ? 'accent.50/60' : undefined}
+      _dark={isSelected ? { bg: 'accent.950/40' } : undefined}
     >
       {row.getVisibleCells().map((cell) => {
         const isWideText =
@@ -58,7 +58,7 @@ function ListingsTableRowImpl({
             <HStack gap={1}>
               <Tooltip content="Приховано локальним фільтром">
                 <span>
-                  <LuFilter color="var(--chakra-colors-orange-500)" />
+                  <LuFilter color="var(--chakra-colors-warning-500)" />
                 </span>
               </Tooltip>
               {content}

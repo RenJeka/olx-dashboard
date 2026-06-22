@@ -81,7 +81,7 @@ export function ManualAssistant({ title, parts, pasteLabel, onSubmit, submitting
         {footer ?? <Box />}
         <Button
           size="sm"
-          colorPalette="blue"
+          colorPalette="accent"
           disabled={!raw.trim()}
           loading={submitting}
           onClick={() => {

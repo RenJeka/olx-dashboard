@@ -52,14 +52,14 @@ export function ActionPanelButtons({
         whiteSpace="normal"
         w="full"
         fontWeight="normal"
-        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'orange.muted', transform: 'translateY(-1px)' } : undefined}
+        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'warning.muted', transform: 'translateY(-1px)' } : undefined}
         _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
         cursor={isScanning ? 'not-allowed' : 'pointer'}
         opacity={isScanning && scanKind !== 'analyze' ? 0.5 : 1}
         transition="all 0.2s"
       >
         <HStack gap={4} align="start" w="full">
-          <Box p={2.5} rounded="lg" bg="orange.subtle" color="orange.fg" flexShrink={0}>
+          <Box p={2.5} rounded="lg" bg="warning.subtle" color="warning.fg" flexShrink={0}>
             <Box as={LuChartNoAxesCombined} animation={isScanning && scanKind === 'analyze' ? 'pulse 2s infinite' : undefined} />
           </Box>
           <Stack gap={1} flex="1" textAlign="left">
@@ -67,7 +67,7 @@ export function ActionPanelButtons({
               <Text textStyle="sm" fontWeight="bold" color="fg.default">
                 Аналіз перед сканом
               </Text>
-              <Badge size="sm" colorPalette="orange" variant="subtle">
+              <Badge size="sm" colorPalette="warning" variant="subtle">
                 до 2–3 хв
               </Badge>
             </HStack>
@@ -95,14 +95,14 @@ export function ActionPanelButtons({
         whiteSpace="normal"
         w="full"
         fontWeight="normal"
-        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'blue.muted', transform: 'translateY(-1px)' } : undefined}
+        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'accent.muted', transform: 'translateY(-1px)' } : undefined}
         _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
         cursor={isScanning ? 'not-allowed' : 'pointer'}
         opacity={isScanning && scanKind !== 'normal' ? 0.5 : 1}
         transition="all 0.2s"
       >
         <HStack gap={4} align="start" w="full">
-          <Box p={2.5} rounded="lg" bg="blue.subtle" color="blue.fg" flexShrink={0}>
+          <Box p={2.5} rounded="lg" bg="accent.subtle" color="accent.fg" flexShrink={0}>
             <Box as={LuRefreshCw} animation={isScanning && scanKind === 'normal' ? 'spin 2s linear infinite' : undefined} />
           </Box>
           <Stack gap={1} flex="1" textAlign="left">
@@ -110,7 +110,7 @@ export function ActionPanelButtons({
               <Text textStyle="sm" fontWeight="bold" color="fg.default">
                 Швидкий скан
               </Text>
-              <Badge size="sm" colorPalette="blue" variant="subtle">
+              <Badge size="sm" colorPalette="accent" variant="subtle">
                 до 2–3 хв
               </Badge>
             </HStack>

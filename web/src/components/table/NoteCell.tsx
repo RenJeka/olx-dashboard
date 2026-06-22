@@ -80,7 +80,7 @@ export function NoteCell({ listing }: Props) {
                 rows={4}
                 autoFocus
               />
-              <Button mt={2} size="sm" colorPalette="blue" onClick={handleSave} loading={updateListing.isPending}>
+              <Button mt={2} size="sm" colorPalette="accent" onClick={handleSave} loading={updateListing.isPending}>
                 Зберегти
               </Button>
             </Popover.Body>

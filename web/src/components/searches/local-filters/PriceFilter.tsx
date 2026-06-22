@@ -29,7 +29,7 @@ export function PriceFilter({
         <Text fontWeight="medium">Діапазон цін</Text>
         <Switch
           size="sm"
-          colorPalette="orange"
+          colorPalette="warning"
           checked={priceInvert}
           onCheckedChange={(d) => onPriceInvertChange(d.checked)}
         >

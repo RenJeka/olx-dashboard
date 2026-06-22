@@ -76,7 +76,7 @@ export function SearchActionPanel({ search }: Props) {
         closeOnInteractOutside={false}
       >
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" colorPalette="blue">
+        <Button size="sm" variant="outline" colorPalette="accent">
           <Box as={LuRefreshCw} animation={isScanning ? 'spin 2s linear infinite' : undefined} />
           Сканувати
         </Button>

@@ -95,6 +95,12 @@ olx-dashboard/
         ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
         │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
         ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
+        ├── theme/            # система стилів Chakra: єдина точка керування кольорами/розмірами
+        │   ├── palette.ts    # ACCENT_BASE, FEEDBACK_BASE (success/warning/danger/info), THEME_PALETTES, STATUS_PALETTE
+        │   ├── tokens.ts     # defineConfig: для кожної палітри (accent/success/warning/danger/info) числова шкала + семантичні аліаси на базу
+        │   ├── system.ts     # createSystem(defaultConfig, customConfig) — підключається у ui/provider.tsx
+        │   ├── layout.ts     # стильові константи розмірів/відступів (SIDEBAR_WIDTH, CONTENT_PAD_*, DIALOG_SIZE, DRAWER_SIZE)
+        │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
         │   ├── base.ts       # fetch-обгортка api<T>
@@ -215,7 +221,7 @@ olx-dashboard/
         │   └── index.ts          # спільні типи фронтенду (Listing, ListingStatus, Search, StoredTableState тощо)
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
-            ├── status.ts         # STATUS_LABELS/STATUS_COLORS, isMutedStatus()
+            ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
             ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
             ├── storage.ts        # збереження/завантаження стану сортування та розмірів колонок таблиці у localStorage
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence

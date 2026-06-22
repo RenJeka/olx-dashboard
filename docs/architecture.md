@@ -427,6 +427,21 @@ flowchart LR
   - `AutoRefreshSection.tsx` — розділ «Автооновлення»: `Switch` автооновлення + `NativeSelect` вибору інтервалу (15/30/60 хв);
   - `ColumnsSection.tsx` — розділ «Колонки таблиці»: підтримка drag-and-drop перевпорядкування колонок (на базі `@dnd-kit`) та чекбокси видимості колонок таблиці (`TOGGLEABLE_COLUMNS`).
   Усі налаштування персистяться в `localStorage` (за допомогою хелперів із `web/src/utils/storage.ts`).
+- `theme/` — **система стилів** (єдина точка керування візуалом). `palette.ts` тримає
+  `ACCENT_BASE` (базова Chakra-палітра акценту), `FEEDBACK_BASE` (success/warning/danger/info →
+  green/orange/red/accent), `THEME_PALETTES` (ім'я→база, з якого генеруються токени) і
+  `STATUS_PALETTE`. `tokens.ts` через `defineConfig` будує для кожної кастомної палітри
+  (`accent`, `success`, `warning`, `danger`, `info`) числову шкалу (`<name>.50…950`) і семантичні
+  аліаси (`<name>.solid`/`fg`/`subtle`/…) на її базу, тож `colorPalette="warning"` і прямі
+  відтінки `warning.500` поводяться як базова палітра, але керуються з одного рядка.
+  `system.ts` (`createSystem(defaultConfig, customConfig)`) підключається у `ui/provider.tsx`
+  замість `defaultSystem`. `layout.ts` — стильові константи розмірів/відступів
+  (`SIDEBAR_WIDTH`, `CONTENT_PAD_*`, `EMPTY_STATE_PAD`, `DIALOG_SIZE`, `DRAWER_SIZE`).
+  Семантика замість буквальних кольорів: акцент → `accent` (не `"blue"`), попередження →
+  `warning` (не `"orange"`), помилка/мінуси → `danger` (не `"red"`), успіх/плюси → `success`
+  (не `"green"`); доменні `purple`/`cyan`/`teal`/`gray`/`yellow` лишаються як є.
+  `utils/status.ts` бере `STATUS_COLORS` з `theme/palette` (interested→success, disabled→danger).
+  План — `plans/theme-and-constants-refactor.md`.
 - `components/ui/` — Chakra UI v3 snippets, здебільшого додані через
   `npx @chakra-ui/cli snippet add` (`provider`, `color-mode`, `toaster`, `tooltip`, `drawer`,
   `switch`, `checkbox`, `close-button`); `dialog.tsx` написаний вручну за тим самим патерном

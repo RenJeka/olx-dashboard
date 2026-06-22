@@ -37,13 +37,13 @@ const columnHelper = createColumnHelper<Listing>();
  * `color` задаємо лише для темних фонів (сьогодні/вчора), де потрібен світлий текст.
  */
 const DATE_CELL_STYLES: { bg: string; color?: string }[] = [
-  { bg: 'blue.500', color: 'white' }, // сьогодні
-  { bg: 'blue.400', color: 'white' }, // вчора
-  { bg: 'blue.300', color: 'gray.900' },
-  { bg: 'blue.200', color: 'gray.900' },
-  { bg: 'blue.100', color: 'gray.900' },
-  { bg: 'blue.50', color: 'gray.900' },
-  { bg: 'blue.50/60', color: 'gray.900' },
+  { bg: 'accent.500', color: 'white' }, // сьогодні
+  { bg: 'accent.400', color: 'white' }, // вчора
+  { bg: 'accent.300', color: 'gray.900' },
+  { bg: 'accent.200', color: 'gray.900' },
+  { bg: 'accent.100', color: 'gray.900' },
+  { bg: 'accent.50', color: 'gray.900' },
+  { bg: 'accent.50/60', color: 'gray.900' },
 ];
 
 export function getDateCellStyle(value: string | null | undefined): { bg?: string; color?: string } {
@@ -105,7 +105,7 @@ export const columns = [
       const query = toHighlightQuery(String(info.table.getState().globalFilter ?? ''));
       const content = <HighlightText text={title} query={query} />;
       return url ? (
-        <Link href={url} target="_blank" rel="noreferrer" colorPalette="blue" color="colorPalette.fg">
+        <Link href={url} target="_blank" rel="noreferrer" colorPalette="accent" color="colorPalette.fg">
           <HStack gap={1}>
             <Text>{content}</Text>
             <LuExternalLink />
@@ -216,7 +216,7 @@ export const columns = [
   }),
   columnHelper.accessor('pros', {
     id: 'pros',
-    header: () => <HeaderLabel icon={<LuThumbsUp color="green" />}>Плюси</HeaderLabel>,
+    header: () => <HeaderLabel icon={<LuThumbsUp color="success" />}>Плюси</HeaderLabel>,
     size: 200,
     minSize: 120,
     maxSize: 400,
@@ -229,7 +229,7 @@ export const columns = [
   }),
   columnHelper.accessor('cons', {
     id: 'cons',
-    header: () => <HeaderLabel icon={<LuThumbsDown color="red" />}>Мінуси</HeaderLabel>,
+    header: () => <HeaderLabel icon={<LuThumbsDown color="danger" />}>Мінуси</HeaderLabel>,
     size: 200,
     minSize: 120,
     maxSize: 400,
@@ -253,7 +253,7 @@ export const columns = [
       if (rank == null) return null;
       const reason = info.row.original.ai_pick_reason ?? '';
       // 1–10 зелений, 11–20 жовтий, 21+ помаранчевий (ближче до червоного).
-      const color = rank <= 10 ? 'green.500' : rank <= 20 ? 'yellow.500' : 'orange.600';
+      const color = rank <= 10 ? 'success.500' : rank <= 20 ? 'yellow.500' : 'warning.600';
       return (
         <Tooltip content={reason} disabled={!reason}>
           <Text fontSize="lg" fontWeight="bold" color={color} cursor={reason ? 'help' : 'default'}>

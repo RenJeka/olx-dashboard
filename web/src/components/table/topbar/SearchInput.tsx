@@ -88,7 +88,7 @@ export function SearchInput({ value, onChange, scope, onScopeChange }: Props) {
               right="-4px"
               w="10px"
               h="10px"
-              bg="green.500"
+              bg="success.500"
               rounded="full"
               border="2px solid"
               borderColor="bg"
@@ -141,7 +141,7 @@ export function SearchInput({ value, onChange, scope, onScopeChange }: Props) {
 
           {/* Підказка якщо нічого не вибрано */}
           {noneSelected && (
-            <Text textStyle="xs" color="orange.fg" fontStyle="italic">
+            <Text textStyle="xs" color="warning.fg" fontStyle="italic">
               Обери хоча б одне поле
             </Text>
           )}

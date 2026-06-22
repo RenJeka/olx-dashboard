@@ -20,7 +20,7 @@ export function ActionPanelLastScan({ lastScan, verifyCandidates }: Props) {
   if (!lastScan) return null;
 
   // Помилка має пріоритет над попередженням (на практиці взаємовиключні).
-  const palette = lastScan.error ? 'red' : lastScan.warning ? 'orange' : null;
+  const palette = lastScan.error ? 'danger' : lastScan.warning ? 'warning' : null;
 
   return (
     <Box
@@ -45,26 +45,26 @@ export function ActionPanelLastScan({ lastScan, verifyCandidates }: Props) {
           )}
         </Stack>
         {lastScan.error && (
-          <Badge colorPalette="red" variant="subtle">
+          <Badge colorPalette="danger" variant="subtle">
             <LuTriangleAlert /> Помилка
           </Badge>
         )}
         {!lastScan.error && lastScan.warning && (
-          <Badge colorPalette="orange" variant="subtle">
+          <Badge colorPalette="warning" variant="subtle">
             <LuCircleAlert /> Попередження
           </Badge>
         )}
       </HStack>
 
       {lastScan.error && (
-        <Box mt={3} p={2} bg="red.muted" rounded="md" position="relative">
+        <Box mt={3} p={2} bg="danger.muted" rounded="md" position="relative">
           <HStack justify="space-between" mb={1}>
-            <Text textStyle="xs" fontWeight="bold" color="red.fg">Деталі помилки:</Text>
+            <Text textStyle="xs" fontWeight="bold" color="danger.fg">Деталі помилки:</Text>
             <IconButton
               aria-label="Скопіювати деталі помилки"
               size="xs"
               variant="ghost"
-              colorPalette="red"
+              colorPalette="danger"
               h={6}
               minW={6}
               onClick={() => copyToClipboard(lastScan.error!)}
@@ -72,7 +72,7 @@ export function ActionPanelLastScan({ lastScan, verifyCandidates }: Props) {
               <LuCopy />
             </IconButton>
           </HStack>
-          <Text textStyle="xs" color="red.fg" whiteSpace="pre-wrap" wordBreak="break-word" maxH="150px" overflowY="auto">
+          <Text textStyle="xs" color="danger.fg" whiteSpace="pre-wrap" wordBreak="break-word" maxH="150px" overflowY="auto">
             {lastScan.error}
           </Text>
         </Box>

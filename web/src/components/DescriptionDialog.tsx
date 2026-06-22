@@ -12,6 +12,7 @@ import {
 } from './ui/dialog';
 import type { Listing } from '../types';
 import { formatPrice, stripDescriptionHtml } from '../utils/format';
+import { DIALOG_SIZE } from '../theme';
 
 interface Props {
   listing: Listing | null;
@@ -25,7 +26,7 @@ export function DescriptionDialog({ listing, onClose }: Props) {
     <DialogRoot
       open={listing != null}
       onOpenChange={(d) => !d.open && onClose()}
-      size="lg"
+      size={DIALOG_SIZE.wide}
       placement="center"
       scrollBehavior="inside"
     >
@@ -50,7 +51,7 @@ export function DescriptionDialog({ listing, onClose }: Props) {
                 )}
                 <Stack gap={1} minW={0}>
                   <DialogTitle lineClamp={2}>{listing.title ?? '—'}</DialogTitle>
-                  <Text fontWeight="semibold" color="colorPalette.fg" colorPalette="blue">
+                  <Text fontWeight="semibold" color="colorPalette.fg" colorPalette="accent">
                     {formatPrice(listing)}
                   </Text>
                   {listing.city && (
@@ -67,7 +68,7 @@ export function DescriptionDialog({ listing, onClose }: Props) {
             <DialogFooter>
               {listing.url && (
                 <Link href={listing.url} target="_blank" rel="noreferrer">
-                  <Button colorPalette="blue" variant="outline">
+                  <Button colorPalette="accent" variant="outline">
                     <LuExternalLink /> Відкрити на OLX
                   </Button>
                 </Link>

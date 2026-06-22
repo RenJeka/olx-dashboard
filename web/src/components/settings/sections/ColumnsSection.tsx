@@ -62,9 +62,9 @@ export function ColumnsSection() {
               onDrop={() => handleDrop(index)}
               onDragEnd={handleDragEnd}
               borderWidth="1px"
-              borderColor={isDragOver ? 'blue.500' : 'border.subtle'}
+              borderColor={isDragOver ? 'accent.500' : 'border.subtle'}
               borderRadius="md"
-              bg={isDragOver ? 'blue.subtle' : 'bg.subtle'}
+              bg={isDragOver ? 'accent.subtle' : 'bg.subtle'}
               px={2}
               py={1.5}
               cursor="default"

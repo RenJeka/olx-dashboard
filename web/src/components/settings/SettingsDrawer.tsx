@@ -15,10 +15,11 @@ import { VisualSection } from './sections/VisualSection';
 import { AutoRefreshSection } from './sections/AutoRefreshSection';
 import { ColumnsSection } from './sections/ColumnsSection';
 import { AnalysisSection } from './sections/AnalysisSection';
+import { DRAWER_SIZE } from '../../theme';
 
 export function SettingsDrawer() {
   return (
-    <DrawerRoot size="sm">
+    <DrawerRoot size={DRAWER_SIZE.default}>
       <Tooltip content="Налаштування">
         <DrawerTrigger asChild>
           <IconButton aria-label="Налаштування" variant="ghost">

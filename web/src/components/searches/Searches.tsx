@@ -16,6 +16,7 @@ import { useSearches } from '../../api';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useNewSearchForm } from '../../hooks/useNewSearchForm';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { SIDEBAR_WIDTH } from '../../theme';
 
 /** Бічна панель «Пошуки»: акордеон активних/архівованих пошуків + кнопка «+» → модалка створення. */
 export function Searches() {
@@ -98,7 +99,7 @@ export function Searches() {
       <Flex
         as="aside"
         direction="column"
-        w="80"
+        w={SIDEBAR_WIDTH}
         flexShrink={0}
         h="full"
         borderRightWidth="1px"
