@@ -67,7 +67,7 @@ export function ConfirmActionDialog({
             Скасувати
           </Button>
           <Button
-            colorPalette="blue"
+            colorPalette="accent"
             onClick={() => {
               onConfirm(skip);
               onOpenChange(false);

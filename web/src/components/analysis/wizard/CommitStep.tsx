@@ -38,7 +38,7 @@ export function CommitStep({ w, onClose }: Props) {
           <Button
             size="xs"
             variant={mergeMode === 'append' ? 'solid' : 'outline'}
-            colorPalette="blue"
+            colorPalette="accent"
             onClick={() => setMergeMode('append')}
           >
             Додати до наявних
@@ -72,7 +72,7 @@ export function CommitStep({ w, onClose }: Props) {
           </Text>
           <Progress.Root
             size="xs"
-            colorPalette="blue"
+            colorPalette="accent"
             value={commitProgress.total > 0 ? (commitProgress.done / commitProgress.total) * 100 : null}
           >
             <Progress.Track>
@@ -89,7 +89,7 @@ export function CommitStep({ w, onClose }: Props) {
           <Button variant="outline" onClick={onClose}>
             Відмінити
           </Button>
-          <Button colorPalette="blue" onClick={() => handleCommitClick(onClose)} loading={commitProgress != null}>
+          <Button colorPalette="accent" onClick={() => handleCommitClick(onClose)} loading={commitProgress != null}>
             {mergeMode === 'append'
               ? `Додати ${modeLabel.toLowerCase()} у таблицю`
               : `Перезаписати ${modeLabel.toLowerCase()} у таблиці`}

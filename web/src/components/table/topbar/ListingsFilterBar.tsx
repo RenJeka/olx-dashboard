@@ -173,7 +173,7 @@ export function ListingsFilterBar({
           <Button
             size="sm"
             variant={allTabSelected ? 'subtle' : 'outline'}
-            colorPalette="blue"
+            colorPalette="accent"
             onClick={onToggleSelectAllInTab}
           >
             <LuListChecks />

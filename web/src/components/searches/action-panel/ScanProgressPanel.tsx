@@ -41,14 +41,14 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
   const segmented = showSegments && status.sub_total! <= MAX_SEGMENTS;
 
   return (
-    <Stack gap={1.5} p={3} rounded="lg" bg="blue.subtle/10" borderWidth="1px" borderColor="blue.subtle" colorPalette="blue">
+    <Stack gap={1.5} p={3} rounded="lg" bg="accent.subtle/10" borderWidth="1px" borderColor="accent.subtle" colorPalette="accent">
       <HStack justify="space-between">
         <HStack gap={2}>
-          <Text textStyle="xs" fontWeight="semibold" color="blue.fg">
+          <Text textStyle="xs" fontWeight="semibold" color="accent.fg">
             Виконується {SCAN_KIND_LABELS[scanKind] ?? scanKind} скан…
           </Text>
           {status.fetch_method && (
-            <Badge size="xs" colorPalette="blue" variant="subtle">
+            <Badge size="xs" colorPalette="accent" variant="subtle">
               {status.fetch_method}
             </Badge>
           )}
@@ -113,7 +113,7 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
         ) : (
           <Progress.Root
             size="xs"
-            colorPalette="blue"
+            colorPalette="accent"
             value={safePercent(status.sub_done, status.sub_total)}
           >
             <Progress.Track>
@@ -125,7 +125,7 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
 
       <Progress.Root
         size="xs"
-        colorPalette="blue"
+        colorPalette="accent"
         value={safePercent(status.requests_done, status.requests_total)}
       >
         <Progress.Track>

@@ -9,7 +9,7 @@ interface Props {
 const RANK_COLORS = ['yellow', 'gray', 'orange'] as const;
 
 function rankColor(rank: number): string {
-  return RANK_COLORS[rank - 1] ?? 'blue';
+  return RANK_COLORS[rank - 1] ?? 'accent';
 }
 
 /** Картка одного AI-обраного оголошення (стиль узгоджено з Box-картками проєкту). */

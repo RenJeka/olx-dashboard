@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import type { NewSearchFormState } from '../../hooks/useNewSearchForm';
+import { DIALOG_SIZE } from '../../theme';
 
 interface Props {
   open: boolean;
@@ -41,7 +42,7 @@ export function SearchCreateDialog({ open, onClose, form }: Props) {
       onOpenChange={(d) => {
         if (!d.open) onClose();
       }}
-      size="md"
+      size={DIALOG_SIZE.form}
       placement="center"
       scrollBehavior="inside"
     >
@@ -120,7 +121,7 @@ export function SearchCreateDialog({ open, onClose, form }: Props) {
             </Button>
             <Button
               type="submit"
-              colorPalette="blue"
+              colorPalette="accent"
               loading={createSearch.isPending}
               disabled={!name.trim() || !query.trim()}
             >

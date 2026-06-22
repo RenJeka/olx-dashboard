@@ -23,7 +23,7 @@ export function ScanStatusChip({ scanKind, status, onClick }: Props) {
 
   return (
     <Tooltip content="Повернутись до скану">
-      <Button size="sm" variant="subtle" colorPalette="blue" onClick={onClick}>
+      <Button size="sm" variant="subtle" colorPalette="accent" onClick={onClick}>
         <Box as={LuRefreshCw} animation="spin 2s linear infinite" />
         {SCAN_KIND_LABELS[scanKind] ?? scanKind} · {progress}
       </Button>

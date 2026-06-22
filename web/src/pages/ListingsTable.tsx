@@ -26,6 +26,7 @@ import { matchesQuery } from '../utils/search';
 import { isListingVisible } from '../utils/listingVisibility';
 import type { SearchScope } from '../components/table';
 import type { Listing } from '../types';
+import { CONTENT_PAD_X, CONTENT_PAD_Y, EMPTY_STATE_PAD } from '../theme';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table';
 
@@ -116,7 +117,7 @@ export function ListingsTable() {
 
   if (searchId == null) {
     return (
-      <Text p={8} color="fg.muted">
+      <Text p={EMPTY_STATE_PAD} color="fg.muted">
         Обери пошук зліва, щоб побачити оголошення.
       </Text>
     );
@@ -124,15 +125,15 @@ export function ListingsTable() {
 
   if (isLoading) {
     return (
-      <Box p={8}>
-        <Spinner color="blue.500" />
+      <Box p={EMPTY_STATE_PAD}>
+        <Spinner color="accent.solid" />
       </Box>
     );
   }
 
   if (rows.length === 0) {
     return (
-      <Text p={8} color="fg.muted">
+      <Text p={EMPTY_STATE_PAD} color="fg.muted">
         Оголошень немає. Натисни «Scan» для цього пошуку.
       </Text>
     );
@@ -169,7 +170,7 @@ export function ListingsTable() {
         allTabSelected={allTabSelected}
         onToggleSelectAllInTab={toggleSelectAllInTab}
       />
-      <Box flex="1" overflow="auto" px={4} pb={4}>
+      <Box flex="1" overflow="auto" px={CONTENT_PAD_X} pb={CONTENT_PAD_Y}>
         <Table.Root size="sm" interactive css={{ tableLayout: 'fixed', width: table.getTotalSize() }}>
           <ListingsTableHeader table={table} />
           <ListingsTableBody

@@ -24,7 +24,7 @@ export function WizardStepper({ step, modeLabel, scopeLabel, effectiveCount }: P
               display="flex"
               alignItems="center"
               justifyContent="center"
-              bg={step === i + 1 ? 'blue.solid' : step > i + 1 ? 'green.solid' : 'bg.muted'}
+              bg={step === i + 1 ? 'accent.solid' : step > i + 1 ? 'green.solid' : 'bg.muted'}
               color={step >= i + 1 ? 'white' : 'fg.muted'}
             >
               {i + 1}

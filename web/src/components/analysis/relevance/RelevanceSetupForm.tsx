@@ -51,7 +51,7 @@ export function RelevanceSetupForm({ flow }: Props) {
             <Button
               size="xs"
               variant={state.scope === 'selected' ? 'solid' : 'outline'}
-              colorPalette="blue"
+              colorPalette="accent"
               onClick={() => actions.setScope('selected')}
             >
               Вибрані ({state.selectedIds.length})
@@ -61,7 +61,7 @@ export function RelevanceSetupForm({ flow }: Props) {
             <Button
               size="xs"
               variant={state.scope === 'tab' ? 'solid' : 'outline'}
-              colorPalette="blue"
+              colorPalette="accent"
               onClick={() => actions.setScope('tab')}
             >
               Статус
@@ -70,7 +70,7 @@ export function RelevanceSetupForm({ flow }: Props) {
           <Button
             size="xs"
             variant={state.scope === 'all' ? 'solid' : 'outline'}
-            colorPalette="blue"
+            colorPalette="accent"
             onClick={() => actions.setScope('all')}
           >
             Весь пошук ({state.listings?.length ?? 0})

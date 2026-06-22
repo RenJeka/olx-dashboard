@@ -46,7 +46,7 @@ export function SearchesPanel({
           value="searches"
           icon={<LuListChecks />}
           label="Пошуки"
-          badgeColorPalette="blue"
+          badgeColorPalette="accent"
           items={activeSearches}
           selectedId={selectedId}
           onSelect={onSelect}

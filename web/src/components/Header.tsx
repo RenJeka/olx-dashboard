@@ -74,7 +74,7 @@ export function Header() {
         </HStack>
         <HStack gap={2}>
           {autoRefreshEnabled && (
-            <Badge colorPalette="blue" variant="subtle" size="lg" px={2.5} py={1}>
+            <Badge colorPalette="accent" variant="subtle" size="lg" px={2.5} py={1}>
               <LuTimer /> авто: {autoRefreshIntervalMin} хв
             </Badge>
           )}

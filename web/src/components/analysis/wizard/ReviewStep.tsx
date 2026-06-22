@@ -215,7 +215,7 @@ export function ReviewStep({ w }: Props) {
         <Button variant="ghost" onClick={() => setStep(2)}>
           Назад
         </Button>
-        <Button colorPalette="blue" onClick={() => setStep(4)}>
+        <Button colorPalette="accent" onClick={() => setStep(4)}>
           Далі: вставка
         </Button>
       </HStack>

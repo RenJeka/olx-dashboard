@@ -14,6 +14,7 @@ import { useFilterOptions, useUpdateSearchFilters } from '../../api';
 import { buildLocalFiltersPayload } from '../../utils/localFilters';
 import { useLocalFiltersForm } from '../../hooks/useLocalFiltersForm';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../constants';
+import { DRAWER_SIZE } from '../../theme';
 import { PriceFilter } from './local-filters/PriceFilter';
 import { TagsFilter } from './local-filters/TagsFilter';
 import type { Search } from '../../types';
@@ -71,7 +72,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
   }
 
   return (
-    <DrawerRoot size="sm" open={open} onOpenChange={(d) => onOpenChange(d.open)}>
+    <DrawerRoot size={DRAWER_SIZE.default} open={open} onOpenChange={(d) => onOpenChange(d.open)}>
       <DrawerBackdrop />
       <DrawerContent>
         <DrawerCloseTrigger />
@@ -149,7 +150,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
           </Stack>
         </DrawerBody>
         <DrawerFooter>
-          <Button colorPalette="blue" loading={updateFilters.isPending} onClick={handleSave}>
+          <Button colorPalette="accent" loading={updateFilters.isPending} onClick={handleSave}>
             Зберегти
           </Button>
         </DrawerFooter>

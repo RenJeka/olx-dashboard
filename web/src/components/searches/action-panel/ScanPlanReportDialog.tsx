@@ -12,6 +12,7 @@ import {
 } from '../../ui/dialog';
 import { Tooltip } from '../../ui/tooltip';
 import { SCAN_PLAN_TTL_MIN } from '../../../constants';
+import { DIALOG_SIZE } from '../../../theme';
 import type { ScanPlan, ScanPlanQuery } from '../../../types';
 
 interface Props {
@@ -200,7 +201,7 @@ export function ScanPlanReportDialog({
     // hideOthers і ставить aria-hidden на модалку скану; при закритті звіту cleanup не знімає його —
     // модалка скану лишається inert і блокує всі кліки (не зупинити скан, не закрити). modal=false
     // не чіпає сусідню модалку, тож після закриття звіту скан повністю інтерактивний.
-    <DialogRoot open={open} onOpenChange={(d) => onOpenChange(d.open)} size="lg" placement="center" modal={false}>
+    <DialogRoot open={open} onOpenChange={(d) => onOpenChange(d.open)} size={DIALOG_SIZE.wide} placement="center" modal={false}>
       <DialogBackdrop />
       <DialogContent>
         <DialogCloseTrigger />

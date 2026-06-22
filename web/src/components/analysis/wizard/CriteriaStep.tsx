@@ -60,7 +60,7 @@ export function CriteriaStep({ w }: Props) {
           <Button
             size="xs"
             variant={scope === 'selected' ? 'solid' : 'outline'}
-            colorPalette="blue"
+            colorPalette="accent"
             disabled={selectedIds.length === 0}
             onClick={() => setScope('selected')}
           >
@@ -70,13 +70,13 @@ export function CriteriaStep({ w }: Props) {
             <Button
               size="xs"
               variant={scope === 'tab' ? 'solid' : 'outline'}
-              colorPalette="blue"
+              colorPalette="accent"
               onClick={() => setScope('tab')}
             >
               {statusFilter === 'ai_picks' ? AI_PICKS_LABEL : STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]} ({tabCount})
             </Button>
           )}
-          <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="blue" onClick={() => setScope('all')}>
+          <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="accent" onClick={() => setScope('all')}>
             Весь пошук ({allIds.length})
           </Button>
         </HStack>
@@ -172,7 +172,7 @@ export function CriteriaStep({ w }: Props) {
             Почати заново
           </Button>
         </HStack>
-        <Button colorPalette="blue" onClick={goToMatching} loading={saveCriteriaIsPending}>
+        <Button colorPalette="accent" onClick={goToMatching} loading={saveCriteriaIsPending}>
           Далі: пошук
         </Button>
       </HStack>

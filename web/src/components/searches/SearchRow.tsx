@@ -47,7 +47,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
   return (
     <Box>
       <HStack
-        colorPalette="blue"
+        colorPalette="accent"
         justify="space-between"
         gap={1}
         px={2}
@@ -80,7 +80,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
               >
                 <Badge
                   size="xs"
-                  colorPalette="blue"
+                  colorPalette="accent"
                   variant="solid"
                   rounded="full"
                   flexShrink={0}

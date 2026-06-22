@@ -88,7 +88,7 @@ export function MatchingStep({ w }: Props) {
         <Button variant="ghost" onClick={() => setStep(1)}>
           Назад
         </Button>
-        <Button colorPalette="blue" disabled={accumulated.length === 0} onClick={() => setStep(3)}>
+        <Button colorPalette="accent" disabled={accumulated.length === 0} onClick={() => setStep(3)}>
           Далі: перевірка ({accumulated.length})
         </Button>
       </HStack>
