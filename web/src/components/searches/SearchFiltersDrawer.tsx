@@ -127,7 +127,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
                 onAdd={addPro}
                 onRemove={removePro}
                 onInvertChange={setProsInvert}
-                tagColorPalette="green"
+                tagColorPalette="success"
                 selectPlaceholder="Додати плюс…"
               />
             )}
@@ -143,7 +143,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
                 onAdd={addCon}
                 onRemove={removeCon}
                 onInvertChange={setConsInvert}
-                tagColorPalette="red"
+                tagColorPalette="danger"
                 selectPlaceholder="Додати мінус…"
               />
             )}

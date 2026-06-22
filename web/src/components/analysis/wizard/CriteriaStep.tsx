@@ -49,10 +49,10 @@ export function CriteriaStep({ w }: Props) {
       {/* Перемикачі режиму та scope */}
       <HStack gap={4} wrap="wrap">
         <HStack gap={1}>
-          <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="red" onClick={() => setMode('cons')}>
+          <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="danger" onClick={() => setMode('cons')}>
             Мінуси
           </Button>
-          <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="green" onClick={() => setMode('pros')}>
+          <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="success" onClick={() => setMode('pros')}>
             Плюси
           </Button>
         </HStack>
@@ -98,7 +98,7 @@ export function CriteriaStep({ w }: Props) {
             <Button
               size="xs"
               variant={selected.has(c) ? 'solid' : 'outline'}
-              colorPalette={mode === 'cons' ? 'red' : 'green'}
+              colorPalette={mode === 'cons' ? 'danger' : 'success'}
               onClick={() => toggleCriterion(c)}
               maxW="260px"
             >

@@ -61,13 +61,13 @@ export function ScanWarningSummary({ warning, verifyCandidates }: Props) {
                 px={2.5}
                 py={1.5}
                 rounded="md"
-                bg="orange.subtle"
+                bg="warning.subtle"
                 borderWidth="1px"
-                borderColor="orange.muted"
+                borderColor="warning.muted"
               >
-                <Box as={Icon} color="orange.fg" fontSize="sm" />
+                <Box as={Icon} color="warning.fg" fontSize="sm" />
                 <Stack gap={0} lineHeight="1">
-                  <Text fontSize="md" fontWeight="bold" fontFamily="mono" color="orange.fg">
+                  <Text fontSize="md" fontWeight="bold" fontFamily="mono" color="warning.fg">
                     {stat.value}
                   </Text>
                   <Text fontSize="2xs" color="fg.muted" textTransform="uppercase" letterSpacing="wide">
@@ -101,8 +101,8 @@ export function ScanWarningSummary({ warning, verifyCandidates }: Props) {
                     flexShrink={0}
                     display="inline-flex"
                     fontSize="sm"
-                    bg={attention ? 'orange.subtle' : 'bg.muted'}
-                    color={attention ? 'orange.fg' : 'fg.muted'}
+                    bg={attention ? 'warning.subtle' : 'bg.muted'}
+                    color={attention ? 'warning.fg' : 'fg.muted'}
                   >
                     <Icon />
                   </Box>
@@ -130,7 +130,7 @@ export function ScanWarningSummary({ warning, verifyCandidates }: Props) {
         <Button
           size="xs"
           variant="ghost"
-          colorPalette="orange"
+          colorPalette="warning"
           onClick={() => setRawOpen((open) => !open)}
         >
           <Box
@@ -146,7 +146,7 @@ export function ScanWarningSummary({ warning, verifyCandidates }: Props) {
               aria-label="Скопіювати технічні деталі"
               size="xs"
               variant="ghost"
-              colorPalette="orange"
+              colorPalette="warning"
               h={6}
               minW={6}
               position="absolute"

@@ -44,7 +44,7 @@ export function SearchDeleteDialog({ open, onOpenChange, searchName, isPending, 
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Скасувати
           </Button>
-          <Button colorPalette="red" loading={isPending} onClick={onConfirm}>
+          <Button colorPalette="danger" loading={isPending} onClick={onConfirm}>
             Видалити
           </Button>
         </DialogFooter>

@@ -46,7 +46,7 @@ export function CommitStep({ w, onClose }: Props) {
           <Button
             size="xs"
             variant={mergeMode === 'replace' ? 'solid' : 'outline'}
-            colorPalette="orange"
+            colorPalette="warning"
             onClick={() => setMergeMode('replace')}
           >
             Перезаписати
@@ -60,7 +60,7 @@ export function CommitStep({ w, onClose }: Props) {
         </Text>
       ) : (
         overwriteCount > 0 && (
-          <Text textStyle="sm" color="orange.fg">
+          <Text textStyle="sm" color="warning.fg">
             Увага: у {overwriteCount} оголошень поле «{modeLabel}» вже заповнене — буде перезаписано.
           </Text>
         )

@@ -216,7 +216,7 @@ export const columns = [
   }),
   columnHelper.accessor('pros', {
     id: 'pros',
-    header: () => <HeaderLabel icon={<LuThumbsUp color="green" />}>Плюси</HeaderLabel>,
+    header: () => <HeaderLabel icon={<LuThumbsUp color="success" />}>Плюси</HeaderLabel>,
     size: 200,
     minSize: 120,
     maxSize: 400,
@@ -229,7 +229,7 @@ export const columns = [
   }),
   columnHelper.accessor('cons', {
     id: 'cons',
-    header: () => <HeaderLabel icon={<LuThumbsDown color="red" />}>Мінуси</HeaderLabel>,
+    header: () => <HeaderLabel icon={<LuThumbsDown color="danger" />}>Мінуси</HeaderLabel>,
     size: 200,
     minSize: 120,
     maxSize: 400,
@@ -253,7 +253,7 @@ export const columns = [
       if (rank == null) return null;
       const reason = info.row.original.ai_pick_reason ?? '';
       // 1–10 зелений, 11–20 жовтий, 21+ помаранчевий (ближче до червоного).
-      const color = rank <= 10 ? 'green.500' : rank <= 20 ? 'yellow.500' : 'orange.600';
+      const color = rank <= 10 ? 'success.500' : rank <= 20 ? 'yellow.500' : 'warning.600';
       return (
         <Tooltip content={reason} disabled={!reason}>
           <Text fontSize="lg" fontWeight="bold" color={color} cursor={reason ? 'help' : 'default'}>

@@ -78,7 +78,7 @@ function CriteriaTags({
         return (
           <Tooltip key={i} content={it.evidence} disabled={!it.evidence}>
             <Badge
-              colorPalette={included ? (mode === 'cons' ? 'red' : 'green') : 'gray'}
+              colorPalette={included ? (mode === 'cons' ? 'danger' : 'success') : 'gray'}
               variant={included ? 'subtle' : 'outline'}
               textDecoration={included ? undefined : 'line-through'}
               borderWidth={it.ok ? undefined : '1px'}

@@ -59,6 +59,19 @@
 - [x] 9. `npm run build` зелений; візуальних змін немає (accent === blue).
 - [x] 10. Оновити `docs/structure.md` + `docs/architecture.md`.
 
+## Прохід 2: семантичні feedback-палітри
+
+Розширення теми на сигнальні кольори (раніше зашиті `orange`/`red`/`green`):
+- [x] `palette.ts` — `FEEDBACK_BASE` (`success`→green, `warning`→orange, `danger`→red,
+  `info`→ACCENT_BASE) + `THEME_PALETTES` (ім'я→база для генерації токенів).
+- [x] `tokens.ts` — узагальнено генерацію: числова шкала + семантичні аліаси для кожної
+  палітри з `THEME_PALETTES` (accent/success/warning/danger/info).
+- [x] Sweep у `.tsx`: `orange`→`warning`, `red`→`danger`, `green`→`success` (colorPalette,
+  raw-токени `*.fg/.subtle/.500/…`, опейсіті, CSS-var `--chakra-colors-*`). `yellow`
+  (highlight, mid-tier rank) і доменні `purple`/`cyan`/`teal`/`gray` лишено.
+- [x] `STATUS_PALETTE`: `interested`→`success`, `disabled`→`danger` (наслідують feedback).
+- [x] `npm run build` зелений; behavior-neutral (success/warning/danger === green/orange/red).
+
 ## Висновок аудиту: хелпери/хуки
 
 Хелпери (`web/src/utils/*`), хуки (`web/src/hooks/*`), стори (`web/src/stores/*`) і

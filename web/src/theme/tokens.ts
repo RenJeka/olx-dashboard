@@ -5,35 +5,40 @@
 // включно зі світлою/темною темою — але керується з одного місця.
 
 import { defineConfig } from '@chakra-ui/react';
-import { ACCENT_BASE, PALETTE_SCALE_STEPS, PALETTE_SEMANTIC_KEYS } from './palette';
+import { PALETTE_SCALE_STEPS, PALETTE_SEMANTIC_KEYS, THEME_PALETTES } from './palette';
+
+type TokenSet = Record<string, { value: string }>;
 
 /** Будує семантичні токени-аліаси (solid/fg/subtle/…) на задану базову палітру. */
-function aliasSemantic(base: string) {
+function aliasSemantic(base: string): TokenSet {
   return Object.fromEntries(
     PALETTE_SEMANTIC_KEYS.map((key) => [key, { value: `{colors.${base}.${key}}` }]),
   );
 }
 
 /** Будує числову шкалу-аліас (50…950) на задану базову палітру. */
-function aliasScale(base: string) {
+function aliasScale(base: string): TokenSet {
   return Object.fromEntries(
     PALETTE_SCALE_STEPS.map((step) => [step, { value: `{colors.${base}.${step}}` }]),
   );
 }
 
+/** Аліас-палітри теми (accent/success/warning/danger/info): ім'я → набір токенів. */
+function buildPalettes(transform: (base: string) => TokenSet): Record<string, TokenSet> {
+  return Object.fromEntries(
+    Object.entries(THEME_PALETTES).map(([name, base]) => [name, transform(base)]),
+  );
+}
+
 export const customConfig = defineConfig({
   theme: {
-    // Числова шкала accent.50…950 — щоб accent керував і прямими відтінками (heatmap, виділення).
+    // Числові шкали <palette>.50…950 — щоб теми керували й прямими відтінками (heatmap, виділення).
     tokens: {
-      colors: {
-        accent: aliasScale(ACCENT_BASE),
-      },
+      colors: buildPalettes(aliasScale),
     },
-    // Семантичні токени accent.solid/fg/… — щоб працював colorPalette="accent".
+    // Семантичні токени <palette>.solid/fg/… — щоб працював colorPalette="<palette>".
     semanticTokens: {
-      colors: {
-        accent: aliasSemantic(ACCENT_BASE),
-      },
+      colors: buildPalettes(aliasSemantic),
     },
   },
 });

@@ -96,8 +96,8 @@ olx-dashboard/
         │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
         ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
         ├── theme/            # система стилів Chakra: єдина точка керування кольорами/розмірами
-        │   ├── palette.ts    # ACCENT_BASE (базова палітра акценту), STATUS_PALETTE, ключі/кроки палітри
-        │   ├── tokens.ts     # defineConfig: токен accent (числова шкала + семантичні аліаси на ACCENT_BASE)
+        │   ├── palette.ts    # ACCENT_BASE, FEEDBACK_BASE (success/warning/danger/info), THEME_PALETTES, STATUS_PALETTE
+        │   ├── tokens.ts     # defineConfig: для кожної палітри (accent/success/warning/danger/info) числова шкала + семантичні аліаси на базу
         │   ├── system.ts     # createSystem(defaultConfig, customConfig) — підключається у ui/provider.tsx
         │   ├── layout.ts     # стильові константи розмірів/відступів (SIDEBAR_WIDTH, CONTENT_PAD_*, DIALOG_SIZE, DRAWER_SIZE)
         │   └── index.ts      # barrel

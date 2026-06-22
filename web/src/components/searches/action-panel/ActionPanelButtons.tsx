@@ -52,14 +52,14 @@ export function ActionPanelButtons({
         whiteSpace="normal"
         w="full"
         fontWeight="normal"
-        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'orange.muted', transform: 'translateY(-1px)' } : undefined}
+        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'warning.muted', transform: 'translateY(-1px)' } : undefined}
         _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
         cursor={isScanning ? 'not-allowed' : 'pointer'}
         opacity={isScanning && scanKind !== 'analyze' ? 0.5 : 1}
         transition="all 0.2s"
       >
         <HStack gap={4} align="start" w="full">
-          <Box p={2.5} rounded="lg" bg="orange.subtle" color="orange.fg" flexShrink={0}>
+          <Box p={2.5} rounded="lg" bg="warning.subtle" color="warning.fg" flexShrink={0}>
             <Box as={LuChartNoAxesCombined} animation={isScanning && scanKind === 'analyze' ? 'pulse 2s infinite' : undefined} />
           </Box>
           <Stack gap={1} flex="1" textAlign="left">
@@ -67,7 +67,7 @@ export function ActionPanelButtons({
               <Text textStyle="sm" fontWeight="bold" color="fg.default">
                 Аналіз перед сканом
               </Text>
-              <Badge size="sm" colorPalette="orange" variant="subtle">
+              <Badge size="sm" colorPalette="warning" variant="subtle">
                 до 2–3 хв
               </Badge>
             </HStack>

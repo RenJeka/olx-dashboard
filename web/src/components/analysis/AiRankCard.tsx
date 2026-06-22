@@ -6,7 +6,7 @@ interface Props {
   listing: Listing | undefined;
 }
 
-const RANK_COLORS = ['yellow', 'gray', 'orange'] as const;
+const RANK_COLORS = ['yellow', 'gray', 'warning'] as const;
 
 function rankColor(rank: number): string {
   return RANK_COLORS[rank - 1] ?? 'accent';
@@ -52,7 +52,7 @@ export function AiRankCard({ pick, listing }: Props) {
         </HStack>
 
         {pros && (
-          <Text textStyle="xs" color="green.600" lineClamp={2}>
+          <Text textStyle="xs" color="success.600" lineClamp={2}>
             {pros}
           </Text>
         )}

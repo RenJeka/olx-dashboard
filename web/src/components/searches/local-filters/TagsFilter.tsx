@@ -38,7 +38,7 @@ export function TagsFilter({
         <Text fontWeight="medium">{title}</Text>
         <Switch
           size="sm"
-          colorPalette="orange"
+          colorPalette="warning"
           checked={isInverted}
           onCheckedChange={(d) => onInvertChange(d.checked)}
         >

@@ -92,7 +92,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
             )}
             {hasActiveLocalFilters(search.local_filters) && (
               <Tooltip content="Застосований фільтр">
-                <Box w="2" h="2" bg="orange.500" rounded="full" flexShrink={0} cursor="default" />
+                <Box w="2" h="2" bg="warning.500" rounded="full" flexShrink={0} cursor="default" />
               </Tooltip>
             )}
           </HStack>
@@ -102,7 +102,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
           {priceRange && (
             <Text
               textStyle="xs"
-              color="orange.500"
+              color="warning.500"
               fontWeight="medium"
               overflow="hidden"
               textOverflow="ellipsis"

@@ -58,7 +58,7 @@ function ListingsTableRowImpl({
             <HStack gap={1}>
               <Tooltip content="Приховано локальним фільтром">
                 <span>
-                  <LuFilter color="var(--chakra-colors-orange-500)" />
+                  <LuFilter color="var(--chakra-colors-warning-500)" />
                 </span>
               </Tooltip>
               {content}

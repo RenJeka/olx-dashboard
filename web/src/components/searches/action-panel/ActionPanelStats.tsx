@@ -24,7 +24,7 @@ export function ActionPanelStats({ visibleTotal, stats }: Props) {
       </Box>
       <Box p={3} bg="bg.muted" rounded="lg" borderWidth="1px" borderColor="border.subtle" textAlign="center">
         <Text textStyle="xs" color="fg.muted" fontWeight="semibold">Зниклі/Старі</Text>
-        <Text textStyle="xl" fontWeight="bold" mt={1} color="orange.fg">
+        <Text textStyle="xl" fontWeight="bold" mt={1} color="warning.fg">
           {(stats?.stale_count ?? 0).toLocaleString('uk-UA')}
         </Text>
       </Box>

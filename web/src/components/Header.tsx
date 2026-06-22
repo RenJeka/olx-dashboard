@@ -53,10 +53,10 @@ export function Header() {
           {selectedSearch && (
             <HStack
               gap={1.5}
-              bg="green.subtle"
-              color="green.fg"
+              bg="success.subtle"
+              color="success.fg"
               borderWidth="1px"
-              borderColor="green.muted"
+              borderColor="success.muted"
               px={3}
               py={1.5}
               ml={{ base: 0, md: '80px' }}

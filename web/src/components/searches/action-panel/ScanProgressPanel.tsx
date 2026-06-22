@@ -141,7 +141,7 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
       <Button
         size="xs"
         variant="outline"
-        colorPalette="red"
+        colorPalette="danger"
         alignSelf="flex-end"
         onClick={onStop}
         disabled={isStopping}

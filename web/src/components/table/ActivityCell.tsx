@@ -10,13 +10,13 @@ interface Props {
 
 /**
  * Опції «Активності» (olx_status). Порожній рядок ↔ null («невідоме»).
- * Палітра збігається з бейджами таблиці (active=green, inactive=gray, removed=red).
+ * Палітра збігається з бейджами таблиці (active=success, inactive=gray, removed=danger).
  */
 const OPTIONS: { value: string; label: string; palette: string }[] = [
   { value: '', label: 'невідоме', palette: 'gray' },
-  { value: 'active', label: 'активне', palette: 'green' },
+  { value: 'active', label: 'активне', palette: 'success' },
   { value: 'inactive', label: 'неактивне', palette: 'gray' },
-  { value: 'removed', label: 'знято', palette: 'red' },
+  { value: 'removed', label: 'знято', palette: 'danger' },
 ];
 
 /**
