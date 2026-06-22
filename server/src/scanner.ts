@@ -8,7 +8,7 @@ import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings, selectKnownOlxIds } from './scraper/normalizer.js';
 import { applyScanStatuses } from './scraper/statusEngine.js';
 import { probeListingPage } from './scraper/verifier.js';
-import { sleep, randomDelayMs } from './scraper/utils.js';
+import { interruptibleSleep, randomDelayMs } from './scraper/utils.js';
 import {
   BATCH_PAUSE_MIN_MS,
   BATCH_PAUSE_MAX_MS,
@@ -227,7 +227,10 @@ async function fetchAllQueries(
           maxTotal = Math.max(maxTotal, candidate, done);
           options.onProgress!({
             done,
-            total: maxTotal,
+            // maxTotal=0 на старті (фаза зондування, ще немає реального total) НЕ пишемо як 0:
+            // інакше requests_total=0 → 0/0=NaN у прогрес-барі фронту (Uncaught Zag error, що
+            // зависав сторінку). undefined → COALESCE лишає NULL → UI показує «Підготовка…».
+            total: maxTotal > 0 ? maxTotal : undefined,
             method: p.method,
             stage: `Синонім «${variant}» (${vi + 1}/${variants.length})${p.stage ? ` · ${p.stage}` : ''}`,
             subDone: vi + 1,
@@ -264,7 +267,7 @@ async function fetchAllQueries(
         subDone: vi + 1,
         subTotal: variants.length,
       });
-      await sleep(delay);
+      await interruptibleSleep(delay, options?.shouldAbort);
     }
   }
 
@@ -582,7 +585,7 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
           subDone: vi + 1,
           subTotal: variants.length,
         });
-        await sleep(delay);
+        await interruptibleSleep(delay, shouldAbort);
       }
     }
 
@@ -817,7 +820,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
           subDone: vi + 1,
           subTotal: variants.length,
         });
-        await sleep(delay);
+        await interruptibleSleep(delay, shouldAbort);
       }
     }
 
@@ -1073,9 +1076,9 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
 
       if (i < candidates.length - 1) {
         if ((i + 1) % VERIFY_BATCH_SIZE === 0) {
-          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
+          await interruptibleSleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS), shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), shouldAbort);
         }
       }
     }

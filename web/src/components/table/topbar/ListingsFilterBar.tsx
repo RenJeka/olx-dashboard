@@ -75,7 +75,7 @@ export function ListingsFilterBar({
       label: (
         <Tooltip content={aiPicksTooltipContent} positioning={{ placement: 'top' }} showArrow openDelay={200}>
           <HStack as="span" gap={1.5} display="inline-flex" position="relative" pr={3}>
-            <Icon asChild fontSize="md"><PiFolderSimpleStarThin /></Icon>
+            <Icon as={PiFolderSimpleStarThin} fontSize="md" />
             <Box as="span">{AI_PICKS_LABEL} ({aiPicksCount})</Box>
             <Box as="span" position="absolute" top="-2px" right="-4px" color="fg.subtle" fontSize="10px">
               <LuInfo />

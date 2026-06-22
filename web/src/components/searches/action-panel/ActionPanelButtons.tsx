@@ -36,6 +36,49 @@ export function ActionPanelButtons({
         Доступні дії
       </Text>
 
+      {/* Аналіз перед сканом — лише зондування + звіт, без допагінації (docs/plans/two-phase-deep-scan.md) */}
+      <Button
+        variant="ghost"
+        onClick={() => !isScanning && onStartAnalysis()}
+        disabled={isScanning}
+        p={4}
+        rounded="xl"
+        borderWidth="1px"
+        borderColor="border.subtle"
+        bg="bg.panel"
+        justifyContent="flex-start"
+        alignItems="flex-start"
+        height="auto"
+        whiteSpace="normal"
+        w="full"
+        fontWeight="normal"
+        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'orange.muted', transform: 'translateY(-1px)' } : undefined}
+        _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
+        cursor={isScanning ? 'not-allowed' : 'pointer'}
+        opacity={isScanning && scanKind !== 'analyze' ? 0.5 : 1}
+        transition="all 0.2s"
+      >
+        <HStack gap={4} align="start" w="full">
+          <Box p={2.5} rounded="lg" bg="orange.subtle" color="orange.fg" flexShrink={0}>
+            <Box as={LuChartNoAxesCombined} animation={isScanning && scanKind === 'analyze' ? 'pulse 2s infinite' : undefined} />
+          </Box>
+          <Stack gap={1} flex="1" textAlign="left">
+            <HStack justify="space-between" align="center" w="full">
+              <Text textStyle="sm" fontWeight="bold" color="fg.default">
+                Аналіз перед сканом
+              </Text>
+              <Badge size="sm" colorPalette="orange" variant="subtle">
+                до 2–3 хв
+              </Badge>
+            </HStack>
+            <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
+              Зондує видачу та цінові діапазони, показує точний звіт із ETA — і лише тоді
+              запускає повний глибокий скан, якщо ви підтвердите.
+            </Text>
+          </Stack>
+        </HStack>
+      </Button>
+
       {/* Швидкий скан */}
       <Button
         variant="ghost"
@@ -68,7 +111,7 @@ export function ActionPanelButtons({
                 Швидкий скан
               </Text>
               <Badge size="sm" colorPalette="blue" variant="subtle">
-                ~10 с
+                до 2–3 хв
               </Badge>
             </HStack>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
@@ -110,56 +153,13 @@ export function ActionPanelButtons({
                 Глибокий скан
               </Text>
               <Badge size="sm" colorPalette="purple" variant="subtle">
-                ~1–2 хв
+                до 10 хв
               </Badge>
             </HStack>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
               {willSplit
                 ? `Проходить всю видачу OLX вглиб із авто-розбиттям на ~${deepScanBuckets} цінових діапазони (~${deepScanRequests} запитів) для повного покриття.`
                 : `Проходить всю видачу OLX вглиб (до ${DEEP_SCAN_MAX_PAGES} запитів) для наповнення бази з нуля.`}
-            </Text>
-          </Stack>
-        </HStack>
-      </Button>
-
-      {/* Аналіз перед сканом — лише зондування + звіт, без допагінації (docs/plans/two-phase-deep-scan.md) */}
-      <Button
-        variant="ghost"
-        onClick={() => !isScanning && onStartAnalysis()}
-        disabled={isScanning}
-        p={4}
-        rounded="xl"
-        borderWidth="1px"
-        borderColor="border.subtle"
-        bg="bg.panel"
-        justifyContent="flex-start"
-        alignItems="flex-start"
-        height="auto"
-        whiteSpace="normal"
-        w="full"
-        fontWeight="normal"
-        _hover={!isScanning ? { bg: 'bg.muted', borderColor: 'orange.muted', transform: 'translateY(-1px)' } : undefined}
-        _active={!isScanning ? { transform: 'translateY(0)' } : undefined}
-        cursor={isScanning ? 'not-allowed' : 'pointer'}
-        opacity={isScanning && scanKind !== 'analyze' ? 0.5 : 1}
-        transition="all 0.2s"
-      >
-        <HStack gap={4} align="start" w="full">
-          <Box p={2.5} rounded="lg" bg="orange.subtle" color="orange.fg" flexShrink={0}>
-            <Box as={LuChartNoAxesCombined} animation={isScanning && scanKind === 'analyze' ? 'pulse 2s infinite' : undefined} />
-          </Box>
-          <Stack gap={1} flex="1" textAlign="left">
-            <HStack justify="space-between" align="center" w="full">
-              <Text textStyle="sm" fontWeight="bold" color="fg.default">
-                Аналіз перед сканом
-              </Text>
-              <Badge size="sm" colorPalette="orange" variant="subtle">
-                ~10–20 с
-              </Badge>
-            </HStack>
-            <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-              Зондує видачу та цінові діапазони, показує точний звіт із ETA — і лише тоді
-              запускає повний глибокий скан, якщо ви підтвердите.
             </Text>
           </Stack>
         </HStack>
@@ -201,7 +201,7 @@ export function ActionPanelButtons({
                 Перевірити неактивні
               </Text>
               <Badge size="sm" colorPalette="teal" variant="subtle">
-                ~1 хв
+                ~2–3 хв
               </Badge>
             </HStack>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal">

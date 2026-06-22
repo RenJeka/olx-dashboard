@@ -175,7 +175,11 @@ export function ScanPlanReportDialog({
   const multi = plan.perQuery.length > 1;
 
   return (
-    <DialogRoot open={open} onOpenChange={(d) => onOpenChange(d.open)} size="lg" placement="center">
+    // modal={false}: цей діалог відкривається ПОВЕРХ модалки скану. Із modal=true Ark запускає
+    // hideOthers і ставить aria-hidden на модалку скану; при закритті звіту cleanup не знімає його —
+    // модалка скану лишається inert і блокує всі кліки (не зупинити скан, не закрити). modal=false
+    // не чіпає сусідню модалку, тож після закриття звіту скан повністю інтерактивний.
+    <DialogRoot open={open} onOpenChange={(d) => onOpenChange(d.open)} size="lg" placement="center" modal={false}>
       <DialogBackdrop />
       <DialogContent>
         <DialogCloseTrigger />

@@ -123,7 +123,14 @@ export function SearchActionPanel({ search }: Props) {
           </Stack>
         </DialogBody>
       </DialogContent>
+      </DialogRoot>
 
+      {/*
+        ConfirmActionDialog і ScanPlanReportDialog — окремі DialogRoot. Тримаємо їх СУСІДАМИ
+        головної модалки скану, а НЕ вкладеними всередині неї: вкладений модальний Dialog.Root
+        у Chakra v3, закриваючись, не прибирає aria-hidden/inert із батьківської модалки — та
+        лишається з pointer-events і блокує всі кліки (не можна ні зупинити скан, ні закрити).
+      */}
       <ConfirmActionDialog
         open={confirmDeepOpen}
         onOpenChange={setConfirmDeepOpen}
@@ -149,7 +156,6 @@ export function SearchActionPanel({ search }: Props) {
         planValid={planValid}
         analyzedAt={analyzedAt}
       />
-      </DialogRoot>
     </>
   );
 }

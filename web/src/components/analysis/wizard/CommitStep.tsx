@@ -70,7 +70,11 @@ export function CommitStep({ w, onClose }: Props) {
           <Text textStyle="xs" color="fg.muted">
             Записано {commitProgress.done}/{commitProgress.total}
           </Text>
-          <Progress.Root size="xs" colorPalette="blue" value={(commitProgress.done / commitProgress.total) * 100}>
+          <Progress.Root
+            size="xs"
+            colorPalette="blue"
+            value={commitProgress.total > 0 ? (commitProgress.done / commitProgress.total) * 100 : null}
+          >
             <Progress.Track>
               <Progress.Range />
             </Progress.Track>

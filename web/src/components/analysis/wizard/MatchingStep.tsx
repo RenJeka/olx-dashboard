@@ -45,7 +45,11 @@ export function MatchingStep({ w }: Props) {
               <Text textStyle="xs" color="fg.muted">
                 Опрацьовано {analyzeProgress.done}/{analyzeProgress.total}
               </Text>
-              <Progress.Root size="xs" colorPalette="purple" value={(analyzeProgress.done / analyzeProgress.total) * 100}>
+              <Progress.Root
+                size="xs"
+                colorPalette="purple"
+                value={analyzeProgress.total > 0 ? (analyzeProgress.done / analyzeProgress.total) * 100 : null}
+              >
                 <Progress.Track>
                   <Progress.Range />
                 </Progress.Track>

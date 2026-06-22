@@ -22,6 +22,15 @@ import {
 import type { Search, ScanPlan, ScanResult } from '../types';
 
 /**
+ * Зупинка користувачем (кнопка «Зупинити») приходить як кинута помилка з текстом
+ * «…зупинено користувачем». Це НЕ збій — показуємо нейтральний info-тост, а не error.
+ */
+function isUserAbort(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /зупинено користувачем/i.test(msg);
+}
+
+/**
  * Опис результату скану для toast: дедуп між синонімами (сирих/злито дублів,
  * docs/plans/deep-scan-stop-and-history.md) + позначка зупинки користувачем.
  */
@@ -109,11 +118,13 @@ export function useSearchActionPanel(search: Search) {
           toaster.create({ type: r.stopped ? 'info' : 'success', title, description });
         },
         onError: (err) =>
-          toaster.create({
-            type: 'error',
-            title: 'Помилка скану',
-            description: err instanceof Error ? err.message : String(err),
-          }),
+          isUserAbort(err)
+            ? toaster.create({ type: 'info', title: 'Скан зупинено' })
+            : toaster.create({
+                type: 'error',
+                title: 'Помилка скану',
+                description: err instanceof Error ? err.message : String(err),
+              }),
         onSettled: () => setScanKind(null),
       },
     );
@@ -143,11 +154,13 @@ export function useSearchActionPanel(search: Search) {
         });
       },
       onError: (err) =>
-        toaster.create({
-          type: 'error',
-          title: 'Помилка перевірки',
-          description: err instanceof Error ? err.message : String(err),
-        }),
+        isUserAbort(err)
+          ? toaster.create({ type: 'info', title: 'Перевірку зупинено' })
+          : toaster.create({
+              type: 'error',
+              title: 'Помилка перевірки',
+              description: err instanceof Error ? err.message : String(err),
+            }),
       onSettled: () => setScanKind(null),
     });
   }
@@ -182,11 +195,13 @@ export function useSearchActionPanel(search: Search) {
           qc.invalidateQueries({ queryKey: ['last-analysis', search.id] });
         },
         onError: (err) =>
-          toaster.create({
-            type: 'error',
-            title: 'Помилка аналізу',
-            description: err instanceof Error ? err.message : String(err),
-          }),
+          isUserAbort(err)
+            ? toaster.create({ type: 'info', title: 'Аналіз зупинено' })
+            : toaster.create({
+                type: 'error',
+                title: 'Помилка аналізу',
+                description: err instanceof Error ? err.message : String(err),
+              }),
         onSettled: () => setScanKind(null),
       },
     );
@@ -208,6 +223,10 @@ export function useSearchActionPanel(search: Search) {
           qc.invalidateQueries({ queryKey: ['last-analysis', search.id] });
         },
         onError: (err) => {
+          if (isUserAbort(err)) {
+            toaster.create({ type: 'info', title: 'Скан зупинено' });
+            return;
+          }
           const message = err instanceof Error ? err.message : String(err);
           const isStale = message.includes('застарів');
           toaster.create({

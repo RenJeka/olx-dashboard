@@ -1,9 +1,22 @@
 import { Badge, Box, Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
-import { LuCircleStop } from 'react-icons/lu';
+import { LuCircleStop, LuInfo, LuPause } from 'react-icons/lu';
 import { SCAN_KIND_LABELS } from '../../../constants';
+import { Tooltip } from '../../ui/tooltip';
 import type { ScanStatus } from '../../../types';
 /** Сегменти показуємо лише до цієї кількості — більше (напр. до 40 цінових бакетів) злилося б у кашу. */
 const MAX_SEGMENTS = 16;
+
+/**
+ * Безпечний відсоток для Progress.Root: `total<=0` (зокрема 0, не лише null) або
+ * нечислове `done/total` інакше дають NaN/Infinity — Zag кидає (НЕ console.warn, а
+ * Uncaught Error) "[progress] The value passed `NaN` exceeds the max value `100`",
+ * що зависає поза React render (через notifyManager) і блокує всю сторінку overlay'єм Vite.
+ */
+function safePercent(done: number | null | undefined, total: number | null | undefined): number | null {
+  if (total == null || total <= 0) return null;
+  const pct = (Math.max(0, done ?? 0) / total) * 100;
+  return Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : null;
+}
 
 interface Props {
   scanKind: 'normal' | 'deep' | 'verify' | 'analyze';
@@ -41,16 +54,38 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
           )}
         </HStack>
         <Text textStyle="xs" color="fg.muted">
-          {status.requests_total == null
+          {status.requests_total == null || status.requests_total <= 0
             ? 'Підготовка…'
             : `Запит ${status.requests_done ?? 0}/${status.requests_total}`}
         </Text>
       </HStack>
 
-      {status.stage && (
-        <Text textStyle="2xs" color="fg.muted" lineClamp={1}>
-          {status.stage}
-        </Text>
+      {/* Лічильник етапів — завжди видимий, не перетирається транзієнтним stage (напр. паузою).
+          Сам stage (у т.ч. текст паузи) показуємо іконкою з тултіпом правіше, щоб обидва
+          шматки інформації були видні одночасно (docs/plans/scan-progress-detail.md). */}
+      {status.sub_total != null ? (
+        <HStack justify="space-between" align="center">
+          <Text textStyle="2xs" color="fg.muted">
+            Етап {status.sub_done ?? 0} з {status.sub_total}
+          </Text>
+          {status.stage && (
+            <Tooltip content={status.stage} positioning={{ placement: 'top' }}>
+              <Box
+                as={status.stage.includes('Пауза') ? LuPause : LuInfo}
+                color="fg.muted"
+                boxSize={3.5}
+                flexShrink={0}
+                cursor="default"
+              />
+            </Tooltip>
+          )}
+        </HStack>
+      ) : (
+        status.stage && (
+          <Text textStyle="2xs" color="fg.muted" lineClamp={1}>
+            {status.stage}
+          </Text>
+        )
       )}
 
       {showSegments && (
@@ -76,35 +111,30 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
             })}
           </HStack>
         ) : (
-          <Stack gap={0.5}>
-            <Progress.Root
-              size="xs"
-              colorPalette="blue"
-              value={((status.sub_done ?? 0) / status.sub_total!) * 100}
-            >
-              <Progress.Track>
-                <Progress.Range />
-              </Progress.Track>
-            </Progress.Root>
-            <Text textStyle="2xs" color="fg.muted" textAlign="right">
-              {status.sub_done ?? 0}/{status.sub_total}
-            </Text>
-          </Stack>
+          <Progress.Root
+            size="xs"
+            colorPalette="blue"
+            value={safePercent(status.sub_done, status.sub_total)}
+          >
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
         )
       )}
 
       <Progress.Root
         size="xs"
         colorPalette="blue"
-        value={status.requests_total == null ? null : ((status.requests_done ?? 0) / status.requests_total) * 100}
+        value={safePercent(status.requests_done, status.requests_total)}
       >
         <Progress.Track>
           <Progress.Range />
         </Progress.Track>
       </Progress.Root>
-      {status.requests_total != null && (
+      {status.requests_total != null && status.requests_total > 0 && (
         <Text textStyle="2xs" color="fg.muted" textAlign="right">
-          Залишилось: ~{Math.round((status.requests_total - (status.requests_done ?? 0)) * secondsPerRequest)} с
+          Залишилось: ~{Math.max(0, Math.round((status.requests_total - (status.requests_done ?? 0)) * secondsPerRequest))} с
         </Text>
       )}
 

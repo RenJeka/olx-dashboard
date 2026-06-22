@@ -14,7 +14,7 @@ import type {
   FetchOptions,
 } from '../../types.js';
 
-import { sleep, randomDelayMs, slugify } from '../utils.js';
+import { interruptibleSleep, randomDelayMs, slugify } from '../utils.js';
 import {
   BATCH_SIZE,
   DEEP_SAFETY_CAP,
@@ -245,9 +245,9 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
       if (i < target - 1) {
         if (deep && requestsUsed % BATCH_SIZE === 0) {
-          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
+          await interruptibleSleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS), options?.shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), options?.shouldAbort);
         }
       }
     }
@@ -565,9 +565,9 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         if (requestsUsed % BATCH_SIZE === 0) {
           const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
           onProgress?.({ done: requestsUsed, stage: `Пауза ~${Math.round(delay / 1000)}с` });
-          await sleep(delay);
+          await interruptibleSleep(delay, shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), shouldAbort);
         }
       }
 
@@ -582,7 +582,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       if (bi < buckets.length - 1) {
         const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
         onProgress?.({ done: requestsUsed, stage: `Пауза перед наступним бакетом ~${Math.round(delay / 1000)}с` });
-        await sleep(delay);
+        await interruptibleSleep(delay, shouldAbort);
       }
     }
 

@@ -7,7 +7,7 @@ import type {
   FetchOptions,
 } from '../types.js';
 import { SELECTORS, OLX_BASE_URL, REQUEST_HEADERS } from './selectors.js';
-import { sleep, randomDelayMs, slugify } from './utils.js';
+import { interruptibleSleep, randomDelayMs, slugify } from './utils.js';
 import {
   BATCH_SIZE,
   DEEP_SAFETY_CAP,
@@ -121,9 +121,9 @@ export class HtmlOlxFetcher implements OlxFetcher {
 
       if (page < target) {
         if (deep && page % BATCH_SIZE === 0) {
-          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
+          await interruptibleSleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS), options?.shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), options?.shouldAbort);
         }
       }
     }

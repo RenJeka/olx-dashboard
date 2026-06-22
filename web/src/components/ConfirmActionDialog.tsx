@@ -38,6 +38,10 @@ export function ConfirmActionDialog({
       role="alertdialog"
       placement="center"
       size="sm"
+      // modal={false}: діалог часто відкривається ПОВЕРХ іншої модалки (напр. панелі скану).
+      // Із modal=true Ark hideOthers ставить aria-hidden на нижню модалку й не знімає його при
+      // закритті — та лишається inert і блокує кліки. modal=false не чіпає сусідню модалку.
+      modal={false}
       open={open}
       onOpenChange={(d) => {
         if (!d.open) setSkip(false);
