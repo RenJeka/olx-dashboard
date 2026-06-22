@@ -255,6 +255,18 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning, aborted };
   }
 
+  /**
+   * Один запит: visible_total_count кореня (offset 0) для переданого `search`. Використовується
+   * для «невідфільтрованого тоталу» у звіті аналізу (скільки всього на OLX без фільтрів пошуку),
+   * щоб користувач бачив, що менше число — це його власний фільтр, а не недозбір.
+   */
+  async probeRootCount(search: SearchConfig): Promise<number | null> {
+    const referer = this.buildReferer(search.query);
+    const page = await this.fetchPage(search, 0, referer);
+    if (page.listingError) return null;
+    return page.visibleTotalCount;
+  }
+
   // ── Probe максимальної ціни ──────────────────────────────────────────────────
 
   /**

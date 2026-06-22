@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Stack, Text } from '@chakra-ui/react';
-import { LuTriangleAlert } from 'react-icons/lu';
+import { LuHistory, LuInfo, LuTriangleAlert } from 'react-icons/lu';
 import {
   DialogBackdrop,
   DialogBody,
@@ -10,6 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from '../../ui/dialog';
+import { Tooltip } from '../../ui/tooltip';
 import { SCAN_PLAN_TTL_MIN } from '../../../constants';
 import type { ScanPlan, ScanPlanQuery } from '../../../types';
 
@@ -24,6 +25,8 @@ interface Props {
   planValid: boolean;
   /** Коли цей аналіз зроблено (ISO) — показуємо для збереженого звіту. */
   analyzedAt: string | null;
+  /** Людиномовний активний фільтр ціни пошуку (напр. «200 – 800 грн») або null — фільтра немає. */
+  priceFilterLabel: string | null;
 }
 
 function formatNumber(n: number): string {
@@ -53,6 +56,18 @@ function describeFallback(reason: string): string {
     return 'аналіз GraphQL не вдався — повний скан спробує ще раз і перейде на HTML, якщо потрібно';
   }
   return reason;
+}
+
+/** Внутрішній маркер у тексті серверного warning — рендериться скорочено з повним поясненням у тултіпі. */
+const COVERAGE_WARNING_PREFIX = 'вікно покриття буде пропущено';
+
+/** Іконка «i» з тултіпом — для виносу довшого пояснення з основного тексту звіту. */
+function InfoTooltip({ content }: { content: React.ReactNode }) {
+  return (
+    <Tooltip content={content} contentProps={{ maxW: '280px' }}>
+      <Box as={LuInfo} display="inline-block" color="fg.muted" fontSize="xs" verticalAlign="middle" cursor="help" />
+    </Tooltip>
+  );
 }
 
 /** Невелика статистична картка в стилі ScanWarningSummary (orange.subtle + мono-цифра). */
@@ -87,11 +102,11 @@ function PriceSpectrum({ q }: { q: ScanPlanQuery }) {
         role="img"
         aria-label={q.rootCount != null ? `Без розбиття: ${q.rootCount} оголошень` : 'Без розбиття на цінові діапазони'}
       >
-        <Text fontSize="2xs" color="orange.fg" fontWeight="semibold">
-          {q.rootCount != null
-            ? `${formatNumber(q.rootCount)} оголошень · без розбиття`
-            : 'без розбиття на цінові діапазони'}
-        </Text>
+        {q.rootCount != null && (
+          <Text fontSize="2xs" color="orange.fg" fontWeight="semibold">
+            {formatNumber(q.rootCount)} оголошень
+          </Text>
+        )}
       </HStack>
     );
   }
@@ -143,6 +158,11 @@ function QuerySection({ q, showLabel }: { q: ScanPlanQuery; showLabel: boolean }
         </HStack>
       )}
       <PriceSpectrum q={q} />
+      {showLabel && q.sampleUnique != null && (
+        <Text fontSize="2xs" color="fg.muted">
+          внесок: ~{formatNumber(q.sampleUnique)} унікальних у вибірці
+        </Text>
+      )}
       {q.fallbackReason && (
         <HStack gap={1.5} align="start">
           <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
@@ -169,6 +189,7 @@ export function ScanPlanReportDialog({
   onNewAnalysis,
   planValid,
   analyzedAt,
+  priceFilterLabel,
 }: Props) {
   if (!plan) return null;
 
@@ -184,12 +205,34 @@ export function ScanPlanReportDialog({
       <DialogContent>
         <DialogCloseTrigger />
         <DialogHeader>
-          <DialogTitle>Аналіз перед сканом</DialogTitle>
-          <Text textStyle="xs" color="fg.muted" mt={1}>
-            {analyzedAt
-              ? `Проаналізовано: ${formatAnalyzedAt(analyzedAt)} — нижче картина останнього аналізу.`
-              : 'Видачу й цінові діапазони вже зондовано — нижче точна картина перед повним сканом.'}
-          </Text>
+          <HStack justify="space-between" align="center" wrap="wrap" gap={2}>
+            <DialogTitle>Аналіз перед сканом</DialogTitle>
+            {analyzedAt && (
+              <Tooltip content="Збережений аналіз — дані не оновлювались із моменту зондування. Нижче картина останнього аналізу.">
+                <HStack
+                  gap={1.5}
+                  px={2.5}
+                  py={1}
+                  rounded="full"
+                  bg="bg.muted"
+                  borderWidth="1px"
+                  borderColor="border.subtle"
+                  cursor="help"
+                  flexShrink={0}
+                >
+                  <Box as={LuHistory} fontSize="xs" color="fg.muted" />
+                  <Text fontSize="2xs" fontFamily="mono" fontWeight="medium" color="fg.muted" letterSpacing="wide">
+                    {formatAnalyzedAt(analyzedAt)}
+                  </Text>
+                </HStack>
+              </Tooltip>
+            )}
+          </HStack>
+          {!analyzedAt && (
+            <Text textStyle="xs" color="fg.muted" mt={1}>
+              Видачу й цінові діапазони вже зондовано — нижче точна картина перед повним сканом.
+            </Text>
+          )}
         </DialogHeader>
 
         <DialogBody pb={6}>
@@ -205,7 +248,15 @@ export function ScanPlanReportDialog({
                 </Text>
               </Stack>
               <HStack gap={2} wrap="wrap">
-                <StatChip value={formatNumber(plan.totalListings)} label="оголошень" />
+                {/* Для кількох синонімів головне число — оцінка унікальних після дедупу;
+                    сума по варіантах стає вторинною з явною міткою «з дублями». */}
+                {multi && plan.estimatedUnique != null && (
+                  <StatChip value={`≈ ${formatNumber(plan.estimatedUnique)}`} label="унікальних (оцінка)" />
+                )}
+                <StatChip
+                  value={formatNumber(plan.totalListings)}
+                  label={multi ? 'сума варіантів · з дублями' : 'оголошень'}
+                />
                 <StatChip value={formatNumber(plan.remainingRequests)} label="запитів лишилось" />
                 {plan.totalBuckets > 0 && (
                   <StatChip value={formatNumber(plan.totalBuckets)} label="діапазонів" />
@@ -218,9 +269,57 @@ export function ScanPlanReportDialog({
                 )}
               </HStack>
               {multi && (
+                <HStack gap={1} align="center">
+                  <Text textStyle="2xs" color="fg.muted">
+                    «Сума варіантів» рахує дублі між синонімами двічі.
+                  </Text>
+                  <InfoTooltip
+                    content={
+                      <Stack gap={1.5}>
+                        <Text fontSize="2xs">
+                          Те саме оголошення під «біговел» і «беговел» враховане окремо. У базі
+                          після злиття по olx_id лишиться
+                          {plan.estimatedUnique != null ? ` ≈ ${formatNumber(plan.estimatedUnique)} ` : ' '}
+                          унікальних.
+                        </Text>
+                        <Text fontSize="2xs">
+                          На сайті OLX один рядок пошуку вже об'єднує словоформи, тож його число
+                          більше за окремий синонім, але менше за цю суму — це не пропажа даних.
+                        </Text>
+                      </Stack>
+                    }
+                  />
+                </HStack>
+              )}
+              {priceFilterLabel && (
+                <HStack
+                  gap={1.5}
+                  align="start"
+                  p={2.5}
+                  rounded="md"
+                  bg="bg.subtle"
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                >
+                  <Box as={LuInfo} color="fg.muted" fontSize="xs" mt="2px" flexShrink={0} />
+                  <Text fontSize="2xs" color="fg.default" lineHeight="1.4">
+                    Усі числа — лише в межах вашого фільтра ціни{' '}
+                    <Text as="span" fontWeight="semibold">{priceFilterLabel}</Text>.
+                    {plan.unfilteredTotal != null && (
+                      <>
+                        {' '}На OLX без фільтра ціни (по «{plan.perQuery[0]?.query}») —{' '}
+                        <Text as="span" fontWeight="semibold">~{formatNumber(plan.unfilteredTotal)}</Text>.
+                        Менше число у звіті — це ваш фільтр, а не недозбір.
+                      </>
+                    )}
+                  </Text>
+                </HStack>
+              )}
+              {plan.lastScanUnique != null && (
                 <Text textStyle="2xs" color="fg.muted">
-                  «Оголошень» — сума по варіантах запиту; дублі між синонімами не відняті, тож
-                  реально унікальних у базі буде менше.
+                  Минулий скан:{' '}
+                  {plan.lastScanRaw != null ? `${formatNumber(plan.lastScanRaw)} сирих → ` : ''}
+                  {formatNumber(plan.lastScanUnique)} унікальних у базі.
                 </Text>
               )}
             </Stack>
@@ -234,33 +333,43 @@ export function ScanPlanReportDialog({
 
             {plan.warnings.length > 0 && (
               <Stack gap={1.5} p={3} rounded="lg" bg="orange.subtle/40" borderWidth="1px" borderColor="orange.muted">
-                {plan.warnings.map((w, idx) => (
-                  <HStack key={idx} gap={1.5} align="start">
-                    <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
-                    <Text fontSize="xs" color="orange.fg" lineHeight="1.4">
-                      {w}
-                    </Text>
-                  </HStack>
-                ))}
+                {plan.warnings.map((w, idx) => {
+                  const isCoverage = w.startsWith(COVERAGE_WARNING_PREFIX);
+                  return (
+                    <HStack key={idx} gap={1.5} align="start">
+                      <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
+                      <Text fontSize="xs" color="orange.fg" lineHeight="1.4">
+                        {isCoverage ? 'Вікно покриття пропущено.' : w}
+                      </Text>
+                      {isCoverage && (
+                        <InfoTooltip content="Декілька варіантів запиту (синоніми) дають об'єднану видачу, не відсортовану глобально за датою підняття, тож авто-вимкнення зниклих оголошень за цим сканом не спрацює. Живість таких оголошень перевіряє ручний прохід «Перевірити неактивні»." />
+                      )}
+                    </HStack>
+                  );
+                })}
               </Stack>
             )}
           </Stack>
         </DialogBody>
 
         <DialogFooter flexDirection="column" alignItems="stretch" gap={2}>
-          {!planValid && (
-            <HStack gap={1.5} align="start">
-              <Box as={LuTriangleAlert} color="orange.fg" fontSize="xs" mt="2px" flexShrink={0} />
-              <Text fontSize="2xs" color="orange.fg" lineHeight="1.4">
-                План застарів (діє {SCAN_PLAN_TTL_MIN} хвилин і одноразовий) — щоб запустити скан, зробіть новий аналіз.
-              </Text>
-            </HStack>
-          )}
-          <HStack justify="flex-end" gap={3}>
+          <HStack justify="flex-end" gap={3} align="center">
+            {!planValid && (
+              <Tooltip
+                content={`План застарів (діє ${SCAN_PLAN_TTL_MIN} хвилин і одноразовий) — запуск повторно зробить аналіз.`}
+              >
+                <HStack gap={1} cursor="help">
+                  <Box as={LuTriangleAlert} color="orange.fg" fontSize="sm" />
+                  <Text fontSize="2xs" color="orange.fg">
+                    План застарів
+                  </Text>
+                </HStack>
+              </Tooltip>
+            )}
             <Button variant="outline" onClick={onNewAnalysis}>
               Зробити новий аналіз
             </Button>
-            <Button colorPalette="orange" onClick={onConfirm} disabled={!planValid}>
+            <Button colorPalette="orange" onClick={onConfirm}>
               Запустити повний скан
             </Button>
           </HStack>

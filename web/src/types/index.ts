@@ -282,6 +282,8 @@ export interface ScanPlanQuery {
   noSplit: boolean;
   fallbackReason?: string;
   remainingRequests: number;
+  /** Внесок варіанта в унікальні: скільки olxId його вибірки нові щодо попередніх варіантів. */
+  sampleUnique: number | null;
 }
 
 /** Звіт аналітичної фази глибокого скану (POST /scan/analyze) — дані для ScanPlanReportDialog. */
@@ -297,6 +299,17 @@ export interface ScanPlan {
   estimatedNew: number | null;
   /** true — estimatedNew рахується лише за першими сторінками бакетів, не повною видачею. */
   estimatedNewIsSample: boolean;
+  /** Оцінка УНІКАЛЬНИХ оголошень після дедупу між синонімами; null — немає вибірки. */
+  estimatedUnique: number | null;
+  /** raw_found останнього завершеного нормального скану (сирих до дедупу); null — сканів не було. */
+  lastScanRaw: number | null;
+  /** found останнього завершеного нормального скану (унікальних після дедупу); null — сканів не було. */
+  lastScanUnique: number | null;
+  /**
+   * visible_total_count головного query БЕЗ фільтрів ціни — «скільки всього на OLX» для чесного
+   * порівняння з відфільтрованими числами звіту. null — фільтра ціни немає або probe не вдався.
+   */
+  unfilteredTotal: number | null;
   /** >1 варіант (синоніми) або є split — вікно покриття пропускається при повному скані. */
   partial: boolean;
   warnings: string[];

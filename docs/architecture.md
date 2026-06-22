@@ -129,7 +129,14 @@ flowchart LR
 > `GraphqlOlxFetcher.analyzeSplit` (root-запит + `probeMaxPrice` + `bisectPriceRange`, **без**
 > допагінації бакетів — лише `page0` кожного бакету), агрегує `ScanPlan` (перелік варіантів,
 > цінові бакети, `remainingRequests`, ETA, вибіркова оцінка `estimatedNew` через
-> `normalizer.selectKnownOlxIds` на `olx_id` з уже завантажених `page0`), кешує внутрішній
+> `normalizer.selectKnownOlxIds` на `olx_id` з уже завантажених `page0`; **оцінка унікальних**
+> `estimatedUnique` через глобальний дедуп вибірок між варіантами — `totalListings × union/sum`
+> розмірів `page0`; per-variant `sampleUnique` — внесок синоніма в унікальні; калібрування
+> `lastScanRaw`/`lastScanUnique` з останнього завершеного нормального скану `scan_runs`;
+> **`unfilteredTotal`** — один додатковий probe головного query БЕЗ фільтра ціни, лише коли
+> `apiFilters.ranges.price` активний (звіт показує «N у вашому фільтрі ціни / ~M всього на OLX»,
+> щоб відфільтрований підрахунок не плутали з недозбором при порівнянні з сайтом —
+> `GraphqlOlxFetcher.probeRootCount`), кешує внутрішній
 > `SplitPlan[]` у пам'яті процесу (`Map<planToken, …>`, TTL 30 хв) і повертає лише DTO з
 > `planToken` (без важких `page0`). Підтверджений запуск (`POST /scan/run-plan` →
 > `runDeepScanFromPlan`) дістає кеш за токеном і для кожного варіанта викликає

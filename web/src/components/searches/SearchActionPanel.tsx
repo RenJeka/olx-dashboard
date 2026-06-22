@@ -21,6 +21,7 @@ import { ScanStatusChip } from './action-panel/ScanStatusChip';
 import { ScanPlanReportDialog } from './action-panel/ScanPlanReportDialog';
 import { useSearchActionPanel } from '../../hooks/useSearchActionPanel';
 import { DEEP_SCAN_SECONDS_PER_REQUEST } from '../../constants';
+import { parsePriceRange, formatPriceRange } from '../../utils/format';
 import type { Search } from '../../types';
 import { useSettingsStore } from '../../stores/settingsStore';
 
@@ -155,6 +156,10 @@ export function SearchActionPanel({ search }: Props) {
         onNewAnalysis={startFreshAnalysis}
         planValid={planValid}
         analyzedAt={analyzedAt}
+        priceFilterLabel={(() => {
+          const r = parsePriceRange(search.api_filters);
+          return r ? formatPriceRange(r.from, r.to) : null;
+        })()}
       />
     </>
   );

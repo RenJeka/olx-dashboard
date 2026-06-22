@@ -452,6 +452,12 @@ export interface ScanPlanQuery {
   fallbackReason?: string;
   /** Скільки запитів допагінації лишилось для цього варіанта (без уже витрачених на аналіз). */
   remainingRequests: number;
+  /**
+   * Внесок варіанта в унікальні: скільки olxId його вибірки (0-ті сторінки) ще НЕ зустрічались
+   * у вибірках попередніх варіантів. Видно, які синоніми реально тягнуть, а які дублюють.
+   * null — вибірки не було (провал аналізу).
+   */
+  sampleUnique: number | null;
 }
 
 /** Звіт аналітичної фази глибокого скану — DTO для ScanPlanReportDialog. */
@@ -470,6 +476,22 @@ export interface ScanPlan {
   estimatedNew: number | null;
   /** true — estimatedNew рахується лише за першими сторінками бакетів, не повною видачею. */
   estimatedNewIsSample: boolean;
+  /**
+   * Оцінка УНІКАЛЬНИХ оголошень після дедупу між синонімами (`totalListings × overlapRatio`,
+   * де overlapRatio = union/sum розмірів вибірок). Overlap у семплі — нижня межа реального
+   * перетину, тож це радше верхня оцінка унікальних. null — немає вибірки.
+   */
+  estimatedUnique: number | null;
+  /** raw_found останнього завершеного нормального скану (сирих до дедупу); null — сканів не було. */
+  lastScanRaw: number | null;
+  /** found останнього завершеного нормального скану (унікальних після дедупу); null — сканів не було. */
+  lastScanUnique: number | null;
+  /**
+   * visible_total_count головного query БЕЗ фільтрів ціни — «скільки всього на OLX» для чесного
+   * порівняння з відфільтрованими числами звіту (пояснює розрив «у звіті менше, ніж на сайті»).
+   * null — фільтра ціни немає (тоді числа й так невідфільтровані) або probe не вдався.
+   */
+  unfilteredTotal: number | null;
   /** >1 варіант (синоніми) або є split — вікно покриття пропускається при повному скані. */
   partial: boolean;
   warnings: string[];

@@ -508,6 +508,9 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
     let knownSampleCount = 0;
     let sampleTotal = 0;
     let hasSample = false;
+    // Глобальний дедуп вибірки між варіантами: оцінити частку унікальних після злиття синонімів.
+    const globalSampleIds = new Set<number>();
+    let sumSampleSize = 0;
     const warnings: string[] = [];
 
     for (let vi = 0; vi < variants.length; vi++) {
@@ -555,6 +558,26 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
           : 0
         : plan.buckets.reduce((sum, b) => sum + Math.max(0, estimatePages(b.count) - 1), 0);
 
+      // Семпл «~нових»: 0-і сторінки бакетів (split) або rootItems (noSplit, успішний аналіз).
+      const sampleItems = plan.noSplit ? plan.rootItems : plan.buckets.flatMap((b) => b.page0);
+
+      // Внесок варіанта в унікальні: olxId вибірки, яких ще не було в попередніх варіантах.
+      let sampleUnique: number | null = null;
+      if (sampleItems.length > 0) {
+        sampleUnique = 0;
+        for (const it of sampleItems) {
+          if (!globalSampleIds.has(it.olxId)) {
+            globalSampleIds.add(it.olxId);
+            sampleUnique++;
+          }
+        }
+        hasSample = true;
+        const known = selectKnownOlxIds(sampleItems.map((it) => it.olxId));
+        knownSampleCount += known.size;
+        sampleTotal += sampleItems.length;
+        sumSampleSize += sampleItems.length;
+      }
+
       perQuery.push({
         query: variant,
         rootCount: plan.rootCount,
@@ -562,20 +585,12 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
         noSplit: plan.noSplit,
         fallbackReason: plan.fallbackReason,
         remainingRequests: variantRemaining,
+        sampleUnique,
       });
 
       if (plan.rootCount != null) totalListings += plan.rootCount;
       totalBuckets += plan.buckets.length;
       remainingRequests += variantRemaining;
-
-      // Семпл «~нових»: 0-і сторінки бакетів (split) або rootItems (noSplit, успішний аналіз).
-      const sampleItems = plan.noSplit ? plan.rootItems : plan.buckets.flatMap((b) => b.page0);
-      if (sampleItems.length > 0) {
-        hasSample = true;
-        const known = selectKnownOlxIds(sampleItems.map((it) => it.olxId));
-        knownSampleCount += known.size;
-        sampleTotal += sampleItems.length;
-      }
 
       if (vi < variants.length - 1) {
         const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
@@ -589,12 +604,44 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
       }
     }
 
+    // Невідфільтрований тотал головного query — щоб звіт показав «N у вашому фільтрі ціни / ~M
+    // всього на OLX» і не виникало хибного відчуття недозбору при порівнянні з сайтом. Один
+    // додатковий запит, лише коли фільтр ціни активний (інакше числа й так невідфільтровані).
+    let unfilteredTotal: number | null = null;
+    const priceRange = search.apiFilters.ranges?.price;
+    if (priceRange && (priceRange.from != null || priceRange.to != null)) {
+      try {
+        const { price: _omitPrice, ...rangesWithoutPrice } = search.apiFilters.ranges ?? {};
+        const stripped: SearchConfig = {
+          ...search,
+          apiFilters: { ...search.apiFilters, ranges: rangesWithoutPrice },
+        };
+        unfilteredTotal = await graphqlFetcher.probeRootCount(stripped);
+      } catch {
+        // Інформаційний probe — помилка не зриває аналіз.
+      }
+    }
+
     const planToken = randomUUID();
     planCache.set(planToken, { searchId, plans, createdAt: Date.now() });
 
     const estimatedNew = hasSample && sampleTotal > 0
       ? Math.round(((sampleTotal - knownSampleCount) / sampleTotal) * totalListings)
       : null;
+
+    // Оцінка унікальних після дедупу між синонімами: частка унікальних у вибірці × сума.
+    const estimatedUnique = hasSample && sumSampleSize > 0
+      ? Math.round((globalSampleIds.size / sumSampleSize) * totalListings)
+      : null;
+
+    // Калібрування реальними даними: останній завершений нормальний скан (не аналітичний).
+    const lastScan = db
+      .prepare(
+        `SELECT raw_found, found FROM scan_runs
+         WHERE search_id = ? AND kind != 'analyze' AND finished_at IS NOT NULL AND found IS NOT NULL
+         ORDER BY finished_at DESC LIMIT 1`,
+      )
+      .get(searchId) as { raw_found: number | null; found: number | null } | undefined;
 
     const partial =
       variants.length > 1 ||
@@ -611,6 +658,10 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
       estimatedDurationSec: remainingRequests * DEEP_SCAN_SECONDS_PER_REQUEST,
       estimatedNew,
       estimatedNewIsSample: true,
+      estimatedUnique,
+      lastScanRaw: lastScan?.raw_found ?? null,
+      lastScanUnique: lastScan?.found ?? null,
+      unfilteredTotal,
       partial,
       warnings,
     };
