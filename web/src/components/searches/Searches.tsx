@@ -12,7 +12,7 @@ import {
 import { SearchCreateDialog } from './SearchCreateDialog';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchesPanel } from './SearchesPanel';
-import { useSearches } from '../../api';
+import { useProjects, useSearches } from '../../api';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useNewSearchForm } from '../../hooks/useNewSearchForm';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -27,6 +27,7 @@ export function Searches() {
 
   const isMobile = useIsMobile();
   const { data: searches, isLoading } = useSearches();
+  const { data: projects } = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
   const newSearchForm = useNewSearchForm(() => setCreateOpen(false));
 
@@ -45,6 +46,7 @@ export function Searches() {
   const panel = (
     <SearchesPanel
       isLoading={isLoading}
+      projects={projects ?? []}
       activeSearches={activeSearches}
       archivedSearches={archivedSearches}
       selectedId={selectedId}

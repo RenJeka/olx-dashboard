@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { searchesRoutes } from './routes/searches.js';
+import { projectsRoutes } from './routes/projects.js';
 import { listingsRoutes } from './routes/listings.js';
 import { analysisRoutes } from './routes/analysis/index.js';
 import { aiPicksRoutes } from './routes/aiPicks.js';
@@ -16,6 +17,7 @@ await app.register(cors, {
 });
 
 await app.register(searchesRoutes);
+await app.register(projectsRoutes);
 await app.register(listingsRoutes);
 await app.register(analysisRoutes);
 await app.register(aiPicksRoutes);

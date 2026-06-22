@@ -12,6 +12,16 @@ export interface Search {
   query_synonyms: string;
   /** 1 — пошук в архіві (docs/plans/archive-searches.md). */
   archived: number;
+  /** Проект, до якого віднесено пошук; null — «Без проекту» (docs/plans/projects.md). */
+  project_id: number | null;
+  created_at: string;
+}
+
+/** Проект — група пошуків (docs/plans/projects.md). */
+export interface Project {
+  id: number;
+  name: string;
+  sort_order: number | null;
   created_at: string;
 }
 

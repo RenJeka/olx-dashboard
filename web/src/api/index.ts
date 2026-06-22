@@ -1,5 +1,6 @@
 export * from './base';
 export * from './searches';
+export * from './projects';
 export * from './listings';
 export * from './scanner';
 export * from './analysis';

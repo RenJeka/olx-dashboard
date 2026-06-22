@@ -74,6 +74,10 @@ addColumnIfMissing('searches', 'query_synonyms', "TEXT DEFAULT '[]'");
 // Архів пошуків (docs/plans/archive-searches.md) — прапорець прихованих зі списку.
 addColumnIfMissing('searches', 'archived', 'INTEGER DEFAULT 0');
 
+// Проекти (docs/plans/projects.md) — групування пошуків; NULL = «Без проекту».
+// Таблиця projects створюється з schema.sql (CREATE TABLE IF NOT EXISTS) вище.
+addColumnIfMissing('searches', 'project_id', 'INTEGER REFERENCES projects(id)');
+
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
  * miss_count. ALTER TABLE не міняє CHECK-констрейнти, тому потрібен повний rebuild
