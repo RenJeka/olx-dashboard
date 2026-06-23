@@ -34,7 +34,12 @@ olx-dashboard/
 │   │   └── olx.db            # SQLite (gitignored, створюється при старті)
 │   └── src/
 │       ├── index.ts          # Fastify bootstrap, CORS :5173, /health, listen :3001
-│       ├── types.ts          # доменні типи + інтерфейс OlxFetcher
+│       ├── types/            # доменні типи (core, listings, scan, analysis) за принципом DDD
+│       │   ├── core.ts       # базові сутності (SearchConfig, Project, фільтри)
+│       │   ├── listings.ts   # оголошення, статуси
+│       │   ├── scan.ts       # типи сканування, прогрес, план глибокого скану
+│       │   └── analysis.ts   # AI аналіз, relevance, aiPicks
+│       ├── types.ts          # barrel-файл експорту доменних типів + інтерфейс OlxFetcher
 │       ├── scanner/           # модулі сканування (розбитий scanner.ts)
 │       │   ├── index.ts      # barrel: реекспорт runScan/analyzeScan/runDeepScanFromPlan/runVerify/requestStopScan/isPlanCached/isAnalysisFresh/countVerifyCandidates
 │       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan
@@ -236,8 +241,12 @@ olx-dashboard/
         │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
-        ├── types/
-        │   └── index.ts          # спільні типи фронтенду (Listing, ListingStatus, Search, StoredTableState тощо)
+        ├── types/                # спільні типи фронтенду за принципом DDD
+        │   ├── core.ts           # базові сутності (Search, Project, фільтри, стан UI)
+        │   ├── listings.ts       # оголошення, статуси
+        │   ├── scan.ts           # статистика скану, результати, план глибокого скану
+        │   ├── analysis.ts       # AI аналіз, relevance, aiPicks
+        │   └── index.ts          # barrel-файл експорту типів
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
@@ -266,7 +275,7 @@ olx-dashboard/
 | Порядок стратегій збору / fallback | `server/src/scanner/fetchOrchestrator.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
-| Доменні типи | `server/src/types.ts` (бек), `web/src/types/index.ts` (фронт) |
+| Доменні типи | `server/src/types/` (бек), `web/src/types/` (фронт) |
 | Запити з фронту | `web/src/api/*` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
