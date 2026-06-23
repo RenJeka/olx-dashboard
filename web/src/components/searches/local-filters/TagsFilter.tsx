@@ -1,15 +1,7 @@
 import { useMemo, useState } from 'react';
-import {
-  Combobox,
-  HStack,
-  Portal,
-  Stack,
-  Tag,
-  Text,
-  Wrap,
-  createListCollection,
-} from '@chakra-ui/react';
+import { Combobox, Portal, Stack, Tag, Text, Wrap, createListCollection } from '@chakra-ui/react';
 import { Switch } from '../../ui/switch';
+import { CollapsibleFilter } from './CollapsibleFilter';
 
 interface Props {
   title: string;
@@ -64,66 +56,68 @@ export function TagsFilter({
     setInputValue('');
   };
 
+  const invertSwitch = (
+    <Switch
+      size="sm"
+      colorPalette="warning"
+      checked={isInverted}
+      onCheckedChange={(d) => onInvertChange(d.checked)}
+    >
+      Інвертувати
+    </Switch>
+  );
+
   return (
-    <Stack gap={2}>
-      <HStack justify="space-between">
-        <Text fontWeight="medium">{title}</Text>
-        <Switch
+    <CollapsibleFilter title={title} actions={invertSwitch}>
+      <Stack gap={2}>
+        <Text textStyle="xs" color="fg.muted">
+          {isInverted ? descriptionInvert : descriptionNormal}
+        </Text>
+
+        {selectedItems.length > 0 && (
+          <Wrap gap={2}>
+            {selectedItems.map((item) => (
+              <Tag.Root key={item} size="md" colorPalette={tagColorPalette}>
+                <Tag.Label>{item}</Tag.Label>
+                <Tag.EndElement>
+                  <Tag.CloseTrigger onClick={() => onRemove(item)} />
+                </Tag.EndElement>
+              </Tag.Root>
+            ))}
+          </Wrap>
+        )}
+
+        <Combobox.Root
           size="sm"
-          colorPalette="warning"
-          checked={isInverted}
-          onCheckedChange={(d) => onInvertChange(d.checked)}
+          collection={collection}
+          value={[]}
+          inputValue={inputValue}
+          onInputValueChange={(e) => setInputValue(e.inputValue)}
+          onValueChange={(e) => handleSelect(e.value[0])}
+          selectionBehavior="clear"
+          openOnClick
+          positioning={{ sameWidth: true }}
         >
-          Інвертувати
-        </Switch>
-      </HStack>
-      <Text textStyle="xs" color="fg.muted">
-        {isInverted ? descriptionInvert : descriptionNormal}
-      </Text>
-
-      {selectedItems.length > 0 && (
-        <Wrap gap={2}>
-          {selectedItems.map((item) => (
-            <Tag.Root key={item} size="md" colorPalette={tagColorPalette}>
-              <Tag.Label>{item}</Tag.Label>
-              <Tag.EndElement>
-                <Tag.CloseTrigger onClick={() => onRemove(item)} />
-              </Tag.EndElement>
-            </Tag.Root>
-          ))}
-        </Wrap>
-      )}
-
-      <Combobox.Root
-        size="sm"
-        collection={collection}
-        value={[]}
-        inputValue={inputValue}
-        onInputValueChange={(e) => setInputValue(e.inputValue)}
-        onValueChange={(e) => handleSelect(e.value[0])}
-        selectionBehavior="clear"
-        openOnClick
-        positioning={{ sameWidth: true }}
-      >
-        <Combobox.Control>
-          <Combobox.Input placeholder={selectPlaceholder || 'Додати…'} />
-          <Combobox.IndicatorGroup>
-            <Combobox.Trigger />
-          </Combobox.IndicatorGroup>
-        </Combobox.Control>
-        <Portal>
-          <Combobox.Positioner>
-            <Combobox.Content maxH="14rem" overflowY="auto">
-              <Combobox.Empty>Нічого не знайдено</Combobox.Empty>
-              {collection.items.map((item) => (
-                <Combobox.Item item={item} key={item.value}>
-                  {item.label}
-                </Combobox.Item>
-              ))}
-            </Combobox.Content>
-          </Combobox.Positioner>
-        </Portal>
-      </Combobox.Root>
-    </Stack>
+          <Combobox.Control>
+            <Combobox.Input placeholder={selectPlaceholder || 'Додати…'} />
+            <Combobox.IndicatorGroup>
+              <Combobox.Trigger />
+            </Combobox.IndicatorGroup>
+          </Combobox.Control>
+          <Portal>
+            <Combobox.Positioner>
+              <Combobox.Content maxH="14rem" overflowY="auto">
+                <Combobox.Empty>Нічого не знайдено</Combobox.Empty>
+                {collection.items.map((item) => (
+                  <Combobox.Item item={item} key={item.value}>
+                    {item.label}
+                  </Combobox.Item>
+                ))}
+              </Combobox.Content>
+            </Combobox.Positioner>
+          </Portal>
+        </Combobox.Root>
+      </Stack>
+    </CollapsibleFilter>
   );
 }

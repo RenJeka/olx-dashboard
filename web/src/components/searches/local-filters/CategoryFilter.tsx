@@ -4,6 +4,7 @@ import { LuChevronDown, LuChevronRight } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
+import { CollapsibleFilter } from './CollapsibleFilter';
 import { useCategoryTree } from '../../../hooks/useCategoryTree';
 import { nodeCheckedState, type CategoryTreeNode } from '../../../utils/categoryCounts';
 import { pluralUk } from '../../../utils/format';
@@ -151,14 +152,13 @@ export function CategoryFilter({
 
   if (categories.length === 0) {
     return (
-      <Stack gap={2}>
-        <Text fontWeight="medium">Категорії</Text>
+      <CollapsibleFilter title="Категорії">
         <Text textStyle="xs" color="fg.muted">
           {uncategorized > 0
             ? `Категорії ще не зібрано (${uncategorized} оголошень). Запустіть скан — вони заповняться.`
             : 'Категорії ще не зібрано. Запустіть скан.'}
         </Text>
-      </Stack>
+      </CollapsibleFilter>
     );
   }
 
@@ -186,19 +186,20 @@ export function CategoryFilter({
     </Stack>
   );
 
+  const invertSwitch = (
+    <Switch
+      size="sm"
+      colorPalette="warning"
+      checked={isInverted}
+      onCheckedChange={(d) => onInvertChange(d.checked)}
+    >
+      Інвертувати
+    </Switch>
+  );
+
   return (
-    <Stack gap={2.5}>
-      <HStack justify="space-between">
-        <Text fontWeight="medium">Категорії</Text>
-        <Switch
-          size="sm"
-          colorPalette="warning"
-          checked={isInverted}
-          onCheckedChange={(d) => onInvertChange(d.checked)}
-        >
-          Інвертувати
-        </Switch>
-      </HStack>
+    <CollapsibleFilter title="Категорії" actions={invertSwitch}>
+      <Stack gap={2.5}>
       <Text textStyle="xs" color="fg.muted">
         {isInverted
           ? LOCAL_FILTER_DESCRIPTIONS.categories.invert
@@ -247,6 +248,7 @@ export function CategoryFilter({
           Без категорії: {uncategorized} (заповняться при наступному скані).
         </Text>
       )}
-    </Stack>
+      </Stack>
+    </CollapsibleFilter>
   );
 }
