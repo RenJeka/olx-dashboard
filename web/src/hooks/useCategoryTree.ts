@@ -16,13 +16,20 @@ import type { CategoryOption } from '../types';
 export function useCategoryTree(
   searchId: number,
   categories: CategoryOption[],
-): { tree: CategoryTreeNode[]; uncategorized: number } {
+): {
+  tree: CategoryTreeNode[];
+  uncategorized: number;
+  /** Усього завантажених оголошень пошуку (база лічильника «скільки покаже таблиця»). */
+  total: number;
+  /** category_id → к-сть оголошень (для живого лічильника вибору). */
+  countMap: Map<number, number>;
+} {
   const { data: listings } = useListings(searchId);
 
   return useMemo(() => {
     const all = listings ?? [];
     const countMap = buildCategoryCountMap(all);
     const tree = buildCategoryTree(categories, countMap);
-    return { tree, uncategorized: countUncategorized(all) };
+    return { tree, uncategorized: countUncategorized(all), total: all.length, countMap };
   }, [listings, categories]);
 }

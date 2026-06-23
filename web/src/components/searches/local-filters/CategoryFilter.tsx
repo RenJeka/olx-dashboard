@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { LuChevronDown, LuChevronRight } from 'react-icons/lu';
+import { LuChevronDown, LuChevronRight, LuEye } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
@@ -138,7 +138,7 @@ export function CategoryFilter({
   onToggle,
   onInvertChange,
 }: Props) {
-  const { tree, uncategorized } = useCategoryTree(searchId, categories);
+  const { tree, uncategorized, total, countMap } = useCategoryTree(searchId, categories);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleCollapse = (key: string) =>
@@ -163,6 +163,14 @@ export function CategoryFilter({
   }
 
   const selected = new Set(selectedIds);
+
+  // Живий лічильник «скільки покаже таблиця» за вибором категорій:
+  // нічого не обрано → усе; прямий режим → лише обрані; інвертований → усе мінус обрані.
+  const matchedCount = selectedIds.reduce((sum, id) => sum + (countMap.get(id) ?? 0), 0);
+  const shownCount =
+    selectedIds.length === 0 ? total : isInverted ? total - matchedCount : matchedCount;
+  const counterTooltip =
+    'Скільки оголошень залишить поточний вибір категорій. Інші фільтри й перемикачі таблиці рахуються окремо.';
 
   const oursTooltip = (
     <Stack gap={1} maxW="60">
@@ -205,20 +213,40 @@ export function CategoryFilter({
           : LOCAL_FILTER_DESCRIPTIONS.categories.normal}
       </Text>
 
-      {/* Легенда: дві наведені-підказки пояснюють парне число біля кожного рядка. */}
-      <HStack gap={1.5} textStyle="2xs" color="fg.subtle">
-        <Text>Біля категорії:</Text>
-        <Tooltip content={oursTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
-          <Box as="span" color="accent.fg" fontWeight="semibold" cursor="help" textDecoration="underline" textDecorationStyle="dotted" textUnderlineOffset="2px">
-            наших
-          </Box>
+      {/* Хедер списку: ліворуч — лічильник «скільки покаже таблиця» за вибором категорій;
+          праворуч — легенда парного числа, вирівняна по правому краю на рівні чисел рядків. */}
+      <HStack
+        justify="space-between"
+        pr={1.5}
+        pb={1.5}
+        borderBottomWidth="1px"
+        borderColor="border.subtle"
+      >
+        <Tooltip content={counterTooltip} openDelay={150} closeDelay={80} positioning={{ placement: 'top' }}>
+          <HStack gap={1.5} cursor="help">
+            <Icon as={LuEye} boxSize={3.5} color="fg.muted" />
+            <Text textStyle="xs" color="fg.muted">
+              У таблиці
+            </Text>
+            <Text textStyle="sm" fontWeight="semibold" fontVariantNumeric="tabular-nums">
+              {shownCount.toLocaleString('uk')}
+            </Text>
+          </HStack>
         </Tooltip>
-        <Text aria-hidden>/</Text>
-        <Tooltip content={olxTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
-          <Box as="span" cursor="help" textDecoration="underline" textDecorationStyle="dotted" textUnderlineOffset="2px">
-            на OLX
-          </Box>
-        </Tooltip>
+
+        <HStack gap={1.5} textStyle="2xs" color="fg.subtle">
+          <Tooltip content={oursTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
+            <Box as="span" color="accent.fg" fontWeight="semibold" cursor="help" textDecoration="underline" textDecorationStyle="dotted" textUnderlineOffset="2px">
+              наших
+            </Box>
+          </Tooltip>
+          <Text aria-hidden>/</Text>
+          <Tooltip content={olxTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
+            <Box as="span" cursor="help" textDecoration="underline" textDecorationStyle="dotted" textUnderlineOffset="2px">
+              на OLX
+            </Box>
+          </Tooltip>
+        </HStack>
       </HStack>
 
       <Stack gap={0.5}>
