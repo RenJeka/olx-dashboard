@@ -38,7 +38,7 @@ flowchart LR
     subgraph server [server/ — Fastify :3001]
         R1[routes/searches.ts<br/>CRUD + /scan]
         R2[routes/listings.ts<br/>GET listings]
-        SC[scanner.ts<br/>runScan]
+        SC[scanner/\nrunScan]
         GQ[scraper/graphql/<br/>GraphqlOlxFetcher — основний]
         FE[scraper/olxFetcher.ts<br/>HtmlOlxFetcher — fallback]
         NR[scraper/normalizer.ts<br/>parse + upsert]
@@ -88,7 +88,7 @@ flowchart LR
    `last_refresh_at` (дата підняття; запити збору передають `sort_by=created_at:desc`,
    фактичний порядок видачі — `last_refresh_time DESC` — `olx-api.md` §2.5,
    `docs/plans/coverage-window-fix.md`). **`threshold`** пропорційний надійності скану:
-   глибокий → `1`, звичайний → `2` (`scanner.ts`: `options.deep ? 1 : 2`); при disable
+   глибокий → `1`, звичайний → `2` (`scanner/scanFinalize.ts`: `missThreshold`); при disable
    також пишеться `olx_status='inactive'` — щоб колонка «Активність» була чесною
    (`docs/plans/honest-olx-status.md`).
 6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`). Розрізнення
@@ -100,7 +100,7 @@ flowchart LR
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
 > **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
-> непорожній, `scanner.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
+> непорожній, `scanner/fetchOrchestrator.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
 > крок 3, послідовно з паузою 3–6с між варіантами) і зливає видачі по `olxId` в один
 > `search_id`. >1 варіант запиту → крок 5 (вікно покриття) **завжди пропускається**
 > (`partial=true`) — union кількох незалежних видач не відсортований глобально за
@@ -124,7 +124,7 @@ flowchart LR
 
 > **Двофазний глибокий скан (`docs/plans/two-phase-deep-scan.md`):** окрема дія «Аналіз перед
 > сканом» (`POST /scan/analyze`) розділяє те, що раніше робив `fetchSearchSplit` одним
-> проходом, на дешеву probe-фазу й окрему дорогу run-фазу. `scanner.analyzeScan(searchId,
+> проходом, на дешеву probe-фазу й окрему дорогу run-фазу. `scanner/analyzeScan.analyzeScan(searchId,
 > {deep})` ітерує `dedupeQueries([query, ...querySynonyms])`, для кожного варіанта викликає
 > `GraphqlOlxFetcher.analyzeSplit` (root-запит + `probeMaxPrice` + `bisectPriceRange`, **без**
 > допагінації бакетів — лише `page0` кожного бакету), агрегує `ScanPlan` (перелік варіантів,
@@ -141,7 +141,7 @@ flowchart LR
 > `planToken` (без важких `page0`). Підтверджений запуск (`POST /scan/run-plan` →
 > `runDeepScanFromPlan`) дістає кеш за токеном і для кожного варіанта викликає
 > `GraphqlOlxFetcher.scanFromPlan` (допагінація вже відомих бакетів, без повторного
-> зондування), далі стандартний хвіст `runScan` (upsert, `applyScanStatuses` лише якщо
+> зондування), далі спільний хвіст `scanFinalize.finalizeScanResult` (upsert, `applyScanStatuses` лише якщо
 > `!partial`, оновлення `visible_total_count`). Прострочений/невідомий `planToken` → помилка
 > («План застарів — повторіть аналіз»), HTTP 410. Прогони аналітичної фази
 > (`scan_runs.kind='analyze'`) виключені із запиту `last_scan` у `/stats`, щоб банер не
@@ -150,13 +150,13 @@ flowchart LR
 > діапазону й інтенсивністю ∝ кількості оголошень).
 
 > **Зупинка скану + прозорість дедупу + історія аналізу (`docs/plans/deep-scan-stop-and-history.md`):**
-> `scanner.ts` тримає `Map<searchId, boolean>` abort-прапорців; `requestStopScan(searchId)`
+> `scanner/abortControl.ts` тримає `Map<searchId, boolean>` abort-прапорців; `requestStopScan(searchId)`
 > (роут `POST /scan/stop`) ставить прапорець, який фетчери опитують через `FetchOptions.shouldAbort`
 > перед кожним запитом/ітерацією (`fetchSearch`, `bisectPriceRange`, `scanBuckets`, HTML-цикл).
 > При зупинці зібране все одно йде в `upsertListings`, скан позначається частковим (вікно
 > покриття пропускається), `scan_runs.warning='Зупинено користувачем — збережено N'`,
 > `ScanResult.stopped=true`. Працює для всіх типів сканів (verify/analyze теж перевіряють прапорець).
-> **Прозорість дедупу:** `fetchAllQueries`/`runDeepScanFromPlan` рахують `rawCount` (сума листів
+> **Прозорість дедупу:** `fetchOrchestrator.fetchAllQueries`/`analyzeScan.runDeepScanFromPlan` рахують `rawCount` (сума листів
 > по варіантах до cross-variant дедупу) → `scan_runs.raw_found` + `ScanResult.rawFound`; UI
 > показує «сирих / унікальних / злито дублів» (пояснює розрив «4000 в аналізі → 2000 у скані»,
 > що виникає бо `analyzeScan` сумує `visible_total_count` синонімів без зняття перетину).
@@ -181,7 +181,7 @@ flowchart LR
 | `scraper/localFilters.ts` | `evaluateFilteredOut(filters, listing) → boolean` (Етап 2, A4) — ціна/міста/продавці/плюси/мінуси + **категорії** (`category_id ∈ filters.categories`, `docs/plans/category-counts-and-filter.md`), кожна група з режимом invert. Чиста функція, використовується `normalizer.ts` і `routes/searches.ts` (ретроактивний перерахунок). |
 | `scraper/olxCategories.ts` | `fetchCategoryOptions(query)` — тягне дерево категорій OLX через facet метаданих пошуку (`/api/v1/offers/metadata/search/?facets=[{field:category,fetchLabel,fetchUrl}]`, верифіковано live, `olx-api.md` §2.11) → `CategoryOption[]` (id + шлях назв root→leaf + OLX-лічильник; ієрархія з url-слагів). Best-effort (помилка/порожньо → null). Викликається `scanner.ts` після скану, результат кешується в `searches.category_facet`. |
 | `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
-| `scanner.ts` | `runScan(searchId, options?: { deep?: boolean })` — спільна логіка для HTTP-роута і CLI; GraphQL → HTML fallback; пише `scan_runs.kind` (`normal`/`deep`); після upsert викликає `statusEngine.applyScanStatuses` лише якщо скан GraphQL; веде `scan_runs` (включно з `requests_done`/`requests_total` через `onProgress`, `disabled_count`, `raw_found` — сирих до дедупу). `requestStopScan(searchId)`/`isPlanCached(token)` — зупинка скану (abort-прапорці, `FetchOptions.shouldAbort`) та валідність кешу плану (`docs/plans/deep-scan-stop-and-history.md`). Також `runVerify(searchId)` (Етап 2, A3) — кандидати P1+P2 (`loadVerifyCandidates`/`countVerifyCandidates`), батчі по `VERIFY_BATCH_SIZE=3` з паузами 1–2с/3–6с, оновлення статусів/backfill за вердиктом `probeListingPage`, `scan_runs.kind='verify'`. Двофазний deep-скан (`docs/plans/two-phase-deep-scan.md`): `analyzeScan(searchId, {deep})` — пробігає всі варіанти запиту через `GraphqlOlxFetcher.analyzeSplit`, агрегує `ScanPlan`, кешує внутрішній план у `Map<planToken, …>` (TTL 30 хв, `randomUUID()`), пише `scan_runs.kind='analyze'`; `runDeepScanFromPlan(searchId, planToken)` — дістає й одноразово видаляє кеш, для кожного варіанта `GraphqlOlxFetcher.scanFromPlan` (з HTML-фолбеком при збої GraphQL, як і звичайний скан), далі стандартний хвіст `runScan`, `scan_runs.kind='deep'`. Після успішного GraphQL-скану — `refreshCategoryFacet(searchId, query)` (best-effort `fetchCategoryOptions` для основного query → кеш `searches.category_facet`, `docs/plans/category-counts-and-filter.md`). |
+| `scanner/` | Модулі сканування (розбитий `scanner.ts`): **`abortControl.ts`** — `Map<searchId, boolean>` abort-прапорці, `requestStopScan`; **`searchLoader.ts`** — `loadSearch` (SQLite → `SearchConfig`), `dedupeQueries`; **`fetchOrchestrator.ts`** — `fetchWithFallback` (GraphQL→HTML), `fetchAllQueries` (мульти-query з синонімами + злиття по `olxId`); **`scanRunLifecycle.ts`** — `withScanRun<T>(searchId, kind, body)` — спільний lifecycle `scan_runs` (insert/`onProgress`/error-handling/abort cleanup); **`scanFinalize.ts`** — `finalizeScanResult` (спільний хвіст `runScan` і `runDeepScanFromPlan`: `upsertListings` → `applyScanStatuses` → `refreshCategoryFacet` → `UPDATE scan_runs`); **`runScan.ts`** — `runScan(searchId, {deep?})` — спільна логіка для HTTP-роута і CLI; GraphQL→HTML fallback; `scan_runs.kind` (`normal`/`deep`); **`analyzeScan.ts`** — двофазний deep-скан: `analyzeScan` (probe-фаза, кеш планів TTL 30 хв), `runDeepScanFromPlan` (допагінація за планом), `isPlanCached`/`isAnalysisFresh`; **`verifyScan.ts`** — `runVerify` (P1+P2, проба сторінок, батчі), `countVerifyCandidates`; **`index.ts`** — barrel реекспорт усіх публічних функцій. |
 | `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`; PATCH `archived` → архів/розархів, `plans/archive-searches.md`; PATCH `project_id` → призначення/відв'язування проекту, `plans/projects.md`) + `POST /:id/move` (сусід серед `archived = 0` ТА того ж `project_id`) + `POST /:id/scan` (`?deep=true`) + `POST /:id/scan/analyze` + `POST /:id/scan/run-plan` + `POST /:id/scan/stop` (зупинка, `docs/plans/deep-scan-stop-and-history.md`) + `GET /:id/scan-status` + `GET /:id/last-analysis` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
 | `routes/projects.ts` | CRUD `/api/projects[/:id]` (групування пошуків в акордеони, `docs/plans/projects.md`): `GET` (сорт `sort_order ASC`), `POST` (нова згори), `PATCH` (перейменування), `DELETE` (відв'язує пошуки `project_id=NULL`, НЕ видаляє), `POST /:id/move` (реордер сусідом). |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` з білим списком колонок для сортування + `PATCH /api/listings/:id` (`{status?, note?, pros?, cons?, ai_relevant?, olx_status?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'`, ручний override семантичного фільтра; `olx_status` (`active`/`inactive`/`removed`/`null`) — ручна «Активність», разова підказка без source-захисту). |

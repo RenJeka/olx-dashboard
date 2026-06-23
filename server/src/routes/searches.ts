@@ -8,7 +8,7 @@ import {
   runDeepScanFromPlan,
   requestStopScan,
   isAnalysisFresh,
-} from '../scanner.js';
+} from '../scanner/index.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
 import type {
