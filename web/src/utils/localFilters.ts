@@ -18,7 +18,8 @@ export function hasActiveLocalFilters(raw: string): boolean {
     (Array.isArray(f.cities) && f.cities.length > 0) ||
     (Array.isArray(f.sellers) && f.sellers.length > 0) ||
     (Array.isArray(f.pros) && f.pros.length > 0) ||
-    (Array.isArray(f.cons) && f.cons.length > 0)
+    (Array.isArray(f.cons) && f.cons.length > 0) ||
+    (Array.isArray(f.categories) && f.categories.length > 0)
   );
 }
 
@@ -29,11 +30,13 @@ export interface LocalFiltersFormState {
   sellers: string[];
   pros: string[];
   cons: string[];
+  categories: number[];
   priceInvert: boolean;
   citiesInvert: boolean;
   sellersInvert: boolean;
   prosInvert: boolean;
   consInvert: boolean;
+  categoriesInvert: boolean;
 }
 
 /** 
@@ -54,6 +57,7 @@ export function buildLocalFiltersPayload(state: LocalFiltersFormState): LocalFil
   if (state.sellers.length > 0) local_filters.sellers = state.sellers;
   if (state.pros.length > 0) local_filters.pros = state.pros;
   if (state.cons.length > 0) local_filters.cons = state.cons;
+  if (state.categories.length > 0) local_filters.categories = state.categories;
 
   // Зберігаємо invert лише для груп, де є значення і прапорець true
   const invert: LocalFilters['invert'] = {};
@@ -62,6 +66,7 @@ export function buildLocalFiltersPayload(state: LocalFiltersFormState): LocalFil
   if (local_filters.sellers && state.sellersInvert) invert.sellers = true;
   if (local_filters.pros && state.prosInvert) invert.pros = true;
   if (local_filters.cons && state.consInvert) invert.cons = true;
+  if (local_filters.categories && state.categoriesInvert) invert.categories = true;
   if (Object.keys(invert).length > 0) local_filters.invert = invert;
 
   return local_filters;

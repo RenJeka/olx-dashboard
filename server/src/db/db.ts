@@ -173,6 +173,11 @@ addColumnIfMissing('listings', 'ai_relevant_source', 'TEXT');
 // Галерея фото (docs/plans/photo-gallery.md) — JSON-масив прев'ю-лінків усіх фото.
 addColumnIfMissing('listings', 'photo_urls', 'TEXT');
 
+// Категорії OLX (docs/plans/category-counts-and-filter.md) — id листової категорії + слаг типу.
+// Заповнюються наступним GraphQL-сканом (бекфіл наявних рядків — після re-scan).
+addColumnIfMissing('listings', 'category_id', 'INTEGER');
+addColumnIfMissing('listings', 'category_type', 'TEXT');
+
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).
  * Зберігає поточний видимий порядок (найновіші згори) як 0..N-1.

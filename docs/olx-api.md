@@ -93,6 +93,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
         created_time
         last_refresh_time
         business
+        category { id type }
         location {
           city { name }
           district { name }
@@ -235,6 +236,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `location.city.name` / `district.name` | `city` / `district` | |
 | `photos[0].link` | `photo_url` | замінити `{width}x{height}` → конкретний розмір, напр. `400x300` |
 | `business` | `seller_type` | `true`→`business`, `false`→`private` |
+| `category.id` / `category.type` | `category_id` / `category_type` | id листової категорії + слаг верхнього рівня; назв/дерева тут немає — резолвимо словником OLX (`server/src/scraper/olxCategories.ts`, кеш `server/data/olx-categories.json`, ⚠️ ендпойнт `/api/v1/categories/` потребує живої верифікації). Для фільтра «Категорії» в локальних фільтрах (`docs/plans/category-counts-and-filter.md`) |
 | `params[]` (без price) | `params` | плаский JSON `{key: label}` |
 | `description` | `description` | HTML з `<br />`; на фронті рендериться як plain text |
 | `user.name` | `seller_name` | |

@@ -37,6 +37,8 @@ export interface GraphqlListing {
   created_time: string;
   last_refresh_time: string;
   business: boolean;
+  /** Категорія оголошення (OLX: лише id листа + грубий слаг type; назв/дерева тут немає). */
+  category?: { id?: number | null; type?: string | null } | null;
   location?: {
     city?: { name: string } | null;
     district?: { name: string } | null;

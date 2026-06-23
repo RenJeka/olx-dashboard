@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS listings (
   city TEXT,
   district TEXT,
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
+  category_id INTEGER,               -- OLX category.id (числовий id листової категорії); словник назв — olxCategories.ts
+  category_type TEXT,                -- OLX category.type (слаг верхнього рівня, напр. "electronics")
   photo_url TEXT,
   photo_urls TEXT,                   -- JSON-масив прев'ю-лінків усіх фото (галерея), NULL до re-scan
   seller_type TEXT,                  -- private | business

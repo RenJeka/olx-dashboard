@@ -70,7 +70,8 @@ olx-dashboard/
 │       │   ├── dateParser.ts   # parseOlxDate(): текстові дати HTML-fallback → ISO ("Сьогодні/Вчора о HH:MM", "D <місяць> YYYY р.")
 │       │   ├── normalizer.ts   # upsert по olx_id; olx_status auto-disable; filtered_out; postedAt HTML-fallback через parseOlxDate; selectKnownOlxIds (для оцінки ~нових у двофазному deep-скані)
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
-│       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
+│       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
+│       │   ├── olxCategories.ts # словник категорій OLX: getCategoryMap()/resolveCategoryPath() — дерево назв з кешу server/data/olx-categories.json (⚠️ ендпойнт потребує live-верифікації)
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats + PATCH (filters, query_synonyms, project_id)
@@ -258,7 +259,8 @@ olx-dashboard/
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
-| Локальні фільтри (`price_range`, `cities`, `sellers`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx`, `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
+| Локальні фільтри (`price_range`, `cities`, `sellers`, `categories`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx` (+ `local-filters/CategoryFilter.tsx`), `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
+| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/olxCategories.ts` (словник), `listings.category_id/category_type`, `web/src/utils/categoryCounts.ts` (дерево+лічильники в пам'яті), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/category-counts-and-filter.md` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
 | Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/two-phase-deep-scan.md` |

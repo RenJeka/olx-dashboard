@@ -17,6 +17,7 @@ import { LOCAL_FILTER_DESCRIPTIONS } from '../../constants';
 import { DRAWER_SIZE } from '../../theme';
 import { PriceFilter } from './local-filters/PriceFilter';
 import { TagsFilter } from './local-filters/TagsFilter';
+import { CategoryFilter } from './local-filters/CategoryFilter';
 import type { Search } from '../../types';
 
 interface Props {
@@ -47,6 +48,8 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     setConsInvert,
     addCon,
     removeCon,
+    setCategoriesInvert,
+    toggleCategories,
   } = useLocalFiltersForm(open ? search.local_filters : '');
 
   function handleSave() {
@@ -88,6 +91,15 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               onPriceMinChange={setPriceMin}
               onPriceMaxChange={setPriceMax}
               onPriceInvertChange={setPriceInvert}
+            />
+
+            <CategoryFilter
+              searchId={search.id}
+              categories={filterOptions?.categories ?? []}
+              selectedIds={state.categories}
+              isInverted={state.categoriesInvert}
+              onToggle={toggleCategories}
+              onInvertChange={setCategoriesInvert}
             />
 
             <TagsFilter

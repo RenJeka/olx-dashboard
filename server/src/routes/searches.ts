@@ -10,8 +10,16 @@ import {
   isAnalysisFresh,
 } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
+import { getCategoryMap, resolveCategoryPath } from '../scraper/olxCategories.js';
 import { parseBullets } from '../analysis/text.js';
-import type { FilterOptions, LocalFilters, ParamKeyInfo, ScanPlan, SearchStats } from '../types.js';
+import type {
+  CategoryOption,
+  FilterOptions,
+  LocalFilters,
+  ParamKeyInfo,
+  ScanPlan,
+  SearchStats,
+} from '../types.js';
 
 interface SearchBody {
   name?: string;
@@ -162,7 +170,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const listingRows = db
-        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons FROM listings WHERE search_id = ?')
+        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE search_id = ?')
         .all(id) as {
           id: number;
           title: string | null;
@@ -173,6 +181,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
           seller_name: string | null;
           pros: string | null;
           cons: string | null;
+          category_id: number | null;
         }[];
 
       const updateFilteredOut = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
@@ -450,11 +459,28 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     const consSet = new Set<string>();
     for (const row of consRows) parseBullets(row.cons).forEach((c) => consSet.add(c));
 
+    // Категорії, наявні в пошуку: distinct листові category_id + слаг для fallback-назви.
+    // Лічильники тут НЕ рахуємо — їх дає фронт із уже завантаженого масиву listings.
+    const categoryRows = db
+      .prepare(
+        'SELECT DISTINCT category_id, category_type FROM listings WHERE search_id = ? AND category_id IS NOT NULL',
+      )
+      .all(id) as { category_id: number; category_type: string | null }[];
+
+    const categoryMap = await getCategoryMap();
+    const categories: CategoryOption[] = categoryRows
+      .map((r) => ({
+        id: r.category_id,
+        path: resolveCategoryPath(categoryMap, r.category_id, r.category_type ?? undefined),
+      }))
+      .sort((a, b) => a.path.join(' / ').localeCompare(b.path.join(' / '), 'uk'));
+
     const result: FilterOptions = {
       cities: cityRows.map((r) => r.city),
       sellers: sellerRows.map((r) => r.seller_name),
       pros: [...prosSet].sort(),
       cons: [...consSet].sort(),
+      categories,
     };
     return result;
   });

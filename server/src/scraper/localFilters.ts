@@ -11,6 +11,7 @@ export interface FilterableListing {
   seller_name: string | null;
   pros: string | null;
   cons: string | null;
+  category_id: number | null;
 }
 
 // ── Заплановано на майбутнє (закомментовано, не видаляти) ──────────────────
@@ -113,6 +114,13 @@ export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableLi
   if (filterCons.length > 0) {
     const hasAny = parseBullets(listing.cons).some((c) => filterCons.includes(c));
     if (invert.cons ? hasAny : !hasAny) return true;
+  }
+
+  // ── Категорії ─────────────────────────────────────────────────────────────
+  const categories = filters.categories ?? [];
+  if (categories.length > 0) {
+    const inList = listing.category_id != null && categories.includes(listing.category_id);
+    if (invert.categories ? inList : !inList) return true;
   }
 
   return false;

@@ -68,6 +68,7 @@ export const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters:
         created_time
         last_refresh_time
         business
+        category { id type }
         location {
           city { name }
           district { name }
