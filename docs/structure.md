@@ -71,7 +71,10 @@ olx-dashboard/
 │       │   ├── utils.ts        # спільні утиліти (sleep, randomDelayMs, slugify)
 │       │   ├── graphql/        # GraphQL-збирач (основний метод збору)
 │       │   │   ├── index.ts    # реекспорт GraphqlOlxFetcher
-│       │   │   ├── fetcher.ts  # GraphqlOlxFetcher: fetchSearch/fetchSearchSplit/probeMaxPrice, exhausted+aborted-флаги; analyzeSplit/scanFromPlan (двофазний deep-скан); shouldAbort у циклах (зупинка, docs/plans/deep-scan-stop-and-history.md)
+│       │   │   ├── client.ts   # GraphqlClient: HTTP запити та парсинг параметрів
+│       │   │   ├── mapper.ts   # GraphqlListingMapper: перетворення сирих даних GraphQL
+│       │   │   ├── split.ts    # SplitScanner: зондування, бісекція цін, допагінація бакетів
+│       │   │   ├── fetcher.ts  # GraphqlOlxFetcher (Facade): fetchSearch/fetchSearchSplit, оркеструє client та split
 │       │   │   ├── constants.ts # GraphQL-специфічні: URL, ліміти, query, split-пороги
 │       │   │   └── types.ts    # типи відповіді GraphQL API (SearchParameter, GraphqlListing, PriceBucket)
 │       │   ├── selectors.ts    # OLX-селектори + заголовки HTML-запиту (fallback)
@@ -256,7 +259,7 @@ olx-dashboard/
 
 | Завдання | Файли |
 | --- | --- |
-| GraphQL-запит до OLX (основний збір) | `server/src/scraper/graphql/` (fetcher/constants/types) + `docs/olx-api.md` §2 |
+| GraphQL-запит до OLX (основний збір) | `server/src/scraper/graphql/` (client/mapper/split/fetcher/constants/types) + `docs/olx-api.md` §2 |
 | Змінити OLX-селектори/заголовки (HTML fallback) | `server/src/scraper/selectors.ts` |
 | Логіка побудови URL / парсингу HTML-списку | `server/src/scraper/olxFetcher.ts` |
 | Нормалізація/дедуплікація | `server/src/scraper/normalizer.ts` |
