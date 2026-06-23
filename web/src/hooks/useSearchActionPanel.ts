@@ -74,7 +74,7 @@ export function useSearchActionPanel(search: Search) {
   const { data: stats } = useSearchStats(search.id);
   const { data: status } = useScanStatus(search.id, scanKind != null);
   // Останній збережений аналіз — підвантажуємо при відкритому діалозі (для перегляду без зондування).
-  const { data: lastAnalysis } = useLastAnalysis(search.id, dialogOpen);
+  const { data: lastAnalysis, isLoading: isLastAnalysisLoading } = useLastAnalysis(search.id, dialogOpen);
 
   const isScanning = scanKind != null;
   const isStopping = stopMutation.isPending;
@@ -177,6 +177,10 @@ export function useSearchActionPanel(search: Search) {
       setReportOpen(true);
       return;
     }
+    // Запит ще вантажиться (швидкий клік одразу після відкриття діалогу): НЕ запускаємо свіже
+    // зондування передчасно — інакше витратимо бюджет запитів OLX, хоча збережений аналіз може
+    // ще приїхати. Чекаємо завершення завантаження (клік просто ігнорується).
+    if (isLastAnalysisLoading) return;
     startFreshAnalysis();
   }
 

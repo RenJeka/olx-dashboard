@@ -15,7 +15,7 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
 
   // Створення
   app.post<{ Body: ProjectBody }>('/api/projects', async (req, reply) => {
-    const name = req.body.name?.trim();
+    const name = req.body?.name?.trim();
     if (!name) {
       return reply.code(400).send({ error: 'Поле name обовʼязкове' });
     }
@@ -43,7 +43,7 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
       const existing = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
       if (!existing) return reply.code(404).send({ error: 'Проект не знайдено' });
 
-      const name = req.body.name?.trim();
+      const name = req.body?.name?.trim();
       if (name) {
         db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(name, id);
       }
@@ -72,7 +72,7 @@ export async function projectsRoutes(app: FastifyInstance): Promise<void> {
     '/api/projects/:id/move',
     async (req, reply) => {
       const id = Number(req.params.id);
-      const direction = req.body.direction;
+      const direction = req.body?.direction;
       if (direction !== 'up' && direction !== 'down') {
         return reply.code(400).send({ error: 'direction має бути "up" або "down"' });
       }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Accordion, HStack, IconButton } from '@chakra-ui/react';
 import { LuArchive, LuFolderPlus, LuListChecks, LuPlus } from 'react-icons/lu';
 import { SearchGroupAccordionItem } from './SearchGroupAccordionItem';
@@ -77,26 +77,34 @@ export function SearchesPanel({
     return [];
   }, [expandedGroups, selectedId, activeSearches, archivedSearches]);
 
+  // Авто-розгортання групи обраного пошуку — ТІЛЬКИ коли selectedId реально змінився (вибрано
+  // інший пошук у згорнутій групі). Без цієї перевірки на «зміну» ефект спрацьовував би й після
+  // ручного згортання (selectedId той самий) і миттєво розгортав групу назад — користувач не міг
+  // згорнути проект із відкритим пошуком. Дефолт «до першої взаємодії» вже дає accordionValue.
+  const prevSelectedId = useRef(selectedId);
   useEffect(() => {
-    if (selectedId != null) {
-      const selectedSearch =
-        activeSearches.find((s) => s.id === selectedId) ||
-        archivedSearches.find((s) => s.id === selectedId);
+    if (selectedId === prevSelectedId.current) return;
+    prevSelectedId.current = selectedId;
+    if (selectedId == null) return;
+    // Поки взаємодії не було (expandedGroups === null), групу обраного й так показує accordionValue.
+    if (expandedGroups === null) return;
 
-      if (selectedSearch) {
-        const groupValue =
-          selectedSearch.archived === 1
-            ? 'archive'
-            : selectedSearch.project_id != null
-              ? `project-${selectedSearch.project_id}`
-              : 'ungrouped';
+    const selectedSearch =
+      activeSearches.find((s) => s.id === selectedId) ||
+      archivedSearches.find((s) => s.id === selectedId);
+    if (!selectedSearch) return;
 
-        if (!accordionValue.includes(groupValue)) {
-          setExpandedGroups([...accordionValue, groupValue]);
-        }
-      }
+    const groupValue =
+      selectedSearch.archived === 1
+        ? 'archive'
+        : selectedSearch.project_id != null
+          ? `project-${selectedSearch.project_id}`
+          : 'ungrouped';
+
+    if (!expandedGroups.includes(groupValue)) {
+      setExpandedGroups([...expandedGroups, groupValue]);
     }
-  }, [selectedId, accordionValue, activeSearches, archivedSearches, setExpandedGroups]);
+  }, [selectedId, expandedGroups, activeSearches, archivedSearches, setExpandedGroups]);
 
   return (
     <>

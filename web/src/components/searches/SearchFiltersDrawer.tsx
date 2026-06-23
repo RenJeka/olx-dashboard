@@ -17,6 +17,7 @@ import { buildLocalFiltersPayload, evaluateLocalFilters } from '../../utils/loca
 import { parsePriceRange, formatPriceRange } from '../../utils/format';
 import { useLocalFiltersForm } from '../../hooks/useLocalFiltersForm';
 import { useListingsUiStore } from '../../stores/listingsUiStore';
+import { passesNoiseFilters } from '../../utils/listingVisibility';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../constants';
 import { DRAWER_SIZE } from '../../theme';
 import { PriceFilter } from './local-filters/PriceFilter';
@@ -75,9 +76,11 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
   const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
   const previewFilters = buildLocalFiltersPayload(state);
   const shownTotal = (listings ?? []).reduce((n, l) => {
-    const hidden = evaluateLocalFilters(previewFilters, l);
-    const visible = (showFilteredOut || !hidden) && (showIrrelevant || l.ai_relevant !== 0);
-    return visible ? n + 1 : n;
+    // Прев'ю незбережених фільтрів накладаємо як синтетичний filtered_out, далі — той самий
+    // предикат шуму, що й таблиця (єдине джерело видимості, CLAUDE.md): якщо passesNoiseFilters
+    // зміниться, цей лічильник лишиться узгодженим з реальною таблицею.
+    const previewListing = { ...l, filtered_out: evaluateLocalFilters(previewFilters, l) ? 1 : 0 };
+    return passesNoiseFilters(previewListing, showFilteredOut, showIrrelevant) ? n + 1 : n;
   }, 0);
   const totalTooltip =
     'Скільки оголошень покаже таблиця з цими фільтрами (враховано перемикачі «показати приховані/нерелевантні»). Поточну вкладку статусу не враховано.';
