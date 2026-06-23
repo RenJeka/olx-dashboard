@@ -5,13 +5,16 @@ import { SETTINGS_STORAGE_KEY, DEFAULT_AUTO_REFRESH_INTERVAL_MIN, DEFAULT_ANALYS
 
 interface SettingsState {
   // Ефемерний стан (не персиститься)
-  selectedSearchId: number | null;
-  setSelectedSearchId: (id: number | null) => void;
-  
   rowSelection: RowSelectionState;
   setRowSelection: (v: RowSelectionState | ((prev: RowSelectionState) => RowSelectionState)) => void;
 
   // Персистентний стан
+  selectedSearchId: number | null;
+  setSelectedSearchId: (id: number | null) => void;
+
+  expandedSearchGroups: string[] | null;
+  setExpandedSearchGroups: (groups: string[] | ((prev: string[] | null) => string[])) => void;
+
   columnVisibility: VisibilityState;
   setColumnVisibility: (v: VisibilityState | ((prev: VisibilityState) => VisibilityState)) => void;
   
@@ -49,6 +52,12 @@ export const useSettingsStore = create<SettingsState>()(
       selectedSearchId: null,
       setSelectedSearchId: (id) => set({ selectedSearchId: id, rowSelection: {} }), // Скидаємо виділення при зміні пошуку
       
+      expandedSearchGroups: null,
+      setExpandedSearchGroups: (groups) =>
+        set((state) => ({
+          expandedSearchGroups: typeof groups === 'function' ? groups(state.expandedSearchGroups) : groups,
+        })),
+
       rowSelection: {},
       setRowSelection: (v) =>
         set((state) => ({
@@ -91,6 +100,8 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: SETTINGS_STORAGE_KEY,
       partialize: (state) => ({
+        selectedSearchId: state.selectedSearchId,
+        expandedSearchGroups: state.expandedSearchGroups,
         columnVisibility: state.columnVisibility,
         columnOrder: state.columnOrder,
         descriptionExpandEnabled: state.descriptionExpandEnabled,

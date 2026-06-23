@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Accordion, HStack, IconButton } from '@chakra-ui/react';
 import { LuArchive, LuFolderPlus, LuListChecks, LuPlus } from 'react-icons/lu';
 import { SearchGroupAccordionItem } from './SearchGroupAccordionItem';
 import { ProjectAccordionItem } from './ProjectAccordionItem';
 import { ProjectCreateDialog } from './ProjectCreateDialog';
 import { Tooltip } from '../ui/tooltip';
+import { useSettingsStore } from '../../stores/settingsStore';
 import type { Project, Search } from '../../types';
 
 interface Props {
@@ -33,6 +34,9 @@ export function SearchesPanel({
   onNewSearch,
 }: Props) {
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  
+  const expandedGroups = useSettingsStore((s) => s.expandedSearchGroups);
+  const setExpandedGroups = useSettingsStore((s) => s.setExpandedSearchGroups);
 
   // Групуємо активні (не архівні) пошуки за project_id.
   const ungrouped = useMemo(
@@ -50,11 +54,49 @@ export function SearchesPanel({
     return map;
   }, [activeSearches]);
 
-  // Усі секції розкриті за замовчуванням.
-  const defaultValue = useMemo(
-    () => [...projects.map((p) => `project-${p.id}`), 'ungrouped', 'archive'],
-    [projects],
-  );
+  const accordionValue = useMemo(() => {
+    if (expandedGroups !== null) return expandedGroups;
+    
+    // За замовчуванням (до першої взаємодії) розгортаємо ТІЛЬКИ той проект, до якого належить вибраний пошук.
+    if (selectedId != null) {
+      const selectedSearch =
+        activeSearches.find((s) => s.id === selectedId) ||
+        archivedSearches.find((s) => s.id === selectedId);
+
+      if (selectedSearch) {
+        return [
+          selectedSearch.archived === 1
+            ? 'archive'
+            : selectedSearch.project_id != null
+              ? `project-${selectedSearch.project_id}`
+              : 'ungrouped'
+        ];
+      }
+    }
+    
+    return [];
+  }, [expandedGroups, selectedId, activeSearches, archivedSearches]);
+
+  useEffect(() => {
+    if (selectedId != null) {
+      const selectedSearch =
+        activeSearches.find((s) => s.id === selectedId) ||
+        archivedSearches.find((s) => s.id === selectedId);
+
+      if (selectedSearch) {
+        const groupValue =
+          selectedSearch.archived === 1
+            ? 'archive'
+            : selectedSearch.project_id != null
+              ? `project-${selectedSearch.project_id}`
+              : 'ungrouped';
+
+        if (!accordionValue.includes(groupValue)) {
+          setExpandedGroups([...accordionValue, groupValue]);
+        }
+      }
+    }
+  }, [selectedId, accordionValue, activeSearches, archivedSearches, setExpandedGroups]);
 
   return (
     <>
@@ -87,7 +129,12 @@ export function SearchesPanel({
         </Tooltip>
       </HStack>
 
-      <Accordion.Root multiple defaultValue={defaultValue} variant="plain">
+      <Accordion.Root
+        multiple
+        value={accordionValue}
+        onValueChange={(e) => setExpandedGroups(e.value)}
+        variant="plain"
+      >
         {projects.map((project, index) => (
           <ProjectAccordionItem
             key={project.id}

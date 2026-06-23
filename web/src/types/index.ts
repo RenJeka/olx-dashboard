@@ -362,6 +362,7 @@ export interface NewSearchInput {
   priceFrom?: number;
   priceTo?: number;
   querySynonyms?: string[];
+  projectId?: number | null;
 }
 
 export interface StoredTableState {

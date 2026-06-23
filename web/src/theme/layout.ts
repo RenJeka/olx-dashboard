@@ -2,8 +2,8 @@
 // геометрією UI з одного місця, а не зашитими числами по компонентах.
 // Значення — у нотації Chakra spacing/sizing scale (число = крок 0.25rem, рядок = токен).
 
-/** Ширина бічної панелі «Пошуки» (Chakra sizing token, '80' = 20rem). */
-export const SIDEBAR_WIDTH = '80';
+/** Ширина бічної панелі «Пошуки» (Chakra sizing token, '80' = 20rem)., можна писати у пікселях (500px) */
+export const SIDEBAR_WIDTH = '300px';
 
 /** Горизонтальний/нижній відступ контентної області таблиці. */
 export const CONTENT_PAD_X = 4;
