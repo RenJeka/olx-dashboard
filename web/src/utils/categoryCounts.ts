@@ -106,16 +106,3 @@ export function nodeCheckedState(
   if (node.leafIds.every((id) => selected.has(id))) return true;
   return node.leafIds.some((id) => selected.has(id)) ? 'indeterminate' : false;
 }
-
-/** Плаский pre-order обхід дерева (для рендеру списку з відступами за depth). */
-export function flattenTree(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
-  const out: CategoryTreeNode[] = [];
-  const walk = (list: CategoryTreeNode[]): void => {
-    for (const n of list) {
-      out.push(n);
-      walk(n.children);
-    }
-  };
-  walk(nodes);
-  return out;
-}
