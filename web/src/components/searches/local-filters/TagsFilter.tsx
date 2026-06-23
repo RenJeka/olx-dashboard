@@ -1,4 +1,14 @@
-import { HStack, NativeSelect, Stack, Tag, Text, Wrap } from '@chakra-ui/react';
+import { useMemo, useState } from 'react';
+import {
+  Combobox,
+  HStack,
+  Portal,
+  Stack,
+  Tag,
+  Text,
+  Wrap,
+  createListCollection,
+} from '@chakra-ui/react';
 import { Switch } from '../../ui/switch';
 
 interface Props {
@@ -15,9 +25,10 @@ interface Props {
   selectPlaceholder?: string;
 }
 
-/** 
+/**
  * Універсальний компонент локального фільтра на основі тегів (Міста, Продавці, Плюси, Мінуси).
- * Відображає перемикач інверсії, список обраних тегів та dropdown для додавання нових.
+ * Перемикач інверсії + список обраних тегів + Combobox з пошуком для додавання нових
+ * (фільтрація опцій по введеному тексту — корисно для довгих списків міст/продавців).
  */
 export function TagsFilter({
   title,
@@ -32,6 +43,27 @@ export function TagsFilter({
   tagColorPalette,
   selectPlaceholder,
 }: Props) {
+  const [inputValue, setInputValue] = useState('');
+
+  // Опції для додавання: ще не обрані + збіг із введеним текстом (пошук без урахування регістру).
+  const filtered = useMemo(() => {
+    const q = inputValue.trim().toLowerCase();
+    return availableOptions
+      .filter((opt) => !selectedItems.includes(opt))
+      .filter((opt) => q === '' || opt.toLowerCase().includes(q));
+  }, [availableOptions, selectedItems, inputValue]);
+
+  const collection = useMemo(
+    () => createListCollection({ items: filtered.map((opt) => ({ label: opt, value: opt })) }),
+    [filtered],
+  );
+
+  // Combobox працює як «додавалка»: після вибору додаємо елемент і очищаємо поле/пошук.
+  const handleSelect = (picked: string | undefined) => {
+    if (picked) onAdd(picked);
+    setInputValue('');
+  };
+
   return (
     <Stack gap={2}>
       <HStack justify="space-between">
@@ -48,7 +80,7 @@ export function TagsFilter({
       <Text textStyle="xs" color="fg.muted">
         {isInverted ? descriptionInvert : descriptionNormal}
       </Text>
-      
+
       {selectedItems.length > 0 && (
         <Wrap gap={2}>
           {selectedItems.map((item) => (
@@ -62,25 +94,36 @@ export function TagsFilter({
         </Wrap>
       )}
 
-      <NativeSelect.Root size="sm">
-        <NativeSelect.Field
-          value=""
-          onChange={(e) => {
-            onAdd(e.target.value);
-            e.target.value = '';
-          }}
-        >
-          <option value="">{selectPlaceholder || `Додати...`}</option>
-          {availableOptions
-            .filter((opt) => !selectedItems.includes(opt))
-            .map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      <Combobox.Root
+        size="sm"
+        collection={collection}
+        value={[]}
+        inputValue={inputValue}
+        onInputValueChange={(e) => setInputValue(e.inputValue)}
+        onValueChange={(e) => handleSelect(e.value[0])}
+        selectionBehavior="clear"
+        openOnClick
+        positioning={{ sameWidth: true }}
+      >
+        <Combobox.Control>
+          <Combobox.Input placeholder={selectPlaceholder || 'Додати…'} />
+          <Combobox.IndicatorGroup>
+            <Combobox.Trigger />
+          </Combobox.IndicatorGroup>
+        </Combobox.Control>
+        <Portal>
+          <Combobox.Positioner>
+            <Combobox.Content maxH="14rem" overflowY="auto">
+              <Combobox.Empty>Нічого не знайдено</Combobox.Empty>
+              {collection.items.map((item) => (
+                <Combobox.Item item={item} key={item.value}>
+                  {item.label}
+                </Combobox.Item>
+              ))}
+            </Combobox.Content>
+          </Combobox.Positioner>
+        </Portal>
+      </Combobox.Root>
     </Stack>
   );
 }
