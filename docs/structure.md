@@ -34,8 +34,22 @@ olx-dashboard/
 │   │   └── olx.db            # SQLite (gitignored, створюється при старті)
 │   └── src/
 │       ├── index.ts          # Fastify bootstrap, CORS :5173, /health, listen :3001
-│       ├── types.ts          # доменні типи + інтерфейс OlxFetcher
-│       ├── scanner.ts        # runScan(): спільна логіка скану (роут + CLI) + applyScanStatuses, scan_runs.kind
+│       ├── types/            # доменні типи (core, listings, scan, analysis) за принципом DDD
+│       │   ├── core.ts       # базові сутності (SearchConfig, Project, фільтри)
+│       │   ├── listings.ts   # оголошення, статуси
+│       │   ├── scan.ts       # типи сканування, прогрес, план глибокого скану
+│       │   └── analysis.ts   # AI аналіз, relevance, aiPicks
+│       ├── types.ts          # barrel-файл експорту доменних типів + інтерфейс OlxFetcher
+│       ├── scanner/           # модулі сканування (розбитий scanner.ts)
+│       │   ├── index.ts      # barrel: реекспорт runScan/analyzeScan/runDeepScanFromPlan/runVerify/requestStopScan/isPlanCached/isAnalysisFresh/countVerifyCandidates
+│       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan
+│       │   ├── searchLoader.ts # loadSearch (SQLite → SearchConfig), dedupeQueries
+│       │   ├── fetchOrchestrator.ts # fetchWithFallback (GraphQL→HTML), fetchAllQueries (синоніми + злиття по olxId)
+│       │   ├── scanRunLifecycle.ts  # withScanRun — спільний lifecycle scan_runs (insert/progress/error/abort)
+│       │   ├── scanFinalize.ts     # finalizeScanResult (upsert→statuses→facet→update), refreshCategoryFacet
+│       │   ├── runScan.ts    # runScan (normal/deep): fetchAllQueries → finalizeScanResult
+│       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
+│       │   └── verifyScan.ts # runVerify (P1+P2 кандидати, probeListingPage), countVerifyCandidates
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
@@ -62,7 +76,10 @@ olx-dashboard/
 │       │   ├── utils.ts        # спільні утиліти (sleep, randomDelayMs, slugify)
 │       │   ├── graphql/        # GraphQL-збирач (основний метод збору)
 │       │   │   ├── index.ts    # реекспорт GraphqlOlxFetcher
-│       │   │   ├── fetcher.ts  # GraphqlOlxFetcher: fetchSearch/fetchSearchSplit/probeMaxPrice, exhausted+aborted-флаги; analyzeSplit/scanFromPlan (двофазний deep-скан); shouldAbort у циклах (зупинка, docs/plans/deep-scan-stop-and-history.md)
+│       │   │   ├── client.ts   # GraphqlClient: HTTP запити та парсинг параметрів
+│       │   │   ├── mapper.ts   # GraphqlListingMapper: перетворення сирих даних GraphQL
+│       │   │   ├── split.ts    # SplitScanner: зондування, бісекція цін, допагінація бакетів
+│       │   │   ├── fetcher.ts  # GraphqlOlxFetcher (Facade): fetchSearch/fetchSearchSplit, оркеструє client та split
 │       │   │   ├── constants.ts # GraphQL-специфічні: URL, ліміти, query, split-пороги
 │       │   │   └── types.ts    # типи відповіді GraphQL API (SearchParameter, GraphqlListing, PriceBucket)
 │       │   ├── selectors.ts    # OLX-селектори + заголовки HTML-запиту (fallback)
@@ -224,8 +241,12 @@ olx-dashboard/
         │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/
         │   └── ListingsTable.tsx # таблиця оголошень + ListingsFilterBar + BulkActionBar + DescriptionDialog
-        ├── types/
-        │   └── index.ts          # спільні типи фронтенду (Listing, ListingStatus, Search, StoredTableState тощо)
+        ├── types/                # спільні типи фронтенду за принципом DDD
+        │   ├── core.ts           # базові сутності (Search, Project, фільтри, стан UI)
+        │   ├── listings.ts       # оголошення, статуси
+        │   ├── scan.ts           # статистика скану, результати, план глибокого скану
+        │   ├── analysis.ts       # AI аналіз, relevance, aiPicks
+        │   └── index.ts          # barrel-файл експорту типів
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
@@ -247,14 +268,14 @@ olx-dashboard/
 
 | Завдання | Файли |
 | --- | --- |
-| GraphQL-запит до OLX (основний збір) | `server/src/scraper/graphql/` (fetcher/constants/types) + `docs/olx-api.md` §2 |
+| GraphQL-запит до OLX (основний збір) | `server/src/scraper/graphql/` (client/mapper/split/fetcher/constants/types) + `docs/olx-api.md` §2 |
 | Змінити OLX-селектори/заголовки (HTML fallback) | `server/src/scraper/selectors.ts` |
 | Логіка побудови URL / парсингу HTML-списку | `server/src/scraper/olxFetcher.ts` |
 | Нормалізація/дедуплікація | `server/src/scraper/normalizer.ts` |
-| Порядок стратегій збору / fallback | `server/src/scanner.ts` |
+| Порядок стратегій збору / fallback | `server/src/scanner/fetchOrchestrator.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
-| Доменні типи | `server/src/types.ts` (бек), `web/src/types/index.ts` (фронт) |
+| Доменні типи | `server/src/types/` (бек), `web/src/types/` (фронт) |
 | Запити з фронту | `web/src/api/*` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
@@ -262,15 +283,15 @@ olx-dashboard/
 | Локальні фільтри (`price_range`, `cities`, `sellers`, `categories`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx` (+ `local-filters/CategoryFilter.tsx`), `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
 | Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/olxCategories.ts` (facet OLX → дерево назв) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: наших/OLX), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/category-counts-and-filter.md` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
-| Глибокий скан / прогрес сканування | `server/src/scanner.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
-| Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/two-phase-deep-scan.md` |
-| Зупинка скану + прозорість дедупу + історія аналізу | `server/src/scanner.ts` (`requestStopScan`/`isPlanCached`, `raw_found`/`scan_plan`), `server/src/scraper/graphql/fetcher.ts` + `olxFetcher.ts` (`FetchOptions.shouldAbort`), `POST /api/searches/:id/scan/stop`, `GET /api/searches/:id/last-analysis`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/{ScanProgressPanel,ScanPlanReportDialog,ActionPanelLastScan}.tsx` + `docs/plans/deep-scan-stop-and-history.md` |
-| Попередження vs помилка скану + людино-зрозуміле зведення warning | `scan_runs.warning` (окремо від `error`) — `server/src/scanner.ts`, `server/src/db/{schema.sql,db.ts}`; UI: `web/src/utils/scanWarning.ts` (парсер), `web/src/components/searches/action-panel/{ScanWarningSummary,ActionPanelLastScan}.tsx` |
-| Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/searches/SearchActionPanel.tsx` |
+| Глибокий скан / прогрес сканування | `server/src/scanner/runScan.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
+| Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner/analyzeScan.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/two-phase-deep-scan.md` |
+| Зупинка скану + прозорість дедупу + історія аналізу | `server/src/scanner/abortControl.ts` (`requestStopScan`), `server/src/scanner/analyzeScan.ts` (`isPlanCached`, `scan_plan`), `server/src/scraper/graphql/fetcher.ts` + `olxFetcher.ts` (`FetchOptions.shouldAbort`), `POST /api/searches/:id/scan/stop`, `GET /api/searches/:id/last-analysis`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/{ScanProgressPanel,ScanPlanReportDialog,ActionPanelLastScan}.tsx` + `docs/plans/deep-scan-stop-and-history.md` |
+| Попередження vs помилка скану + людино-зрозуміле зведення warning | `scan_runs.warning` (окремо від `error`) — `server/src/scanner/scanFinalize.ts`, `server/src/db/{schema.sql,db.ts}`; UI: `web/src/utils/scanWarning.ts` (парсер), `web/src/components/searches/action-panel/{ScanWarningSummary,ActionPanelLastScan}.tsx` |
+| Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner/verifyScan.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/searches/SearchActionPanel.tsx` |
 | Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphql/fetcher.ts`, `server/src/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
-| Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
+| Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner/fetchOrchestrator.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
 | Проекти (групування пошуків в акордеони) | `server/src/routes/projects.ts`, `searches.project_id` (`server/src/db/schema.sql`/`db.ts`), `web/src/api/projects.ts`, `web/src/components/searches/{SearchesPanel,ProjectAccordionItem,ProjectCreateDialog,ProjectEditDialog,ProjectDeleteDialog,SearchRowMenu}.tsx` + `docs/plans/projects.md` |
-| Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner.ts` (виклик `deep?1:2`, verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
+| Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner/scanFinalize.ts` (виклик `deep?1:2`), `server/src/scanner/verifyScan.ts` (verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

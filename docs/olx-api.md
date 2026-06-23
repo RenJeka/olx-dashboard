@@ -17,7 +17,7 @@
 
 | № | Метод | Статус | Код |
 | --- | --- | --- | --- |
-| 1 | **GraphQL** `POST /apigateway/graphql` | ✅ основний | `server/src/scraper/graphqlOlxFetcher.ts` |
+| 1 | **GraphQL** `POST /apigateway/graphql` | ✅ основний | `server/src/scraper/graphql/fetcher.ts` |
 | 2 | HTML-сторінка пошуку + cheerio | ✅ fallback №1 (автоматичний у scanner) | `server/src/scraper/olxFetcher.ts` |
 | 3 | `__NEXT_DATA__` JSON зі сторінки | концепт (не реалізовано) | — |
 | 4 | Playwright з видимим Chromium | крайній випадок, рішення людини | — |
