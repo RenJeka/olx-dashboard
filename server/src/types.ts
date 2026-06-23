@@ -36,6 +36,8 @@ export interface LocalFilters {
   pros?: string[];
   /** Білий список критеріїв мінусів (listings.cons). Оголошення має мати хоча б один. Порожньо → вимкнено. */
   cons?: string[];
+  /** Білий список листових category_id (точна відповідність listings.category_id). Порожньо → вимкнено. */
+  categories?: number[];
   /**
    * Інвертований режим для кожної групи фільтрів. Відсутній ключ / false = прямий режим
    * (показувати лише збіги). true = збіги приховуються (чорний список).
@@ -47,6 +49,7 @@ export interface LocalFilters {
     sellers?: boolean;
     pros?: boolean;
     cons?: boolean;
+    categories?: boolean;
   };
 }
 
@@ -86,6 +89,10 @@ export interface RawListing {
   lastRefreshAt?: string;
   city?: string;
   district?: string;
+  /** OLX category.id (числовий id листової категорії); назву резолвимо словником olxCategories.ts. */
+  categoryId?: number | null;
+  /** OLX category.type (слаг верхнього рівня, напр. "electronics"). */
+  categoryType?: string | null;
   sellerType?: 'private' | 'business';
   /** Плаский обʼєкт характеристик (без ціни): { key: label }. */
   params?: Record<string, string>;
@@ -326,6 +333,17 @@ export interface ParamKeyInfo {
   samples: string[];
 }
 
+/**
+ * Вузол дерева категорій OLX для пошуку (facet, docs/plans/category-counts-and-filter.md).
+ * `id` — category id (збігається з listings.category_id); `path` — назви предків root→leaf;
+ * `olxCount` — лічильник OLX для запиту (включно з підкатегоріями, як віддає facet).
+ */
+export interface CategoryOption {
+  id: number;
+  path: string[];
+  olxCount: number;
+}
+
 /** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */
 export interface FilterOptions {
   /** Унікальні непорожні listings.city цього пошуку, відсортовані. */
@@ -336,6 +354,8 @@ export interface FilterOptions {
   pros: string[];
   /** Критерії мінусів із searches.analysis_criteria для цього пошуку. */
   cons: string[];
+  /** Дерево категорій OLX для пошуку (facet з останнього скану): назви + ієрархія + OLX-лічильники. */
+  categories: CategoryOption[];
 }
 
 /** Останній рядок scan_runs — частина відповіді GET /api/searches/:id/stats. */

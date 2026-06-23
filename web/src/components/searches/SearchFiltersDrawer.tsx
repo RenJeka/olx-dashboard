@@ -1,4 +1,5 @@
-import { Stack, Button } from '@chakra-ui/react';
+import { Stack, Button, HStack, Icon, Text } from '@chakra-ui/react';
+import { LuLayers } from 'react-icons/lu';
 import {
   DrawerBackdrop,
   DrawerBody,
@@ -9,14 +10,18 @@ import {
   DrawerRoot,
   DrawerTitle,
 } from '../ui/drawer';
+import { Tooltip } from '../ui/tooltip';
 import { toaster } from '../ui/toaster';
-import { useFilterOptions, useUpdateSearchFilters } from '../../api';
-import { buildLocalFiltersPayload } from '../../utils/localFilters';
+import { useFilterOptions, useUpdateSearchFilters, useListings } from '../../api';
+import { buildLocalFiltersPayload, evaluateLocalFilters } from '../../utils/localFilters';
+import { parsePriceRange, formatPriceRange } from '../../utils/format';
 import { useLocalFiltersForm } from '../../hooks/useLocalFiltersForm';
+import { useListingsUiStore } from '../../stores/listingsUiStore';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../constants';
 import { DRAWER_SIZE } from '../../theme';
 import { PriceFilter } from './local-filters/PriceFilter';
 import { TagsFilter } from './local-filters/TagsFilter';
+import { CategoryFilter } from './local-filters/CategoryFilter';
 import type { Search } from '../../types';
 
 interface Props {
@@ -47,7 +52,35 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     setConsInvert,
     addCon,
     removeCon,
+    setCategoriesInvert,
+    toggleCategories,
   } = useLocalFiltersForm(open ? search.local_filters : '');
+
+  // Контекст для пояснення розриву «наших / OLX» у фільтрі категорій.
+  const priceRange = parsePriceRange(search.api_filters);
+  const priceFilterLabel = priceRange ? formatPriceRange(priceRange.from, priceRange.to) : null;
+  let synonymCount = 0;
+  try {
+    const parsed = JSON.parse(search.query_synonyms || '[]');
+    synonymCount = Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    synonymCount = 0;
+  }
+
+  // Зведений лічильник «Всього» — скільки оголошень покаже таблиця з ПОТОЧНИМИ (незбереженими)
+  // локальними фільтрами + перемикачами «показати приховані/нерелевантні». Вкладка статусу не
+  // враховується (це = майбутнє число вкладки «Всі»). Рахується в пам'яті з завантажених listings.
+  const { data: listings } = useListings(open ? search.id : null);
+  const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
+  const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
+  const previewFilters = buildLocalFiltersPayload(state);
+  const shownTotal = (listings ?? []).reduce((n, l) => {
+    const hidden = evaluateLocalFilters(previewFilters, l);
+    const visible = (showFilteredOut || !hidden) && (showIrrelevant || l.ai_relevant !== 0);
+    return visible ? n + 1 : n;
+  }, 0);
+  const totalTooltip =
+    'Скільки оголошень покаже таблиця з цими фільтрами (враховано перемикачі «показати приховані/нерелевантні»). Поточну вкладку статусу не враховано.';
 
   function handleSave() {
     const local_filters = buildLocalFiltersPayload(state);
@@ -77,7 +110,36 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
       <DrawerContent>
         <DrawerCloseTrigger />
         <DrawerHeader>
-          <DrawerTitle>Локальні фільтри — {search.name}</DrawerTitle>
+          <HStack justify="space-between" align="center" gap={3}>
+            <DrawerTitle>Локальні фільтри — {search.name}</DrawerTitle>
+            <Tooltip content={totalTooltip} openDelay={150} closeDelay={80} positioning={{ placement: 'bottom' }}>
+              <HStack
+                as="span"
+                gap={1.5}
+                px={2.5}
+                py={1}
+                borderRadius="full"
+                bg="bg.muted"
+                borderWidth="1px"
+                borderColor="border.subtle"
+                cursor="help"
+                flexShrink={0}
+              >
+                <Icon as={LuLayers} boxSize={3.5} color="fg.muted" />
+                <Text textStyle="xs" color="fg.muted">
+                  Всього
+                </Text>
+                <Text
+                  textStyle="sm"
+                  fontWeight="bold"
+                  color="accent.fg"
+                  fontVariantNumeric="tabular-nums"
+                >
+                  {shownTotal.toLocaleString('uk')}
+                </Text>
+              </HStack>
+            </Tooltip>
+          </HStack>
         </DrawerHeader>
         <DrawerBody>
           <Stack gap={6}>
@@ -88,6 +150,17 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               onPriceMinChange={setPriceMin}
               onPriceMaxChange={setPriceMax}
               onPriceInvertChange={setPriceInvert}
+            />
+
+            <CategoryFilter
+              searchId={search.id}
+              categories={filterOptions?.categories ?? []}
+              selectedIds={state.categories}
+              isInverted={state.categoriesInvert}
+              priceFilterLabel={priceFilterLabel}
+              synonymCount={synonymCount}
+              onToggle={toggleCategories}
+              onInvertChange={setCategoriesInvert}
             />
 
             <TagsFilter

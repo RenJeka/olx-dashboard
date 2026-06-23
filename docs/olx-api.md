@@ -93,6 +93,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
         created_time
         last_refresh_time
         business
+        category { id type }
         location {
           city { name }
           district { name }
@@ -235,6 +236,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `location.city.name` / `district.name` | `city` / `district` | |
 | `photos[0].link` | `photo_url` | замінити `{width}x{height}` → конкретний розмір, напр. `400x300` |
 | `business` | `seller_type` | `true`→`business`, `false`→`private` |
+| `category.id` / `category.type` | `category_id` / `category_type` | id категорії оголошення + слаг типу. Для фільтра «Категорії» (`docs/plans/category-counts-and-filter.md`): `category_id` дає локальні лічильники/фільтрацію; назви+ієрархію+OLX-лічильники бере facet (§2.11) |
 | `params[]` (без price) | `params` | плаский JSON `{key: label}` |
 | `description` | `description` | HTML з `<br />`; на фронті рендериться як plain text |
 | `user.name` | `seller_name` | |
@@ -422,6 +424,31 @@ laquesis (A/B-тести olxcdn.com).
   `suggest_filters="true"` та `sl` — обидва опціональні (§2.5).
 - `filter_float_price:from` у живому запиті фронтенду — у тому самому форматі,
   що ми шлемо (значення рядком). Повторно верифіковано.
+
+### 2.11 Дерево категорій (facet метаданих пошуку) — верифіковано live 2026-06-23
+
+Для фільтра «Категорії» (`docs/plans/category-counts-and-filter.md`) дерево категорій із
+**назвами + ієрархією + лічильниками** тягнеться ОДНИМ запитом:
+
+```
+GET https://www.olx.ua/api/v1/offers/metadata/search/?query=<q>&facets=[{"field":"category","fetchLabel":true,"fetchUrl":true,"limit":100}]
+```
+
+Відповідь — `data.facets.category[]`, елемент: `{ id, count, label, url }`:
+- `label` — людська назва категорії (укр);
+- `count` — к-сть оголошень OLX для запиту в цій категорії (включно з підкатегоріями);
+- `url` — слаг-шлях, що кодує ПОВНУ ієрархію: `/hobbi-otdyh-i-sport/velo/velosipedy/q-<q>`
+  (останній слаг перед `/q-` — власний; попередні — предки). Кожен предок присутній окремим
+  елементом (його `count` ≥ `count` нащадка), тож дерево назв будується суто з цієї відповіді.
+
+Числовий `id` збігається з per-listing `category.id` (§2.7) — facet годиться як джерело назв для
+нашого `listings.category_id`. Реалізація — `server/src/scraper/olxCategories.ts`
+(`fetchCategoryOptions`), тягнеться `scanner.ts` після успішного скану й кешується в
+`searches.category_facet`.
+
+**Що НЕ працює (перевірено live):** `…/api/v1/categories/` → deprecated / access denied;
+`…/api/v1/offers/metadata/search-categories/` → лише `{id, count}` без назв (параметр `facets`
+там ігнорується).
 
 ---
 

@@ -41,6 +41,8 @@ export interface LocalFilters {
   pros?: string[];
   /** Білий список критеріїв мінусів. Оголошення має мати хоча б один. Порожньо → вимкнено. */
   cons?: string[];
+  /** Білий список листових category_id (точна відповідність Listing.category_id). Порожньо → вимкнено. */
+  categories?: number[];
   /**
    * Інвертований режим для кожної групи фільтрів. Відсутній ключ / false = прямий режим.
    * true = збіги приховуються (чорний список). Кожна група незалежна.
@@ -51,6 +53,7 @@ export interface LocalFilters {
     sellers?: boolean;
     pros?: boolean;
     cons?: boolean;
+    categories?: boolean;
   };
 }
 
@@ -60,12 +63,25 @@ export interface ParamKeyInfo {
   samples: string[];
 }
 
+/**
+ * Вузол дерева категорій OLX (facet з останнього скану).
+ * `id` — category id (= Listing.category_id); `path` — назви предків root→leaf;
+ * `olxCount` — лічильник OLX для запиту (включно з підкатегоріями).
+ */
+export interface CategoryOption {
+  id: number;
+  path: string[];
+  olxCount: number;
+}
+
 /** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */
 export interface FilterOptions {
   cities: string[];
   sellers: string[];
   pros: string[];
   cons: string[];
+  /** Листові категорії, наявні в оголошеннях пошуку, зі шляхом назв (дерево фільтра категорій). */
+  categories: CategoryOption[];
 }
 
 /** Відповідь PATCH /api/searches/:id при зміні local_filters — містить лічильник перерахунку. */
@@ -105,6 +121,10 @@ export interface Listing {
   price: number | null;
   currency: string;
   city: string | null;
+  /** OLX category.id (числовий id листової категорії); назву резолвить словник на бекенді. NULL до re-scan. */
+  category_id: number | null;
+  /** OLX category.type (слаг верхнього рівня). NULL до re-scan. */
+  category_type: string | null;
   photo_url: string | null;
   /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
   photo_urls: string | null;
@@ -343,6 +363,7 @@ export interface NewSearchInput {
   priceFrom?: number;
   priceTo?: number;
   querySynonyms?: string[];
+  projectId?: number | null;
 }
 
 export interface StoredTableState {

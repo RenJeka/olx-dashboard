@@ -13,12 +13,14 @@ export function useLocalFiltersForm(initialFiltersRaw: string) {
   const [sellers, setSellers] = useState<string[]>([]);
   const [pros, setPros] = useState<string[]>([]);
   const [cons, setCons] = useState<string[]>([]);
+  const [categories, setCategories] = useState<number[]>([]);
 
   const [priceInvert, setPriceInvert] = useState(false);
   const [citiesInvert, setCitiesInvert] = useState(false);
   const [sellersInvert, setSellersInvert] = useState(false);
   const [prosInvert, setProsInvert] = useState(false);
   const [consInvert, setConsInvert] = useState(false);
+  const [categoriesInvert, setCategoriesInvert] = useState(false);
 
   useEffect(() => {
     const filters = parseLocalFilters(initialFiltersRaw);
@@ -28,13 +30,15 @@ export function useLocalFiltersForm(initialFiltersRaw: string) {
     setSellers(filters.sellers ?? []);
     setPros(filters.pros ?? []);
     setCons(filters.cons ?? []);
-    
+    setCategories(filters.categories ?? []);
+
     const inv = filters.invert ?? {};
     setPriceInvert(inv.price_range ?? false);
     setCitiesInvert(inv.cities ?? false);
     setSellersInvert(inv.sellers ?? false);
     setProsInvert(inv.pros ?? false);
     setConsInvert(inv.cons ?? false);
+    setCategoriesInvert(inv.categories ?? false);
   }, [initialFiltersRaw]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -62,9 +66,19 @@ export function useLocalFiltersForm(initialFiltersRaw: string) {
   };
   const removeCon = (criterion: string) => setCons((prev) => prev.filter((c) => c !== criterion));
 
+  // Категорії: вибір/зняття набору листових id (вузол дерева = вся його гілка).
+  const toggleCategories = (ids: number[], checked: boolean) => {
+    setCategories((prev) => {
+      const set = new Set(prev);
+      if (checked) ids.forEach((id) => set.add(id));
+      else ids.forEach((id) => set.delete(id));
+      return [...set];
+    });
+  };
+
   const state: LocalFiltersFormState = {
-    priceMin, priceMax, cities, sellers, pros, cons,
-    priceInvert, citiesInvert, sellersInvert, prosInvert, consInvert,
+    priceMin, priceMax, cities, sellers, pros, cons, categories,
+    priceInvert, citiesInvert, sellersInvert, prosInvert, consInvert, categoriesInvert,
   };
 
   return {
@@ -74,5 +88,6 @@ export function useLocalFiltersForm(initialFiltersRaw: string) {
     setSellersInvert, addSeller, removeSeller,
     setProsInvert, addPro, removePro,
     setConsInvert, addCon, removeCon,
+    setCategoriesInvert, toggleCategories,
   };
 }

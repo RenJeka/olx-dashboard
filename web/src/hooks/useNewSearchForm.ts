@@ -15,6 +15,8 @@ export interface NewSearchFormState {
   setSynonyms: (v: string[]) => void;
   variantsOpen: boolean;
   setVariantsOpen: (v: boolean) => void;
+  projectId: number | null;
+  setProjectId: (v: number | null) => void;
   submit: (e: FormEvent) => void;
   createSearch: ReturnType<typeof useCreateSearch>;
 }
@@ -28,6 +30,7 @@ export function useNewSearchForm(onCreated?: () => void): NewSearchFormState {
   const [priceTo, setPriceTo] = useState('');
   const [synonyms, setSynonyms] = useState<string[]>([]);
   const [variantsOpen, setVariantsOpen] = useState(false);
+  const [projectId, setProjectId] = useState<number | null>(null);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -39,6 +42,7 @@ export function useNewSearchForm(onCreated?: () => void): NewSearchFormState {
         priceFrom: priceFrom ? Number(priceFrom) : undefined,
         priceTo: priceTo ? Number(priceTo) : undefined,
         querySynonyms: synonyms,
+        projectId,
       },
       {
         onSuccess: () => {
@@ -47,6 +51,7 @@ export function useNewSearchForm(onCreated?: () => void): NewSearchFormState {
           setPriceFrom('');
           setPriceTo('');
           setSynonyms([]);
+          setProjectId(null);
           onCreated?.();
         },
       },
@@ -66,6 +71,8 @@ export function useNewSearchForm(onCreated?: () => void): NewSearchFormState {
     setSynonyms,
     variantsOpen,
     setVariantsOpen,
+    projectId,
+    setProjectId,
     submit,
     createSearch,
   };

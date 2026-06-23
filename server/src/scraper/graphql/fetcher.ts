@@ -642,6 +642,8 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       lastRefreshAt: item.last_refresh_time,
       city: item.location?.city?.name,
       district: item.location?.district?.name,
+      categoryId: item.category?.id ?? null,
+      categoryType: item.category?.type ?? null,
       sellerType: item.business ? 'business' : 'private',
       params,
       description: item.description ?? undefined,

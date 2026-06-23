@@ -11,7 +11,14 @@ import {
 } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
-import type { FilterOptions, LocalFilters, ParamKeyInfo, ScanPlan, SearchStats } from '../types.js';
+import type {
+  CategoryOption,
+  FilterOptions,
+  LocalFilters,
+  ParamKeyInfo,
+  ScanPlan,
+  SearchStats,
+} from '../types.js';
 
 interface SearchBody {
   name?: string;
@@ -67,8 +74,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const info = db
       .prepare(
-        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -80,6 +87,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         sortOrder,
         toJsonText(req.body.query_synonyms, '[]'),
         req.body.archived ? 1 : 0,
+        req.body.project_id ?? null,
       );
 
     return reply
@@ -162,7 +170,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const listingRows = db
-        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons FROM listings WHERE search_id = ?')
+        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE search_id = ?')
         .all(id) as {
           id: number;
           title: string | null;
@@ -173,6 +181,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
           seller_name: string | null;
           pros: string | null;
           cons: string | null;
+          category_id: number | null;
         }[];
 
       const updateFilteredOut = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
@@ -450,11 +459,24 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     const consSet = new Set<string>();
     for (const row of consRows) parseBullets(row.cons).forEach((c) => consSet.add(c));
 
+    // Дерево категорій OLX — кешований facet з останнього скану (searches.category_facet).
+    // Назви/ієрархія/OLX-лічильники готові; локальні лічильники накладає фронт із listings.
+    const facetRow = db.prepare('SELECT category_facet FROM searches WHERE id = ?').get(id) as
+      | { category_facet: string | null }
+      | undefined;
+    let categories: CategoryOption[] = [];
+    try {
+      categories = facetRow?.category_facet ? (JSON.parse(facetRow.category_facet) as CategoryOption[]) : [];
+    } catch {
+      categories = [];
+    }
+
     const result: FilterOptions = {
       cities: cityRows.map((r) => r.city),
       sellers: sellerRows.map((r) => r.seller_name),
       pros: [...prosSet].sort(),
       cons: [...consSet].sort(),
+      categories,
     };
     return result;
   });

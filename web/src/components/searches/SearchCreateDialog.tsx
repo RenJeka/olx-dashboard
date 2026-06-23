@@ -1,4 +1,4 @@
-import { Box, Button, Field, HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { Box, Button, Field, HStack, Input, NativeSelect, Stack, Text } from '@chakra-ui/react';
 import { LuLayers, LuPlus } from 'react-icons/lu';
 import {
   DialogBackdrop,
@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import type { NewSearchFormState } from '../../hooks/useNewSearchForm';
+import { useProjects } from '../../api';
 import { DIALOG_SIZE } from '../../theme';
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
 
 /** Модалка створення нового пошуку (назва/запит/ціна/варіанти). Контрольована — тригер на боці виклика. */
 export function SearchCreateDialog({ open, onClose, form }: Props) {
+  const { data: projects } = useProjects();
   const {
     name,
     setName,
@@ -32,6 +34,8 @@ export function SearchCreateDialog({ open, onClose, form }: Props) {
     setPriceTo,
     synonyms,
     setVariantsOpen,
+    projectId,
+    setProjectId,
     submit,
     createSearch,
   } = form;
@@ -86,6 +90,24 @@ export function SearchCreateDialog({ open, onClose, form }: Props) {
               >
                 <LuLayers /> Варіанти пошуку{synonyms.length > 0 ? ` (${synonyms.length})` : ''}
               </Button>
+              <Field.Root>
+                <Field.Label>Проект (категорія)</Field.Label>
+                <NativeSelect.Root size="sm">
+                  <NativeSelect.Field
+                    cursor="pointer"
+                    value={projectId ?? ''}
+                    onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">Без проекту</option>
+                    {projects?.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Field.Root>
               <HStack gap={2}>
                 <Field.Root>
                   <Field.Label>Ціна від</Field.Label>

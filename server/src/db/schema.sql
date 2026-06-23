@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS searches (
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
+  category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/category-counts-and-filter.md
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
   project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
   created_at TEXT DEFAULT (datetime('now'))
@@ -39,6 +40,8 @@ CREATE TABLE IF NOT EXISTS listings (
   city TEXT,
   district TEXT,
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
+  category_id INTEGER,               -- OLX category.id (числовий id листової категорії); словник назв — olxCategories.ts
+  category_type TEXT,                -- OLX category.type (слаг верхнього рівня, напр. "electronics")
   photo_url TEXT,
   photo_urls TEXT,                   -- JSON-масив прев'ю-лінків усіх фото (галерея), NULL до re-scan
   seller_type TEXT,                  -- private | business

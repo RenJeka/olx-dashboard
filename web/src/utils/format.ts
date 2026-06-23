@@ -41,6 +41,18 @@ export function formatPriceRange(from?: number | null, to?: number | null): stri
   return `до ${fmt(to as number)} грн`;
 }
 
+/**
+ * Українська множина за числом: `pluralUk(1, ['синонім','синоніми','синонімів']) → 'синонім'`.
+ * forms = [однина, 2–4, 5+/0].
+ */
+export function pluralUk(n: number, forms: [string, string, string]): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
+  return forms[2];
+}
+
 const KY_LOCALE = 'uk-UA';
 const KY_TZ = 'Europe/Kyiv';
 
