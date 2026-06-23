@@ -26,11 +26,20 @@ export const SPLIT_THRESHOLD = MAX_OFFSET;
 /** Мінімальна ширина цінового діапазону (грн) — вужче ділити немає сенсу. */
 export const MIN_PRICE_WIDTH = 1;
 
-/** Глобальний запобіжник: максимум листів-бакетів (проти лавини запитів). */
-export const MAX_BUCKETS = 40;
+/**
+ * Глобальний запобіжник: максимум листів-бакетів (проти лавини запитів).
+ * Підвищено 40→60 (docs/plans/deep-scan-stop-and-history.md): дуже великі пошуки
+ * (десятки тисяч оголошень) потребують більше бакетів для повного покриття без обрізання.
+ */
+export const MAX_BUCKETS = 60;
 
-/** Глобальний запобіжник: максимум HTTP-запитів на весь split-скан. */
-export const MAX_TOTAL_REQUESTS = 200;
+/**
+ * Глобальний запобіжник: максимум HTTP-запитів на весь split-скан (на варіант query).
+ * Підвищено 200→400 (docs/plans/deep-scan-stop-and-history.md): страховка для дуже
+ * великих пошуків, щоб усі дані доходили до користувача. Якщо ліміт усе одно впирається —
+ * scanFromPlan ставить `warning` (capHit) і скан позначається частковим.
+ */
+export const MAX_TOTAL_REQUESTS = 400;
 
 /**
  * Кандидати `sort_by` для зондування максимальної ціни (probeMaxPrice). OLX може приймати
@@ -59,6 +68,7 @@ export const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters:
         created_time
         last_refresh_time
         business
+        category { id type }
         location {
           city { name }
           district { name }

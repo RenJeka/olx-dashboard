@@ -47,11 +47,18 @@ addColumnIfMissing('scan_runs', 'requests_done', 'INTEGER DEFAULT 0');
 addColumnIfMissing('scan_runs', 'requests_total', 'INTEGER');
 addColumnIfMissing('scan_runs', 'fetch_method', 'TEXT');
 addColumnIfMissing('scan_runs', 'kind', "TEXT DEFAULT 'normal'");
+// Попередження часткового успіху окремо від реальної помилки (щоб UI не показував warning як «Помилку»).
+addColumnIfMissing('scan_runs', 'warning', 'TEXT');
 
 // Деталізований прогрес сканування (docs/plans/scan-progress-detail.md).
 addColumnIfMissing('scan_runs', 'stage', 'TEXT');
 addColumnIfMissing('scan_runs', 'sub_done', 'INTEGER');
 addColumnIfMissing('scan_runs', 'sub_total', 'INTEGER');
+
+// Прозорість дедупу + історія аналізу (docs/plans/deep-scan-stop-and-history.md):
+// raw_found — сирих до дедупу між синонімами; scan_plan — JSON ScanPlan для kind='analyze'.
+addColumnIfMissing('scan_runs', 'raw_found', 'INTEGER');
+addColumnIfMissing('scan_runs', 'scan_plan', 'TEXT');
 addColumnIfMissing('listings', 'pros', "TEXT DEFAULT ''");
 addColumnIfMissing('listings', 'cons', "TEXT DEFAULT ''");
 
@@ -64,8 +71,15 @@ addColumnIfMissing('searches', 'relevance_target', "TEXT DEFAULT ''");
 // Синоніми пошукового запиту (docs/plans/search-synonyms.md) — JSON-масив рядків.
 addColumnIfMissing('searches', 'query_synonyms', "TEXT DEFAULT '[]'");
 
+// Дерево категорій OLX з останнього скану (docs/plans/category-counts-and-filter.md) — JSON CategoryOption[].
+addColumnIfMissing('searches', 'category_facet', 'TEXT');
+
 // Архів пошуків (docs/plans/archive-searches.md) — прапорець прихованих зі списку.
 addColumnIfMissing('searches', 'archived', 'INTEGER DEFAULT 0');
+
+// Проекти (docs/plans/projects.md) — групування пошуків; NULL = «Без проекту».
+// Таблиця projects створюється з schema.sql (CREATE TABLE IF NOT EXISTS) вище.
+addColumnIfMissing('searches', 'project_id', 'INTEGER REFERENCES projects(id)');
 
 /**
  * Етап 2: `listings` table rebuild — новий CHECK на status (+ 'rejected') і колонка
@@ -161,6 +175,11 @@ addColumnIfMissing('listings', 'ai_relevant_source', 'TEXT');
 
 // Галерея фото (docs/plans/photo-gallery.md) — JSON-масив прев'ю-лінків усіх фото.
 addColumnIfMissing('listings', 'photo_urls', 'TEXT');
+
+// Категорії OLX (docs/plans/category-counts-and-filter.md) — id листової категорії + слаг типу.
+// Заповнюються наступним GraphQL-сканом (бекфіл наявних рядків — після re-scan).
+addColumnIfMissing('listings', 'category_id', 'INTEGER');
+addColumnIfMissing('listings', 'category_type', 'TEXT');
 
 /**
  * Одноразовий бекфіл sort_order для існуючих пошуків (нові колонки — NULL).

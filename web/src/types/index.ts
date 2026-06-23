@@ -12,6 +12,16 @@ export interface Search {
   query_synonyms: string;
   /** 1 — пошук в архіві (docs/plans/archive-searches.md). */
   archived: number;
+  /** Проект, до якого віднесено пошук; null — «Без проекту» (docs/plans/projects.md). */
+  project_id: number | null;
+  created_at: string;
+}
+
+/** Проект — група пошуків (docs/plans/projects.md). */
+export interface Project {
+  id: number;
+  name: string;
+  sort_order: number | null;
   created_at: string;
 }
 
@@ -31,6 +41,8 @@ export interface LocalFilters {
   pros?: string[];
   /** Білий список критеріїв мінусів. Оголошення має мати хоча б один. Порожньо → вимкнено. */
   cons?: string[];
+  /** Білий список листових category_id (точна відповідність Listing.category_id). Порожньо → вимкнено. */
+  categories?: number[];
   /**
    * Інвертований режим для кожної групи фільтрів. Відсутній ключ / false = прямий режим.
    * true = збіги приховуються (чорний список). Кожна група незалежна.
@@ -41,6 +53,7 @@ export interface LocalFilters {
     sellers?: boolean;
     pros?: boolean;
     cons?: boolean;
+    categories?: boolean;
   };
 }
 
@@ -50,12 +63,25 @@ export interface ParamKeyInfo {
   samples: string[];
 }
 
+/**
+ * Вузол дерева категорій OLX (facet з останнього скану).
+ * `id` — category id (= Listing.category_id); `path` — назви предків root→leaf;
+ * `olxCount` — лічильник OLX для запиту (включно з підкатегоріями).
+ */
+export interface CategoryOption {
+  id: number;
+  path: string[];
+  olxCount: number;
+}
+
 /** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */
 export interface FilterOptions {
   cities: string[];
   sellers: string[];
   pros: string[];
   cons: string[];
+  /** Листові категорії, наявні в оголошеннях пошуку, зі шляхом назв (дерево фільтра категорій). */
+  categories: CategoryOption[];
 }
 
 /** Відповідь PATCH /api/searches/:id при зміні local_filters — містить лічильник перерахунку. */
@@ -82,6 +108,8 @@ export interface ListingPatch {
   cons?: string;
   /** Ручний override семантичного фільтра: 1=релевантне, 0=нерелевантне, null=скинути. */
   ai_relevant?: number | null;
+  /** Ручний override «Активності» (разова підказка): 'active'|'inactive'|'removed' або null. */
+  olx_status?: string | null;
 }
 
 export interface Listing {
@@ -93,6 +121,10 @@ export interface Listing {
   price: number | null;
   currency: string;
   city: string | null;
+  /** OLX category.id (числовий id листової категорії); назву резолвить словник на бекенді. NULL до re-scan. */
+  category_id: number | null;
+  /** OLX category.type (слаг верхнього рівня). NULL до re-scan. */
+  category_type: string | null;
   photo_url: string | null;
   /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
   photo_urls: string | null;
@@ -190,12 +222,17 @@ export interface CommitItem {
 }
 
 export interface ScanResult {
+  /** Унікальних оголошень (після дедупу по olx_id між синонімами/бакетами). */
   found: number;
   new_count: number;
+  /** Сирих оголошень до cross-variant дедупу; `rawFound - found` = злито дублів між синонімами. */
+  rawFound?: number;
   requestsUsed: number;
   disabled_count: number;
   /** Кількість цінових бакетів глибокого скану з авто-розбиттям (>1 — діапазон ділився). */
   bucketsUsed?: number;
+  /** Скан зупинено користувачем — збережено частковий результат. */
+  stopped?: boolean;
 }
 
 /** Результат verify-проходу (POST /api/searches/:id/verify, Етап 2 A3). */
@@ -216,6 +253,8 @@ export interface ScanStatus {
   finished_at: string | null;
   found: number | null;
   new_count: number | null;
+  /** Сирих оголошень до дедупу між синонімами (NULL для старих сканів). */
+  raw_found: number | null;
   error: string | null;
   requests_done: number | null;
   requests_total: number | null;
@@ -236,8 +275,13 @@ export interface LastScanInfo {
   finished_at: string | null;
   found: number | null;
   new_count: number | null;
+  /** Сирих оголошень до дедупу між синонімами (NULL для старих сканів). */
+  raw_found: number | null;
   disabled_count: number | null;
+  /** Реальний збій скану (обидві стратегії впали). */
   error: string | null;
+  /** Попередження часткового успіху (скан вдався, але з застереженням) — не помилка. */
+  warning: string | null;
 }
 
 /** Відповідь GET /api/searches/:id/stats — для панелі дій. */
@@ -250,12 +294,76 @@ export interface SearchStats {
   last_scan: LastScanInfo | null;
 }
 
+// ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ───────────
+// (docs/plans/two-phase-deep-scan.md). Дзеркало DTO server/src/types.ts.
+
+/** Підсумок одного цінового бакету split-скану — для стрічки «ціновий спектр» у звіті. */
+export interface PriceBucketSummary {
+  from: number;
+  to: number | null;
+  count: number;
+}
+
+/** Підсумок аналітичної фази для одного варіанта запиту (основний query або синонім). */
+export interface ScanPlanQuery {
+  query: string;
+  rootCount: number | null;
+  buckets: PriceBucketSummary[];
+  noSplit: boolean;
+  fallbackReason?: string;
+  remainingRequests: number;
+  /** Внесок варіанта в унікальні: скільки olxId його вибірки нові щодо попередніх варіантів. */
+  sampleUnique: number | null;
+}
+
+/** Звіт аналітичної фази глибокого скану (POST /scan/analyze) — дані для ScanPlanReportDialog. */
+export interface ScanPlan {
+  /** Токен для POST /scan/run-plan; план кешується на сервері (TTL), повторний probe не потрібен. */
+  planToken: string;
+  perQuery: ScanPlanQuery[];
+  totalListings: number;
+  totalBuckets: number;
+  remainingRequests: number;
+  estimatedDurationSec: number;
+  /** Оцінка нових (відсутніх у БД) оголошень за семплом 0-х сторінок бакетів; null — немає семпла. */
+  estimatedNew: number | null;
+  /** true — estimatedNew рахується лише за першими сторінками бакетів, не повною видачею. */
+  estimatedNewIsSample: boolean;
+  /** Оцінка УНІКАЛЬНИХ оголошень після дедупу між синонімами; null — немає вибірки. */
+  estimatedUnique: number | null;
+  /** raw_found останнього завершеного нормального скану (сирих до дедупу); null — сканів не було. */
+  lastScanRaw: number | null;
+  /** found останнього завершеного нормального скану (унікальних після дедупу); null — сканів не було. */
+  lastScanUnique: number | null;
+  /**
+   * visible_total_count головного query БЕЗ фільтрів ціни — «скільки всього на OLX» для чесного
+   * порівняння з відфільтрованими числами звіту. null — фільтра ціни немає або probe не вдався.
+   */
+  unfilteredTotal: number | null;
+  /** >1 варіант (синоніми) або є split — вікно покриття пропускається при повному скані. */
+  partial: boolean;
+  warnings: string[];
+}
+
+/**
+ * Останній збережений аналіз (GET /api/searches/:id/last-analysis,
+ * docs/plans/deep-scan-stop-and-history.md). `planValid` — часова валідність (у межах TTL 30 хв
+ * за `finished_at`): true → звіт ще запускний (сервер за потреби перезондує); false →
+ * протермінований, потрібен новий аналіз.
+ */
+export interface LastAnalysis {
+  plan: ScanPlan;
+  analyzedAt: string | null;
+  planValid: boolean;
+}
+
 export interface NewSearchInput {
   name: string;
   query: string;
   priceFrom?: number;
   priceTo?: number;
   querySynonyms?: string[];
+  projectId?: number | null;
 }
 
 export interface StoredTableState {

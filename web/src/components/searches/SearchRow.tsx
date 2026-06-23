@@ -7,7 +7,8 @@ import { SearchFiltersDrawer } from './SearchFiltersDrawer';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchEditDialog } from './SearchEditDialog';
 import { Tooltip } from '../ui/tooltip';
-import { useUpdateSearchSynonyms } from '../../api';
+import { useAssignSearchToProject, useProjects, useUpdateSearchSynonyms } from '../../api';
+import { toaster } from '../ui/toaster';
 import { useSearchRowActions } from '../../hooks/useSearchRowActions';
 import { formatPriceRange, parsePriceRange } from '../../utils/format';
 import { hasActiveLocalFilters } from '../../utils/localFilters';
@@ -31,8 +32,24 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const updateSynonyms = useUpdateSearchSynonyms();
+  const { data: projects } = useProjects();
+  const assignProject = useAssignSearchToProject();
   const { isArchived, deleteSearch, reorderSearch, handleArchiveToggle, handleDelete, handleMove } =
     useSearchRowActions(search);
+
+  function handleAssignProject(projectId: number | null) {
+    assignProject.mutate(
+      { searchId: search.id, projectId },
+      {
+        onError: (err) =>
+          toaster.create({
+            type: 'error',
+            title: 'Не вдалося перемістити пошук',
+            description: err instanceof Error ? err.message : String(err),
+          }),
+      },
+    );
+  }
 
   const synonyms = parseSearchSynonyms(search.query_synonyms);
   const priceRange = parsePriceRange(search.api_filters);
@@ -47,7 +64,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
   return (
     <Box>
       <HStack
-        colorPalette="blue"
+        colorPalette="accent"
         justify="space-between"
         gap={1}
         px={2}
@@ -80,7 +97,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
               >
                 <Badge
                   size="xs"
-                  colorPalette="blue"
+                  colorPalette="accent"
                   variant="solid"
                   rounded="full"
                   flexShrink={0}
@@ -92,7 +109,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
             )}
             {hasActiveLocalFilters(search.local_filters) && (
               <Tooltip content="Застосований фільтр">
-                <Box w="2" h="2" bg="orange.500" rounded="full" flexShrink={0} cursor="default" />
+                <Box w="2" h="2" bg="warning.500" rounded="full" flexShrink={0} cursor="default" />
               </Tooltip>
             )}
           </HStack>
@@ -102,7 +119,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
           {priceRange && (
             <Text
               textStyle="xs"
-              color="orange.500"
+              color="warning.500"
               fontWeight="medium"
               overflow="hidden"
               textOverflow="ellipsis"
@@ -147,6 +164,9 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
         <SearchRowMenu
           isArchived={isArchived}
           synonymsCount={synonyms.length}
+          projects={projects ?? []}
+          currentProjectId={search.project_id}
+          onAssignProject={handleAssignProject}
           onEdit={() => setEditOpen(true)}
           onFilters={() => setFiltersOpen(true)}
           onVariants={() => setVariantsOpen(true)}

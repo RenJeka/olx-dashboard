@@ -48,8 +48,8 @@ export function ListingsTableHeader({ table }: ListingsTableHeaderProps) {
                   cursor="col-resize"
                   userSelect="none"
                   style={{ touchAction: 'none' }}
-                  bg={header.column.getIsResizing() ? 'blue.500' : 'transparent'}
-                  _hover={{ bg: 'blue.400' }}
+                  bg={header.column.getIsResizing() ? 'accent.500' : 'transparent'}
+                  _hover={{ bg: 'accent.400' }}
                 />
               )}
             </Table.ColumnHeader>

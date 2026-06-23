@@ -7,7 +7,7 @@ import type {
   FetchOptions,
 } from '../types.js';
 import { SELECTORS, OLX_BASE_URL, REQUEST_HEADERS } from './selectors.js';
-import { sleep, randomDelayMs, slugify } from './utils.js';
+import { interruptibleSleep, randomDelayMs, slugify } from './utils.js';
 import {
   BATCH_SIZE,
   DEEP_SAFETY_CAP,
@@ -74,8 +74,13 @@ export class HtmlOlxFetcher implements OlxFetcher {
     // HTML не дає visible_total_count — для глибокого ціль одразу DEEP_SAFETY_CAP.
     const target = deep ? DEEP_SAFETY_CAP : BATCH_SIZE;
     let requestsUsed = 0;
+    let aborted = false;
 
     for (let page = 1; page <= target; page++) {
+      if (options?.shouldAbort?.()) {
+        aborted = true;
+        break;
+      }
       const url = this.buildUrl(search, page);
 
       const res = await fetch(url, {
@@ -116,16 +121,16 @@ export class HtmlOlxFetcher implements OlxFetcher {
 
       if (page < target) {
         if (deep && page % BATCH_SIZE === 0) {
-          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
+          await interruptibleSleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS), options?.shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), options?.shouldAbort);
         }
       }
     }
 
     // HTML-сторінка пошуку не дає metadata.visible_total_count — лише GraphQL.
     // exhausted: false — statusEngine для fallback-сканів не викликається (CLAUDE.md).
-    return { listings: all, visibleTotalCount: null, requestsUsed, exhausted: false };
+    return { listings: all, visibleTotalCount: null, requestsUsed, exhausted: false, aborted };
   }
 
   /**

@@ -45,7 +45,11 @@ export function MatchingStep({ w }: Props) {
               <Text textStyle="xs" color="fg.muted">
                 Опрацьовано {analyzeProgress.done}/{analyzeProgress.total}
               </Text>
-              <Progress.Root size="xs" colorPalette="purple" value={(analyzeProgress.done / analyzeProgress.total) * 100}>
+              <Progress.Root
+                size="xs"
+                colorPalette="purple"
+                value={analyzeProgress.total > 0 ? (analyzeProgress.done / analyzeProgress.total) * 100 : null}
+              >
                 <Progress.Track>
                   <Progress.Range />
                 </Progress.Track>
@@ -84,7 +88,7 @@ export function MatchingStep({ w }: Props) {
         <Button variant="ghost" onClick={() => setStep(1)}>
           Назад
         </Button>
-        <Button colorPalette="blue" disabled={accumulated.length === 0} onClick={() => setStep(3)}>
+        <Button colorPalette="accent" disabled={accumulated.length === 0} onClick={() => setStep(3)}>
           Далі: перевірка ({accumulated.length})
         </Button>
       </HStack>

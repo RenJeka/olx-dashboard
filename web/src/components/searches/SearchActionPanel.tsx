@@ -17,8 +17,11 @@ import { ActionPanelStats } from './action-panel/ActionPanelStats';
 import { ActionPanelLastScan } from './action-panel/ActionPanelLastScan';
 import { ActionPanelButtons } from './action-panel/ActionPanelButtons';
 import { ScanProgressPanel } from './action-panel/ScanProgressPanel';
+import { ScanStatusChip } from './action-panel/ScanStatusChip';
+import { ScanPlanReportDialog } from './action-panel/ScanPlanReportDialog';
 import { useSearchActionPanel } from '../../hooks/useSearchActionPanel';
 import { DEEP_SCAN_SECONDS_PER_REQUEST } from '../../constants';
+import { parsePriceRange, formatPriceRange } from '../../utils/format';
 import type { Search } from '../../types';
 import { useSettingsStore } from '../../stores/settingsStore';
 
@@ -35,6 +38,12 @@ export function SearchActionPanel({ search }: Props) {
     setConfirmDeepOpen,
     scanKind,
     isScanning,
+    isStopping,
+    scanPlan,
+    reportOpen,
+    setReportOpen,
+    planValid,
+    analyzedAt,
     stats,
     status,
     lastScan,
@@ -46,18 +55,28 @@ export function SearchActionPanel({ search }: Props) {
     deepScanMinutes,
     startDeepScan,
     runScan,
+    stopScan,
     runVerifyPass,
+    startAnalysis,
+    startFreshAnalysis,
+    runPlan,
   } = useSearchActionPanel(search);
 
   return (
-    <DialogRoot
-      open={dialogOpen}
-      onOpenChange={(details) => setDialogOpen(details.open)}
-      size="md"
-      placement="center"
-    >
+    <>
+      {/* Згорнутий скан — індикатор у хедері повертає модалку (docs/plans/scan-progress-detail.md). */}
+      {isScanning && !dialogOpen && status && scanKind && (
+        <ScanStatusChip scanKind={scanKind} status={status} onClick={() => setDialogOpen(true)} />
+      )}
+      <DialogRoot
+        open={dialogOpen}
+        onOpenChange={(details) => setDialogOpen(details.open)}
+        size="lg"
+        placement="center"
+        closeOnInteractOutside={false}
+      >
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" colorPalette="blue">
+        <Button size="sm" variant="outline" colorPalette="accent">
           <Box as={LuRefreshCw} animation={isScanning ? 'spin 2s linear infinite' : undefined} />
           Сканувати
         </Button>
@@ -76,7 +95,7 @@ export function SearchActionPanel({ search }: Props) {
           <Stack gap={5}>
             <ActionPanelStats visibleTotal={visibleTotal} stats={stats} />
             
-            <ActionPanelLastScan lastScan={lastScan} />
+            <ActionPanelLastScan lastScan={lastScan} verifyCandidates={verifyCandidates} />
 
             {/* Деталізований прогрес сканування (docs/plans/scan-progress-detail.md) */}
             {isScanning && status && scanKind && (
@@ -84,6 +103,8 @@ export function SearchActionPanel({ search }: Props) {
                 scanKind={scanKind}
                 status={status}
                 secondsPerRequest={DEEP_SCAN_SECONDS_PER_REQUEST}
+                onStop={stopScan}
+                isStopping={isStopping}
               />
             )}
 
@@ -98,11 +119,19 @@ export function SearchActionPanel({ search }: Props) {
               onRunQuickScan={() => runScan(false)}
               onStartDeepScan={startDeepScan}
               onRunVerifyPass={runVerifyPass}
+              onStartAnalysis={startAnalysis}
             />
           </Stack>
         </DialogBody>
       </DialogContent>
+      </DialogRoot>
 
+      {/*
+        ConfirmActionDialog і ScanPlanReportDialog — окремі DialogRoot. Тримаємо їх СУСІДАМИ
+        головної модалки скану, а НЕ вкладеними всередині неї: вкладений модальний Dialog.Root
+        у Chakra v3, закриваючись, не прибирає aria-hidden/inert із батьківської модалки — та
+        лишається з pointer-events і блокує всі кліки (не можна ні зупинити скан, ні закрити).
+      */}
       <ConfirmActionDialog
         open={confirmDeepOpen}
         onOpenChange={setConfirmDeepOpen}
@@ -118,6 +147,20 @@ export function SearchActionPanel({ search }: Props) {
           runScan(true);
         }}
       />
-    </DialogRoot>
+
+      <ScanPlanReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        plan={scanPlan}
+        onConfirm={runPlan}
+        onNewAnalysis={startFreshAnalysis}
+        planValid={planValid}
+        analyzedAt={analyzedAt}
+        priceFilterLabel={(() => {
+          const r = parsePriceRange(search.api_filters);
+          return r ? formatPriceRange(r.from, r.to) : null;
+        })()}
+      />
+    </>
   );
 }

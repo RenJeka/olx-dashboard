@@ -3,7 +3,7 @@ import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
 import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './searches/SearchActionPanel';
-import { AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog } from './analysis';
+import { AiToolsHub } from './analysis';
 import { SettingsDrawer } from './settings';
 import { Tooltip } from './ui/tooltip';
 import { useSearches } from '../api';
@@ -53,10 +53,10 @@ export function Header() {
           {selectedSearch && (
             <HStack
               gap={1.5}
-              bg="green.subtle"
-              color="green.fg"
+              bg="success.subtle"
+              color="success.fg"
               borderWidth="1px"
-              borderColor="green.muted"
+              borderColor="success.muted"
               px={3}
               py={1.5}
               ml={{ base: 0, md: '80px' }}
@@ -74,14 +74,12 @@ export function Header() {
         </HStack>
         <HStack gap={2}>
           {autoRefreshEnabled && (
-            <Badge colorPalette="blue" variant="subtle" size="lg" px={2.5} py={1}>
+            <Badge colorPalette="accent" variant="subtle" size="lg" px={2.5} py={1}>
               <LuTimer /> авто: {autoRefreshIntervalMin} хв
             </Badge>
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
-          {selectedSearch && <RelevanceFilterDialog search={selectedSearch} selectedIds={selectedIds} />}
-          {selectedSearch && <AnalysisWizardDialog search={selectedSearch} selectedIds={selectedIds} />}
-          {selectedSearch && <AiPicksDialog search={selectedSearch} />}
+          {selectedSearch && <AiToolsHub search={selectedSearch} selectedIds={selectedIds} />}
           <SettingsDrawer />
         </HStack>
       </HStack>

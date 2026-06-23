@@ -71,7 +71,7 @@ export function TablePagination({ table }: TablePaginationProps) {
               render={(page) => (
                 <IconButton
                   variant={page.value === pageIndex + 1 ? 'outline' : 'ghost'}
-                  colorPalette={page.value === pageIndex + 1 ? 'blue' : undefined}
+                  colorPalette={page.value === pageIndex + 1 ? 'accent' : undefined}
                 >
                   {page.value}
                 </IconButton>

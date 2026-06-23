@@ -46,7 +46,7 @@ function parseLocationDate(raw?: string): {
 const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
 const searchLocalFiltersStmt = db.prepare('SELECT local_filters FROM searches WHERE id = ?');
 const selectForFilterStmt = db.prepare(
-  'SELECT id, title, description, params, price, city, seller_name, pros, cons FROM listings WHERE olx_id = ?',
+  'SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE olx_id = ?',
 );
 const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
 
@@ -64,12 +64,14 @@ const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? W
 const upsertStmt = db.prepare(`
   INSERT INTO listings (
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
+    category_id, category_type,
     photo_url, photo_urls, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
     last_seen_at, status, note
   )
   VALUES (
     @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
-    COALESCE(@params, '{}'), @photo_url, @photo_urls, @description, @seller_name, @contact_name, @olx_status,
+    COALESCE(@params, '{}'), @category_id, @category_type,
+    @photo_url, @photo_urls, @description, @seller_name, @contact_name, @olx_status,
     @posted_at, @last_refresh_at, datetime('now'),
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN 'disabled' ELSE 'new' END,
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END
@@ -83,6 +85,8 @@ const upsertStmt = db.prepare(`
     district      = COALESCE(excluded.district, district),
     seller_type   = COALESCE(excluded.seller_type, seller_type),
     params        = COALESCE(@params, params, '{}'),
+    category_id   = COALESCE(excluded.category_id, category_id),
+    category_type = COALESCE(excluded.category_type, category_type),
     photo_url     = excluded.photo_url,
     photo_urls    = COALESCE(excluded.photo_urls, photo_urls),
     description   = COALESCE(excluded.description, description),
@@ -201,6 +205,8 @@ export function upsertListings(
         district,
         seller_type: sellerType,
         params,
+        category_id: hasStructuredData ? (item.categoryId ?? null) : null,
+        category_type: hasStructuredData ? (item.categoryType ?? null) : null,
         photo_url: item.photoUrl ?? null,
         photo_urls:
           item.photoUrls && item.photoUrls.length > 0 ? JSON.stringify(item.photoUrls) : null,
@@ -226,6 +232,7 @@ export function upsertListings(
             seller_name: string | null;
             pros: string | null;
             cons: string | null;
+            category_id: number | null;
           }
         | undefined;
       if (persisted) {
@@ -238,4 +245,17 @@ export function upsertListings(
   run(raw);
 
   return { found: raw.length, new_count: newCount };
+}
+
+/**
+ * Які з переданих olx_id уже є в БД — для оцінки «~нових» у звіті аналітичної фази
+ * глибокого скану (docs/plans/two-phase-deep-scan.md). Батч одним запитом замість N окремих.
+ */
+export function selectKnownOlxIds(olxIds: number[]): Set<number> {
+  if (olxIds.length === 0) return new Set();
+  const placeholders = olxIds.map(() => '?').join(', ');
+  const rows = db
+    .prepare(`SELECT olx_id FROM listings WHERE olx_id IN (${placeholders})`)
+    .all(...olxIds) as { olx_id: number }[];
+  return new Set(rows.map((r) => r.olx_id));
 }

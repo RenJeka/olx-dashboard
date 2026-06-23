@@ -41,7 +41,7 @@ export function RelevanceResultsList({ flow }: Props) {
             >
               <HStack gap={2} align="start">
                 <Badge
-                  colorPalette={relevant ? 'green' : 'red'}
+                  colorPalette={relevant ? 'success' : 'danger'}
                   variant="solid"
                   cursor="pointer"
                   flexShrink={0}

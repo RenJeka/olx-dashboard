@@ -75,7 +75,7 @@ export function ListingsFilterBar({
       label: (
         <Tooltip content={aiPicksTooltipContent} positioning={{ placement: 'top' }} showArrow openDelay={200}>
           <HStack as="span" gap={1.5} display="inline-flex" position="relative" pr={3}>
-            <Icon asChild fontSize="md"><PiFolderSimpleStarThin /></Icon>
+            <Icon as={PiFolderSimpleStarThin} fontSize="md" />
             <Box as="span">{AI_PICKS_LABEL} ({aiPicksCount})</Box>
             <Box as="span" position="absolute" top="-2px" right="-4px" color="fg.subtle" fontSize="10px">
               <LuInfo />
@@ -109,7 +109,7 @@ export function ListingsFilterBar({
             <Switch
               checked={!showFilteredOut}
               onCheckedChange={(d) => setShowFilteredOut(!d.checked)}
-              colorPalette={showFilteredOut ? undefined : 'orange'}
+              colorPalette={showFilteredOut ? undefined : 'warning'}
               disabled={statusFilter === 'ai_picks'}
             >
               <HStack as="span" gap={1.5}>
@@ -118,7 +118,7 @@ export function ListingsFilterBar({
                   <Box
                     as="span"
                     fontWeight="bold"
-                    color={showFilteredOut ? undefined : 'orange.500'}
+                    color={showFilteredOut ? undefined : 'warning.500'}
                   >
                     {showFilteredOut ? 'ВСІ' : 'ВІДФІЛЬТРОВАНІ'}
                   </Box>{' '}
@@ -173,7 +173,7 @@ export function ListingsFilterBar({
           <Button
             size="sm"
             variant={allTabSelected ? 'subtle' : 'outline'}
-            colorPalette="blue"
+            colorPalette="accent"
             onClick={onToggleSelectAllInTab}
           >
             <LuListChecks />

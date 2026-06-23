@@ -1,59 +1,189 @@
-import { Accordion } from '@chakra-ui/react';
-import { LuArchive, LuListChecks } from 'react-icons/lu';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Accordion, HStack, IconButton } from '@chakra-ui/react';
+import { LuArchive, LuFolderPlus, LuListChecks, LuPlus } from 'react-icons/lu';
 import { SearchGroupAccordionItem } from './SearchGroupAccordionItem';
-import { NewSearchForm } from './NewSearchForm';
-import type { NewSearchFormState } from '../../hooks/useNewSearchForm';
-import type { Search } from '../../types';
+import { ProjectAccordionItem } from './ProjectAccordionItem';
+import { ProjectCreateDialog } from './ProjectCreateDialog';
+import { Tooltip } from '../ui/tooltip';
+import { useSettingsStore } from '../../stores/settingsStore';
+import type { Project, Search } from '../../types';
 
 interface Props {
   isLoading: boolean;
+  projects: Project[];
   activeSearches: Search[];
   archivedSearches: Search[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   onDeleted: (id: number) => void;
-  newSearchForm: NewSearchFormState;
+  onNewSearch: () => void;
 }
 
-/** Вміст бічної панелі: акордеон «Пошуки» / «Архів» (опц.) / «Новий пошук». */
+/**
+ * Вміст бічної панелі: кнопки «Новий пошук»/«Новий проект» + акордеон проектів,
+ * групи «Без проекту» та «Архів» (опц.).
+ */
 export function SearchesPanel({
   isLoading,
+  projects,
   activeSearches,
   archivedSearches,
   selectedId,
   onSelect,
   onDeleted,
-  newSearchForm,
+  onNewSearch,
 }: Props) {
-  return (
-    <Accordion.Root multiple defaultValue={['searches']} variant="plain">
-      <SearchGroupAccordionItem
-        value="searches"
-        icon={<LuListChecks />}
-        label="Пошуки"
-        badgeColorPalette="blue"
-        items={activeSearches}
-        selectedId={selectedId}
-        onSelect={onSelect}
-        onDeleted={onDeleted}
-        isLoading={isLoading}
-        emptyMessage="Поки що порожньо — додай перший пошук нижче."
-      />
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  
+  const expandedGroups = useSettingsStore((s) => s.expandedSearchGroups);
+  const setExpandedGroups = useSettingsStore((s) => s.setExpandedSearchGroups);
 
-      {archivedSearches.length > 0 && (
+  // Групуємо активні (не архівні) пошуки за project_id.
+  const ungrouped = useMemo(
+    () => activeSearches.filter((s) => s.project_id == null),
+    [activeSearches],
+  );
+  const byProject = useMemo(() => {
+    const map = new Map<number, Search[]>();
+    for (const s of activeSearches) {
+      if (s.project_id == null) continue;
+      const list = map.get(s.project_id) ?? [];
+      list.push(s);
+      map.set(s.project_id, list);
+    }
+    return map;
+  }, [activeSearches]);
+
+  const accordionValue = useMemo(() => {
+    if (expandedGroups !== null) return expandedGroups;
+    
+    // За замовчуванням (до першої взаємодії) розгортаємо ТІЛЬКИ той проект, до якого належить вибраний пошук.
+    if (selectedId != null) {
+      const selectedSearch =
+        activeSearches.find((s) => s.id === selectedId) ||
+        archivedSearches.find((s) => s.id === selectedId);
+
+      if (selectedSearch) {
+        return [
+          selectedSearch.archived === 1
+            ? 'archive'
+            : selectedSearch.project_id != null
+              ? `project-${selectedSearch.project_id}`
+              : 'ungrouped'
+        ];
+      }
+    }
+    
+    return [];
+  }, [expandedGroups, selectedId, activeSearches, archivedSearches]);
+
+  // Авто-розгортання групи обраного пошуку — ТІЛЬКИ коли selectedId реально змінився (вибрано
+  // інший пошук у згорнутій групі). Без цієї перевірки на «зміну» ефект спрацьовував би й після
+  // ручного згортання (selectedId той самий) і миттєво розгортав групу назад — користувач не міг
+  // згорнути проект із відкритим пошуком. Дефолт «до першої взаємодії» вже дає accordionValue.
+  const prevSelectedId = useRef(selectedId);
+  useEffect(() => {
+    if (selectedId === prevSelectedId.current) return;
+    prevSelectedId.current = selectedId;
+    if (selectedId == null) return;
+    // Поки взаємодії не було (expandedGroups === null), групу обраного й так показує accordionValue.
+    if (expandedGroups === null) return;
+
+    const selectedSearch =
+      activeSearches.find((s) => s.id === selectedId) ||
+      archivedSearches.find((s) => s.id === selectedId);
+    if (!selectedSearch) return;
+
+    const groupValue =
+      selectedSearch.archived === 1
+        ? 'archive'
+        : selectedSearch.project_id != null
+          ? `project-${selectedSearch.project_id}`
+          : 'ungrouped';
+
+    if (!expandedGroups.includes(groupValue)) {
+      setExpandedGroups([...expandedGroups, groupValue]);
+    }
+  }, [selectedId, expandedGroups, activeSearches, archivedSearches, setExpandedGroups]);
+
+  return (
+    <>
+      <HStack justify="flex-end" px={4} py={3} gap={2}>
+        <Tooltip content="Новий проект">
+          <IconButton
+            aria-label="Новий проект"
+            rounded="full"
+            size="lg"
+            colorPalette="purple"
+            variant="outline"
+            shadow="sm"
+            onClick={() => setCreateProjectOpen(true)}
+          >
+            <LuFolderPlus />
+          </IconButton>
+        </Tooltip>
+        <Tooltip content="Новий пошук">
+          <IconButton
+            aria-label="Новий пошук"
+            rounded="full"
+            size="lg"
+            colorPalette="success"
+            variant="solid"
+            shadow="md"
+            onClick={onNewSearch}
+          >
+            <LuPlus />
+          </IconButton>
+        </Tooltip>
+      </HStack>
+
+      <Accordion.Root
+        multiple
+        value={accordionValue}
+        onValueChange={(e) => setExpandedGroups(e.value)}
+        variant="plain"
+      >
+        {projects.map((project, index) => (
+          <ProjectAccordionItem
+            key={project.id}
+            project={project}
+            items={byProject.get(project.id) ?? []}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onDeleted={onDeleted}
+            isFirst={index === 0}
+            isLast={index === projects.length - 1}
+          />
+        ))}
+
         <SearchGroupAccordionItem
-          value="archive"
-          icon={<LuArchive />}
-          label="Архів"
-          badgeColorPalette="gray"
-          items={archivedSearches}
+          value="ungrouped"
+          icon={<LuListChecks />}
+          label={projects.length > 0 ? 'Без проекту' : 'Пошуки'}
+          badgeColorPalette="accent"
+          items={ungrouped}
           selectedId={selectedId}
           onSelect={onSelect}
           onDeleted={onDeleted}
+          isLoading={isLoading}
+          emptyMessage="Поки що порожньо — додай перший пошук вгорі."
         />
-      )}
 
-      <NewSearchForm form={newSearchForm} />
-    </Accordion.Root>
+        {archivedSearches.length > 0 && (
+          <SearchGroupAccordionItem
+            value="archive"
+            icon={<LuArchive />}
+            label="Архів"
+            badgeColorPalette="gray"
+            items={archivedSearches}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onDeleted={onDeleted}
+          />
+        )}
+      </Accordion.Root>
+
+      <ProjectCreateDialog open={createProjectOpen} onOpenChange={setCreateProjectOpen} />
+    </>
   );
 }

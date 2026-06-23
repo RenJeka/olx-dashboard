@@ -2,6 +2,14 @@
 -- Застосовується при старті через db.ts (CREATE TABLE IF NOT EXISTS).
 -- НЕ дублювати визначення таблиць у коді — джерело істини тут.
 
+-- Проекти — групування пошуків в акордеони (docs/plans/projects.md).
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  sort_order INTEGER,                -- ручний порядок (менше — вище); NULL до бекфілу
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS searches (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,                -- "MacBook Air M1/M2 Київ"
@@ -15,7 +23,9 @@ CREATE TABLE IF NOT EXISTS searches (
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
+  category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/category-counts-and-filter.md
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
+  project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -30,6 +40,8 @@ CREATE TABLE IF NOT EXISTS listings (
   city TEXT,
   district TEXT,
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
+  category_id INTEGER,               -- OLX category.id (числовий id листової категорії); словник назв — olxCategories.ts
+  category_type TEXT,                -- OLX category.type (слаг верхнього рівня, напр. "electronics")
   photo_url TEXT,
   photo_urls TEXT,                   -- JSON-масив прев'ю-лінків усіх фото (галерея), NULL до re-scan
   seller_type TEXT,                  -- private | business
@@ -75,13 +87,16 @@ CREATE TABLE IF NOT EXISTS price_history (
 CREATE TABLE IF NOT EXISTS scan_runs (
   id INTEGER PRIMARY KEY,
   search_id INTEGER REFERENCES searches(id),
-  kind TEXT DEFAULT 'normal',        -- normal | deep | verify (Етап 2)
+  kind TEXT DEFAULT 'normal',        -- normal | deep | verify | analyze (двофазний deep-скан)
   started_at TEXT,
   finished_at TEXT,
-  found INTEGER,
+  found INTEGER,                     -- унікальних оголошень (після дедупу по olx_id)
   new_count INTEGER,
+  raw_found INTEGER,                 -- сирих оголошень до дедупу між синонімами (raw_found - found = злито дублів)
   disabled_count INTEGER,
-  error TEXT,
+  scan_plan TEXT,                    -- JSON ScanPlan для kind='analyze' (історія аналізу, перегляд останнього)
+  error TEXT,                        -- ТІЛЬКИ реальний збій скану (обидві стратегії впали)
+  warning TEXT,                      -- частковий успіх (multi-query/split/HTML-fallback): скан вдався, але з застереженням; НЕ помилка
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
   requests_total INTEGER,            -- прогрес глибокого скану: ціль (NULL поки невідома)
   fetch_method TEXT,                 -- GraphQL | HTML

@@ -14,7 +14,7 @@ import type {
   FetchOptions,
 } from '../../types.js';
 
-import { sleep, randomDelayMs, slugify } from '../utils.js';
+import { interruptibleSleep, randomDelayMs, slugify } from '../utils.js';
 import {
   BATCH_SIZE,
   DEEP_SAFETY_CAP,
@@ -42,6 +42,7 @@ import type {
   ListingError,
   GraphqlResponse,
   PriceBucket,
+  SplitPlan,
 } from './types.js';
 
 /** Опції побудови searchParameters (перевизначення sort/limit/price для probe та split). */
@@ -201,8 +202,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     let requestsUsed = 0;
     let exhausted = false;
     let warning: string | undefined;
+    let aborted = false;
 
     for (let i = 0; i < target; i++) {
+      if (options?.shouldAbort?.()) {
+        aborted = true;
+        break;
+      }
       const offset = i * PAGE_LIMIT;
       const page = await this.fetchPage(search, offset, referer);
 
@@ -239,14 +245,26 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
       if (i < target - 1) {
         if (deep && requestsUsed % BATCH_SIZE === 0) {
-          await sleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS));
+          await interruptibleSleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS), options?.shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), options?.shouldAbort);
         }
       }
     }
 
-    return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning };
+    return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning, aborted };
+  }
+
+  /**
+   * Один запит: visible_total_count кореня (offset 0) для переданого `search`. Використовується
+   * для «невідфільтрованого тоталу» у звіті аналізу (скільки всього на OLX без фільтрів пошуку),
+   * щоб користувач бачив, що менше число — це його власний фільтр, а не недозбір.
+   */
+  async probeRootCount(search: SearchConfig): Promise<number | null> {
+    const referer = this.buildReferer(search.query);
+    const page = await this.fetchPage(search, 0, referer);
+    if (page.listingError) return null;
+    return page.visibleTotalCount;
   }
 
   // ── Probe максимальної ціни ──────────────────────────────────────────────────
@@ -287,12 +305,24 @@ export class GraphqlOlxFetcher implements OlxFetcher {
   // ── Глибокий скан із авто-розбиттям по ціні (split) ──────────────────────────
 
   /**
-   * Глибокий скан із авто-розбиттям по ціні (docs/plans/price-range-split.md).
-   * Якщо `visible_total_count > SPLIT_THRESHOLD`, ділить ціновий діапазон бісекцією на
-   * під-діапазони, що вкладаються у вікно пагінації OLX, сканує кожен і зливає через
-   * дедуп `olxId`. Малі пошуки (≤ вікна) делегуються звичайному `fetchSearch`.
+   * Глибокий скан із авто-розбиттям по ціні (docs/plans/price-range-split.md) — суцільним
+   * проходом: `analyzeSplit` (probe-фаза) одразу довершується `scanFromPlan` (допагінація).
+   * Для двофазного UX (аналіз → звіт → підтверджений запуск) використовуйте ці методи
+   * окремо (docs/plans/two-phase-deep-scan.md) — план з `analyzeSplit` можна закешувати й
+   * передати у `scanFromPlan` пізніше без повторних probe-запитів.
    */
   async fetchSearchSplit(search: SearchConfig, options?: FetchOptions): Promise<FetchSearchResult> {
+    const plan = await this.analyzeSplit(search, options);
+    return this.scanFromPlan(search, plan, options);
+  }
+
+  /**
+   * Аналітична (probe) фаза split-скану: root-зондування → межі ціни → бісекція на бакети.
+   * Жодної допагінації листів — лише видача `SplitPlan`, який `scanFromPlan` довершує без
+   * повторних probe-запитів. Малий пошук (≤ вікна) або провал probe верхньої межі ціни →
+   * `noSplit: true` (`scanFromPlan` делегує звичайний `fetchSearch`).
+   */
+  async analyzeSplit(search: SearchConfig, options?: FetchOptions): Promise<SplitPlan> {
     const referer = this.buildReferer(search.query);
     const onProgress = options?.onProgress;
     let requestsUsed = 0;
@@ -309,53 +339,88 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
     // Малий пошук (або без метаданих) — розбиття не потрібне, поведінка як зараз.
     if (rootCount == null || rootCount <= SPLIT_THRESHOLD) {
-      return this.fetchSearch(search, options);
+      return { rootCount, buckets: [], rootItems: rootPage.items, requestsUsed, noSplit: true };
     }
 
     // 2. Визначаємо межі діапазону. Верхня: явна `to` або probe максимальної ціни.
-    const hi = await this.resolveUpperPriceBound(search, options, requestsUsed);
+    const hi = await this.resolveUpperPriceBound(search, requestsUsed, onProgress);
     requestsUsed = hi.requestsUsed;
-    if (hi.fallbackResult) return hi.fallbackResult;
+
+    if (hi.upperBound == null) {
+      return {
+        rootCount,
+        buckets: [],
+        rootItems: rootPage.items,
+        requestsUsed,
+        noSplit: true,
+        fallbackReason: 'no upper price bound',
+      };
+    }
 
     const lo = search.apiFilters.ranges?.price?.from ?? 0;
 
     // 3. Фаза бісекції: черга інтервалів → листи-бакети, що влазять у вікно пагінації.
-    const bisection = await this.bisectPriceRange(search, referer, lo, hi.upperBound!, requestsUsed, onProgress);
-    requestsUsed = bisection.requestsUsed;
-
-    // 4. Фаза сканування листів: допагінація кожного бакету + злиття.
-    const scanResult = await this.scanBuckets(
-      search, referer, rootPage.items, bisection.buckets, requestsUsed, onProgress,
+    const bisection = await this.bisectPriceRange(
+      search, referer, lo, hi.upperBound, requestsUsed, onProgress, options?.shouldAbort,
     );
 
-    const warnings = [`split: ${bisection.buckets.length} price buckets; coverage window skipped`];
-    if (scanResult.capHit) warnings.push('some buckets hit pagination/request cap');
+    return {
+      rootCount,
+      buckets: bisection.buckets,
+      rootItems: rootPage.items,
+      requestsUsed: bisection.requestsUsed,
+      noSplit: false,
+    };
+  }
+
+  /**
+   * Довершує збір за вже готовим `SplitPlan` (допагінація листів-бакетів). `noSplit` —
+   * делегує звичайний `fetchSearch` (з попередженням, якщо план виник через провал probe).
+   */
+  async scanFromPlan(
+    search: SearchConfig,
+    plan: SplitPlan,
+    options?: FetchOptions,
+  ): Promise<FetchSearchResult> {
+    if (plan.noSplit) {
+      const res = await this.fetchSearch(search, options);
+      if (!plan.fallbackReason) return res;
+      return {
+        ...res,
+        warning: [res.warning, `split skipped: ${plan.fallbackReason}`].filter(Boolean).join('; '),
+      };
+    }
+
+    const referer = this.buildReferer(search.query);
+    const onProgress = options?.onProgress;
+    const scanResult = await this.scanBuckets(
+      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress, options?.shouldAbort,
+    );
+
+    const warnings = [`split: ${plan.buckets.length} price buckets; coverage window skipped`];
+    if (scanResult.capHit) {
+      warnings.push('деякі діапазони вперлися в ліміт запитів — дані можуть бути неповними');
+    }
 
     return {
       listings: scanResult.listings,
-      visibleTotalCount: rootCount,
+      visibleTotalCount: plan.rootCount,
       requestsUsed: scanResult.requestsUsed,
       exhausted: scanResult.allExhausted && !scanResult.capHit,
       warning: warnings.join('; '),
-      bucketsUsed: bisection.buckets.length,
+      bucketsUsed: plan.buckets.length,
+      aborted: scanResult.aborted,
     };
   }
 
   // ── Приватні хелпери split-скану ─────────────────────────────────────────────
 
-  /**
-   * Визначає верхню межу ціни для split-скану: явна `to` з apiFilters або probe.
-   * Якщо probe невдалий — повертає fallbackResult (звичайний deep + попередження).
-   */
+  /** Визначає верхню межу ціни для split-скану: явна `to` з apiFilters або probe. */
   private async resolveUpperPriceBound(
     search: SearchConfig,
-    options: FetchOptions | undefined,
     startRequestsUsed: number,
-  ): Promise<{
-    upperBound: number | null;
-    requestsUsed: number;
-    fallbackResult?: FetchSearchResult;
-  }> {
+    onProgress?: FetchOptions['onProgress'],
+  ): Promise<{ upperBound: number | null; requestsUsed: number }> {
     let requestsUsed = startRequestsUsed;
     const priceRange = search.apiFilters.ranges?.price;
     const explicitTo = priceRange?.to ?? null;
@@ -364,24 +429,9 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       return { upperBound: explicitTo, requestsUsed };
     }
 
-    options?.onProgress?.({ done: requestsUsed, stage: 'Зондування максимальної ціни' });
+    onProgress?.({ done: requestsUsed, stage: 'Зондування максимальної ціни' });
     const maxPrice = await this.probeMaxPrice(search);
     requestsUsed += PRICE_SORT_CANDIDATES.length; // верхня оцінка probe-запитів
-
-    if (maxPrice == null) {
-      // Probe не дав надійної верхньої межі — звичайний deep + попередження.
-      const res = await this.fetchSearch(search, options);
-      return {
-        upperBound: null,
-        requestsUsed,
-        fallbackResult: {
-          ...res,
-          warning: [res.warning, 'split skipped: no upper price bound']
-            .filter(Boolean)
-            .join('; '),
-        },
-      };
-    }
 
     return { upperBound: maxPrice, requestsUsed };
   }
@@ -397,6 +447,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     hi: number,
     startRequestsUsed: number,
     onProgress?: FetchOptions['onProgress'],
+    shouldAbort?: () => boolean,
   ): Promise<{ buckets: PriceBucket[]; requestsUsed: number }> {
     let requestsUsed = startRequestsUsed;
     const buckets: PriceBucket[] = [];
@@ -404,6 +455,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
     while (queue.length > 0) {
       if (requestsUsed >= MAX_TOTAL_REQUESTS) break;
+      if (shouldAbort?.()) break;
       const interval = queue.shift()!;
       const page = await this.fetchPage(search, 0, referer, {
         priceRange: { from: interval.from, to: interval.to },
@@ -447,11 +499,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     buckets: PriceBucket[],
     startRequestsUsed: number,
     onProgress?: FetchOptions['onProgress'],
+    shouldAbort?: () => boolean,
   ): Promise<{
     listings: RawListing[];
     requestsUsed: number;
     allExhausted: boolean;
     capHit: boolean;
+    aborted: boolean;
   }> {
     let requestsUsed = startRequestsUsed;
     const merged = new Map<number, RawListing>();
@@ -466,8 +520,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
 
     let allExhausted = true;
     let capHit = false;
+    let aborted = false;
 
     for (let bi = 0; bi < buckets.length; bi++) {
+      if (shouldAbort?.()) {
+        aborted = true;
+        break;
+      }
       const bucket = buckets[bi]!;
       for (const item of bucket.page0) merged.set(item.olxId, item);
 
@@ -482,6 +541,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       for (let p = 1; p < pages; p++) {
         if (requestsUsed >= MAX_TOTAL_REQUESTS) {
           capHit = true;
+          break;
+        }
+        if (shouldAbort?.()) {
+          aborted = true;
           break;
         }
         const offset = p * PAGE_LIMIT;
@@ -514,12 +577,13 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         if (requestsUsed % BATCH_SIZE === 0) {
           const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
           onProgress?.({ done: requestsUsed, stage: `Пауза ~${Math.round(delay / 1000)}с` });
-          await sleep(delay);
+          await interruptibleSleep(delay, shouldAbort);
         } else {
-          await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
+          await interruptibleSleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS), shouldAbort);
         }
       }
 
+      if (aborted) break;
       if (!bucketExhausted) allExhausted = false;
       if (requestsUsed >= MAX_TOTAL_REQUESTS) {
         capHit = true;
@@ -530,11 +594,11 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       if (bi < buckets.length - 1) {
         const delay = randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS);
         onProgress?.({ done: requestsUsed, stage: `Пауза перед наступним бакетом ~${Math.round(delay / 1000)}с` });
-        await sleep(delay);
+        await interruptibleSleep(delay, shouldAbort);
       }
     }
 
-    return { listings: [...merged.values()], requestsUsed, allExhausted, capHit };
+    return { listings: [...merged.values()], requestsUsed, allExhausted, capHit, aborted };
   }
 
   // ── Маппінг і хелпери ────────────────────────────────────────────────────────
@@ -578,6 +642,8 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       lastRefreshAt: item.last_refresh_time,
       city: item.location?.city?.name,
       district: item.location?.district?.name,
+      categoryId: item.category?.id ?? null,
+      categoryType: item.category?.type ?? null,
       sellerType: item.business ? 'business' : 'private',
       params,
       description: item.description ?? undefined,
@@ -597,6 +663,6 @@ export class GraphqlOlxFetcher implements OlxFetcher {
  * Оцінює кількість сторінок для бакету з `count` оголошень
  * (обмежено MAX_PAGES — вікном пагінації GraphQL OLX).
  */
-function estimatePages(count: number): number {
+export function estimatePages(count: number): number {
   return Math.min(MAX_PAGES, Math.max(1, Math.ceil(count / PAGE_LIMIT)));
 }

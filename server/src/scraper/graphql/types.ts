@@ -37,6 +37,8 @@ export interface GraphqlListing {
   created_time: string;
   last_refresh_time: string;
   business: boolean;
+  /** Категорія оголошення (OLX: лише id листа + грубий слаг type; назв/дерева тут немає). */
+  category?: { id?: number | null; type?: string | null } | null;
   location?: {
     city?: { name: string } | null;
     district?: { name: string } | null;
@@ -77,4 +79,24 @@ export interface PriceBucket {
   count: number;
   /** Оголошення з 0-ї сторінки бакету (вже завантажені під час бісекції). */
   page0: import('../../types.js').RawListing[];
+}
+
+/**
+ * Результат аналітичної (probe) фази split-скану (docs/plans/two-phase-deep-scan.md):
+ * root-зондування + межі ціни + бісекція на бакети — БЕЗ допагінації листів. `scanFromPlan`
+ * довершує збір за цим планом, не повторюючи жодного з probe-запитів.
+ */
+export interface SplitPlan {
+  /** visible_total_count кореневого запиту; null — якщо OLX не повернув метадані. */
+  rootCount: number | null;
+  /** Листи-бакети з уже завантаженим `page0` (порожньо, якщо `noSplit`). */
+  buckets: PriceBucket[];
+  /** Оголошення з 0-ї сторінки кореневого запиту (база для злиття в `scanFromPlan`). */
+  rootItems: import('../../types.js').RawListing[];
+  /** Запитів витрачено в самій аналітичній фазі (root + probe ціни + бісекція). */
+  requestsUsed: number;
+  /** Розбиття не потрібне (малий пошук) або неможливе (немає верхньої межі ціни). */
+  noSplit: boolean;
+  /** Чому `noSplit=true` без природньої малості — `scanFromPlan` додає це у warning. */
+  fallbackReason?: string;
 }

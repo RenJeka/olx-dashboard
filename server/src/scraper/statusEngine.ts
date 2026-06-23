@@ -9,17 +9,28 @@ interface CandidateRow {
   note: string | null;
 }
 
-const COVERAGE_NOTE_MARKER = 'auto-disabled: coverage miss_count=2';
+const COVERAGE_NOTE_PREFIX = 'auto-disabled: coverage miss_count=';
 
 const updateCandidateStmt = db.prepare(
   'UPDATE listings SET miss_count = ?, status = ?, note = ? WHERE id = ?',
 );
+// Гілка disable додатково перезаписує olx_status='inactive' — щоб колонка «Активність» у
+// таблиці була чесною (інакше лишалося б застигле 'active' від останнього скану, що бачив
+// оголошення). docs/plans/honest-olx-status.md.
+const updateDisabledStmt = db.prepare(
+  `UPDATE listings SET miss_count = ?, status = 'disabled', note = ?, olx_status = 'inactive' WHERE id = ?`,
+);
 
-/** Ідемпотентно дописує маркер у note (патерн olx_status-disable з normalizer.ts). */
-function appendCoverageNote(note: string | null): string {
-  if (note != null && note.includes(COVERAGE_NOTE_MARKER)) return note;
-  if (note == null || note === '') return COVERAGE_NOTE_MARKER;
-  return `${note}\n${COVERAGE_NOTE_MARKER}`;
+/**
+ * Ідемпотентно дописує маркер причини у note (патерн olx_status-disable з normalizer.ts).
+ * `threshold` потрапляє у маркер (`miss_count=1` для deep / `=2` для normal); перевірка
+ * за префіксом, тож повторний disable не дублює маркер навіть з іншим порогом.
+ */
+function appendCoverageNote(note: string | null, threshold: number): string {
+  const marker = `${COVERAGE_NOTE_PREFIX}${threshold}`;
+  if (note != null && note.includes(COVERAGE_NOTE_PREFIX)) return note;
+  if (note == null || note === '') return marker;
+  return `${note}\n${marker}`;
 }
 
 /**
@@ -41,13 +52,17 @@ function appendCoverageNote(note: string | null): string {
  * Кандидати: рядки цього search зі status != 'disabled', відсутні у `fetched`,
  * і (windowFloor IS NULL OR last_refresh_at >= windowFloor; NULL-refresh — старі рядки
  * і «хвіст» за вікном пагінації — у кандидати не потрапляють, їх перевіряє verify).
- * Їм miss_count += 1; при miss_count >= 2 і (status_source='auto' OR
- * status='rejected') → status='disabled' + маркер у note (прозорість причини).
+ * Їм miss_count += 1; при miss_count >= `threshold` і (status_source='auto' OR
+ * status='rejected') → status='disabled', olx_status='inactive' + маркер у note
+ * (прозорість причини). `threshold` залежить від глибини скану: глибокий скан бачить усю
+ * видачу, тож 1 промах — достатній доказ смерті; звичайний (≤3 запити) бачить лише верхівку,
+ * тож дефолт 2 як буфер проти дрижання видачі (scanner.ts передає deep?1:2).
  */
 export function applyScanStatuses(
   searchId: number,
   fetched: RawListing[],
   exhausted: boolean,
+  threshold = 2,
 ): { disabled_count: number } {
   let windowFloor: string | null = null;
 
@@ -98,17 +113,19 @@ export function applyScanStatuses(
     for (const candidate of candidates) {
       const missCount = candidate.miss_count + 1;
       const becomesDisabled =
-        missCount >= 2 &&
+        missCount >= threshold &&
         (candidate.status_source === 'auto' || candidate.status === 'rejected');
 
-      if (becomesDisabled) disabledCount++;
-
-      updateCandidateStmt.run(
-        missCount,
-        becomesDisabled ? 'disabled' : candidate.status,
-        becomesDisabled ? appendCoverageNote(candidate.note) : candidate.note,
-        candidate.id,
-      );
+      if (becomesDisabled) {
+        disabledCount++;
+        updateDisabledStmt.run(
+          missCount,
+          appendCoverageNote(candidate.note, threshold),
+          candidate.id,
+        );
+      } else {
+        updateCandidateStmt.run(missCount, candidate.status, candidate.note, candidate.id);
+      }
     }
 
     return { disabled_count: disabledCount };

@@ -34,7 +34,7 @@ export function BulkActionBar({ searchId, selectedIds, onClear }: Props) {
   return (
     <HStack
       gap={5}
-      colorPalette="blue"
+      colorPalette="accent"
       ml={{ base: 0, sm: 10 }}
       bg="colorPalette.subtle"
       rounded="md"

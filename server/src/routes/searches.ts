@@ -1,9 +1,24 @@
 import type { FastifyInstance } from 'fastify';
 import { db } from '../db/db.js';
-import { runScan, runVerify, countVerifyCandidates } from '../scanner.js';
+import {
+  runScan,
+  runVerify,
+  countVerifyCandidates,
+  analyzeScan,
+  runDeepScanFromPlan,
+  requestStopScan,
+  isAnalysisFresh,
+} from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
-import type { FilterOptions, LocalFilters, ParamKeyInfo, SearchStats } from '../types.js';
+import type {
+  CategoryOption,
+  FilterOptions,
+  LocalFilters,
+  ParamKeyInfo,
+  ScanPlan,
+  SearchStats,
+} from '../types.js';
 
 interface SearchBody {
   name?: string;
@@ -16,6 +31,8 @@ interface SearchBody {
   query_synonyms?: string[];
   /** Архів пошуку (docs/plans/archive-searches.md): 1 — в архіві. */
   archived?: number;
+  /** Проект (docs/plans/projects.md): id проекту або null — «Без проекту». */
+  project_id?: number | null;
 }
 
 /** api_filters/local_filters приймаємо як обʼєкт або рядок → зберігаємо як JSON-рядок. */
@@ -57,8 +74,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const info = db
       .prepare(
-        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         name,
@@ -70,6 +87,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         sortOrder,
         toJsonText(req.body.query_synonyms, '[]'),
         req.body.archived ? 1 : 0,
+        req.body.project_id ?? null,
       );
 
     return reply
@@ -124,6 +142,10 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         fields.push('archived = ?');
         values.push(req.body.archived ? 1 : 0);
       }
+      if (req.body.project_id !== undefined) {
+        fields.push('project_id = ?');
+        values.push(req.body.project_id ?? null);
+      }
 
       if (fields.length > 0) {
         values.push(id);
@@ -148,7 +170,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const listingRows = db
-        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons FROM listings WHERE search_id = ?')
+        .prepare('SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE search_id = ?')
         .all(id) as {
           id: number;
           title: string | null;
@@ -159,6 +181,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
           seller_name: string | null;
           pros: string | null;
           cons: string | null;
+          category_id: number | null;
         }[];
 
       const updateFilteredOut = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
@@ -212,21 +235,25 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: 'direction має бути "up" або "down"' });
       }
 
-      const current = db.prepare('SELECT id, sort_order FROM searches WHERE id = ?').get(id) as
-        | { id: number; sort_order: number }
-        | undefined;
+      const current = db
+        .prepare('SELECT id, sort_order, project_id FROM searches WHERE id = ?')
+        .get(id) as { id: number; sort_order: number; project_id: number | null } | undefined;
       if (!current) return reply.code(404).send({ error: 'Пошук не знайдено' });
 
-      // Реордер лише серед активних (не архівних) — сусіда шукаємо з archived = 0.
+      // Реордер лише серед активних (не архівних) у межах ТІЄЇ Ж групи-проекту
+      // (project_id збігається; NULL = група «Без проекту»).
+      const sameProject = '(project_id = ? OR (? IS NULL AND project_id IS NULL))';
       const neighbor = (
         direction === 'up'
           ? db.prepare(
-              'SELECT id, sort_order FROM searches WHERE sort_order < ? AND archived = 0 ORDER BY sort_order DESC LIMIT 1',
+              `SELECT id, sort_order FROM searches WHERE sort_order < ? AND archived = 0 AND ${sameProject} ORDER BY sort_order DESC LIMIT 1`,
             )
           : db.prepare(
-              'SELECT id, sort_order FROM searches WHERE sort_order > ? AND archived = 0 ORDER BY sort_order ASC LIMIT 1',
+              `SELECT id, sort_order FROM searches WHERE sort_order > ? AND archived = 0 AND ${sameProject} ORDER BY sort_order ASC LIMIT 1`,
             )
-      ).get(current.sort_order) as { id: number; sort_order: number } | undefined;
+      ).get(current.sort_order, current.project_id, current.project_id) as
+        | { id: number; sort_order: number }
+        | undefined;
 
       if (neighbor) {
         const swap = db.transaction(
@@ -260,6 +287,51 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // Аналітична (probe) фаза двофазного глибокого скану (docs/plans/two-phase-deep-scan.md):
+  // root + межі ціни + бісекція по кожному варіанту query, БЕЗ допагінації листів. Повертає
+  // звіт ScanPlan для ScanPlanReportDialog; план кешується на сервері під planToken.
+  app.post<{ Params: { id: string }; Querystring: { deep?: string } }>(
+    '/api/searches/:id/scan/analyze',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      try {
+        const plan = await analyzeScan(id, { deep: req.query.deep === 'true' });
+        return plan;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        app.log.error({ err }, 'Помилка аналітичної фази глибокого скану');
+        return reply.code(500).send({ error: message });
+      }
+    },
+  );
+
+  // Запуск повного глибокого скану за раніше зібраним планом (без повторного зондування).
+  app.post<{ Params: { id: string }; Body: { planToken?: string } }>(
+    '/api/searches/:id/scan/run-plan',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const planToken = req.body.planToken;
+      if (!planToken) return reply.code(400).send({ error: 'planToken обовʼязковий' });
+      try {
+        const result = await runDeepScanFromPlan(id, planToken);
+        return result;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const isStale = message.includes('застарів');
+        app.log.error({ err }, 'Помилка запуску скану за планом');
+        return reply.code(isStale ? 410 : 500).send({ error: message });
+      }
+    },
+  );
+
+  // Зупинка активного скану (docs/plans/deep-scan-stop-and-history.md): ставить abort-прапорець,
+  // активний скан завершиться частковим успіхом і збереже вже зібране у БД.
+  app.post<{ Params: { id: string } }>('/api/searches/:id/scan/stop', async (req) => {
+    const id = Number(req.params.id);
+    const stopped = requestStopScan(id);
+    return { stopped };
+  });
+
   // Verify-прохід (A3): перевірка живості давно не бачених + дозаповнення опису/продавця.
   app.post<{ Params: { id: string } }>('/api/searches/:id/verify', async (req, reply) => {
     const id = Number(req.params.id);
@@ -282,13 +354,49 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       const row = db
         .prepare(
-          `SELECT id, started_at, finished_at, found, new_count, error, requests_done, requests_total,
+          `SELECT id, started_at, finished_at, found, new_count, raw_found, error, requests_done, requests_total,
                   fetch_method, kind, stage, sub_done, sub_total
            FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
         )
         .get(id);
       if (!row) return reply.code(404).send({ error: 'Сканів ще не було' });
       return row;
+    },
+  );
+
+  // Останній збережений аналіз (kind='analyze') — для перегляду без повторного зондування
+  // (docs/plans/deep-scan-stop-and-history.md). planValid — часова валідність (у межах TTL за
+  // finished_at): true → звіт ще запускний (за потреби runDeepScanFromPlan перезондує);
+  // false → аналіз протермінований, потрібен новий.
+  app.get<{ Params: { id: string } }>(
+    '/api/searches/:id/last-analysis',
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const row = db
+        .prepare(
+          `SELECT finished_at, scan_plan FROM scan_runs
+           WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
+           ORDER BY id DESC LIMIT 1`,
+        )
+        .get(id) as { finished_at: string | null; scan_plan: string } | undefined;
+
+      if (!row) return reply.code(404).send({ error: 'Аналізів ще не було' });
+
+      let plan: ScanPlan;
+      try {
+        plan = JSON.parse(row.scan_plan) as ScanPlan;
+      } catch {
+        return reply.code(404).send({ error: 'Збережений аналіз пошкоджено' });
+      }
+
+      return {
+        plan,
+        analyzedAt: row.finished_at,
+        // Валідність — часова (у межах TTL за finished_at), НЕ прив'язана до in-memory кешу:
+        // звіт лишається запускним протягом TTL навіть після закриття діалогу/перезапуску
+        // сервера (runDeepScanFromPlan за потреби перезондує).
+        planValid: isAnalysisFresh(row.finished_at),
+      };
     },
   );
 
@@ -351,11 +459,24 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     const consSet = new Set<string>();
     for (const row of consRows) parseBullets(row.cons).forEach((c) => consSet.add(c));
 
+    // Дерево категорій OLX — кешований facet з останнього скану (searches.category_facet).
+    // Назви/ієрархія/OLX-лічильники готові; локальні лічильники накладає фронт із listings.
+    const facetRow = db.prepare('SELECT category_facet FROM searches WHERE id = ?').get(id) as
+      | { category_facet: string | null }
+      | undefined;
+    let categories: CategoryOption[] = [];
+    try {
+      categories = facetRow?.category_facet ? (JSON.parse(facetRow.category_facet) as CategoryOption[]) : [];
+    } catch {
+      categories = [];
+    }
+
     const result: FilterOptions = {
       cities: cityRows.map((r) => r.city),
       sellers: sellerRows.map((r) => r.seller_name),
       pros: [...prosSet].sort(),
       cons: [...consSet].sort(),
+      categories,
     };
     return result;
   });
@@ -379,8 +500,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
     const lastScan = db
       .prepare(
-        `SELECT kind, started_at, finished_at, found, new_count, disabled_count, error
-         FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
+        `SELECT kind, started_at, finished_at, found, new_count, raw_found, disabled_count, error, warning
+         FROM scan_runs WHERE search_id = ? AND kind != 'analyze' ORDER BY id DESC LIMIT 1`,
       )
       .get(id) as SearchStats['last_scan'] | undefined;
 

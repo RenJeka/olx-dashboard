@@ -93,3 +93,22 @@ Signature-елемент — **сегментована "смуга подоро
 - [ ] Verify з кандидатами в обох фазах — 2 сегменти, live-лічильники.
 - [ ] `prefers-reduced-motion: reduce` — пульсація вимкнена.
 - [ ] >16 підодиниць — деградація до тонкого бару.
+
+## Доповнення — стабільний `requests_total` + згортання скану в хедер (2026-06-20)
+
+Виправлено два UX-баги глибокого скану:
+
+- **Лічильник «103/3» (`requests_total` стрибав униз і ставав меншим за `requests_done`).**
+  Корінь — мульти-query агрегатори прогресу: у `runDeepScanFromPlan` (`server/src/scanner.ts`)
+  `onVariantProgress` зміщував `done` на кумулятивний `requestsUsed`, але `total` віддавав без
+  зміщення (оцінку лише поточного варіанта). Тепер total рахується **наперед** на весь скан
+  (`estimateRunRequests(plan)` по кожному кешованому `SplitPlan` → `plannedTotal`), емітиться
+  одразу (`stage: 'Підготовка…'`) і клампиться `Math.max(plannedTotal, done)` — стабільний і
+  ніколи не менший за `done`. Аналогічно у `fetchAllQueries` (прямий «Глибокий скан» із
+  синонімами) total зроблено монотонно-незменшуваним через `maxTotal = Math.max(maxTotal,
+  totalOffset + p.total, done)`. Single-query split не змінювався (`scanBuckets.totalEstimate`
+  уже стабільний).
+- **Скан легко «загубити».** Новий `web/src/components/searches/action-panel/ScanStatusChip.tsx`
+  — компактний клікабельний індикатор у хедері, що з'являється, коли скан іде, а модалку
+  згорнуто (`isScanning && !dialogOpen`), і повертає модалку (`setDialogOpen(true)`) з тим самим
+  прогресом. Підняття стану не потрібне — рендериться всередині `SearchActionPanel`.

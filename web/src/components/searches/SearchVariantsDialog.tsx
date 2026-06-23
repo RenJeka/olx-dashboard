@@ -20,6 +20,7 @@ import {
 } from '../../api';
 import { showErrorToast } from '../../utils/toast';
 import { sortAlpha } from '../../utils/sort';
+import { DIALOG_SIZE } from '../../theme';
 
 interface Props {
   open: boolean;
@@ -115,7 +116,7 @@ export function SearchVariantsDialog({ open, onOpenChange, query, value, onChang
     <DialogRoot
       open={open}
       onOpenChange={(d) => onOpenChange(d.open)}
-      size="md"
+      size={DIALOG_SIZE.form}
       placement="center"
       scrollBehavior="inside"
     >
@@ -152,7 +153,7 @@ export function SearchVariantsDialog({ open, onOpenChange, query, value, onChang
                       rounded="lg"
                       bg="bg.subtle"
                       _hover={{ borderColor: 'colorPalette.solid', shadow: 'xs' }}
-                      colorPalette="blue"
+                      colorPalette="accent"
                     >
                       <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
                         {s}
@@ -216,7 +217,7 @@ export function SearchVariantsDialog({ open, onOpenChange, query, value, onChang
               <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
                 Відмінити
               </Button>
-              <Button size="sm" colorPalette="blue" onClick={handleSave}>
+              <Button size="sm" colorPalette="accent" onClick={handleSave}>
                 Зберегти
               </Button>
             </HStack>

@@ -26,7 +26,7 @@ export function AnalysisSection() {
             <LuSparkles /> AI-аналіз
           </HStack>
         </Heading>
-        <Badge colorPalette={status?.apiAvailable ? 'green' : 'gray'} variant="subtle">
+        <Badge colorPalette={status?.apiAvailable ? 'success' : 'gray'} variant="subtle">
           {status?.apiAvailable ? 'ключ є (авто)' : 'ручний режим'}
         </Badge>
       </HStack>

@@ -1,4 +1,5 @@
 import type { ListingStatus } from '../types';
+import { STATUS_PALETTE } from '../theme/palette';
 
 /** Лейбли статусів для UI (B1). */
 export const STATUS_LABELS: Record<ListingStatus, string> = {
@@ -9,14 +10,8 @@ export const STATUS_LABELS: Record<ListingStatus, string> = {
   disabled: 'Вимкнено',
 };
 
-/** colorPalette для бейджа/селекта статусу (B1). */
-export const STATUS_COLORS: Record<ListingStatus, string> = {
-  new: 'blue',
-  interested: 'green',
-  contacted: 'purple',
-  rejected: 'gray',
-  disabled: 'red',
-};
+/** colorPalette для бейджа/селекта статусу (B1) — джерело істини у theme/palette. */
+export const STATUS_COLORS: Record<ListingStatus, string> = STATUS_PALETTE;
 
 /** Рядки з цими статусами показуємо приглушеними (opacity). */
 export function isMutedStatus(status: string): boolean {

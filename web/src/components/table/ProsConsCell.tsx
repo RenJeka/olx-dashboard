@@ -15,14 +15,14 @@ interface Props {
 const CONFIG = {
   pros: {
     icon: <LuThumbsUp />,
-    color: 'green.fg',
+    color: 'success.fg',
     placeholder: 'Плюси...',
     emptyLabel: '+ додати плюси',
     saveLabel: 'Зберегти плюси',
   },
   cons: {
     icon: <LuThumbsDown />,
-    color: 'red.fg',
+    color: 'danger.fg',
     placeholder: 'Мінуси...',
     emptyLabel: '− додати мінуси',
     saveLabel: 'Зберегти мінуси',
@@ -73,7 +73,7 @@ export function ProsConsCell({ listing, field }: Props) {
       </Text>
       {listing.analysis_stale === 1 && (
         <Tooltip content="Застарілий аналіз: title/опис змінились після аналізу">
-          <Box color="orange.fg" flexShrink={0} mt="2px">
+          <Box color="warning.fg" flexShrink={0} mt="2px">
             <LuTriangleAlert />
           </Box>
         </Tooltip>
@@ -143,7 +143,7 @@ export function ProsConsCell({ listing, field }: Props) {
               <Button
                 mt={2}
                 size="sm"
-                colorPalette={field === 'pros' ? 'green' : 'red'}
+                colorPalette={field === 'pros' ? 'success' : 'danger'}
                 onClick={handleSave}
                 loading={updateListing.isPending}
               >

@@ -24,6 +24,7 @@ export function useCreateSearch() {
           query: input.query,
           api_filters: { ranges },
           query_synonyms: input.querySynonyms ?? [],
+          project_id: input.projectId,
         }),
       });
     },

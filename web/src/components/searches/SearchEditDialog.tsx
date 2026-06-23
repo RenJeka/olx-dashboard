@@ -16,6 +16,7 @@ import { toaster } from '../ui/toaster';
 import { useUpdateSearch } from '../../api';
 import { parsePriceRange } from '../../utils/format';
 import { parseSearchSynonyms } from '../../utils/searchSynonyms';
+import { DIALOG_SIZE } from '../../theme';
 import type { Search } from '../../types';
 
 interface Props {
@@ -94,7 +95,7 @@ export function SearchEditDialog({ open, onOpenChange, search }: Props) {
       <DialogRoot
         open={open}
         onOpenChange={(d) => onOpenChange(d.open)}
-        size="md"
+        size={DIALOG_SIZE.form}
         placement="center"
         scrollBehavior="inside"
       >
@@ -154,7 +155,7 @@ export function SearchEditDialog({ open, onOpenChange, search }: Props) {
               Скасувати
             </Button>
             <Button
-              colorPalette="blue"
+              colorPalette="accent"
               loading={updateSearch.isPending}
               disabled={!name.trim() || !query.trim()}
               onClick={handleSave}

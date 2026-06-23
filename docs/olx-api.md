@@ -93,6 +93,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
         created_time
         last_refresh_time
         business
+        category { id type }
         location {
           city { name }
           district { name }
@@ -235,6 +236,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `location.city.name` / `district.name` | `city` / `district` | |
 | `photos[0].link` | `photo_url` | замінити `{width}x{height}` → конкретний розмір, напр. `400x300` |
 | `business` | `seller_type` | `true`→`business`, `false`→`private` |
+| `category.id` / `category.type` | `category_id` / `category_type` | id категорії оголошення + слаг типу. Для фільтра «Категорії» (`docs/plans/category-counts-and-filter.md`): `category_id` дає локальні лічильники/фільтрацію; назви+ієрархію+OLX-лічильники бере facet (§2.11) |
 | `params[]` (без price) | `params` | плаский JSON `{key: label}` |
 | `description` | `description` | HTML з `<br />`; на фронті рендериться як plain text |
 | `user.name` | `seller_name` | |
@@ -334,6 +336,43 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - Результат містить `bucketsUsed` (кількість листів-бакетів; `>1` — було розбиття) у
   `FetchSearchResult`/`ScanResult` (для toast/звіту).
 
+#### Двофазний deep-скан — аналіз → звіт → підтверджений запуск (`docs/plans/two-phase-deep-scan.md`)
+
+Усе вище (root-зондування → `probeMaxPrice` → бісекція → допагінація бакетів) виконує
+**швидкий** «Глибокий скан» одним непереривним проходом. Окрема дія «Аналіз перед сканом»
+розбиває це на дві фази, щоб користувач побачив точну картину (ETA, цінові бакети, оцінку
+нових) ПЕРЕД тим, як платити часом за повну допагінацію:
+
+- **Фаза 1 (аналіз, `analyzeSplit`):** робить лише root-запит + `probeMaxPrice` + бісекцію —
+  рівно ті самі кроки, що й раніше, але **без** фази «допагінація листів». Кожен лист-бакет
+  вже містить свою першу сторінку (`page0`, offset 0 — той самий запит, яким бісекція
+  визначала `visible_total_count` бакета), тож жодного зайвого запиту порівняно зі старим
+  єдинопроходовим `fetchSearchSplit`. Малий пошук (`rootCount ≤ SPLIT_THRESHOLD`) або
+  невдалий `probeMaxPrice` → план з одним псевдо-бакетом (`noSplit: true`,
+  `fallbackReason` — напр. `"no upper price bound"`). Виконується **окремо для кожного
+  варіанта запиту** (основний `query` + кожен синонім), з тими самими паузами 3–6с між
+  варіантами, що й multi-query скан.
+- **Звіт:** агрегований результат (`ScanPlan`) показує користувачу розбивку по варіантах
+  запиту, цінові бакети (ширина сегмента ∝ ширині цінового діапазону, інтенсивність ∝
+  кількості оголошень — компонент `ScanPlanReportDialog.tsx`), ETA
+  (`remainingRequests × DEEP_SCAN_SECONDS_PER_REQUEST`) і вибіркову оцінку `estimatedNew`
+  (із `page0` кожного бакету проти БД, `normalizer.selectKnownOlxIds`).
+- **Кешування плану:** оскільки застосунок single-user/локальний, повний внутрішній
+  `SplitPlan[]` (з `page0`) кешується в пам'яті процесу (`Map<planToken, …>`, TTL 30 хв,
+  `randomUUID()`) — фронту повертається лише легкий DTO з токеном. Прострочений/невідомий
+  токен при спробі запуску → HTTP 410, зрозуміла помилка («План застарів — повторіть
+  аналіз»), без падіння.
+- **Фаза 2 (запуск, `scanFromPlan`):** користувач підтверджує кнопкою «Запустити повний
+  скан» у звіті → `runDeepScanFromPlan` дістає кеш за токеном і для кожного варіанта
+  допагінує вже відомі бакети (`scanBuckets`) — **без повторного** root-запиту/`probeMaxPrice`/
+  бісекції. Якщо GraphQL впав між фазами — той самий fallback-патерн, що й у звичайного
+  скану (перехід на `HtmlOlxFetcher` для цього варіанта, з позначкою у `warning`).
+- Швидка кнопка «Глибокий скан» (одна дія, без проміжного звіту) лишається незмінною:
+  `fetchSearchSplit` — тонка композиція `analyzeSplit` + `scanFromPlan` без зміни поведінки.
+- Аналітичні прогони пишуться в `scan_runs` із `kind='analyze'` і виключені з `last_scan` у
+  `GET /api/searches/:id/stats`, щоб банер останнього скану не плутав їх із реальним
+  GraphQL/HTML збором.
+
 > ⚠️ **Не плутати з `/api/searches/:id/listings`.** Ліміт «≤3 запити» вище — це
 > ввічливість стосовно **OLX.ua** під час *збору* (`GraphqlOlxFetcher`/`HtmlOlxFetcher`,
 > ≤120 сирих оголошень за скан). Наш власний `GET /api/searches/:id/listings`
@@ -385,6 +424,31 @@ laquesis (A/B-тести olxcdn.com).
   `suggest_filters="true"` та `sl` — обидва опціональні (§2.5).
 - `filter_float_price:from` у живому запиті фронтенду — у тому самому форматі,
   що ми шлемо (значення рядком). Повторно верифіковано.
+
+### 2.11 Дерево категорій (facet метаданих пошуку) — верифіковано live 2026-06-23
+
+Для фільтра «Категорії» (`docs/plans/category-counts-and-filter.md`) дерево категорій із
+**назвами + ієрархією + лічильниками** тягнеться ОДНИМ запитом:
+
+```
+GET https://www.olx.ua/api/v1/offers/metadata/search/?query=<q>&facets=[{"field":"category","fetchLabel":true,"fetchUrl":true,"limit":100}]
+```
+
+Відповідь — `data.facets.category[]`, елемент: `{ id, count, label, url }`:
+- `label` — людська назва категорії (укр);
+- `count` — к-сть оголошень OLX для запиту в цій категорії (включно з підкатегоріями);
+- `url` — слаг-шлях, що кодує ПОВНУ ієрархію: `/hobbi-otdyh-i-sport/velo/velosipedy/q-<q>`
+  (останній слаг перед `/q-` — власний; попередні — предки). Кожен предок присутній окремим
+  елементом (його `count` ≥ `count` нащадка), тож дерево назв будується суто з цієї відповіді.
+
+Числовий `id` збігається з per-listing `category.id` (§2.7) — facet годиться як джерело назв для
+нашого `listings.category_id`. Реалізація — `server/src/scraper/olxCategories.ts`
+(`fetchCategoryOptions`), тягнеться `scanner.ts` після успішного скану й кешується в
+`searches.category_facet`.
+
+**Що НЕ працює (перевірено live):** `…/api/v1/categories/` → deprecated / access denied;
+`…/api/v1/offers/metadata/search-categories/` → лише `{id, count}` без назв (параметр `facets`
+там ігнорується).
 
 ---
 
@@ -465,6 +529,27 @@ GET <listing.url>
 > ⚠️ Текстові маркери (фрази типу «неактивне», «знято з продажу») **НЕнадійні** — такі
 > рядки трапляються навіть у JS-бандлах живої сторінки. Детект ТІЛЬКИ за HTTP-кодом +
 > наявністю `ad_description`.
+
+**Значення `listings.olx_status` (колонка «Активність» у UI).** OLX у GraphQL присилає
+сирий статус лише для оголошень, що ще є у видачі (`'active'` тощо); для зниклих —
+нічого. Тож «смерть» ми **виводимо самі** й записуємо синтетичне значення (колонка
+`TEXT` без CHECK — вільні значення):
+
+| Значення | Джерело | Певність |
+| --- | --- | --- |
+| `active` | GraphQL-скан бачив оголошення живим (або verify-проба 200+опис при реактивації) | підтверджено |
+| `inactive` | вікно покриття: оголошення зникло з видачі (`miss_count >= threshold`) | інферовано |
+| `removed` | verify-проба: HTTP `410`/`404` | підтверджено |
+| `<сире>` | миттєвий `olx_status`-disable: GraphQL повернув статус ≠ `active` | від OLX |
+| `NULL` | зібрано лише HTML-fallback (без GraphQL) або до міграції колонки; UI рендерить outline-бейдж «невідоме» | не визначено |
+
+> verify-вердикт `unknown` (200 без `ad_description`, 3xx, мережева помилка) `olx_status`
+> **НЕ змінює** — щоб не затирати останнє відоме значення гіршим. Слід спроби — у `note`/`last_seen_at`.
+
+Self-healing: повернення оголошення у GraphQL-видачу живим перезаписує `inactive`/`removed`
+назад на `active` (`normalizer.ts`, `olx_status = COALESCE(excluded.olx_status, olx_status)`)
++ auto-reactivate. Точна причина disable завжди є в `note` (`coverage miss_count=N` /
+`verify http=410` / `olx_status=<значення>`).
 
 **Парсинг живої сторінки (cheerio, `selectors.ts`):**
 

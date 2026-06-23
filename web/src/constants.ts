@@ -59,6 +59,10 @@ export const LOCAL_FILTER_DESCRIPTIONS = {
     normal: 'Показуються лише оголошення з обраними мінусами. Необрані — приховуються.',
     invert: 'Оголошення з обраними мінусами — будуть приховані. Необрані — показуються.',
   },
+  categories: {
+    normal: 'Якщо обрано хоча б одну категорію — показуються лише оголошення з цих категорій.',
+    invert: 'Оголошення з обраних категорій — будуть приховані.',
+  },
 } as const;
 
 // ── Сканування (SearchActionPanel) ──────────────────────────────────────────
@@ -66,9 +70,12 @@ export const SCAN_KIND_LABELS: Record<string, string> = {
   normal: 'швидкий',
   deep: 'глибокий',
   verify: 'перевірка',
+  analyze: 'аналіз',
 };
 
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+/** Скільки хвилин живе закешований план аналізу скану (дзеркалить PLAN_TTL_MIN у server/src/scanner.ts). */
+export const SCAN_PLAN_TTL_MIN = 30;
 export const DEEP_SCAN_PAGE_LIMIT = 40;
 /** Межа вікна пагінації GraphQL OLX (offset ≤ 1000) — дзеркалить MAX_PAGES у graphqlOlxFetcher.ts. */
 export const DEEP_SCAN_MAX_PAGES = 26;
