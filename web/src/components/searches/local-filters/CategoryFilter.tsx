@@ -1,16 +1,13 @@
-import { useMemo } from 'react';
 import { Badge, Box, HStack, Stack, Text } from '@chakra-ui/react';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
-import { useListings } from '../../../api';
-import {
-  buildCategoryCountMap,
-  buildCategoryTree,
-  countUncategorized,
-  flattenTree,
-} from '../../../utils/categoryCounts';
+import { useCategoryTree } from '../../../hooks/useCategoryTree';
+import { nodeCheckedState } from '../../../utils/categoryCounts';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../../constants';
 import type { CategoryOption } from '../../../types';
+
+/** Відступ на рівень вкладеності дерева категорій (rem). */
+const TREE_INDENT_REM = 1.25;
 
 interface Props {
   searchId: number;
@@ -25,8 +22,8 @@ interface Props {
 
 /**
  * Фільтр категорій: дерево «категорія → підкатегорія» з кількістю оголошень біля кожного
- * вузла. Лічильники рахуються в пам'яті з уже завантажених listings (0 запитів до БД).
- * Вибір вузла = вибір усіх листових category_id під ним; між групами фільтрів — AND.
+ * вузла. Лічильники рахуються в пам'яті (useCategoryTree). Вибір вузла = вибір усіх
+ * листових category_id під ним; між групами фільтрів — AND.
  */
 export function CategoryFilter({
   searchId,
@@ -36,14 +33,7 @@ export function CategoryFilter({
   onToggle,
   onInvertChange,
 }: Props) {
-  const { data: listings } = useListings(searchId);
-
-  const { rows, uncategorized } = useMemo(() => {
-    const all = listings ?? [];
-    const countMap = buildCategoryCountMap(all);
-    const tree = buildCategoryTree(categories, countMap);
-    return { rows: flattenTree(tree), uncategorized: countUncategorized(all) };
-  }, [listings, categories]);
+  const { rows, uncategorized } = useCategoryTree(searchId, categories);
 
   if (categories.length === 0) {
     return (
@@ -80,34 +70,24 @@ export function CategoryFilter({
       </Text>
 
       <Stack gap={1}>
-        {rows.map((node) => {
-          const allSelected = node.leafIds.every((id) => selected.has(id));
-          const someSelected = !allSelected && node.leafIds.some((id) => selected.has(id));
-          const checkedState: boolean | 'indeterminate' = allSelected
-            ? true
-            : someSelected
-              ? 'indeterminate'
-              : false;
-
-          return (
-            <Box key={node.key} pl={`${node.depth * 1.25}rem`}>
-              <HStack justify="space-between" gap={2}>
-                <Checkbox
-                  size="sm"
-                  checked={checkedState}
-                  onCheckedChange={(d) => onToggle(node.leafIds, d.checked === true)}
-                >
-                  <Text textStyle="sm" fontWeight={node.depth === 0 ? 'medium' : 'normal'}>
-                    {node.label}
-                  </Text>
-                </Checkbox>
-                <Badge size="sm" variant="subtle" colorPalette="gray">
-                  {node.count}
-                </Badge>
-              </HStack>
-            </Box>
-          );
-        })}
+        {rows.map((node) => (
+          <Box key={node.key} pl={`${node.depth * TREE_INDENT_REM}rem`}>
+            <HStack justify="space-between" gap={2}>
+              <Checkbox
+                size="sm"
+                checked={nodeCheckedState(node, selected)}
+                onCheckedChange={(d) => onToggle(node.leafIds, d.checked === true)}
+              >
+                <Text textStyle="sm" fontWeight={node.depth === 0 ? 'medium' : 'normal'}>
+                  {node.label}
+                </Text>
+              </Checkbox>
+              <Badge size="sm" variant="subtle" colorPalette="gray">
+                {node.count}
+              </Badge>
+            </HStack>
+          </Box>
+        ))}
       </Stack>
 
       {uncategorized > 0 && (

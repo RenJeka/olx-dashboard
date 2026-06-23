@@ -76,6 +76,18 @@ export function buildCategoryTree(
   return roots;
 }
 
+/**
+ * Стан чекбокса вузла за поточним вибором: усі листи обрані → `true`,
+ * частина → `'indeterminate'`, жодного → `false`.
+ */
+export function nodeCheckedState(
+  node: CategoryTreeNode,
+  selected: Set<number>,
+): boolean | 'indeterminate' {
+  if (node.leafIds.every((id) => selected.has(id))) return true;
+  return node.leafIds.some((id) => selected.has(id)) ? 'indeterminate' : false;
+}
+
 /** Плаский pre-order обхід дерева (для рендеру списку з відступами за depth). */
 export function flattenTree(nodes: CategoryTreeNode[]): CategoryTreeNode[] {
   const out: CategoryTreeNode[] = [];

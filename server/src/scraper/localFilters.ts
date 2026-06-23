@@ -46,6 +46,16 @@ export interface FilterableListing {
  *
  * Між групами — AND: повернути true, якщо будь-яке правило спрацювало.
  */
+/**
+ * Чи приховати рядок за однією групою фільтра.
+ * - `active` — група увімкнена (є значення/межі); вимкнена нічого не ховає.
+ * - `matched` — рядок відповідає критерію групи.
+ * - Прямий режим (`inverted` false/undefined) ховає НЕвідповідні; інвертований — відповідні.
+ */
+function hides(active: boolean, matched: boolean, inverted?: boolean): boolean {
+  return active && (inverted ? matched : !matched);
+}
+
 export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableListing): boolean {
   // ── Заплановано на майбутнє (закомментовано, не видаляти) ────────────────
   // const keywords = filters.exclude_keywords ?? [];
@@ -85,43 +95,57 @@ export function evaluateFilteredOut(filters: LocalFilters, listing: FilterableLi
     const within =
       (priceRange.min == null || listing.price >= priceRange.min) &&
       (priceRange.max == null || listing.price <= priceRange.max);
-    if (invert.price_range ? within : !within) return true;
+    if (hides(true, within, invert.price_range)) return true;
   }
 
   // ── Міста ─────────────────────────────────────────────────────────────────
   const cities = filters.cities ?? [];
-  if (cities.length > 0) {
-    const inList = listing.city != null && cities.includes(listing.city);
-    if (invert.cities ? inList : !inList) return true;
-  }
+  if (hides(cities.length > 0, listing.city != null && cities.includes(listing.city), invert.cities))
+    return true;
 
   // ── Продавці ──────────────────────────────────────────────────────────────
   const sellers = filters.sellers ?? [];
-  if (sellers.length > 0) {
-    const inList = listing.seller_name != null && sellers.includes(listing.seller_name);
-    if (invert.sellers ? inList : !inList) return true;
-  }
+  if (
+    hides(
+      sellers.length > 0,
+      listing.seller_name != null && sellers.includes(listing.seller_name),
+      invert.sellers,
+    )
+  )
+    return true;
 
   // ── Плюси ─────────────────────────────────────────────────────────────────
   const filterPros = filters.pros ?? [];
-  if (filterPros.length > 0) {
-    const hasAny = parseBullets(listing.pros).some((p) => filterPros.includes(p));
-    if (invert.pros ? hasAny : !hasAny) return true;
-  }
+  if (
+    hides(
+      filterPros.length > 0,
+      parseBullets(listing.pros).some((p) => filterPros.includes(p)),
+      invert.pros,
+    )
+  )
+    return true;
 
   // ── Мінуси ────────────────────────────────────────────────────────────────
   const filterCons = filters.cons ?? [];
-  if (filterCons.length > 0) {
-    const hasAny = parseBullets(listing.cons).some((c) => filterCons.includes(c));
-    if (invert.cons ? hasAny : !hasAny) return true;
-  }
+  if (
+    hides(
+      filterCons.length > 0,
+      parseBullets(listing.cons).some((c) => filterCons.includes(c)),
+      invert.cons,
+    )
+  )
+    return true;
 
   // ── Категорії ─────────────────────────────────────────────────────────────
   const categories = filters.categories ?? [];
-  if (categories.length > 0) {
-    const inList = listing.category_id != null && categories.includes(listing.category_id);
-    if (invert.categories ? inList : !inList) return true;
-  }
+  if (
+    hides(
+      categories.length > 0,
+      listing.category_id != null && categories.includes(listing.category_id),
+      invert.categories,
+    )
+  )
+    return true;
 
   return false;
 }
