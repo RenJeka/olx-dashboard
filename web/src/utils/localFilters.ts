@@ -1,4 +1,4 @@
-import type { LocalFilters } from '../types';
+import type { LocalFilters, Listing } from '../types';
 
 /** Парсить JSON `searches.local_filters` у типізовану структуру (порожньо при помилці парсингу). */
 export function parseLocalFilters(raw: string): LocalFilters {
@@ -7,6 +7,54 @@ export function parseLocalFilters(raw: string): LocalFilters {
   } catch {
     return {};
   }
+}
+
+/** Пункти з bullet-тексту «• a\n• b» → ['a','b'] (для оцінки фільтрів плюсів/мінусів). */
+function parseBullets(text: string | null): string[] {
+  if (!text) return [];
+  return text
+    .split('\n')
+    .map((line) => line.replace(/^[•\-\s]+/, '').trim())
+    .filter(Boolean);
+}
+
+/** Прямий режим ховає невідповідні; інвертований — відповідні; вимкнена група нічого не ховає. */
+function hides(active: boolean, matched: boolean, inverted?: boolean): boolean {
+  return active && (inverted ? matched : !matched);
+}
+
+/**
+ * Дзеркало серверного `evaluateFilteredOut` (server/src/scraper/localFilters.ts) для ЖИВОГО
+ * прев'ю в Drawer — чи рядок буде прихований локальними фільтрами. Тримати синхронним із сервером.
+ * Активні групи: ціна / міста / продавці / плюси / мінуси / категорії (кожна з режимом invert).
+ */
+export function evaluateLocalFilters(f: LocalFilters, l: Listing): boolean {
+  const invert = f.invert ?? {};
+
+  const pr = f.price_range;
+  if (pr && l.price != null) {
+    const within = (pr.min == null || l.price >= pr.min) && (pr.max == null || l.price <= pr.max);
+    if (hides(true, within, invert.price_range)) return true;
+  }
+
+  const cities = f.cities ?? [];
+  if (hides(cities.length > 0, l.city != null && cities.includes(l.city), invert.cities)) return true;
+
+  const sellers = f.sellers ?? [];
+  if (hides(sellers.length > 0, l.seller_name != null && sellers.includes(l.seller_name), invert.sellers))
+    return true;
+
+  const pros = f.pros ?? [];
+  if (hides(pros.length > 0, parseBullets(l.pros).some((p) => pros.includes(p)), invert.pros)) return true;
+
+  const cons = f.cons ?? [];
+  if (hides(cons.length > 0, parseBullets(l.cons).some((c) => cons.includes(c)), invert.cons)) return true;
+
+  const cats = f.categories ?? [];
+  if (hides(cats.length > 0, l.category_id != null && cats.includes(l.category_id), invert.categories))
+    return true;
+
+  return false;
 }
 
 /** Чи має пошук активні локальні фільтри (індикатор-крапка у рядку пошуку). */
