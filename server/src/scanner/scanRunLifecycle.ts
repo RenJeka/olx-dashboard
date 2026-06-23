@@ -1,4 +1,4 @@
-import { db } from '../db/db.js';
+import { dbRun } from '../db/db.js';
 import type { ScanProgress } from '../types.js';
 import { abortFlags } from './abortControl.js';
 
@@ -12,27 +12,21 @@ export interface ScanRunContext {
   onProgress: (p: ScanProgress) => void;
 }
 
-// Unified prepared statement: `fetch_method` — через COALESCE (analyze не має його,
-// решта scan-видів мають). `stage` завжди перезаписується (транзієнтний текст).
-const updateProgressStmt = db.prepare(
-  `UPDATE scan_runs SET
+// Unified SQL: `fetch_method` — через COALESCE (analyze не має його, решта scan-видів мають).
+// `stage` завжди перезаписується (транзієнтний текст).
+const UPDATE_PROGRESS_SQL = `UPDATE scan_runs SET
      requests_done = ?,
      requests_total = COALESCE(?, requests_total),
      fetch_method = COALESCE(?, fetch_method),
      stage = ?,
      sub_done = COALESCE(?, sub_done),
      sub_total = COALESCE(?, sub_total)
-   WHERE id = ?`,
-);
+   WHERE id = ?`;
 
-const insertRunStmt = db.prepare(
-  'INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)',
-);
+const INSERT_RUN_SQL = 'INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)';
 
-const finalizeErrorStmt = db.prepare(
-  `UPDATE scan_runs SET finished_at = ?, error = ?,
-     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
-);
+const FINALIZE_ERROR_SQL = `UPDATE scan_runs SET finished_at = ?, error = ?,
+     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
 /**
  * Обгортка lifecycle для scan_runs: створює запис, налаштовує abort/progress,
@@ -50,11 +44,14 @@ export async function withScanRun<T>(
   const shouldAbort = (): boolean => abortFlags.get(searchId) === true;
 
   const runId = Number(
-    insertRunStmt.run(searchId, new Date().toISOString(), kind).lastInsertRowid,
+    (await dbRun(INSERT_RUN_SQL, [searchId, new Date().toISOString(), kind])).lastInsertRowid,
   );
 
+  // Прогрес — best-effort: callback лишається синхронним (void), запис fire-and-forget із
+  // ковтанням помилки. Деталі прогресу косметичні (поллінг scan-status); фінальний запис
+  // (finalize) робиться вже після завершення body, коли всі onProgress вже видані.
   const onProgress = (p: ScanProgress): void => {
-    updateProgressStmt.run(
+    void dbRun(UPDATE_PROGRESS_SQL, [
       p.done,
       p.total ?? null,
       p.method ?? null,
@@ -62,14 +59,14 @@ export async function withScanRun<T>(
       p.subDone ?? null,
       p.subTotal ?? null,
       runId,
-    );
+    ]).catch(() => {});
   };
 
   try {
     return await body({ runId, shouldAbort, onProgress });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    finalizeErrorStmt.run(new Date().toISOString(), message, runId);
+    await dbRun(FINALIZE_ERROR_SQL, [new Date().toISOString(), message, runId]);
     throw err;
   } finally {
     abortFlags.delete(searchId);

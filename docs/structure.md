@@ -26,14 +26,16 @@ olx-dashboard/
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
-│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio, exceljs, archiver
+│   ├── package.json          # deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
 │   ├── scripts/
 │   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/
-│   │   └── olx.db            # SQLite (gitignored, створюється при старті)
+│   │   └── olx.db            # локальна libSQL/SQLite БД (gitignored; file: дефолт, створюється initDb при старті)
+│   ├── .env.example          # OPENROUTER_API_KEY + TURSO_DATABASE_URL/TURSO_AUTH_TOKEN/WEB_ORIGIN
 │   └── src/
-│       ├── index.ts          # Fastify bootstrap, CORS :5173, /health, listen :3001
+│       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
+│       ├── index.ts          # Fastify bootstrap, CORS з WEB_ORIGIN, /health, await initDb(), listen :3001 host 0.0.0.0
 │       ├── types/            # доменні типи (core, listings, scan, analysis) за принципом DDD
 │       │   ├── core.ts       # базові сутності (SearchConfig, Project, фільтри)
 │       │   ├── listings.ts   # оголошення, статуси
@@ -53,8 +55,8 @@ olx-dashboard/
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
-│       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
-│       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
+│       │   ├── schema.sql    # КАНОН схеми БД (5 таблиць) — джерело істини
+│       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey

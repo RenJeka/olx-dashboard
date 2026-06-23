@@ -21,7 +21,7 @@
 | Шар | Технологія |
 | --- | --- |
 | Monorepo | npm workspaces (`server/` + `web/`) |
-| Backend | Node.js 20+, TypeScript (strict), Fastify 5, better-sqlite3 (синхронний), cheerio |
+| Backend | Node.js 20+, TypeScript (strict), Fastify 5, @libsql/client (Turso/libSQL, async; локально `file:`), cheerio |
 | Frontend | React 18, Vite 6, TanStack Query v5, TanStack Table v8, Chakra UI v3 (+ next-themes) |
 | Збір даних | GraphQL `POST /apigateway/graphql` (основний); `fetch` + cheerio HTML-парсинг (fallback). БЕЗ браузера/Playwright |
 
@@ -42,7 +42,7 @@ flowchart LR
         GQ[scraper/graphql/<br/>GraphqlOlxFetcher — основний]
         FE[scraper/olxFetcher.ts<br/>HtmlOlxFetcher — fallback]
         NR[scraper/normalizer.ts<br/>parse + upsert]
-        DB[(db/db.ts<br/>better-sqlite3)]
+        DB[(db/db.ts<br/>@libsql/client — Turso/file:)]
         R1 --> SC
         SC --> GQ
         SC -. "якщо GraphQL упав" .-> FE
@@ -169,7 +169,7 @@ flowchart LR
 
 | Модуль | Відповідальність |
 | --- | --- |
-| `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
+| `db/db.ts` | Створює клієнт `@libsql/client` (`createClient`): локально `file:server/data/olx.db` (дефолт), у проді `TURSO_DATABASE_URL` (`libsql://…`) + `TURSO_AUTH_TOKEN`. Експортує `db` + тонкі async-обгортки `dbGet`/`dbAll`/`dbRun` (НЕ ORM — лише прибирають boilerplate `{sql,args}` і локалізують каст `Row`→тип) + `initDb()` (`executeMultiple(schema.sql)` — викликати на старті кожної точки входу). Схема libSQL-сумісна (`CREATE TABLE IF NOT EXISTS`); історичний міграц-скаффолд (`addColumnIfMissing`/`migrateListingsTable`/backfill/PRAGMA/WAL) прибрано — `schema.sql` містить усі колонки. Інтерактивні транзакції (`db.transaction('write')`) для read→умова→write (upsert/statusEngine/commit); `db.batch([...], 'write')` для чистих наборів записів (cascade/swap/recompute). Env вантажиться `env.ts` (імпортований першим рядком `db.ts`). |
 | `db/schema.sql` | Канонічна схема (5 таблиць: `projects`, `searches`, `listings`, `price_history`, `scan_runs`). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`, `PriceBucketSummary`/`ScanPlanQuery`/`ScanPlan` — DTO двофазного deep-скану, `docs/plans/two-phase-deep-scan.md`). Без `any`. |
 | `scraper/graphql/` | `GraphqlOlxFetcher implements OlxFetcher` (основний). Модуль розбитий на: `constants.ts` (URL, ліміти, GraphQL query, split-пороги), `types.ts` (типи відповіді GraphQL API, `PriceBucket`, `SplitPlan`), `client.ts` (HTTP запити/парсинг параметрів), `mapper.ts` (конвертація сирих даних у RawListing), `split.ts` (алгоритм розбиття діапазонів і допагінації бакетів), `fetcher.ts` (Facade, який оркеструє client та split), `index.ts` (реекспорт). `fetchPage` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина, тепер у `client.ts`). `fetchSearch` — звичайний/глибокий прохід одного діапазону. Двофазний split (`docs/plans/two-phase-deep-scan.md`): `analyzeSplit(search, options?) → SplitPlan` — лише root-probe + `resolveUpperPriceBound` + `bisectPriceRange`, **без** допагінації (малий пошук/невдалий probe → `SplitPlan.noSplit=true`); `scanFromPlan(search, plan, options?)` — допагінація вже зібраних бакетів (`scanBuckets`) без повторного зондування; `fetchSearchSplit` лишається тонкою композицією `analyzeSplit` + `scanFromPlan` (поведінка швидкого deep-скану незмінна). `probeMaxPrice` — зондування верхньої межі. Запобіжники `MAX_BUCKETS=60`/`MAX_TOTAL_REQUESTS=400` (на варіант; підняті для повного покриття великих пошуків, `docs/plans/deep-scan-stop-and-history.md`); повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
@@ -208,9 +208,10 @@ flowchart LR
 - `filtered_out` — прапорець локальних фільтрів (`local_filters`), рядок не видаляється.
 - `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/projects.md`).
-- `searches.sort_order` — ручний порядок у списку (менше → вище); бекфіл існуючих рядків
-  (`0..N-1` за `created_at DESC`) виконує `db.ts` при старті, нові пошуки отримують
-  `MIN(sort_order) - 1` (з'являються згори).
+- `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
+  `MIN(sort_order) - 1` (з'являються згори). Історичний одноразовий бекфіл у `db.ts` прибрано
+  при міграції на libSQL (порожня Turso/нова БД не має чого бекфілити; наявна локальна БД уже
+  заповнена).
 
 > `price_history` створена у схемі, але кодом ще не наповнюється (Етап 3).
 

@@ -1,6 +1,11 @@
 # Phase 0 — Міграція persistence-шару: better-sqlite3 → @libsql/client (Turso)
 
-> Статус: **ПЛАН на рев'ю** — без змін коду. Реалізація — лише після підтвердження.
+> Статус: **РЕАЛІЗОВАНО** (Phase 0). Усі test-cases пройдені локально проти libSQL `file:`:
+> `npm run build -w server` зелений; `/health` ok; реальний скан з live OLX (135/151 оголошень,
+> GraphQL) → upsert через інтерактивну транзакцію + дедуп; `applyScanStatuses` disable (miss_count,
+> coverage-маркер, `olx_status=inactive`); `PATCH /api/listings/:id` → `status_source='manual'`,
+> `miss_count=0`; CLI `npm run scan -- --search <id>`; cascade-delete/recompute через `db.batch`.
+> Деплой-конфіг (render.yaml/Static Site/cron) — поза Phase 0, наступні фази.
 
 ## Контекст (навіщо)
 

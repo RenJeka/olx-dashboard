@@ -1,4 +1,4 @@
-import { db } from '../db/db.js';
+import { dbAll, dbGet, dbRun } from '../db/db.js';
 import { probeListingPage } from '../scraper/verifier.js';
 import { interruptibleSleep, randomDelayMs } from '../scraper/utils.js';
 import {
@@ -47,40 +47,39 @@ const P2_CONDITION = `
  * Кандидати verify-проходу (≤ cap, P1 спершу). Реалізація — `docs/plans/verify-pass.md` групи B1.
  * `p1Count` — межа фаз (P1 живість / P2 дозаповнення) для прогресу (docs/plans/scan-progress-detail.md).
  */
-function loadVerifyCandidates(
+async function loadVerifyCandidates(
   searchId: number,
   cap: number,
-): { candidates: VerifyCandidateRow[]; p1Count: number } {
+): Promise<{ candidates: VerifyCandidateRow[]; p1Count: number }> {
   const columns = 'id, olx_id, url, status, status_source, note, description, seller_name';
 
-  const p1 = db
-    .prepare(
-      `SELECT ${columns} FROM listings WHERE search_id = ? AND ${P1_CONDITION} ORDER BY last_seen_at ASC LIMIT ?`,
-    )
-    .all(searchId, cap) as VerifyCandidateRow[];
+  const p1 = await dbAll<VerifyCandidateRow>(
+    `SELECT ${columns} FROM listings WHERE search_id = ? AND ${P1_CONDITION} ORDER BY last_seen_at ASC LIMIT ?`,
+    [searchId, cap],
+  );
 
   if (p1.length >= cap) return { candidates: p1, p1Count: p1.length };
 
-  const p2 = db
-    .prepare(
-      `SELECT ${columns} FROM listings WHERE search_id = ? AND ${P2_CONDITION} ORDER BY posted_at DESC LIMIT ?`,
-    )
-    .all(searchId, cap - p1.length) as VerifyCandidateRow[];
+  const p2 = await dbAll<VerifyCandidateRow>(
+    `SELECT ${columns} FROM listings WHERE search_id = ? AND ${P2_CONDITION} ORDER BY posted_at DESC LIMIT ?`,
+    [searchId, cap - p1.length],
+  );
 
   return { candidates: [...p1, ...p2], p1Count: p1.length };
 }
 
 /** Загальна кількість кандидатів verify-проходу (P1+P2, без перетину) — для /stats. */
-export function countVerifyCandidates(searchId: number): number {
-  const { cnt: p1 } = db
-    .prepare(`SELECT COUNT(*) AS cnt FROM listings WHERE search_id = ? AND ${P1_CONDITION}`)
-    .get(searchId) as { cnt: number };
+export async function countVerifyCandidates(searchId: number): Promise<number> {
+  const p1 = await dbGet<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM listings WHERE search_id = ? AND ${P1_CONDITION}`,
+    [searchId],
+  );
+  const p2 = await dbGet<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM listings WHERE search_id = ? AND ${P2_CONDITION}`,
+    [searchId],
+  );
 
-  const { cnt: p2 } = db
-    .prepare(`SELECT COUNT(*) AS cnt FROM listings WHERE search_id = ? AND ${P2_CONDITION}`)
-    .get(searchId) as { cnt: number };
-
-  return p1 + p2;
+  return (p1?.cnt ?? 0) + (p2?.cnt ?? 0);
 }
 
 /** Дописує marker у note, якщо його ще немає (ідемпотентність — патерн normalizer.ts). */
@@ -90,13 +89,11 @@ function appendVerifyNote(note: string, marker: string): string {
 }
 
 // dead → olx_status='removed' (підтверджено прямою пробою 410/404 — точніше за coverage 'inactive').
-const updateDeadStmt = db.prepare(
-  `UPDATE listings SET status = 'disabled', note = ?, olx_status = 'removed' WHERE id = ?`,
-);
+const UPDATE_DEAD_SQL = `UPDATE listings SET status = 'disabled', note = ?, olx_status = 'removed' WHERE id = ?`;
 
 // alive: при реактивації (disabled→new) сторінка живою підтверджена (200+опис) → olx_status='active';
 // без реактивації olx_status не чіпаємо (probe — HTML, сирого статусу OLX не дає).
-const updateAliveStmt = db.prepare(`
+const UPDATE_ALIVE_SQL = `
   UPDATE listings SET
     last_seen_at = datetime('now'),
     miss_count = 0,
@@ -105,16 +102,12 @@ const updateAliveStmt = db.prepare(`
     description = COALESCE(description, @description),
     seller_name = COALESCE(seller_name, @seller_name)
   WHERE id = @id
-`);
+`;
 
-const updateVerifyProgressStmt = db.prepare(
-  `UPDATE scan_runs SET requests_done = ?, stage = ?, sub_done = ?, sub_total = ? WHERE id = ?`,
-);
+const UPDATE_VERIFY_PROGRESS_SQL = `UPDATE scan_runs SET requests_done = ?, stage = ?, sub_done = ?, sub_total = ? WHERE id = ?`;
 
-const finalizeVerifyStmt = db.prepare(
-  `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?, warning = ?,
-     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
-);
+const FINALIZE_VERIFY_SQL = `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, disabled_count = ?, error = ?, warning = ?,
+     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
 /**
  * Verify-прохід (Етап 2 A3, `docs/plans/verify-pass.md`): пряма перевірка сторінок
@@ -127,22 +120,22 @@ const finalizeVerifyStmt = db.prepare(
  * 200 + `ad_description` → alive; інше → unknown (статус не змінюється).
  */
 export async function runVerify(searchId: number): Promise<VerifyResult> {
-  const search = db.prepare('SELECT id FROM searches WHERE id = ?').get(searchId);
+  const search = await dbGet('SELECT id FROM searches WHERE id = ?', [searchId]);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }
 
   return withScanRun(searchId, 'verify', async (ctx) => {
-    const { candidates, p1Count } = loadVerifyCandidates(searchId, VERIFY_PAGE_CAP);
+    const { candidates, p1Count } = await loadVerifyCandidates(searchId, VERIFY_PAGE_CAP);
     const total = candidates.length;
     const p2Count = total - p1Count;
     // Сегментована смуга прогресу має сенс лише коли ОБИДВІ фази мають кандидатів — інакше
     // прохід однофазний і sub_total лишаємо NULL (docs/plans/scan-progress-detail.md).
     const hasTwoPhases = p1Count > 0 && p2Count > 0;
-    db.prepare('UPDATE scan_runs SET requests_done = 0, requests_total = ? WHERE id = ?').run(
+    await dbRun('UPDATE scan_runs SET requests_done = 0, requests_total = ? WHERE id = ?', [
       total,
       ctx.runId,
-    );
+    ]);
 
     const result: VerifyResult = {
       checked: 0,
@@ -169,7 +162,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
         result.dead++;
         if (candidate.status_source === 'auto' || candidate.status === 'rejected') {
           const marker = `auto-disabled: verify http=${probe.httpStatus}`;
-          updateDeadStmt.run(appendVerifyNote(candidate.note, marker), candidate.id);
+          await dbRun(UPDATE_DEAD_SQL, [appendVerifyNote(candidate.note, marker), candidate.id]);
           result.disabled_count++;
         }
       } else if (probe.verdict === 'alive') {
@@ -181,7 +174,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
         const backfillsSeller = candidate.seller_name == null && probe.sellerName != null;
         if (backfillsDescription || backfillsSeller) result.backfilled++;
 
-        updateAliveStmt.run({
+        await dbRun(UPDATE_ALIVE_SQL, {
           id: candidate.id,
           status: reactivate ? 'new' : candidate.status,
           reactivate: reactivate ? 1 : 0,
@@ -197,13 +190,13 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
 
       const phase = i < p1Count ? 'Перевірка живості' : 'Перевірка опису';
       const stage = `${phase} · #${candidate.olx_id} · живих ${result.alive} · мертвих ${result.dead}`;
-      updateVerifyProgressStmt.run(
+      await dbRun(UPDATE_VERIFY_PROGRESS_SQL, [
         i + 1,
         stage,
         hasTwoPhases ? (i < p1Count ? 1 : 2) : null,
         hasTwoPhases ? 2 : null,
         ctx.runId,
-      );
+      ]);
 
       if (i < candidates.length - 1) {
         if ((i + 1) % VERIFY_BATCH_SIZE === 0) {
@@ -217,7 +210,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     const error = unknownIssues.length > 0 ? `verify unknown: ${unknownIssues.join('; ')}` : null;
     const warning = aborted ? `Зупинено користувачем — перевірено ${result.checked} з ${total}` : null;
 
-    finalizeVerifyStmt.run(
+    await dbRun(FINALIZE_VERIFY_SQL, [
       new Date().toISOString(),
       result.checked,
       result.reactivated,
@@ -225,7 +218,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
       error,
       warning,
       ctx.runId,
-    );
+    ]);
 
     return result;
   });
