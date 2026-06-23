@@ -12,6 +12,7 @@ import {
 import { toaster } from '../ui/toaster';
 import { useFilterOptions, useUpdateSearchFilters } from '../../api';
 import { buildLocalFiltersPayload } from '../../utils/localFilters';
+import { parsePriceRange, formatPriceRange } from '../../utils/format';
 import { useLocalFiltersForm } from '../../hooks/useLocalFiltersForm';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../constants';
 import { DRAWER_SIZE } from '../../theme';
@@ -51,6 +52,17 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     setCategoriesInvert,
     toggleCategories,
   } = useLocalFiltersForm(open ? search.local_filters : '');
+
+  // Контекст для пояснення розриву «наших / OLX» у фільтрі категорій.
+  const priceRange = parsePriceRange(search.api_filters);
+  const priceFilterLabel = priceRange ? formatPriceRange(priceRange.from, priceRange.to) : null;
+  let synonymCount = 0;
+  try {
+    const parsed = JSON.parse(search.query_synonyms || '[]');
+    synonymCount = Array.isArray(parsed) ? parsed.length : 0;
+  } catch {
+    synonymCount = 0;
+  }
 
   function handleSave() {
     const local_filters = buildLocalFiltersPayload(state);
@@ -98,6 +110,8 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
               categories={filterOptions?.categories ?? []}
               selectedIds={state.categories}
               isInverted={state.categoriesInvert}
+              priceFilterLabel={priceFilterLabel}
+              synonymCount={synonymCount}
               onToggle={toggleCategories}
               onInvertChange={setCategoriesInvert}
             />
