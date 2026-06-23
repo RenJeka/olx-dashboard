@@ -13,69 +13,77 @@
 підкатегорій у per-listing відповіді немає. Тому потрібні: (1) збір категорії під час скану,
 (2) словник категорій OLX для назв/ієрархії, (3) ре-скан для бекфілу наявних рядків.
 
-**Рішення:** per-listing зберігаємо `category_id`+`category_type`; назви/ієрархію беремо зі
-словника категорій OLX (кеш `server/data/olx-categories.json`, з fallback на id/слаг, якщо
-недоступний); дерево з лічильниками — у наявному Drawer локальних фільтрів; лічильники рахуються
-**в пам'яті** з уже завантаженого масиву listings (0 додаткових запитів до БД); фільтрація — нова
-група `categories` у `local_filters` (білий/чорний список + invert).
+**Рішення (джерело назв верифіковано live 2026-06-23):**
+- **Назви + ієрархія + OLX-лічильники** — з facet метаданих пошуку (ОДИН запит, `olx-api.md` §2.11):
+  `…/offers/metadata/search/?query=<q>&facets=[{field:category,fetchLabel:true,fetchUrl:true}]`
+  → `{id, count, label, url}`; ієрархія з `url`-слагів. Тягнеться `scanner.ts` після успішного
+  скану (best-effort), кешується у `searches.category_facet` (JSON `CategoryOption[]`). Фільтр читає
+  кеш — **без мережі в запиті**.
+- **Локальні лічильники** («наших у базі») — з per-listing `listings.category_id` (+`category_type`),
+  рахуються **в пам'яті** з уже завантаженого масиву listings (0 додаткових запитів до БД).
+- **Фільтрація** — нова група `categories` у `local_filters` (білий/чорний список + invert), збіг по
+  `listings.category_id`.
+- **UI:** дерево у Drawer локальних фільтрів; біля кожного вузла **два числа — «наших / на OLX»**.
 
-> ⚠️ Ендпойнт словника категорій OLX (кандидат `https://www.olx.ua/api/v1/categories/`) **НЕ
-> верифіковано live** (мережа OLX у build-середовищі заблокована egress-політикою). Реалізація
-> самоперевіряється у рантаймі + graceful fallback на id/слаг; формат відповіді звірити при
-> першому живому запуску локально.
+> Перевірені факти OLX-API (live 2026-06-23): `…/api/v1/categories/` — deprecated/access denied;
+> `…/metadata/search-categories/` — лише `{id,count}` без назв; робочий — facet `…/metadata/search/`
+> (вище). Деталі — пам'ять `olx-category-facet-endpoint`, `docs/olx-api.md` §2.11.
 
 ## Файли
 
 ### Backend
-- `server/src/db/schema.sql` — `listings`: `category_id INTEGER`, `category_type TEXT`.
-- `server/src/db/db.ts` — `addColumnIfMissing` для двох нових колонок (бекфіл наявної БД).
-- `server/src/scraper/graphql/constants.ts` — у `LISTING_SEARCH_QUERY` додати `category { id type }`.
-- `server/src/scraper/graphql/types.ts` — `GraphqlListing.category`.
-- `server/src/scraper/graphql/fetcher.ts` — `mapListing` витягує `categoryId`/`categoryType`.
-- `server/src/types.ts` — `RawListing.categoryId/categoryType`; `LocalFilters.categories` +
-  `invert.categories`; `FilterOptions.categories: CategoryOption[]`; новий тип `CategoryOption`.
+- `server/src/db/schema.sql` + `db.ts` — `listings`: `category_id`/`category_type`;
+  `searches`: `category_facet TEXT` (кеш дерева). `addColumnIfMissing` для бекфілу наявної БД.
+- `server/src/scraper/graphql/{constants,types,fetcher}.ts` — query запитує `category { id type }`,
+  `GraphqlListing.category`, `mapListing` витягує `categoryId`/`categoryType`.
+- `server/src/types.ts` — `RawListing.categoryId/categoryType`; `LocalFilters.categories`+invert;
+  `CategoryOption {id, path, olxCount}`; `FilterOptions.categories`.
 - `server/src/scraper/normalizer.ts` — UPSERT пише `category_id`/`category_type`; `FilterableListing`
   читає `category_id`.
 - `server/src/scraper/localFilters.ts` — гілка `categories` в `evaluateFilteredOut`.
+- `server/src/scraper/olxCategories.ts` (**новий**) — `fetchCategoryOptions(query)`: facet OLX →
+  `CategoryOption[]` (id + шлях назв + olxCount; ієрархія з url-слагів). Best-effort.
+- `server/src/scanner.ts` — `refreshCategoryFacet(searchId, query)` після успішного скану → кеш у
+  `searches.category_facet`.
 - `server/src/routes/searches.ts` — рекомпʼют PATCH читає `category_id`; `/filter-options` віддає
-  `categories` (distinct id + шлях назв зі словника).
+  `categories` з кешу `searches.category_facet` (без мережі).
 - `server/src/routes/listings.ts` — SELECT повертає `category_id`/`category_type`.
-- `server/src/scraper/olxCategories.ts` (**новий**) — fetch+кеш словника OLX, `resolveCategoryPath`.
 
 ### Frontend
 - `web/src/types/index.ts` — `Listing.category_id/category_type`; `LocalFilters.categories`+invert;
-  `FilterOptions.categories`; `CategoryOption`.
-- `web/src/components/searches/local-filters/CategoryFilter.tsx` (**новий**) — дерево з
-  лічильниками+чекбоксами+invert.
+  `CategoryOption {id, path, olxCount}`; `FilterOptions.categories`.
+- `web/src/utils/categoryCounts.ts` (**новий**) — `buildCategoryCountMap` + `buildCategoryTree`
+  (вузол: `localCount` сумою по підгілці + `olxCount` із facet) + `nodeCheckedState`.
+- `web/src/hooks/useCategoryTree.ts` (**новий**) — обв'язка listings+дерево (лічильники в пам'яті).
+- `web/src/components/searches/local-filters/CategoryFilter.tsx` (**новий**) — дерево, чекбокси,
+  invert, два числа «наших / OLX».
 - `web/src/components/searches/SearchFiltersDrawer.tsx` — вмонтувати `CategoryFilter`.
 - `web/src/hooks/useLocalFiltersForm.ts` — стан `categories: number[]` + `categoriesInvert`.
 - `web/src/utils/localFilters.ts` — серіалізація/парсинг групи `categories`; `hasActiveLocalFilters`.
-- `web/src/utils/categoryCounts.ts` (**новий**) — побудова `Map<category_id,count>` + агрегація дерева.
 - `web/src/constants.ts` — `LOCAL_FILTER_DESCRIPTIONS.categories`.
 
 ### Документація
-- `docs/architecture.md`, `docs/structure.md`, `docs/olx-api.md` (query тепер запитує `category`;
-  словниковий кеш-файл), `server/src/db/schema.sql` коментарі.
+- `docs/architecture.md`, `docs/structure.md`, `docs/olx-api.md` §2.11 (верифікований facet),
+  `server/src/db/schema.sql` коментарі.
 
 ## Кроки
 
-- [ ] Backend: схема + міграція колонок.
-- [ ] Backend: GraphQL query/тип/мапінг category.
-- [ ] Backend: normalizer UPSERT + filterable.
-- [ ] Backend: LocalFilters.categories + evaluateFilteredOut.
-- [ ] Backend: словник OLX (olxCategories.ts) + /filter-options.categories + listings SELECT.
-- [ ] Frontend: типи + форма + payload + CategoryFilter + counts + Drawer.
-- [ ] Документація + build.
+- [x] Backend: схема/міграція (listings.category_*, searches.category_facet) + GraphQL category.
+- [x] Backend: normalizer UPSERT + LocalFilters.categories + evaluateFilteredOut.
+- [x] Backend: olxCategories.fetchCategoryOptions (facet) + scanner.refreshCategoryFacet +
+  /filter-options з кешу + listings SELECT.
+- [x] Frontend: типи + форма + payload + categoryCounts + useCategoryTree + CategoryFilter (наших/OLX) + Drawer.
+- [x] Документація + build.
 
 ## Test-cases
 
-1. `npm run build` — типи беку/фронту збираються (strict).
-2. Скан пошуку → `listings.category_id/category_type` заповнені; `server/data/olx-categories.json`
-   зʼявляється (або, якщо мережа недоступна — fallback: дерево показує id/слаг, без падіння).
-3. Drawer → секція «Категорії»: дерево з числом біля кожного вузла; сума підкатегорій = число категорії.
-4. Вибір категорії/підкатегорії + Зберегти → ретроактивний перерахунок `filtered_out`; таблиця
-   показує лише відповідні (invert — навпаки); «Результатів» оновлюється.
-5. Перезавантаження → вибір збережено в `local_filters`.
+1. ✅ `npm run build` — типи беку/фронту збираються (strict).
+2. ✅ `fetchCategoryOptions('велобіг')` live → 36 `CategoryOption` з назвами/ієрархією/OLX-лічильниками.
+3. ▢ Скан пошуку → `listings.category_id` заповнені; `searches.category_facet` оновлено.
+4. ▢ Drawer → «Категорії»: дерево з двома числами біля вузла («наших / OLX»); сума підкатегорій
+   (наших) сходиться; OLX-число — facet категорії.
+5. ▢ Вибір категорії/підкатегорії + Зберегти → ретроактивний перерахунок `filtered_out`; таблиця
+   показує лише відповідні (invert — навпаки); «Результатів» оновлюється. Перезавантаження → вибір збережено.
 
 ## Відповідь на питання «скільки операцій зчитування»
 

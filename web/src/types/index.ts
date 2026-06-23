@@ -64,13 +64,14 @@ export interface ParamKeyInfo {
 }
 
 /**
- * Категорія, наявна у пошуку (для дерева фільтра категорій).
- * `id` — листовий Listing.category_id; `path` — назви предків зверху вниз (зі словника OLX;
- * fallback — один сегмент із id/слагом, якщо словник недоступний).
+ * Вузол дерева категорій OLX (facet з останнього скану).
+ * `id` — category id (= Listing.category_id); `path` — назви предків root→leaf;
+ * `olxCount` — лічильник OLX для запиту (включно з підкатегоріями).
  */
 export interface CategoryOption {
   id: number;
   path: string[];
+  olxCount: number;
 }
 
 /** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */

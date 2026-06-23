@@ -75,9 +75,6 @@ server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
 
-# Кеш словника категорій OLX (docs/plans/category-counts-and-filter.md)
-server/data/olx-categories.json
-
 # Архіви локальних даних/бекапів (напр. server/data.zip)
 *.zip
 

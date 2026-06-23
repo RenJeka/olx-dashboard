@@ -10,7 +10,6 @@ import {
   isAnalysisFresh,
 } from '../scanner.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
-import { getCategoryMap, resolveCategoryPath } from '../scraper/olxCategories.js';
 import { parseBullets } from '../analysis/text.js';
 import type {
   CategoryOption,
@@ -460,21 +459,17 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     const consSet = new Set<string>();
     for (const row of consRows) parseBullets(row.cons).forEach((c) => consSet.add(c));
 
-    // Категорії, наявні в пошуку: distinct листові category_id + слаг для fallback-назви.
-    // Лічильники тут НЕ рахуємо — їх дає фронт із уже завантаженого масиву listings.
-    const categoryRows = db
-      .prepare(
-        'SELECT DISTINCT category_id, category_type FROM listings WHERE search_id = ? AND category_id IS NOT NULL',
-      )
-      .all(id) as { category_id: number; category_type: string | null }[];
-
-    const categoryMap = await getCategoryMap();
-    const categories: CategoryOption[] = categoryRows
-      .map((r) => ({
-        id: r.category_id,
-        path: resolveCategoryPath(categoryMap, r.category_id, r.category_type ?? undefined),
-      }))
-      .sort((a, b) => a.path.join(' / ').localeCompare(b.path.join(' / '), 'uk'));
+    // Дерево категорій OLX — кешований facet з останнього скану (searches.category_facet).
+    // Назви/ієрархія/OLX-лічильники готові; локальні лічильники накладає фронт із listings.
+    const facetRow = db.prepare('SELECT category_facet FROM searches WHERE id = ?').get(id) as
+      | { category_facet: string | null }
+      | undefined;
+    let categories: CategoryOption[] = [];
+    try {
+      categories = facetRow?.category_facet ? (JSON.parse(facetRow.category_facet) as CategoryOption[]) : [];
+    } catch {
+      categories = [];
+    }
 
     const result: FilterOptions = {
       cities: cityRows.map((r) => r.city),

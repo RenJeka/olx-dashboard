@@ -334,13 +334,14 @@ export interface ParamKeyInfo {
 }
 
 /**
- * Категорія, наявна у пошуку (для дерева фільтра категорій).
- * `id` — листовий listings.category_id; `path` — назви предків зверху вниз
- * (зі словника OLX; якщо словник недоступний — один сегмент із id/слагом як fallback).
+ * Вузол дерева категорій OLX для пошуку (facet, docs/plans/category-counts-and-filter.md).
+ * `id` — category id (збігається з listings.category_id); `path` — назви предків root→leaf;
+ * `olxCount` — лічильник OLX для запиту (включно з підкатегоріями, як віддає facet).
  */
 export interface CategoryOption {
   id: number;
   path: string[];
+  olxCount: number;
 }
 
 /** Відповідь GET /api/searches/:id/filter-options — варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси". */
@@ -353,7 +354,7 @@ export interface FilterOptions {
   pros: string[];
   /** Критерії мінусів із searches.analysis_criteria для цього пошуку. */
   cons: string[];
-  /** Листові категорії, наявні в оголошеннях пошуку, зі шляхом назв (дерево фільтра категорій). */
+  /** Дерево категорій OLX для пошуку (facet з останнього скану): назви + ієрархія + OLX-лічильники. */
   categories: CategoryOption[];
 }
 

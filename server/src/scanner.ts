@@ -8,6 +8,7 @@ import { HtmlOlxFetcher } from './scraper/olxFetcher.js';
 import { upsertListings, selectKnownOlxIds } from './scraper/normalizer.js';
 import { applyScanStatuses } from './scraper/statusEngine.js';
 import { probeListingPage } from './scraper/verifier.js';
+import { fetchCategoryOptions } from './scraper/olxCategories.js';
 import { interruptibleSleep, randomDelayMs } from './scraper/utils.js';
 import {
   BATCH_PAUSE_MIN_MS,
@@ -298,6 +299,26 @@ async function fetchAllQueries(
  * запитів). Прогрес пишеться у scan_runs.requests_done/requests_total через onProgress —
  * фронтенд поллить GET /api/searches/:id/scan-status.
  */
+/**
+ * Best-effort оновлення дерева категорій OLX (facet) для пошуку після успішного скану.
+ * Один легкий запит до OLX; результат кешується у searches.category_facet (фільтр категорій
+ * читає його без мережі). Помилка/недоступність → лишаємо попереднє дерево, скан не валимо.
+ * Тягнемо лише для основного `query` (синоніми дали б непорівнянні OLX-числа через перетин видач).
+ */
+async function refreshCategoryFacet(searchId: number, query: string): Promise<void> {
+  try {
+    const categories = await fetchCategoryOptions(query);
+    if (categories) {
+      db.prepare('UPDATE searches SET category_facet = ? WHERE id = ?').run(
+        JSON.stringify(categories),
+        searchId,
+      );
+    }
+  } catch {
+    // best-effort — дерево категорій не критичне для скану
+  }
+}
+
 export async function runScan(searchId: number, options?: { deep?: boolean }): Promise<ScanResult> {
   const search = loadSearch(searchId);
   if (!search) {
@@ -378,6 +399,9 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
         searchId,
       );
     }
+
+    // Дерево категорій OLX (facet) — оновлюємо лише після успішного GraphQL-скану.
+    if (usedGraphql && !stopped) await refreshCategoryFacet(searchId, search.query);
 
     const finalNote = stopped
       ? [`Зупинено користувачем — збережено ${result.found} оголошень`, note].filter(Boolean).join('; ')
@@ -902,6 +926,9 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
         searchId,
       );
     }
+
+    // Дерево категорій OLX (facet) — оновлюємо після успішного глибокого скану з плану.
+    if (!stopped) await refreshCategoryFacet(searchId, search.query);
 
     if (stopped) {
       notes.unshift(`Зупинено користувачем — збережено ${result.found} оголошень`);

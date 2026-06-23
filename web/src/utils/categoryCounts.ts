@@ -14,10 +14,14 @@ export interface CategoryTreeNode {
   label: string;
   /** Глибина (0 — коренева категорія). */
   depth: number;
-  /** Усі листові category_id, що проходять через цей вузол (для вибору «вся гілка»). */
+  /** category id цього вузла. */
+  id: number;
+  /** Усі category id, що проходять через цей вузол (сам + нащадки) — для вибору «вся гілка». */
   leafIds: number[];
-  /** Сума оголошень у всіх листах цього вузла. */
-  count: number;
+  /** Скільки оголошень У НАШІЙ БД у цьому вузлі та підкатегоріях (сума по leafIds). */
+  localCount: number;
+  /** Лічильник OLX для цього вузла (включно з підкатегоріями — як віддає facet). */
+  olxCount: number;
   children: CategoryTreeNode[];
 }
 
@@ -39,8 +43,11 @@ export function countUncategorized(listings: Listing[]): number {
 }
 
 /**
- * Будує дерево категорій із плоского списку `CategoryOption` (шлях назв) + лічильників.
- * Дочірні вузли сортуються за спаданням лічильника, тоді за назвою.
+ * Будує дерево категорій із facet-списку `CategoryOption` (шлях назв + OLX-лічильник) і
+ * локального `countMap` (listings.category_id → к-сть). Для кожного вузла:
+ * - `olxCount` — власний лічильник facet (вже включає підкатегорії, як віддає OLX);
+ * - `localCount` — сума наших оголошень у вузлі та всіх підкатегоріях (по `leafIds`).
+ * Дочірні вузли сортуються за спаданням OLX-лічильника, тоді за назвою.
  */
 export function buildCategoryTree(
   options: CategoryOption[],
@@ -50,7 +57,6 @@ export function buildCategoryTree(
   const nodeByKey = new Map<string, CategoryTreeNode>();
 
   for (const opt of options) {
-    const count = countMap.get(opt.id) ?? 0;
     let prefix = '';
     let siblings = roots;
     for (let depth = 0; depth < opt.path.length; depth++) {
@@ -58,18 +64,31 @@ export function buildCategoryTree(
       prefix = prefix ? `${prefix} / ${seg}` : seg;
       let node = nodeByKey.get(prefix);
       if (!node) {
-        node = { key: prefix, label: seg, depth, leafIds: [], count: 0, children: [] };
+        node = { key: prefix, label: seg, depth, id: 0, leafIds: [], localCount: 0, olxCount: 0, children: [] };
         nodeByKey.set(prefix, node);
         siblings.push(node);
       }
       node.leafIds.push(opt.id);
-      node.count += count;
+      // Власний вузол опції (останній сегмент шляху) — звідси беремо id та OLX-лічильник.
+      if (depth === opt.path.length - 1) {
+        node.id = opt.id;
+        node.olxCount = opt.olxCount;
+      }
       siblings = node.children;
     }
   }
 
+  const finalize = (nodes: CategoryTreeNode[]): void => {
+    for (const n of nodes) {
+      n.leafIds = [...new Set(n.leafIds)];
+      n.localCount = n.leafIds.reduce((sum, id) => sum + (countMap.get(id) ?? 0), 0);
+      finalize(n.children);
+    }
+  };
+  finalize(roots);
+
   const sortRec = (nodes: CategoryTreeNode[]): void => {
-    nodes.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'uk'));
+    nodes.sort((a, b) => b.olxCount - a.olxCount || a.label.localeCompare(b.label, 'uk'));
     for (const n of nodes) sortRec(n.children);
   };
   sortRec(roots);

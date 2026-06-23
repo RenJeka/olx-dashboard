@@ -68,6 +68,9 @@ export function CategoryFilter({
           ? LOCAL_FILTER_DESCRIPTIONS.categories.invert
           : LOCAL_FILTER_DESCRIPTIONS.categories.normal}
       </Text>
+      <Text textStyle="2xs" color="fg.subtle">
+        Числа біля категорії: <b>наших у базі</b> / усього на OLX.
+      </Text>
 
       <Stack gap={1}>
         {rows.map((node) => (
@@ -82,9 +85,14 @@ export function CategoryFilter({
                   {node.label}
                 </Text>
               </Checkbox>
-              <Badge size="sm" variant="subtle" colorPalette="gray">
-                {node.count}
-              </Badge>
+              <HStack gap={1} flexShrink={0}>
+                <Badge size="sm" colorPalette="accent" variant={node.localCount > 0 ? 'solid' : 'subtle'}>
+                  {node.localCount}
+                </Badge>
+                <Text textStyle="xs" color="fg.subtle">
+                  / {node.olxCount.toLocaleString('uk')}
+                </Text>
+              </HStack>
             </HStack>
           </Box>
         ))}

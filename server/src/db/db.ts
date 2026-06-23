@@ -71,6 +71,9 @@ addColumnIfMissing('searches', 'relevance_target', "TEXT DEFAULT ''");
 // Синоніми пошукового запиту (docs/plans/search-synonyms.md) — JSON-масив рядків.
 addColumnIfMissing('searches', 'query_synonyms', "TEXT DEFAULT '[]'");
 
+// Дерево категорій OLX з останнього скану (docs/plans/category-counts-and-filter.md) — JSON CategoryOption[].
+addColumnIfMissing('searches', 'category_facet', 'TEXT');
+
 // Архів пошуків (docs/plans/archive-searches.md) — прапорець прихованих зі списку.
 addColumnIfMissing('searches', 'archived', 'INTEGER DEFAULT 0');
 
