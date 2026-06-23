@@ -2,6 +2,14 @@
 -- Застосовується при старті через db.ts (CREATE TABLE IF NOT EXISTS).
 -- НЕ дублювати визначення таблиць у коді — джерело істини тут.
 
+-- Проекти — групування пошуків в акордеони (docs/plans/projects.md).
+CREATE TABLE IF NOT EXISTS projects (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  sort_order INTEGER,                -- ручний порядок (менше — вище); NULL до бекфілу
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS searches (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,                -- "MacBook Air M1/M2 Київ"
@@ -16,6 +24,7 @@ CREATE TABLE IF NOT EXISTS searches (
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
+  project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
   created_at TEXT DEFAULT (datetime('now'))
 );
 

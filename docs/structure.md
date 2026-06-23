@@ -73,7 +73,8 @@ olx-dashboard/
 │       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move + param-keys + filter-options + stats + PATCH (filters, query_synonyms)
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats + PATCH (filters, query_synonyms, project_id)
+│           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt + .../ai-picks/package.zip (ZIP map-reduce, пули >50) + POST .../ai-picks/rank(авто)/import(ручний)/commit
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
@@ -105,6 +106,7 @@ olx-dashboard/
         │   ├── index.ts      # барель-експорт усіх API хуків
         │   ├── base.ts       # fetch-обгортка api<T>
         │   ├── searches.ts   # CRUD пошуків, статистика
+        │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
         │   ├── scanner.ts    # скан, verify, прогрес сканування, useAnalyzeScan/useRunScanPlan (двофазний deep-скан)
         │   ├── analysis.ts   # LLM-аналіз (мінуси/плюси)
@@ -114,11 +116,15 @@ olx-dashboard/
         ├── components/
         │   ├── searches/         # бічна панель «Пошуки» (акордеон + архів + форма створення), розбита на дрібні компоненти
         │   │   ├── Searches.tsx           # точка входу: mobile (Drawer) / desktop (aside), useNewSearchForm + SearchVariantsDialog для нового пошуку
-        │   │   ├── SearchesPanel.tsx       # Accordion.Root: секції «Пошуки»/«Архів» + NewSearchForm
-        │   │   ├── SearchGroupAccordionItem.tsx # спільна секція акордеону зі списком SearchRow (активні/архівовані)
+        │   │   ├── SearchesPanel.tsx       # Accordion.Root: секції-проекти + «Без проекту»/«Архів» + кнопки «Новий проект»/«Новий пошук»
+        │   │   ├── SearchGroupAccordionItem.tsx # спільна секція акордеону зі списком SearchRow (без проекту/архівовані)
+        │   │   ├── ProjectAccordionItem.tsx # секція-акордеон проекту: меню (перейменувати/видалити) + реордер + список SearchRow (docs/plans/projects.md)
+        │   │   ├── ProjectCreateDialog.tsx # модалка створення проекту (назва)
+        │   │   ├── ProjectEditDialog.tsx   # модалка перейменування проекту
+        │   │   ├── ProjectDeleteDialog.tsx # alert-діалог видалення проекту (пошуки → «Без проекту», не видаляються)
         │   │   ├── NewSearchForm.tsx       # акордеон-секція форми створення пошуку (презентаційний, стан — useNewSearchForm)
         │   │   ├── SearchRow.tsx           # рядок пошуку: назва/запит/ціна, бейдж синонімів, реордер ↑/↓, SearchRowMenu
-        │   │   ├── SearchRowMenu.tsx       # 3-dot меню рядка (редагувати/фільтри/варіанти/архів/видалення)
+        │   │   ├── SearchRowMenu.tsx       # 3-dot меню рядка (редагувати/фільтри/варіанти/перемістити в проект/архів/видалення)
         │   │   ├── SearchDeleteDialog.tsx  # alert-діалог підтвердження видалення пошуку
         │   │   ├── SearchVariantsDialog.tsx # контрольований модал «Варіанти пошуку»: синоніми query (docs/plans/search-synonyms.md) — список + генерація авто/ручна (ManualAssistant)
         │   │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку" (обгортка)
@@ -263,5 +269,6 @@ olx-dashboard/
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/llm-analysis.md` |
 | Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
+| Проекти (групування пошуків в акордеони) | `server/src/routes/projects.ts`, `searches.project_id` (`server/src/db/schema.sql`/`db.ts`), `web/src/api/projects.ts`, `web/src/components/searches/{SearchesPanel,ProjectAccordionItem,ProjectCreateDialog,ProjectEditDialog,ProjectDeleteDialog,SearchRowMenu}.tsx` + `docs/plans/projects.md` |
 | Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner.ts` (виклик `deep?1:2`, verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

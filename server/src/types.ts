@@ -1,5 +1,13 @@
 // Доменні типи OLX Dashboard. Без `any` у доменному ядрі (scraper/db/logic).
 
+/** Проект — група пошуків (docs/plans/projects.md). */
+export interface Project {
+  id: number;
+  name: string;
+  sort_order: number | null;
+  created_at: string;
+}
+
 /** Серверні фільтри OLX, що йдуть у URL пошуку. */
 export interface ApiFilters {
   /** Числові range-фільтри: search[filter_float_<name>:from/:to]. */

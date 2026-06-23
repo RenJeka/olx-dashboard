@@ -7,7 +7,8 @@ import { SearchFiltersDrawer } from './SearchFiltersDrawer';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchEditDialog } from './SearchEditDialog';
 import { Tooltip } from '../ui/tooltip';
-import { useUpdateSearchSynonyms } from '../../api';
+import { useAssignSearchToProject, useProjects, useUpdateSearchSynonyms } from '../../api';
+import { toaster } from '../ui/toaster';
 import { useSearchRowActions } from '../../hooks/useSearchRowActions';
 import { formatPriceRange, parsePriceRange } from '../../utils/format';
 import { hasActiveLocalFilters } from '../../utils/localFilters';
@@ -31,8 +32,24 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const updateSynonyms = useUpdateSearchSynonyms();
+  const { data: projects } = useProjects();
+  const assignProject = useAssignSearchToProject();
   const { isArchived, deleteSearch, reorderSearch, handleArchiveToggle, handleDelete, handleMove } =
     useSearchRowActions(search);
+
+  function handleAssignProject(projectId: number | null) {
+    assignProject.mutate(
+      { searchId: search.id, projectId },
+      {
+        onError: (err) =>
+          toaster.create({
+            type: 'error',
+            title: 'Не вдалося перемістити пошук',
+            description: err instanceof Error ? err.message : String(err),
+          }),
+      },
+    );
+  }
 
   const synonyms = parseSearchSynonyms(search.query_synonyms);
   const priceRange = parsePriceRange(search.api_filters);
@@ -147,6 +164,9 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
         <SearchRowMenu
           isArchived={isArchived}
           synonymsCount={synonyms.length}
+          projects={projects ?? []}
+          currentProjectId={search.project_id}
+          onAssignProject={handleAssignProject}
           onEdit={() => setEditOpen(true)}
           onFilters={() => setFiltersOpen(true)}
           onVariants={() => setVariantsOpen(true)}
