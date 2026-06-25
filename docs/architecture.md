@@ -21,7 +21,7 @@
 | Шар | Технологія |
 | --- | --- |
 | Monorepo | npm workspaces (`server/` + `web/`) |
-| Backend | Node.js 20+, TypeScript (strict), Fastify 5, better-sqlite3 (синхронний), cheerio |
+| Backend | Node.js 20+, TypeScript (strict), Fastify 5, @libsql/client (Turso/libSQL, async; локально `file:`), cheerio |
 | Frontend | React 18, Vite 6, TanStack Query v5, TanStack Table v8, Chakra UI v3 (+ next-themes) |
 | Збір даних | GraphQL `POST /apigateway/graphql` (основний); `fetch` + cheerio HTML-парсинг (fallback). БЕЗ браузера/Playwright |
 
@@ -42,7 +42,7 @@ flowchart LR
         GQ[scraper/graphql/<br/>GraphqlOlxFetcher — основний]
         FE[scraper/olxFetcher.ts<br/>HtmlOlxFetcher — fallback]
         NR[scraper/normalizer.ts<br/>parse + upsert]
-        DB[(db/db.ts<br/>better-sqlite3)]
+        DB[(db/db.ts<br/>@libsql/client — Turso/file:)]
         R1 --> SC
         SC --> GQ
         SC -. "якщо GraphQL упав" .-> FE
@@ -169,7 +169,7 @@ flowchart LR
 
 | Модуль | Відповідальність |
 | --- | --- |
-| `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
+| `db/db.ts` | Створює клієнт `@libsql/client` (`createClient`): локально `file:server/data/olx.db` (дефолт), у проді `TURSO_DATABASE_URL` (`libsql://…`) + `TURSO_AUTH_TOKEN`. Експортує `db` + тонкі async-обгортки `dbGet`/`dbAll`/`dbRun` (НЕ ORM — лише прибирають boilerplate `{sql,args}` і локалізують каст `Row`→тип) + `initDb()` (`executeMultiple(schema.sql)` — викликати на старті кожної точки входу). Схема libSQL-сумісна (`CREATE TABLE IF NOT EXISTS`); історичний міграц-скаффолд (`addColumnIfMissing`/`migrateListingsTable`/backfill/PRAGMA/WAL) прибрано — `schema.sql` містить усі колонки. Інтерактивні транзакції (`db.transaction('write')`) для read→умова→write (upsert/statusEngine/commit); `db.batch([...], 'write')` для чистих наборів записів (cascade/swap/recompute). Env вантажиться `env.ts` (імпортований першим рядком `db.ts`). |
 | `db/schema.sql` | Канонічна схема (5 таблиць: `projects`, `searches`, `listings`, `price_history`, `scan_runs`). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`, `PriceBucketSummary`/`ScanPlanQuery`/`ScanPlan` — DTO двофазного deep-скану, `docs/plans/two-phase-deep-scan.md`). Без `any`. |
 | `scraper/graphql/` | `GraphqlOlxFetcher implements OlxFetcher` (основний). Модуль розбитий на: `constants.ts` (URL, ліміти, GraphQL query, split-пороги), `types.ts` (типи відповіді GraphQL API, `PriceBucket`, `SplitPlan`), `client.ts` (HTTP запити/парсинг параметрів), `mapper.ts` (конвертація сирих даних у RawListing), `split.ts` (алгоритм розбиття діапазонів і допагінації бакетів), `fetcher.ts` (Facade, який оркеструє client та split), `index.ts` (реекспорт). `fetchPage` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина, тепер у `client.ts`). `fetchSearch` — звичайний/глибокий прохід одного діапазону. Двофазний split (`docs/plans/two-phase-deep-scan.md`): `analyzeSplit(search, options?) → SplitPlan` — лише root-probe + `resolveUpperPriceBound` + `bisectPriceRange`, **без** допагінації (малий пошук/невдалий probe → `SplitPlan.noSplit=true`); `scanFromPlan(search, plan, options?)` — допагінація вже зібраних бакетів (`scanBuckets`) без повторного зондування; `fetchSearchSplit` лишається тонкою композицією `analyzeSplit` + `scanFromPlan` (поведінка швидкого deep-скану незмінна). `probeMaxPrice` — зондування верхньої межі. Запобіжники `MAX_BUCKETS=60`/`MAX_TOTAL_REQUESTS=400` (на варіант; підняті для повного покриття великих пошуків, `docs/plans/deep-scan-stop-and-history.md`); повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
@@ -190,7 +190,8 @@ flowchart LR
 | `routes/analysis/*` | Ендпойнти LLM-аналізу (нижче §6), розбиті по файлах: `index.ts` (реєстрація + `GET /api/analysis/status`), `criteria.ts` (генерація/імпорт критеріїв), `matching.ts` (`analyze`/`package.zip`/`import`/`export`), `commit.ts` (запис у БД). Критерії читаються/пишуться у `searches.analysis_criteria`; commit пише `pros`/`cons` + `analysis_at/source/model`, `analysis_stale=0`. |
 | `analysis/aiPicks.ts` + `routes/aiPicks.ts` | **AI Вибір** (план `plans/AI-auto-top.md`) — окрема від matching фіча ранжування: кандидати без мінусів/не відфільтровані/активні/релевантні (`ai_relevant IS NOT 0` — як вкладка «Найкращі кандидати»), сортовані за ціною, до `PICK_CANDIDATES_LIMIT=500` (`repo.ts: loadPickCandidates`) йдуть у промпт; LLM обирає й сортує фінальний ТОП-`PICK_TOP_N=30`. `buildPickPrompt`/`parsePickResponse`/`runAiPicks` — спільні для авто (OpenRouter) й ручного режиму. Ручний режим: один промпт (`GET /ai-picks/prompt`) для пулів ≤`MANUAL_PICKS_ZIP_CHUNK_SIZE=50`; для більших — ZIP-пакет (`GET /ai-picks/package.zip`, `prompt.txt` + `candidates/chunk-NNN.json` по 50). На відміну від matching тут немає детермінованого скрипта (ранжування вимагає LLM-судження, не літерального матчингу) — `buildPickManualZipInstructions` замість цього кладе в `prompt.txt` 2-етапні map-reduce інструкції: етап 1 — LLM номінує до `PICKS_NOMINEES_PER_CHUNK=10` кращих із кожного чанку; етап 2 — фінальний ТОП-30 серед усіх номінантів; усе виконується всередині одної агент/чат-сесії, у застосунок вставляється рівно ОДНА фінальна JSON-відповідь (без нової UI-логіки накопичення). `POST /ai-picks/commit` пише `ai_rank`/`ai_pick_reason`/`ai_ranked_at`, скидаючи попередні результати пошуку. |
 | `analysis/relevance.ts` + `routes/relevance.ts` | **Семантичний фільтр релевантності** (план `plans/semantic-relevance-filter.md`) — окрема від matching/AI Вибору фіча: для кожного оголошення класифікує «чи цей лот ПРОДАЄ цільовий товар» (а не аксесуар/запчастину/згадку сумісності). Цільовий товар — на рівні пошуку (`searches.relevance_target`, порожній → `query`, `repo.ts: getRelevanceTarget`/`setRelevanceTarget`). `buildRelevancePrompt`/`buildRelevanceZipInstructions`/`parseRelevanceResponse`/`runRelevance` — спільні для авто (OpenRouter, чанки по `AUTO_CHUNK_SIZE=12`) й ручного режиму (ZIP `prompt.txt` + `descriptions/chunk-NNN.json` по `MANUAL_ZIP_CHUNK_SIZE=50`, без `analyze.py` — класифікація семантична, не літеральний матчинг). **Евристичний пре-фільтр перед ШІ** (`prefilterCandidates`): для цілей формату «бренд + номер моделі» відсіює оголошення, де бренд і номер моделі НЕ стоять поруч (`RELEVANCE_PROXIMITY_WINDOW=4` слів) — напр. «iPhone 1**5**», «батарея **5**%» для цілі «iphone 5»; до ШІ йдуть лише кандидати, відсіяні одразу `relevant=false` (reason «Авто-відсіяно…»). Обережний: ціль без номера моделі/бренду або «відкинуло б усе» → пропускає всіх до ШІ. Застосовується в `runRelevance` (авто), `package.zip` (у ZIP лише кандидати) і `relevance/import` (інжектує відсіяних за scope `ids`). `POST /relevance/preview` віддає розбивку (total/candidates/autoRejected) для UI. **Ручний ZIP** для агентного CLI (Antigravity, слабкі моделі типу Gemini Flash): крім `prompt.txt` + чанків кладе готові `relevance_merge.py`/`relevance_verify.py` (у ZIP — `merge.py`/`verify.py`); інструкція — жорстка покрокова процедура (класифікуй чанк → `classifications/result-NNN.json` → `merge.py` → `verify.py`), що обходить ліміт довжини відповіді й забороняє вигадувати власні скрипти. `POST /relevance/import` мерж відповіді в накопичене за `id`. `POST /relevance/commit` пише `ai_relevant`/`ai_relevant_reason`/`ai_relevant_at`/`ai_relevant_source`; рядки з `ai_relevant_source='manual'` НЕ перетираються (умова в `UPDATE`). PII продавця в промпт не йде. |
-| `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, реєстрація `searchesRoutes`/`projectsRoutes`/`listingsRoutes`/`analysisRoutes`/`aiPicksRoutes`/`relevanceRoutes`, слухає `:3001`. |
+| `auth/*` | **Google OAuth «ворота»** single-user (план `plans/google-oauth-gate.md`) — замок доступу, НЕ мультиюзер (жодної таблиці `users`/`user_id`). `config.ts` — env `GOOGLE_CLIENT_ID`/`ALLOWED_EMAILS`/`SESSION_SECRET`/`AUTH_COOKIE_SECURE`/`AUTH_DISABLED`, кукі-флаги (прод cross-site: `Secure`+`SameSite=None`; локал http: `Lax`), `assertAuthConfigured()` (fail-fast, якщо auth on без ключів). `plugin.ts` — `fastify-plugin` (non-encapsulated, щоб глобальний хук бачив усі роути): реєструє `@fastify/cookie`+`@fastify/jwt` (сесійний JWT у httpOnly-кукі `olx_session`), декоратор `verifyGoogleIdToken` (`google-auth-library` `OAuth2Client.verifyIdToken` → перевірка `aud`+`email_verified`+allowlist), глобальний `onRequest`-замок на `/api/*` (пропускає `/health`, `/api/auth/*`, CORS-preflight). `routes.ts` — `POST /api/auth/google` (обмін Google ID-token на сесійну кукі), `GET /api/auth/me`, `POST /api/auth/logout`. `AUTH_DISABLED=true` (лише dev) вимикає замок повністю. |
+| `index.ts` | Fastify bootstrap, `assertAuthConfigured()` (fail-fast), CORS для `WEB_ORIGIN` з `credentials:true`, реєстрація `authPlugin`+`authRoutes` ДО доменних роутів (`searchesRoutes`/`projectsRoutes`/`listingsRoutes`/`analysisRoutes`/`aiPicksRoutes`/`relevanceRoutes`), `/health`, слухає `:3001`. |
 | `scan.ts` | CLI-обгортка над `runScan` (`npm run scan -- --search <id>`). |
 | `migratePostedAt.ts` | Одноразова CLI-міграція (`npm run migrate:posted-at`): конвертує наявні текстові `posted_at` (старий HTML-fallback) через `dateParser.parseOlxDate` в ISO; нерозпізнане → `NULL`. Виводить кількість конвертованих/занулених. |
 
@@ -208,9 +209,10 @@ flowchart LR
 - `filtered_out` — прапорець локальних фільтрів (`local_filters`), рядок не видаляється.
 - `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/projects.md`).
-- `searches.sort_order` — ручний порядок у списку (менше → вище); бекфіл існуючих рядків
-  (`0..N-1` за `created_at DESC`) виконує `db.ts` при старті, нові пошуки отримують
-  `MIN(sort_order) - 1` (з'являються згори).
+- `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
+  `MIN(sort_order) - 1` (з'являються згори). Історичний одноразовий бекфіл у `db.ts` прибрано
+  при міграції на libSQL (порожня Turso/нова БД не має чого бекфілити; наявна локальна БД уже
+  заповнена).
 
 > `price_history` створена у схемі, але кодом ще не наповнюється (Етап 3).
 
@@ -226,6 +228,9 @@ flowchart LR
 
 | Метод | Шлях | Стан |
 | --- | --- | --- |
+| `POST` | `/api/auth/google` | ✅ Auth (`plans/google-oauth-gate.md`) — body `{credential}` (Google ID-token); verify + allowlist → ставить httpOnly-кукі сесії, повертає `{email}`; не в allowlist → 403, невалідний токен → 401 |
+| `GET` | `/api/auth/me` | ✅ — поточна сесія `{email}` з кукі (для гейта на фронті); немає/прострочена → 401 |
+| `POST` | `/api/auth/logout` | ✅ — чистить сесійну кукі |
 | `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1/2 — `GET` сортує за `sort_order ASC, created_at DESC, id DESC`; `DELETE` каскадний (`price_history` → `scan_runs` → `listings` → `searches`, у транзакції); `PATCH` з `local_filters` (Етап 2) → зберігає + синхронно перераховує `filtered_out` для всіх рядків пошуку, повертає `filtered_out_count` |
 | `POST` | `/api/searches/:id/move` | ✅ — `{direction: 'up'\|'down'}`, міняє `sort_order` із сусідом (серед `archived=0` ТА того ж `project_id`, для кнопок ↑/↓ у sidebar) |
 | `GET/POST/PATCH/DELETE` | `/api/projects[/:id]` | ✅ Проекти (`docs/plans/projects.md`) — групування пошуків в акордеони; `GET` сорт `sort_order ASC, created_at DESC, id DESC`; `POST {name}` (нова згори); `PATCH {name}` (перейменування); `DELETE` відв'язує пошуки (`project_id=NULL`), пошуки НЕ видаляє |

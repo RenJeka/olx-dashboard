@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Badge, Box, Heading, HStack, IconButton } from '@chakra-ui/react';
-import { LuChevronLeft, LuMenu, LuTimer } from 'react-icons/lu';
+import { LuChevronLeft, LuLogOut, LuMenu, LuTimer } from 'react-icons/lu';
 import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './searches/SearchActionPanel';
 import { AiToolsHub } from './analysis';
@@ -8,6 +8,7 @@ import { SettingsDrawer } from './settings';
 import { Tooltip } from './ui/tooltip';
 import { useSearches } from '../api';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useLogout } from '../auth/useAuth';
 
 export function Header() {
   const { data: searches } = useSearches();
@@ -29,6 +30,8 @@ export function Header() {
 
   const autoRefreshEnabled = useSettingsStore((s) => s.autoRefreshEnabled);
   const autoRefreshIntervalMin = useSettingsStore((s) => s.autoRefreshIntervalMin);
+
+  const logout = useLogout();
 
   return (
     <Box as="header" borderBottomWidth="1px" borderColor="border.subtle" px={4} py={3} bg="bg.panel">
@@ -81,6 +84,17 @@ export function Header() {
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
           {selectedSearch && <AiToolsHub search={selectedSearch} selectedIds={selectedIds} />}
           <SettingsDrawer />
+          <Tooltip content="Вийти">
+            <IconButton
+              aria-label="Вийти"
+              variant="ghost"
+              size="sm"
+              loading={logout.isPending}
+              onClick={() => logout.mutate()}
+            >
+              <LuLogOut />
+            </IconButton>
+          </Tooltip>
         </HStack>
       </HStack>
     </Box>

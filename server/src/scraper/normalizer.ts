@@ -1,4 +1,4 @@
-import { db } from '../db/db.js';
+import { db, dbAll, dbGet } from '../db/db.js';
 import { evaluateFilteredOut } from './localFilters.js';
 import { parseOlxDate } from './dateParser.js';
 import type { RawListing, NormalizedPrice, ScanResult, LocalFilters } from '../types.js';
@@ -43,12 +43,11 @@ function parseLocationDate(raw?: string): {
   return { city, postedAt };
 }
 
-const existsStmt = db.prepare('SELECT 1 FROM listings WHERE olx_id = ?');
-const searchLocalFiltersStmt = db.prepare('SELECT local_filters FROM searches WHERE id = ?');
-const selectForFilterStmt = db.prepare(
-  'SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE olx_id = ?',
-);
-const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? WHERE id = ?');
+const EXISTS_SQL = 'SELECT 1 FROM listings WHERE olx_id = ?';
+const SEARCH_LOCAL_FILTERS_SQL = 'SELECT local_filters FROM searches WHERE id = ?';
+const SELECT_FOR_FILTER_SQL =
+  'SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE olx_id = ?';
+const UPDATE_FILTERED_OUT_SQL = 'UPDATE listings SET filtered_out = ? WHERE id = ?';
 
 // district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
@@ -61,7 +60,7 @@ const updateFilteredOutStmt = db.prepare('UPDATE listings SET filtered_out = ? W
 // - olx_status ≠ 'active' → миттєвий disable (auto-рядки і manual 'rejected' — факт
 //   зникнення сильніший за оцінку), з позначкою в note для ручної перевірки (CLAUDE.md);
 // - auto-рядок, що був disabled і знову з'явився живим → auto-reactivate в 'new'.
-const upsertStmt = db.prepare(`
+const UPSERT_SQL = `
   INSERT INTO listings (
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
     category_id, category_type,
@@ -125,7 +124,7 @@ const upsertStmt = db.prepare(`
                          THEN 1
                        ELSE analysis_stale
                      END
-`);
+`;
 
 /**
  * Upsert розпарсених оголошень по olx_id.
@@ -133,15 +132,15 @@ const upsertStmt = db.prepare(`
  * фільтри пошуку (Етап 2) — після upsert, бо враховує COALESCE'ні description/params.
  * Повертає кількість знайдених і нових.
  */
-export function upsertListings(
+export async function upsertListings(
   searchId: number,
   raw: RawListing[],
-): Pick<ScanResult, 'found' | 'new_count'> {
+): Promise<Pick<ScanResult, 'found' | 'new_count'>> {
   let newCount = 0;
 
-  const localFiltersRow = searchLocalFiltersStmt.get(searchId) as
-    | { local_filters: string }
-    | undefined;
+  const localFiltersRow = await dbGet<{ local_filters: string }>(SEARCH_LOCAL_FILTERS_SQL, [
+    searchId,
+  ]);
   let localFilters: LocalFilters = {};
   try {
     localFilters = JSON.parse(localFiltersRow?.local_filters || '{}') as LocalFilters;
@@ -149,9 +148,13 @@ export function upsertListings(
     localFilters = {};
   }
 
-  const run = db.transaction((items: RawListing[]) => {
-    for (const item of items) {
-      const isNew = existsStmt.get(item.olxId) === undefined;
+  // Інтерактивна транзакція libSQL: цикл містить читання (exists/persisted) + умовні записи,
+  // тож db.batch не підходить — потрібна атомарність усього циклу (як db.transaction раніше).
+  const tx = await db.transaction('write');
+  try {
+    for (const item of raw) {
+      const existing = await tx.execute({ sql: EXISTS_SQL, args: [item.olxId] });
+      const isNew = existing.rows.length === 0;
       if (isNew) newCount++;
 
       // Структуровані поля присутні (GraphQL-фетчер) — пріоритет їм.
@@ -194,7 +197,9 @@ export function upsertListings(
 
       const olxStatusInactive = hasStructuredData && olxStatus != null && olxStatus !== 'active';
 
-      upsertStmt.run({
+      await tx.execute({
+        sql: UPSERT_SQL,
+        args: {
         olx_id: item.olxId,
         search_id: searchId,
         title: item.title || null,
@@ -219,9 +224,11 @@ export function upsertListings(
         is_graphql: hasStructuredData ? 1 : 0,
         olx_status_inactive: olxStatusInactive ? 1 : 0,
         status_note: olxStatusInactive ? `auto-disabled: olx_status=${olxStatus}` : '',
+        },
       });
 
-      const persisted = selectForFilterStmt.get(item.olxId) as
+      const persistedRows = await tx.execute({ sql: SELECT_FOR_FILTER_SQL, args: [item.olxId] });
+      const persisted = persistedRows.rows[0] as unknown as
         | {
             id: number;
             title: string | null;
@@ -237,12 +244,14 @@ export function upsertListings(
         | undefined;
       if (persisted) {
         const filteredOut = evaluateFilteredOut(localFilters, persisted);
-        updateFilteredOutStmt.run(filteredOut ? 1 : 0, persisted.id);
+        await tx.execute({ sql: UPDATE_FILTERED_OUT_SQL, args: [filteredOut ? 1 : 0, persisted.id] });
       }
     }
-  });
-
-  run(raw);
+    await tx.commit();
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
 
   return { found: raw.length, new_count: newCount };
 }
@@ -251,11 +260,12 @@ export function upsertListings(
  * Які з переданих olx_id уже є в БД — для оцінки «~нових» у звіті аналітичної фази
  * глибокого скану (docs/plans/two-phase-deep-scan.md). Батч одним запитом замість N окремих.
  */
-export function selectKnownOlxIds(olxIds: number[]): Set<number> {
+export async function selectKnownOlxIds(olxIds: number[]): Promise<Set<number>> {
   if (olxIds.length === 0) return new Set();
   const placeholders = olxIds.map(() => '?').join(', ');
-  const rows = db
-    .prepare(`SELECT olx_id FROM listings WHERE olx_id IN (${placeholders})`)
-    .all(...olxIds) as { olx_id: number }[];
+  const rows = await dbAll<{ olx_id: number }>(
+    `SELECT olx_id FROM listings WHERE olx_id IN (${placeholders})`,
+    olxIds,
+  );
   return new Set(rows.map((r) => r.olx_id));
 }

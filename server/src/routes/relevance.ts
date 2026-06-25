@@ -38,26 +38,26 @@ const EMPTY_RESPONSE = 'Порожня відповідь';
 const NO_TARGET = 'Вкажіть цільовий товар';
 
 /** Цільовий товар із тіла запиту (з фолбеком на збережений/query). */
-function resolveTarget(searchId: number, raw?: string): string {
+async function resolveTarget(searchId: number, raw?: string): Promise<string> {
   const trimmed = (raw ?? '').trim();
-  return trimmed || getRelevanceTarget(searchId);
+  return trimmed || (await getRelevanceTarget(searchId));
 }
 
 export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   // Цільовий товар (передзаповнюється query, якщо ще не збережений).
   app.get<{ Params: { id: string } }>('/api/searches/:id/relevance/target', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
-    return { target: getRelevanceTarget(id) };
+    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    return { target: await getRelevanceTarget(id) };
   });
 
   app.put<{ Params: { id: string }; Body: { target?: string } }>(
     '/api/searches/:id/relevance/target',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
-      setRelevanceTarget(id, (req.body.target ?? '').trim());
-      return { target: getRelevanceTarget(id) };
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      await setRelevanceTarget(id, (req.body.target ?? '').trim());
+      return { target: await getRelevanceTarget(id) };
     },
   );
 
@@ -66,11 +66,11 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/relevance/preview',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
-      const target = resolveTarget(id, req.body.target);
-      const aliases = getRelevanceAliases(id);
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      const target = await resolveTarget(id, req.body.target);
+      const aliases = await getRelevanceAliases(id);
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-      const listings = loadListings(id, ids);
+      const listings = await loadListings(id, ids);
       const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
       return { total: listings.length, candidates: candidates.length, autoRejected: rejected.length };
     },
@@ -82,19 +82,19 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Body: { target?: string; ids?: number[]; model?: string };
   }>('/api/searches/:id/relevance/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
     if (!hasApiKey()) return reply.code(409).send({ error: NO_API_KEY });
 
-    const target = resolveTarget(id, req.body.target);
+    const target = await resolveTarget(id, req.body.target);
     if (!target) return reply.code(400).send({ error: NO_TARGET });
-    const aliases = getRelevanceAliases(id);
+    const aliases = await getRelevanceAliases(id);
 
     const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
     if (ids.length > MAX_ANALYZE_IDS) {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    const listings = loadListings(id, ids);
+    const listings = await loadListings(id, ids);
     try {
       const result = await runRelevance(
         target,
@@ -113,14 +113,14 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/relevance/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const target = resolveTarget(id, req.body.target);
+      const target = await resolveTarget(id, req.body.target);
       if (!target) return reply.code(400).send({ error: NO_TARGET });
-      const aliases = getRelevanceAliases(id);
+      const aliases = await getRelevanceAliases(id);
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-      const listings = loadListings(id, ids);
+      const listings = await loadListings(id, ids);
       // У ZIP кладемо лише кандидатів (відсіяні евристикою додаються при import).
       const { candidates } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
 
@@ -151,13 +151,13 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Body: { raw?: string; accumulated?: RelevanceItem[]; ids?: number[]; target?: string };
   }>('/api/searches/:id/relevance/import', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
     if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
-    const target = resolveTarget(id, req.body.target);
-    const aliases = getRelevanceAliases(id);
+    const target = await resolveTarget(id, req.body.target);
+    const aliases = await getRelevanceAliases(id);
     const scopeIds = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-    const listings = loadListings(id, scopeIds);
+    const listings = await loadListings(id, scopeIds);
     const { rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
     const validIds = listings.map((l) => l.id);
 
@@ -186,26 +186,32 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Body: { items?: RelevanceItem[]; source?: string };
   }>('/api/searches/:id/relevance/commit', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const source = req.body.source === 'import' ? 'import' : 'api';
 
-    const setStmt = db.prepare(
-      `UPDATE listings
+    const SET_SQL = `UPDATE listings
        SET ai_relevant = ?, ai_relevant_reason = ?, ai_relevant_at = datetime('now'), ai_relevant_source = ?
-       WHERE id = ? AND search_id = ? AND (ai_relevant_source IS NULL OR ai_relevant_source != 'manual')`,
-    );
+       WHERE id = ? AND search_id = ? AND (ai_relevant_source IS NULL OR ai_relevant_source != 'manual')`;
 
-    const run = db.transaction(() => {
-      let committed = 0;
+    // Інтерактивна транзакція: пакет UPDATE-ів; ручні override (source='manual') не перетираємо (WHERE).
+    const tx = await db.transaction('write');
+    let committed = 0;
+    try {
       for (const item of items) {
-        const info = setStmt.run(item.relevant ? 1 : 0, item.reason, source, item.id, id);
-        committed += info.changes;
+        const info = await tx.execute({
+          sql: SET_SQL,
+          args: [item.relevant ? 1 : 0, item.reason, source, item.id, id],
+        });
+        committed += info.rowsAffected;
       }
-      return committed;
-    });
+      await tx.commit();
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
 
-    return { committed: run() };
+    return { committed };
   });
 }
