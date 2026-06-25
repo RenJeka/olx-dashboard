@@ -24,32 +24,36 @@ export async function commitRoutes(app: FastifyInstance): Promise<void> {
     const append = req.body.merge === 'append';
     const column = req.body.mode; // 'cons' | 'pros' — безпечно (whitelist через isMode)
 
-    const stmt = db.prepare(
-      `UPDATE listings SET ${column} = ?, analysis_at = datetime('now'),
+    // column — з whitelist (isMode): 'cons' | 'pros', безпечна інтерполяція.
+    const UPDATE_SQL = `UPDATE listings SET ${column} = ?, analysis_at = datetime('now'),
               analysis_source = ?, analysis_model = ?, analysis_stale = 0
-       WHERE id = ?`,
-    );
-    const selectStmt = db.prepare(`SELECT ${column} AS val FROM listings WHERE id = ?`);
+       WHERE id = ?`;
+    const SELECT_SQL = `SELECT ${column} AS val FROM listings WHERE id = ?`;
 
-    const run = db.transaction((rows: CommitItem[]) => {
-      let updated = 0;
-      for (const row of rows) {
+    // Інтерактивна транзакція: append-режим читає наявне значення перед записом → атомарність циклу.
+    const tx = await db.transaction('write');
+    let updated = 0;
+    try {
+      for (const row of items) {
         let criteria = row.criteria;
         if (append) {
-          const existing = (selectStmt.get(row.id) as { val: string | null } | undefined)?.val ?? null;
+          const existingRows = await tx.execute({ sql: SELECT_SQL, args: [row.id] });
+          const existing = (existingRows.rows[0] as unknown as { val: string | null } | undefined)?.val ?? null;
           const existingItems = parseBullets(existing);
           const seen = new Set(existingItems.map((c) => c.toLowerCase()));
           const additions = row.criteria.filter((c) => !seen.has(c.toLowerCase()));
           criteria = [...existingItems, ...additions];
         }
         const text = criteria.length > 0 ? criteria.map((c) => `${BULLET_PREFIX}${c}`).join('\n') : '';
-        const info = stmt.run(text, source, model, row.id);
-        updated += info.changes;
+        const info = await tx.execute({ sql: UPDATE_SQL, args: [text, source, model, row.id] });
+        updated += info.rowsAffected;
       }
-      return updated;
-    });
+      await tx.commit();
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
 
-    const updated = run(items);
     return { updated };
   });
 }

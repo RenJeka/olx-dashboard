@@ -1,4 +1,3 @@
-import { db } from '../db/db.js';
 import type { ScanResult } from '../types.js';
 import { loadSearch } from './searchLoader.js';
 import { fetchAllQueries } from './fetchOrchestrator.js';
@@ -15,7 +14,7 @@ import { finalizeScanResult } from './scanFinalize.js';
  * фронтенд поллить GET /api/searches/:id/scan-status.
  */
 export async function runScan(searchId: number, options?: { deep?: boolean }): Promise<ScanResult> {
-  const search = loadSearch(searchId);
+  const search = await loadSearch(searchId);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }
