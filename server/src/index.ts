@@ -21,7 +21,8 @@ assertAuthConfigured();
 const app = Fastify({ logger: true });
 
 await app.register(cors, {
-  origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
+  // || замість ?? — порожній рядок (WEB_ORIGIN=) теж замінюється дефолтом.
+  origin: process.env.WEB_ORIGIN || 'http://localhost:5173',
   credentials: true, // cross-site сесійна кукі (фронт і API на різних доменах)
 });
 

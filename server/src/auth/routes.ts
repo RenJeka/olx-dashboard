@@ -28,7 +28,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       email = await app.verifyGoogleIdToken(credential);
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode ?? 401;
-      return reply.code(status).send({ error: (err as Error).message });
+      const msg = (err as Error).message ?? String(err);
+      req.log.warn({ status, err: msg }, 'Google token verify failed');
+      return reply.code(status).send({ error: msg });
     }
 
     const token = app.jwt.sign({ email }, { expiresIn: SESSION_TTL_SECONDS });
@@ -42,7 +44,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     try {
       const { email } = await req.jwtVerify<{ email: string }>();
       return reply.send({ email });
-    } catch {
+    } catch (err) {
+      req.log.debug({ err: (err as Error).message }, 'JWT verify failed on /me');
       return reply.code(401).send({ error: 'Не авторизовано' });
     }
   });

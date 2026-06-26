@@ -69,7 +69,8 @@ async function authPluginImpl(app: FastifyInstance): Promise<void> {
     if (!url.startsWith('/api/')) return;
     try {
       await request.jwtVerify();
-    } catch {
+    } catch (err) {
+      request.log.debug({ url, err: (err as Error).message }, 'JWT verify failed — 401');
       return reply.code(401).send({ error: 'Не авторизовано' });
     }
   });
