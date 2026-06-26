@@ -44,21 +44,54 @@ async function authPluginImpl(app: FastifyInstance): Promise<void> {
     cookie: { cookieName: SESSION_COOKIE_NAME, signed: false },
   });
 
-  // Локальна верифікація ID-токена через Google JWKS (oauth2/v3/certs). НЕ через
-  // google-auth-library.verifyIdToken: на Node воно завжди тягне legacy PEM-сертифікати
-  // з /oauth2/v1/certs, який Google віддає 403 (зокрема з Render). jose ходить на v3-JWK,
-  // кешує ключі й перевіряє підпис/iss/aud/exp локально.
-  const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
   const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
+  const audience: string = clientId; // звужений (clientId вже не null після guard вище)
 
-  app.decorate('verifyGoogleIdToken', async (credential: string): Promise<string> => {
+  // Чому не google-auth-library.verifyIdToken: на Node воно завжди тягне legacy PEM-сертифікати
+  // з www.googleapis.com/oauth2/v1/certs (Google віддає 403). А середовище Render не дістає й
+  // JWK-хоста www.googleapis.com (jose: "Expected 200 OK from the JWK Set").
+  //
+  // Тому ПЕРВИННО — tokeninfo на ІНШОМУ хості oauth2.googleapis.com (OAuth-інфраструктура,
+  // досяжна з Render): Google сам перевіряє підпис, ми валідуємо aud/iss/email_verified.
+  // ЗАПАСНО — локальна перевірка через jose+JWKS (працює там, де www.googleapis.com досяжний).
+
+  /** tokeninfo повертає всі поля рядками (email_verified="true", aud="…"). */
+  async function emailViaTokeninfo(credential: string): Promise<string> {
+    const res = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { headers: { 'User-Agent': 'olx-dashboard' } },
+    );
+    if (!res.ok) throw new Error(`tokeninfo HTTP ${res.status}`);
+    const info = (await res.json()) as Record<string, string | undefined>;
+    if (info.aud !== audience) throw new Error('Невірний audience Google-токена.');
+    if (!info.iss || !GOOGLE_ISSUERS.includes(info.iss)) {
+      throw new Error('Невірний issuer Google-токена.');
+    }
+    if (!info.email || info.email_verified !== 'true') {
+      throw new Error('Google-акаунт без верифікованого email.');
+    }
+    return info.email;
+  }
+
+  const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+  async function emailViaJwks(credential: string): Promise<string> {
     const { payload } = await jwtVerify(credential, GOOGLE_JWKS, {
       issuer: GOOGLE_ISSUERS,
-      audience: clientId,
+      audience,
     });
-    const email = typeof payload.email === 'string' ? payload.email : undefined;
-    if (!email || payload.email_verified !== true) {
+    if (typeof payload.email !== 'string' || payload.email_verified !== true) {
       throw new Error('Google-акаунт без верифікованого email.');
+    }
+    return payload.email;
+  }
+
+  app.decorate('verifyGoogleIdToken', async (credential: string): Promise<string> => {
+    let email: string;
+    try {
+      email = await emailViaTokeninfo(credential);
+    } catch (err) {
+      app.log.warn({ err: (err as Error).message }, 'tokeninfo verify failed — fallback to JWKS');
+      email = await emailViaJwks(credential);
     }
     if (!isEmailAllowed(email)) {
       const err = new Error('Доступ заборонено для цього акаунта.');
