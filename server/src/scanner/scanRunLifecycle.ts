@@ -25,6 +25,9 @@ const UPDATE_PROGRESS_SQL = `UPDATE scan_runs SET
 
 const INSERT_RUN_SQL = 'INSERT INTO scan_runs (search_id, started_at, kind) VALUES (?, ?, ?)';
 
+// Мін. інтервал між записами прогресу в БД (поллінг фронту — 1.5 с, частіше писати немає сенсу).
+const PROGRESS_WRITE_THROTTLE_MS = 1000;
+
 const FINALIZE_ERROR_SQL = `UPDATE scan_runs SET finished_at = ?, error = ?,
      stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
@@ -48,9 +51,14 @@ export async function withScanRun<T>(
   );
 
   // Прогрес — best-effort: callback лишається синхронним (void), запис fire-and-forget із
-  // ковтанням помилки. Деталі прогресу косметичні (поллінг scan-status); фінальний запис
-  // (finalize) робиться вже після завершення body, коли всі onProgress вже видані.
+  // ковтанням помилки. Деталі прогресу косметичні (поллінг scan-status раз на 1.5 с), тож
+  // тротлимо записи ≥ PROGRESS_WRITE_THROTTLE_MS — інакше глибокий скан робить десятки-сотні
+  // зайвих UPDATE до Turso. Фінальний стан фіксує окремий finalize-запис після завершення body.
+  let lastWriteAt = 0;
   const onProgress = (p: ScanProgress): void => {
+    const now = Date.now();
+    if (now - lastWriteAt < PROGRESS_WRITE_THROTTLE_MS) return;
+    lastWriteAt = now;
     void dbRun(UPDATE_PROGRESS_SQL, [
       p.done,
       p.total ?? null,

@@ -78,9 +78,14 @@ flowchart LR
    `options.onProgress(done, total)`, який scanner записує у
    `scan_runs.requests_done`/`requests_total`.
 4. `normalizer.upsertListings()` використовує структуровані поля (GraphQL) або парсить сирі
-   рядки (HTML), робить upsert по `olx_id` у транзакції, рахує `new_count`, оновлює
-   `filtered_out` (`localFilters.evaluateFilteredOut`) і — для GraphQL-даних — застосовує
-   миттєвий `olx_status`-disable/reactivate.
+   рядки (HTML), робить upsert по `olx_id`, рахує `new_count`, обчислює `filtered_out`
+   (`localFilters.evaluateFilteredOut`) і — для GraphQL-даних — застосовує миттєвий
+   `olx_status`-disable/reactivate. **Оптимізовано під Turso** (кожен `execute` — мережевий
+   round-trip): замість циклу «EXISTS → upsert → read-back → UPDATE filtered_out» на кожен
+   рядок — один bulk-`SELECT` наявних полів по `olx_id` (чанками), злиття COALESCE-значень і
+   `filtered_out` рахуються в пам'яті, а всі upsert-и (з уже вписаним `filtered_out`) ідуть
+   одним `db.batch('write')` (атомарно, як транзакція). Скан на N оголошень — ~2 round-trip
+   замість ~4N.
 5. Якщо фетчер був GraphQL (не fallback), скан успішний і **повний** (без warning часткового
    результату — напр. «window cap hit») — `statusEngine.applyScanStatuses(searchId,
    fetched, exhausted, threshold)` застосовує вікно покриття (`miss_count`/disable, §6.1
@@ -207,6 +212,10 @@ flowchart LR
   `miss_count` — лічильник сканів поспіль без оголошення у вікні покриття.
 - `params` зберігається сирим JSON.
 - `filtered_out` — прапорець локальних фільтрів (`local_filters`), рядок не видаляється.
+- Індекси `listings`: `idx_listings_search_status` (список/фільтр), `idx_listings_search_refresh`
+  (`search_id, last_refresh_at` — кандидати вікна покриття у `statusEngine`),
+  `idx_listings_search_lastseen` (`search_id, last_seen_at` — verify-прохід P1). `olx_id` UNIQUE
+  уже проіндексований (bulk-upsert лукапи).
 - `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/projects.md`).
 - `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
@@ -275,6 +284,10 @@ flowchart LR
 
 ## 7. Frontend
 
+- `main.tsx` — `QueryClient` з дефолтами `staleTime: 60_000` + `refetchOnWindowFocus: false`
+  (щоб не перезавантажувати весь список оголошень при кожному фокусі вікна; дані оновлюються
+  явно через скан/мутації з точковою інвалідацією). Локальні `staleTime` (`useSession` —
+  `Infinity`, `useAnalysisStatus` — 5 хв) перекривають ці дефолти.
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки: `useSearches`, `useCreateSearch`,
   `useDeleteSearch`, `useReorderSearches`, `useScan`, `useVerify`, `useScanStatus`,
   `useSearchStats`, `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`.

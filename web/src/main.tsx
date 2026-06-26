@@ -5,7 +5,18 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Provider } from './components/ui/provider';
 import { App } from './App';
 
-const queryClient = new QueryClient();
+// Дефолти кешу: у межах staleTime дані вважаються свіжими (без зайвих рефетчів), і не
+// перезавантажуємо весь список оголошень при кожному фокусі вікна. Дані оновлюються явно —
+// скан/мутації точково інвалідують потрібні ключі. (Локальні staleTime у useSession/
+// useAnalysisStatus лишаються чинними — вони перекривають ці дефолти.)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Client ID для Google Identity Services. У режимі AUTH_DISABLED гейт не показується,
 // тож порожнє значення безпечне (кнопка Google не рендериться).

@@ -1,3 +1,4 @@
+import type { InValue } from '@libsql/client';
 import { db, dbAll, dbGet } from '../db/db.js';
 import { evaluateFilteredOut } from './localFilters.js';
 import { parseOlxDate } from './dateParser.js';
@@ -43,11 +44,14 @@ function parseLocationDate(raw?: string): {
   return { city, postedAt };
 }
 
-const EXISTS_SQL = 'SELECT 1 FROM listings WHERE olx_id = ?';
 const SEARCH_LOCAL_FILTERS_SQL = 'SELECT local_filters FROM searches WHERE id = ?';
-const SELECT_FOR_FILTER_SQL =
-  'SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE olx_id = ?';
-const UPDATE_FILTERED_OUT_SQL = 'UPDATE listings SET filtered_out = ? WHERE id = ?';
+
+// Поля наявних рядків, потрібні для злиття (COALESCE) перед обчисленням filtered_out у JS.
+// `id` НЕ потрібен — filtered_out тепер пишеться у тому ж UPSERT (не окремим UPDATE by id).
+const SELECT_EXISTING_FIELDS = 'olx_id, description, params, pros, cons, seller_name, category_id';
+
+/** Розмір чанка для IN-списку (ліміт змінних SQLite — 999). */
+const IN_CHUNK = 500;
 
 // district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
@@ -65,7 +69,7 @@ const UPSERT_SQL = `
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
     category_id, category_type,
     photo_url, photo_urls, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
-    last_seen_at, status, note
+    last_seen_at, status, note, filtered_out
   )
   VALUES (
     @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
@@ -73,7 +77,8 @@ const UPSERT_SQL = `
     @photo_url, @photo_urls, @description, @seller_name, @contact_name, @olx_status,
     @posted_at, @last_refresh_at, datetime('now'),
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN 'disabled' ELSE 'new' END,
-    CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END
+    CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END,
+    @filtered_out
   )
   ON CONFLICT(olx_id) DO UPDATE SET
     title         = excluded.title,
@@ -123,20 +128,64 @@ const UPSERT_SQL = `
                                       AND description IS NOT excluded.description) )
                          THEN 1
                        ELSE analysis_stale
-                     END
+                     END,
+    -- filtered_out перерахований у JS (на злитих COALESCE-значеннях) і переданий параметром.
+    filtered_out  = @filtered_out
 `;
+
+/** Наявні поля рядка, потрібні для злиття перед обчисленням filtered_out. */
+interface ExistingFields {
+  description: string | null;
+  params: string | null;
+  pros: string | null;
+  cons: string | null;
+  seller_name: string | null;
+  category_id: number | null;
+}
+
+/**
+ * Bulk-завантаження наявних рядків (по olx_id) для злиття COALESCE-полів перед filtered_out.
+ * Один запит на чанк замість N×EXISTS+SELECT — на Turso це economія мережевих round-trip.
+ */
+async function loadExistingByOlxId(olxIds: number[]): Promise<Map<number, ExistingFields>> {
+  const map = new Map<number, ExistingFields>();
+  for (let i = 0; i < olxIds.length; i += IN_CHUNK) {
+    const chunk = olxIds.slice(i, i + IN_CHUNK);
+    const placeholders = chunk.map(() => '?').join(', ');
+    const rows = await dbAll<ExistingFields & { olx_id: number }>(
+      `SELECT ${SELECT_EXISTING_FIELDS} FROM listings WHERE olx_id IN (${placeholders})`,
+      chunk,
+    );
+    for (const r of rows) {
+      map.set(r.olx_id, {
+        description: r.description,
+        params: r.params,
+        pros: r.pros,
+        cons: r.cons,
+        seller_name: r.seller_name,
+        category_id: r.category_id,
+      });
+    }
+  }
+  return map;
+}
 
 /**
  * Upsert розпарсених оголошень по olx_id.
- * price_history НЕ чіпаємо (Етап 3). filtered_out перераховується через локальні
- * фільтри пошуку (Етап 2) — після upsert, бо враховує COALESCE'ні description/params.
+ * price_history НЕ чіпаємо (Етап 3). filtered_out рахується в JS на злитих (COALESCE)
+ * значеннях і пишеться у тому ж UPSERT — без окремого read-back/UPDATE.
+ *
+ * Потік (мінімум мережевих round-trip для Turso):
+ *   1) один bulk-SELECT наявних рядків по olx_id (чанками);
+ *   2) у пам'яті: new_count + злиття COALESCE-полів + filtered_out;
+ *   3) один db.batch('write') усіх UPSERT-ів (атомарно, як транзакція).
  * Повертає кількість знайдених і нових.
  */
 export async function upsertListings(
   searchId: number,
   raw: RawListing[],
 ): Promise<Pick<ScanResult, 'found' | 'new_count'>> {
-  let newCount = 0;
+  if (raw.length === 0) return { found: 0, new_count: 0 };
 
   const localFiltersRow = await dbGet<{ local_filters: string }>(SEARCH_LOCAL_FILTERS_SQL, [
     searchId,
@@ -148,58 +197,78 @@ export async function upsertListings(
     localFilters = {};
   }
 
-  // Інтерактивна транзакція libSQL: цикл містить читання (exists/persisted) + умовні записи,
-  // тож db.batch не підходить — потрібна атомарність усього циклу (як db.transaction раніше).
-  const tx = await db.transaction('write');
-  try {
-    for (const item of raw) {
-      const existing = await tx.execute({ sql: EXISTS_SQL, args: [item.olxId] });
-      const isNew = existing.rows.length === 0;
-      if (isNew) newCount++;
+  const existingMap = await loadExistingByOlxId(raw.map((r) => r.olxId));
 
-      // Структуровані поля присутні (GraphQL-фетчер) — пріоритет їм.
-      // HTML-фетчер createdAt не заповнює, тому це надійний дискримінатор.
-      const hasStructuredData = item.createdAt !== undefined;
+  let newCount = 0;
+  // Дублі в межах одного raw (одне оголошення на кількох сторінках) рахуються як новий один раз,
+  // як і в попередній EXISTS-логіці (друга поява вже «існує»).
+  const seen = new Set<number>();
+  const statements: { sql: string; args: Record<string, InValue> }[] = [];
 
-      let price: number | null;
-      let currency: string;
-      let city: string | null;
-      let postedAt: string | null;
-      let district: string | null = null;
-      let sellerType: string | null = null;
-      let params: string | null = null;
-      let description: string | null = null;
-      let sellerName: string | null = null;
-      let contactName: string | null = null;
-      let olxStatus: string | null = null;
+  for (const item of raw) {
+    const existing = existingMap.get(item.olxId);
+    const isNew = existing === undefined && !seen.has(item.olxId);
+    if (isNew) newCount++;
+    seen.add(item.olxId);
 
-      if (hasStructuredData) {
-        price = item.price ?? null;
-        currency = item.currency ?? 'UAH';
-        city = item.city ?? null;
-        district = item.district ?? null;
-        postedAt = item.createdAt ?? null;
-        sellerType = item.sellerType ?? null;
-        params = item.params ? JSON.stringify(item.params) : null;
-        description = item.description ?? null;
-        sellerName = item.sellerName ?? null;
-        contactName = item.contactName ?? null;
-        olxStatus = item.olxStatus ?? null;
-      } else {
-        const parsedPrice = parsePrice(item.rawPrice);
-        price = parsedPrice.price;
-        currency = parsedPrice.currency;
+    // Структуровані поля присутні (GraphQL-фетчер) — пріоритет їм.
+    // HTML-фетчер createdAt не заповнює, тому це надійний дискримінатор.
+    const hasStructuredData = item.createdAt !== undefined;
 
-        const parsedLocation = parseLocationDate(item.locationDate);
-        city = parsedLocation.city;
-        postedAt = parseOlxDate(parsedLocation.postedAt);
-      }
+    let price: number | null;
+    let currency: string;
+    let city: string | null;
+    let postedAt: string | null;
+    let district: string | null = null;
+    let sellerType: string | null = null;
+    let params: string | null = null;
+    let description: string | null = null;
+    let sellerName: string | null = null;
+    let contactName: string | null = null;
+    let olxStatus: string | null = null;
 
-      const olxStatusInactive = hasStructuredData && olxStatus != null && olxStatus !== 'active';
+    if (hasStructuredData) {
+      price = item.price ?? null;
+      currency = item.currency ?? 'UAH';
+      city = item.city ?? null;
+      district = item.district ?? null;
+      postedAt = item.createdAt ?? null;
+      sellerType = item.sellerType ?? null;
+      params = item.params ? JSON.stringify(item.params) : null;
+      description = item.description ?? null;
+      sellerName = item.sellerName ?? null;
+      contactName = item.contactName ?? null;
+      olxStatus = item.olxStatus ?? null;
+    } else {
+      const parsedPrice = parsePrice(item.rawPrice);
+      price = parsedPrice.price;
+      currency = parsedPrice.currency;
 
-      await tx.execute({
-        sql: UPSERT_SQL,
-        args: {
+      const parsedLocation = parseLocationDate(item.locationDate);
+      city = parsedLocation.city;
+      postedAt = parseOlxDate(parsedLocation.postedAt);
+    }
+
+    const olxStatusInactive = hasStructuredData && olxStatus != null && olxStatus !== 'active';
+    const categoryId = hasStructuredData ? (item.categoryId ?? null) : null;
+
+    // Злиті значення — дзеркало COALESCE в UPSERT_SQL (новий ?? наявний), щоб filtered_out
+    // збігався з тим, що реально опиниться у рядку після upsert.
+    const filteredOut = evaluateFilteredOut(localFilters, {
+      title: item.title || null,
+      description: description ?? existing?.description ?? null,
+      params: params ?? existing?.params ?? '{}',
+      price,
+      city,
+      seller_name: sellerName ?? existing?.seller_name ?? null,
+      pros: existing?.pros ?? '',
+      cons: existing?.cons ?? '',
+      category_id: categoryId ?? existing?.category_id ?? null,
+    });
+
+    statements.push({
+      sql: UPSERT_SQL,
+      args: {
         olx_id: item.olxId,
         search_id: searchId,
         title: item.title || null,
@@ -210,7 +279,7 @@ export async function upsertListings(
         district,
         seller_type: sellerType,
         params,
-        category_id: hasStructuredData ? (item.categoryId ?? null) : null,
+        category_id: categoryId,
         category_type: hasStructuredData ? (item.categoryType ?? null) : null,
         photo_url: item.photoUrl ?? null,
         photo_urls:
@@ -224,34 +293,13 @@ export async function upsertListings(
         is_graphql: hasStructuredData ? 1 : 0,
         olx_status_inactive: olxStatusInactive ? 1 : 0,
         status_note: olxStatusInactive ? `auto-disabled: olx_status=${olxStatus}` : '',
-        },
-      });
-
-      const persistedRows = await tx.execute({ sql: SELECT_FOR_FILTER_SQL, args: [item.olxId] });
-      const persisted = persistedRows.rows[0] as unknown as
-        | {
-            id: number;
-            title: string | null;
-            description: string | null;
-            params: string | null;
-            price: number | null;
-            city: string | null;
-            seller_name: string | null;
-            pros: string | null;
-            cons: string | null;
-            category_id: number | null;
-          }
-        | undefined;
-      if (persisted) {
-        const filteredOut = evaluateFilteredOut(localFilters, persisted);
-        await tx.execute({ sql: UPDATE_FILTERED_OUT_SQL, args: [filteredOut ? 1 : 0, persisted.id] });
-      }
-    }
-    await tx.commit();
-  } catch (err) {
-    await tx.rollback();
-    throw err;
+        filtered_out: filteredOut ? 1 : 0,
+      },
+    });
   }
+
+  // Один round-trip: усі UPSERT-и виконуються атомарно (libSQL batch = транзакція).
+  await db.batch(statements, 'write');
 
   return { found: raw.length, new_count: newCount };
 }
