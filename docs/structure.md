@@ -35,7 +35,11 @@ olx-dashboard/
 │   ├── .env.example          # OPENROUTER_API_KEY + TURSO_DATABASE_URL/TURSO_AUTH_TOKEN/WEB_ORIGIN
 │   └── src/
 │       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
-│       ├── index.ts          # Fastify bootstrap, CORS з WEB_ORIGIN, /health, await initDb(), listen :3001 host 0.0.0.0
+│       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
+│       ├── auth/             # Google OAuth «ворота» single-user (docs/plans/google-oauth-gate.md)
+│       │   ├── config.ts     # env: GOOGLE_CLIENT_ID/ALLOWED_EMAILS/SESSION_SECRET, кукі-флаги, isAuthDisabled, assertAuthConfigured (fail-fast)
+│       │   ├── plugin.ts     # fastify-plugin (non-encapsulated): @fastify/cookie+@fastify/jwt, verifyGoogleIdToken (google-auth-library), глобальний onRequest-замок /api/*
+│       │   └── routes.ts     # POST /api/auth/google (verify→allowlist→сесійна кукі), GET /api/auth/me, POST /api/auth/logout
 │       ├── types/            # доменні типи (core, listings, scan, analysis) за принципом DDD
 │       │   ├── core.ts       # базові сутності (SearchConfig, Project, фільтри)
 │       │   ├── listings.ts   # оголошення, статуси
@@ -112,9 +116,13 @@ olx-dashboard/
     ├── vite.config.ts        # react plugin, proxy /api → :3001
     ├── index.html            # точка входу Vite
     └── src/
-        ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
-        ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
-        │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
+        ├── main.tsx          # ReactDOM + GoogleOAuthProvider + ChakraProvider + QueryClientProvider
+        ├── vite-env.d.ts     # типи import.meta.env (VITE_GOOGLE_CLIENT_ID, VITE_API_BASE) + vite/client
+        ├── App.tsx           # AuthGate-обгортка → Dashboard (Header, Searches sidebar, ListingsTable);
+        │                      #   useAutoRefresh лише після проходження гейта
+        ├── auth/             # Google OAuth «ворота» (docs/plans/google-oauth-gate.md)
+        │   ├── useAuth.ts    # useSession (GET /api/auth/me, слухає подію 401) + useLogin + useLogout
+        │   └── AuthGate.tsx  # гейт-екран із <GoogleLogin> (рендериться поки немає сесії)
         ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
         ├── theme/            # система стилів Chakra: єдина точка керування кольорами/розмірами
         │   ├── palette.ts    # ACCENT_BASE, FEEDBACK_BASE (success/warning/danger/info), THEME_PALETTES, STATUS_PALETTE
@@ -124,7 +132,7 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T>
+        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
@@ -277,6 +285,7 @@ olx-dashboard/
 | Порядок стратегій збору / fallback | `server/src/scanner/fetchOrchestrator.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
+| Авторизація (Google OAuth «ворота») | `server/src/auth/{config,plugin,routes}.ts`, `web/src/auth/{useAuth,AuthGate}.tsx`, `web/src/api/base.ts`, env `GOOGLE_CLIENT_ID`/`ALLOWED_EMAILS`/`SESSION_SECRET`/`AUTH_DISABLED`, `docs/plans/google-oauth-gate.md` |
 | Доменні типи | `server/src/types/` (бек), `web/src/types/` (фронт) |
 | Запити з фронту | `web/src/api/*` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |

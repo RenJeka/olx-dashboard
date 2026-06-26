@@ -76,6 +76,10 @@ CREATE TABLE IF NOT EXISTS listings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);
+-- Вікно покриття (statusEngine): кандидати за search_id + last_refresh_at >= windowFloor.
+CREATE INDEX IF NOT EXISTS idx_listings_search_refresh ON listings(search_id, last_refresh_at);
+-- Verify-прохід P1: давно не бачені (search_id + ORDER BY last_seen_at ASC).
+CREATE INDEX IF NOT EXISTS idx_listings_search_lastseen ON listings(search_id, last_seen_at);
 
 CREATE TABLE IF NOT EXISTS price_history (
   id INTEGER PRIMARY KEY,
