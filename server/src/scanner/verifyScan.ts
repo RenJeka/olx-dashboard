@@ -28,7 +28,8 @@ interface VerifyCandidateRow {
 
 // P1 (живість): давно не бачені auto-рядки або manual-rejected — включно зі status='disabled'
 // (auto), щоб дати шанс на реактивацію. ORDER BY last_seen_at ASC — найдавніші спершу.
-const P1_CONDITION = `
+// Експортується для реюзу в агрегаті /stats (єдине джерело предикату verify-кандидатів).
+export const P1_CONDITION = `
   url IS NOT NULL
   AND last_seen_at < datetime('now', '-3 days')
   AND (status_source = 'auto' OR status = 'rejected')
@@ -36,7 +37,7 @@ const P1_CONDITION = `
 
 // P2 (дозаповнення): рядки без опису, що ще активні — не в P1 (NOT (P1_CONDITION)).
 // ORDER BY posted_at DESC — свіжі цінніші.
-const P2_CONDITION = `
+export const P2_CONDITION = `
   url IS NOT NULL
   AND description IS NULL
   AND status != 'disabled'
