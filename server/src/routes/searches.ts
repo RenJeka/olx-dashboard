@@ -4,12 +4,12 @@ import { db, dbAll, dbGet, dbRun } from '../db/db.js';
 import {
   runScan,
   runVerify,
-  countVerifyCandidates,
   analyzeScan,
   runDeepScanFromPlan,
   requestStopScan,
   isAnalysisFresh,
 } from '../scanner/index.js';
+import { P1_CONDITION, P2_CONDITION } from '../scanner/verifyScan.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
 import type {
@@ -423,30 +423,25 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { id: string } }>('/api/searches/:id/filter-options', async (req) => {
     const id = Number(req.params.id);
 
-    const cityRows = await dbAll<{ city: string }>(
-      "SELECT DISTINCT city FROM listings WHERE search_id = ? AND city IS NOT NULL AND city != '' ORDER BY city ASC",
-      [id],
-    );
+    // Один прохід по рядках пошуку замість 4 окремих сканів (city/seller/pros/cons) —
+    // дедуп і парсинг bullet-тексту в JS (на Turso кожен скан = +N прочитаних рядків).
+    const rows = await dbAll<{
+      city: string | null;
+      seller_name: string | null;
+      pros: string | null;
+      cons: string | null;
+    }>('SELECT city, seller_name, pros, cons FROM listings WHERE search_id = ?', [id]);
 
-    const sellerRows = await dbAll<{ seller_name: string }>(
-      "SELECT DISTINCT seller_name FROM listings WHERE search_id = ? AND seller_name IS NOT NULL AND seller_name != '' ORDER BY seller_name ASC",
-      [id],
-    );
-
-    // Унікальні критерії плюсів/мінусів — DISTINCT із рядків listings, парсинг bullet-тексту.
-    const prosRows = await dbAll<{ pros: string }>(
-      "SELECT pros FROM listings WHERE search_id = ? AND pros IS NOT NULL AND pros != ''",
-      [id],
-    );
-    const consRows = await dbAll<{ cons: string }>(
-      "SELECT cons FROM listings WHERE search_id = ? AND cons IS NOT NULL AND cons != ''",
-      [id],
-    );
-
+    const citySet = new Set<string>();
+    const sellerSet = new Set<string>();
     const prosSet = new Set<string>();
-    for (const row of prosRows) parseBullets(row.pros).forEach((c) => prosSet.add(c));
     const consSet = new Set<string>();
-    for (const row of consRows) parseBullets(row.cons).forEach((c) => consSet.add(c));
+    for (const row of rows) {
+      if (row.city) citySet.add(row.city);
+      if (row.seller_name) sellerSet.add(row.seller_name);
+      if (row.pros) parseBullets(row.pros).forEach((c) => prosSet.add(c));
+      if (row.cons) parseBullets(row.cons).forEach((c) => consSet.add(c));
+    }
 
     // Дерево категорій OLX — кешований facet з останнього скану (searches.category_facet).
     // Назви/ієрархія/OLX-лічильники готові; локальні лічильники накладає фронт із listings.
@@ -462,8 +457,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const result: FilterOptions = {
-      cities: cityRows.map((r) => r.city),
-      sellers: sellerRows.map((r) => r.seller_name),
+      cities: [...citySet].sort(),
+      sellers: [...sellerSet].sort(),
       pros: [...prosSet].sort(),
       cons: [...consSet].sort(),
       categories,
@@ -477,26 +472,33 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     const search = await dbGet('SELECT id FROM searches WHERE id = ?', [id]);
     if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
 
-    const inDbRow = await dbGet<{ in_db: number }>(
-      'SELECT COUNT(*) AS in_db FROM listings WHERE search_id = ?',
+    // Один прохід по рядках пошуку замість 4 окремих COUNT-сканів (in_db + stale + verify P1/P2).
+    // На Turso кожен скан = +N прочитаних рядків, тож агрегат через SUM(CASE…) ріже читання вчетверо.
+    // P1/P2 взаємовиключні (P2_CONDITION містить NOT(P1_CONDITION)) → verify = p1 + p2.
+    const aggRow = await dbGet<{
+      in_db: number;
+      stale_count: number;
+      verify_p1: number;
+      verify_p2: number;
+    }>(
+      `SELECT
+         COUNT(*) AS in_db,
+         SUM(CASE WHEN status_source = 'auto' AND last_seen_at < datetime('now', '-3 days')
+                  THEN 1 ELSE 0 END) AS stale_count,
+         SUM(CASE WHEN ${P1_CONDITION} THEN 1 ELSE 0 END) AS verify_p1,
+         SUM(CASE WHEN ${P2_CONDITION} THEN 1 ELSE 0 END) AS verify_p2
+       FROM listings WHERE search_id = ?`,
       [id],
     );
-    const in_db = inDbRow?.in_db ?? 0;
-
-    const staleRow = await dbGet<{ stale_count: number }>(
-      `SELECT COUNT(*) AS stale_count FROM listings
-         WHERE search_id = ? AND status_source = 'auto' AND last_seen_at < datetime('now', '-3 days')`,
-      [id],
-    );
-    const stale_count = staleRow?.stale_count ?? 0;
+    const in_db = aggRow?.in_db ?? 0;
+    const stale_count = aggRow?.stale_count ?? 0;
+    const verify_candidates = (aggRow?.verify_p1 ?? 0) + (aggRow?.verify_p2 ?? 0);
 
     const lastScan = await dbGet<NonNullable<SearchStats['last_scan']>>(
       `SELECT kind, started_at, finished_at, found, new_count, raw_found, disabled_count, error, warning
          FROM scan_runs WHERE search_id = ? AND kind != 'analyze' ORDER BY id DESC LIMIT 1`,
       [id],
     );
-
-    const verify_candidates = await countVerifyCandidates(id);
 
     const stats: SearchStats = { in_db, stale_count, verify_candidates, last_scan: lastScan ?? null };
     return stats;
