@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import fastifyCookie from '@fastify/cookie';
 import fastifyJwt from '@fastify/jwt';
-import { OAuth2Client } from 'google-auth-library';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import {
   SESSION_COOKIE_NAME,
   getGoogleClientId,
@@ -44,13 +44,20 @@ async function authPluginImpl(app: FastifyInstance): Promise<void> {
     cookie: { cookieName: SESSION_COOKIE_NAME, signed: false },
   });
 
-  const googleClient = new OAuth2Client(clientId);
+  // Локальна верифікація ID-токена через Google JWKS (oauth2/v3/certs). НЕ через
+  // google-auth-library.verifyIdToken: на Node воно завжди тягне legacy PEM-сертифікати
+  // з /oauth2/v1/certs, який Google віддає 403 (зокрема з Render). jose ходить на v3-JWK,
+  // кешує ключі й перевіряє підпис/iss/aud/exp локально.
+  const GOOGLE_JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+  const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
 
   app.decorate('verifyGoogleIdToken', async (credential: string): Promise<string> => {
-    const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: clientId });
-    const payload = ticket.getPayload();
-    const email = payload?.email;
-    if (!email || payload?.email_verified !== true) {
+    const { payload } = await jwtVerify(credential, GOOGLE_JWKS, {
+      issuer: GOOGLE_ISSUERS,
+      audience: clientId,
+    });
+    const email = typeof payload.email === 'string' ? payload.email : undefined;
+    if (!email || payload.email_verified !== true) {
       throw new Error('Google-акаунт без верифікованого email.');
     }
     if (!isEmailAllowed(email)) {
