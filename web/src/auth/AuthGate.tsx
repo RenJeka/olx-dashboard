@@ -8,6 +8,10 @@ import { useLogin, useSession } from './useAuth';
  * Замок доступу: поки не пройдено авторизацію — рендериться екран входу з Google, а не
  * застосунок. Це гарантує, що захищені ендпойнти не бʼються до логіну.
  */
+// Той самий client ID, що передається у GoogleOAuthProvider (main.tsx). Порожній →
+// кнопку Google рендерити немає сенсу; показуємо зрозумілу підказку замість мертвого екрана.
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const session = useSession();
   const login = useLogin();
@@ -49,20 +53,36 @@ export function AuthGate({ children }: { children: ReactNode }) {
           </Text>
         </VStack>
 
-        <Box>
-          <GoogleLogin
-            onSuccess={(resp) => {
-              if (resp.credential) login.mutate(resp.credential);
-            }}
-            onError={() => login.reset()}
-          />
-        </Box>
+        {googleClientId ? (
+          <Box>
+            <GoogleLogin
+              onSuccess={(resp) => {
+                if (resp.credential) login.mutate(resp.credential);
+              }}
+              onError={() => login.reset()}
+            />
+          </Box>
+        ) : (
+          <Text fontSize="sm" color="error.fg" textAlign="center">
+            Google-логін не налаштовано: відсутній <code>VITE_GOOGLE_CLIENT_ID</code>. Для
+            локального запуску без логіну виставте <code>AUTH_DISABLED=true</code> у{' '}
+            <code>server/.env</code>.
+          </Text>
+        )}
 
         {login.isError && (
           <Text fontSize="sm" color="error.fg" textAlign="center">
             {login.error.message || 'Не вдалося увійти. Спробуйте ще раз.'}
           </Text>
         )}
+
+        {/* Якщо кнопка вище не з'являється — типово Google Identity заблоковано
+            (origin не в Authorized origins / вимкнені сторонні cookies / FedCM). */}
+        <Text fontSize="xs" color="fg.muted" textAlign="center">
+          Кнопка не з'являється? Перевірте, що поточний домен додано в Authorized JavaScript
+          origins у Google Console і що cookies увімкнені. Для локальної розробки —{' '}
+          <code>AUTH_DISABLED=true</code> у <code>server/.env</code>.
+        </Text>
       </VStack>
     </Center>
   );
