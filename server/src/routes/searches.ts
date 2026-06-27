@@ -9,7 +9,6 @@ import {
   requestStopScan,
   isAnalysisFresh,
 } from '../scanner/index.js';
-import { P1_CONDITION, P2_CONDITION } from '../scanner/verifyScan.js';
 import { evaluateFilteredOut } from '../scraper/localFilters.js';
 import { parseBullets } from '../analysis/text.js';
 import type {
@@ -18,7 +17,7 @@ import type {
   LocalFilters,
   ParamKeyInfo,
   ScanPlan,
-  SearchStats,
+  LastScanResponse,
 } from '../types.js';
 
 interface SearchBody {
@@ -466,41 +465,21 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     return result;
   });
 
-  // Статистика для панелі дій: скільки в базі, скільки "давно не бачених", останній скан.
+  // Останній скан для панелі дій. Агрегати in_db/stale_count/verify_candidates НЕ рахуємо тут:
+  // фронт виводить їх із уже завантаженого масиву listings, щоб не робити зайвий 408-рядковий
+  // SUM(CASE…)-прохід на кожен вибір пошуку (Turso reads, docs/plans/turso-stats-clientside.md).
   app.get<{ Params: { id: string } }>('/api/searches/:id/stats', async (req, reply) => {
     const id = Number(req.params.id);
     const search = await dbGet('SELECT id FROM searches WHERE id = ?', [id]);
     if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
 
-    // Один прохід по рядках пошуку замість 4 окремих COUNT-сканів (in_db + stale + verify P1/P2).
-    // На Turso кожен скан = +N прочитаних рядків, тож агрегат через SUM(CASE…) ріже читання вчетверо.
-    // P1/P2 взаємовиключні (P2_CONDITION містить NOT(P1_CONDITION)) → verify = p1 + p2.
-    const aggRow = await dbGet<{
-      in_db: number;
-      stale_count: number;
-      verify_p1: number;
-      verify_p2: number;
-    }>(
-      `SELECT
-         COUNT(*) AS in_db,
-         SUM(CASE WHEN status_source = 'auto' AND last_seen_at < datetime('now', '-3 days')
-                  THEN 1 ELSE 0 END) AS stale_count,
-         SUM(CASE WHEN ${P1_CONDITION} THEN 1 ELSE 0 END) AS verify_p1,
-         SUM(CASE WHEN ${P2_CONDITION} THEN 1 ELSE 0 END) AS verify_p2
-       FROM listings WHERE search_id = ?`,
-      [id],
-    );
-    const in_db = aggRow?.in_db ?? 0;
-    const stale_count = aggRow?.stale_count ?? 0;
-    const verify_candidates = (aggRow?.verify_p1 ?? 0) + (aggRow?.verify_p2 ?? 0);
-
-    const lastScan = await dbGet<NonNullable<SearchStats['last_scan']>>(
+    const lastScan = await dbGet<NonNullable<LastScanResponse['last_scan']>>(
       `SELECT kind, started_at, finished_at, found, new_count, raw_found, disabled_count, error, warning
          FROM scan_runs WHERE search_id = ? AND kind != 'analyze' ORDER BY id DESC LIMIT 1`,
       [id],
     );
 
-    const stats: SearchStats = { in_db, stale_count, verify_candidates, last_scan: lastScan ?? null };
-    return stats;
+    const response: LastScanResponse = { last_scan: lastScan ?? null };
+    return response;
   });
 }

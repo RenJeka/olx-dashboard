@@ -77,13 +77,13 @@ export interface LastScanInfo {
   warning: string | null;
 }
 
-/** Відповідь GET /api/searches/:id/stats — для панелі дій (Етап 2). */
-export interface SearchStats {
-  in_db: number;
-  /** status_source='auto' AND last_seen_at старше 3 днів — для картки «Зниклі/Старі». */
-  stale_count: number;
-  /** Кандидати verify-проходу (A3): давно не бачені (P1) + рядки без опису (P2), без перетину. */
-  verify_candidates: number;
+/**
+ * Відповідь GET /api/searches/:id/stats — лише `last_scan` (1 рядок scan_runs).
+ * Агрегати `in_db`/`stale_count`/`verify_candidates` НЕ рахуються на сервері: фронт виводить їх
+ * із уже завантаженого масиву listings, щоб не робити зайвий 408-рядковий прохід на кожен вибір
+ * пошуку (Turso reads, docs/plans/turso-stats-clientside.md).
+ */
+export interface LastScanResponse {
   last_scan: LastScanInfo | null;
 }
 

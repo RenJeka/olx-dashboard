@@ -61,7 +61,19 @@ export interface LastScanInfo {
   warning: string | null;
 }
 
-/** Відповідь GET /api/searches/:id/stats — для панелі дій. */
+/**
+ * Відповідь сервера GET /api/searches/:id/stats — лише `last_scan` (1 рядок scan_runs).
+ * Дзеркало server `LastScanResponse`. Агрегати рахуються на клієнті (`computeListingStats`),
+ * docs/plans/turso-stats-clientside.md.
+ */
+export interface LastScanResponse {
+  last_scan: LastScanInfo | null;
+}
+
+/**
+ * Статистика пошуку для панелі дій — збирається на КЛІЄНТІ: `in_db`/`stale_count`/
+ * `verify_candidates` з масиву listings (`computeListingStats`), `last_scan` зі звуженого `/stats`.
+ */
 export interface SearchStats {
   in_db: number;
   /** status_source='auto' AND last_seen_at старше 3 днів — для картки «Зниклі/Старі». */
