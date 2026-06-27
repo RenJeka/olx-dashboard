@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { db } from '../db/db.js';
+import { dbGet, dbRun } from '../db/db.js';
 import { estimatePages } from '../scraper/graphql/fetcher.js';
 import { MAX_PAGES } from '../scraper/graphql/constants.js';
 import type { SplitPlan } from '../scraper/graphql/types.js';
@@ -72,11 +72,9 @@ export function isAnalysisFresh(finishedAt: string | null | undefined): boolean 
   return Number.isFinite(t) && Date.now() - t < PLAN_TTL_MS;
 }
 
-// ── Prepared statement для фіналізації analyze-скану ─────────────────────────
-const finalizeAnalyzeStmt = db.prepare(
-  `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, scan_plan = ?, error = NULL,
-     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
-);
+// ── SQL для фіналізації analyze-скану ────────────────────────────────────────
+const FINALIZE_ANALYZE_SQL = `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, scan_plan = ?, error = NULL,
+     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
 /**
  * Обробляє один варіант query в циклі analyze-скану: probe + агрегація метрик.
@@ -157,7 +155,7 @@ async function analyzeVariant(
         sampleUnique++;
       }
     }
-    const known = selectKnownOlxIds(sampleItems.map((it) => it.olxId));
+    const known = await selectKnownOlxIds(sampleItems.map((it) => it.olxId));
     knownSampleCount = known.size;
     sampleTotal = sampleItems.length;
   }
@@ -194,7 +192,7 @@ async function analyzeVariant(
  * на стадії `runDeepScanFromPlan`, якщо повторна спроба теж впаде.
  */
 export async function analyzeScan(searchId: number, options?: { deep?: boolean }): Promise<ScanPlan> {
-  const search = loadSearch(searchId);
+  const search = await loadSearch(searchId);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }
@@ -290,13 +288,12 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
       : null;
 
     // Калібрування реальними даними: останній завершений нормальний скан (не аналітичний).
-    const lastScan = db
-      .prepare(
-        `SELECT raw_found, found FROM scan_runs
-         WHERE search_id = ? AND kind != 'analyze' AND finished_at IS NOT NULL AND found IS NOT NULL
-         ORDER BY finished_at DESC LIMIT 1`,
-      )
-      .get(searchId) as { raw_found: number | null; found: number | null } | undefined;
+    const lastScan = await dbGet<{ raw_found: number | null; found: number | null }>(
+      `SELECT raw_found, found FROM scan_runs
+       WHERE search_id = ? AND kind != 'analyze' AND finished_at IS NOT NULL AND found IS NOT NULL
+       ORDER BY finished_at DESC LIMIT 1`,
+      [searchId],
+    );
 
     const partial =
       variants.length > 1 ||
@@ -323,12 +320,12 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
 
     // Зберігаємо повний ScanPlan у scan_runs.scan_plan — для перегляду останнього аналізу
     // після закриття діалогу (GET /last-analysis, docs/plans/deep-scan-stop-and-history.md).
-    finalizeAnalyzeStmt.run(
+    await dbRun(FINALIZE_ANALYZE_SQL, [
       new Date().toISOString(),
       warnings.length > 0 ? warnings.join('; ') : null,
       JSON.stringify(scanPlan),
       ctx.runId,
-    );
+    ]);
 
     return scanPlan;
   });
@@ -366,13 +363,12 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
   cleanupExpiredPlans();
   const cached = planCache.get(planToken);
   if (!cached || cached.searchId !== searchId) {
-    const lastAnalyze = db
-      .prepare(
-        `SELECT finished_at FROM scan_runs
-         WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
-         ORDER BY id DESC LIMIT 1`,
-      )
-      .get(searchId) as { finished_at: string | null } | undefined;
+    const lastAnalyze = await dbGet<{ finished_at: string | null }>(
+      `SELECT finished_at FROM scan_runs
+       WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
+       ORDER BY id DESC LIMIT 1`,
+      [searchId],
+    );
     if (lastAnalyze && isAnalysisFresh(lastAnalyze.finished_at)) {
       return runScan(searchId, { deep: true });
     }
@@ -380,7 +376,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
   }
   planCache.delete(planToken);
 
-  const search = loadSearch(searchId);
+  const search = await loadSearch(searchId);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }

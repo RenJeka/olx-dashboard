@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { db } from '../db/db.js';
+import type { InValue } from '@libsql/client';
+import { dbAll, dbGet, dbRun } from '../db/db.js';
 import { LISTING_STATUSES, type ListingPatch } from '../types.js';
 
 // Білий список колонок для сортування (захист від SQL-інʼєкцій).
@@ -33,14 +34,13 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       : 'first_seen_at';
     const order = req.query.order?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-    return db
-      .prepare(
-        `SELECT ${LISTING_COLUMNS}
+    return dbAll(
+      `SELECT ${LISTING_COLUMNS}
          FROM listings
          WHERE search_id = ?
          ORDER BY ${sort} ${order}`,
-      )
-      .all(searchId);
+      [searchId],
+    );
   });
 
   // Ручна зміна статусу/нотатки. Будь-яка зміна статусу → status_source='manual', miss_count=0.
@@ -48,7 +48,7 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
     '/api/listings/:id',
     async (req, reply) => {
       const id = Number(req.params.id);
-      const existing = db.prepare('SELECT id FROM listings WHERE id = ?').get(id);
+      const existing = await dbGet('SELECT id FROM listings WHERE id = ?', [id]);
       if (!existing) return reply.code(404).send({ error: 'Оголошення не знайдено' });
 
       const { status, note, pros, cons, ai_relevant, olx_status } = req.body;
@@ -67,7 +67,7 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const fields: string[] = [];
-      const values: unknown[] = [];
+      const values: InValue[] = [];
 
       if (status !== undefined) {
         fields.push("status = ?", "status_source = 'manual'", 'miss_count = 0');
@@ -102,10 +102,10 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
 
       if (fields.length > 0) {
         values.push(id);
-        db.prepare(`UPDATE listings SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+        await dbRun(`UPDATE listings SET ${fields.join(', ')} WHERE id = ?`, values);
       }
 
-      return db.prepare(`SELECT ${LISTING_COLUMNS} FROM listings WHERE id = ?`).get(id);
+      return dbGet(`SELECT ${LISTING_COLUMNS} FROM listings WHERE id = ?`, [id]);
     },
   );
 }

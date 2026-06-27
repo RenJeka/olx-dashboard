@@ -7,7 +7,7 @@
 ## Стек
 
 - **Monorepo:** npm workspaces — `server/` + `web/`
-- **Backend:** Node.js 20+, TypeScript, Fastify 5, better-sqlite3, cheerio
+- **Backend:** Node.js 20+, TypeScript, Fastify 5, @libsql/client (Turso/SQLite), cheerio
 - **Frontend:** React 18, Vite 6, TanStack Query/Table, Chakra UI v3 (+ next-themes, react-icons/lu)
 - **Збір даних:** GraphQL `POST /apigateway/graphql` (основний) + `fetch`/cheerio HTML-fallback (без браузера/Playwright)
 
@@ -18,9 +18,15 @@ npm install          # залежності обох воркспейсів
 npm run dev          # server :3001 + web :5173 паралельно
 ```
 
-Відкрий http://localhost:5173 → створи пошук (напр. query `iphone 13`, ціна 8000–15000) →
-натисни **Scan** → оголошення зʼявляться в таблиці. Повторний Scan не дублює рядки
-(дедуплікація по `olx_id`).
+> **Авторизація (Google OAuth):** дашборд захищений логіном — пускає лише тебе. Перед першим
+> запуском налаштуй Client ID та `.env` файли. Детальна покрокова інструкція →
+> **[`docs/google-oauth-setup.md`](docs/google-oauth-setup.md)**.
+>
+> Якщо хочеш запускати локально без логіну (для розробки): `AUTH_DISABLED=true` у `server/.env`.
+
+Відкрий http://localhost:5173 → увійди через Google → створи пошук (напр. query `iphone 13`,
+ціна 8000–15000) → натисни **Scan** → оголошення зʼявляться в таблиці. Повторний Scan не
+дублює рядки (дедуплікація по `olx_id`).
 
 CLI-скан без UI:
 
@@ -63,4 +69,5 @@ npm run scan -- --search <id>
 - [`docs/structure.md`](docs/structure.md) — структура файлів і папок
 - [`docs/plans/initial-mvp.md`](docs/plans/initial-mvp.md) — план Етапу 1 із прогресом
 - [`docs/plans/graphql-migration.md`](docs/plans/graphql-migration.md) — план міграції збору на GraphQL
+- [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) — покрокове налаштування Google OAuth (Google Console, env-змінні, локал, Render)
 - [`CLAUDE.md`](CLAUDE.md) — інваріанти й конвенції (обовʼязкові при змінах)

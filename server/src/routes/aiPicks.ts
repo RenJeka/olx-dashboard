@@ -31,9 +31,9 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/prompt',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const candidates = loadPickCandidates(id);
+      const candidates = await loadPickCandidates(id);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       const prompt = buildPickPrompt(candidates);
@@ -48,9 +48,9 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const candidates = loadPickCandidates(id);
+      const candidates = await loadPickCandidates(id);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       const chunks = chunk(candidates, MANUAL_PICKS_ZIP_CHUNK_SIZE);
@@ -79,10 +79,10 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/rank',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       if (!hasApiKey()) return reply.code(409).send({ error: NO_API_KEY });
 
-      const candidates = loadPickCandidates(id);
+      const candidates = await loadPickCandidates(id);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       try {
@@ -99,10 +99,10 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/import',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
-      const candidates = loadPickCandidates(id);
+      const candidates = await loadPickCandidates(id);
       const validIds = candidates.map((c) => c.id);
 
       try {
@@ -120,30 +120,30 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/commit',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
       const picks = Array.isArray(req.body.picks) ? req.body.picks : [];
 
-      const clearStmt = db.prepare(
-        `UPDATE listings SET ai_rank = NULL, ai_pick_reason = NULL, ai_ranked_at = NULL
-         WHERE search_id = ?`,
-      );
-      const setStmt = db.prepare(
-        `UPDATE listings SET ai_rank = ?, ai_pick_reason = ?, ai_ranked_at = datetime('now')
-         WHERE id = ? AND search_id = ?`,
-      );
+      const CLEAR_SQL = `UPDATE listings SET ai_rank = NULL, ai_pick_reason = NULL, ai_ranked_at = NULL
+         WHERE search_id = ?`;
+      const SET_SQL = `UPDATE listings SET ai_rank = ?, ai_pick_reason = ?, ai_ranked_at = datetime('now')
+         WHERE id = ? AND search_id = ?`;
 
-      const run = db.transaction(() => {
-        clearStmt.run(id);
-        let committed = 0;
+      // Інтерактивна транзакція: скидання старих результатів + запис нових атомарно.
+      const tx = await db.transaction('write');
+      let committed = 0;
+      try {
+        await tx.execute({ sql: CLEAR_SQL, args: [id] });
         for (const pick of picks) {
-          const info = setStmt.run(pick.rank, pick.reason, pick.id, id);
-          committed += info.changes;
+          const info = await tx.execute({ sql: SET_SQL, args: [pick.rank, pick.reason, pick.id, id] });
+          committed += info.rowsAffected;
         }
-        return committed;
-      });
+        await tx.commit();
+      } catch (err) {
+        await tx.rollback();
+        throw err;
+      }
 
-      const committed = run();
       return { committed };
     },
   );
