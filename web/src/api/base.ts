@@ -20,3 +20,20 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
+/**
+ * Як api(), але повертає Blob (для ZIP/xlsx-завантажень). Та сама сесійна кукі
+ * (credentials: 'include' — критично для cross-site проду Render) і 401-гейт.
+ */
+export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const headers = init?.body ? { 'Content-Type': 'application/json' } : undefined;
+  const res = await fetch(`${API_BASE}${path}`, { headers, credentials: 'include', ...init });
+  if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/api/auth/')) {
+      window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+    }
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
