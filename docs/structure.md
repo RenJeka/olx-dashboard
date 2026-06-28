@@ -26,14 +26,20 @@ olx-dashboard/
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
-│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio, exceljs, archiver
+│   ├── package.json          # deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
 │   ├── scripts/
 │   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/
-│   │   └── olx.db            # SQLite (gitignored, створюється при старті)
+│   │   └── olx.db            # локальна libSQL/SQLite БД (gitignored; file: дефолт, створюється initDb при старті)
+│   ├── .env.example          # OPENROUTER_API_KEY + TURSO_DATABASE_URL/TURSO_AUTH_TOKEN/WEB_ORIGIN
 │   └── src/
-│       ├── index.ts          # Fastify bootstrap, CORS :5173, /health, listen :3001
+│       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
+│       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
+│       ├── auth/             # Google OAuth «ворота» single-user (docs/plans/google-oauth-gate.md)
+│       │   ├── config.ts     # env: GOOGLE_CLIENT_ID/ALLOWED_EMAILS/SESSION_SECRET, кукі-флаги, isAuthDisabled, assertAuthConfigured (fail-fast)
+│       │   ├── plugin.ts     # fastify-plugin (non-encapsulated): @fastify/cookie+@fastify/jwt, verifyGoogleIdToken (google-auth-library), глобальний onRequest-замок /api/*
+│       │   └── routes.ts     # POST /api/auth/google (verify→allowlist→сесійна кукі), GET /api/auth/me, POST /api/auth/logout
 │       ├── types/            # доменні типи (core, listings, scan, analysis) за принципом DDD
 │       │   ├── core.ts       # базові сутності (SearchConfig, Project, фільтри)
 │       │   ├── listings.ts   # оголошення, статуси
@@ -53,8 +59,8 @@ olx-dashboard/
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
-│       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
-│       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
+│       │   ├── schema.sql    # КАНОН схеми БД (5 таблиць) — джерело істини
+│       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
@@ -91,7 +97,7 @@ olx-dashboard/
 │       │   ├── olxCategories.ts # fetchCategoryOptions(query): дерево категорій OLX (facet метаданих пошуку, olx-api.md §2.11) → CategoryOption[]; тягнеться scanner-ом, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats + PATCH (filters, query_synonyms, project_id)
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt + .../ai-picks/package.zip (ZIP map-reduce, пули >50) + POST .../ai-picks/rank(авто)/import(ручний)/commit
@@ -110,9 +116,13 @@ olx-dashboard/
     ├── vite.config.ts        # react plugin, proxy /api → :3001
     ├── index.html            # точка входу Vite
     └── src/
-        ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
-        ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
-        │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
+        ├── main.tsx          # ReactDOM + GoogleOAuthProvider + ChakraProvider + QueryClientProvider
+        ├── vite-env.d.ts     # типи import.meta.env (VITE_GOOGLE_CLIENT_ID, VITE_API_BASE) + vite/client
+        ├── App.tsx           # AuthGate-обгортка → Dashboard (Header, Searches sidebar, ListingsTable);
+        │                      #   useAutoRefresh лише після проходження гейта
+        ├── auth/             # Google OAuth «ворота» (docs/plans/google-oauth-gate.md)
+        │   ├── useAuth.ts    # useSession (GET /api/auth/me, слухає подію 401) + useLogin + useLogout
+        │   └── AuthGate.tsx  # гейт-екран із <GoogleLogin> (рендериться поки немає сесії)
         ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
         ├── theme/            # система стилів Chakra: єдина точка керування кольорами/розмірами
         │   ├── palette.ts    # ACCENT_BASE, FEEDBACK_BASE (success/warning/danger/info), THEME_PALETTES, STATUS_PALETTE
@@ -122,7 +132,7 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T>
+        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
@@ -261,6 +271,7 @@ olx-dashboard/
             ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
             ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
             ├── relevance.ts      # чисті функції для AI-фільтра (getEffectiveRelevanceIds, getRelevanceStats)
+            ├── searchStats.ts    # computeListingStats() — клієнтський аналог агрегату /stats (in_db/stale/verify) з масиву listings, щоб не робити 408-рядковий прохід на сервері (docs/plans/turso-stats-clientside.md)
             └── analysis.ts       # чисті функції для AI-аналізу (isIncludedFn, computeDefaultScope, buildScopeLabel)
 ```
 
@@ -275,6 +286,7 @@ olx-dashboard/
 | Порядок стратегій збору / fallback | `server/src/scanner/fetchOrchestrator.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
+| Авторизація (Google OAuth «ворота») | `server/src/auth/{config,plugin,routes}.ts`, `web/src/auth/{useAuth,AuthGate}.tsx`, `web/src/api/base.ts`, env `GOOGLE_CLIENT_ID`/`ALLOWED_EMAILS`/`SESSION_SECRET`/`AUTH_DISABLED`, `docs/plans/google-oauth-gate.md` |
 | Доменні типи | `server/src/types/` (бек), `web/src/types/` (фронт) |
 | Запити з фронту | `web/src/api/*` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |

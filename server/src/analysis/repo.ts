@@ -1,4 +1,4 @@
-import { db } from '../db/db.js';
+import { dbAll, dbGet, dbRun } from '../db/db.js';
 import type { PickCandidate } from '../types.js';
 import { PICK_CANDIDATES_LIMIT } from './constants.js';
 
@@ -9,16 +9,20 @@ export interface ListingRow {
   params: string | null;
 }
 
-export function getSearch(id: number): { id: number; name: string; analysis_criteria: string } | undefined {
-  return db.prepare('SELECT id, name, analysis_criteria FROM searches WHERE id = ?').get(id) as
-    | { id: number; name: string; analysis_criteria: string }
-    | undefined;
+export async function getSearch(
+  id: number,
+): Promise<{ id: number; name: string; analysis_criteria: string } | undefined> {
+  return dbGet<{ id: number; name: string; analysis_criteria: string }>(
+    'SELECT id, name, analysis_criteria FROM searches WHERE id = ?',
+    [id],
+  );
 }
 
-export function getSavedCriteria(searchId: number): { cons: string[]; pros: string[] } {
-  const row = db.prepare('SELECT analysis_criteria FROM searches WHERE id = ?').get(searchId) as
-    | { analysis_criteria: string }
-    | undefined;
+export async function getSavedCriteria(searchId: number): Promise<{ cons: string[]; pros: string[] }> {
+  const row = await dbGet<{ analysis_criteria: string }>(
+    'SELECT analysis_criteria FROM searches WHERE id = ?',
+    [searchId],
+  );
   try {
     const parsed = JSON.parse(row?.analysis_criteria || '{}') as { cons?: string[]; pros?: string[] };
     return { cons: parsed.cons ?? [], pros: parsed.pros ?? [] };
@@ -31,27 +35,29 @@ export function getSavedCriteria(searchId: number): { cons: string[]; pros: stri
  * Цільовий товар семантичного фільтра. Якщо relevance_target порожній — повертаємо query
  * пошуку як передзаповнення (щоб перший прогін мав осмислену ціль).
  */
-export function getRelevanceTarget(searchId: number): string {
-  const row = db.prepare('SELECT relevance_target, query FROM searches WHERE id = ?').get(searchId) as
-    | { relevance_target: string | null; query: string }
-    | undefined;
+export async function getRelevanceTarget(searchId: number): Promise<string> {
+  const row = await dbGet<{ relevance_target: string | null; query: string }>(
+    'SELECT relevance_target, query FROM searches WHERE id = ?',
+    [searchId],
+  );
   if (!row) return '';
   return (row.relevance_target ?? '').trim() || row.query;
 }
 
 /** Зберігає цільовий товар на рівні пошуку (для повторних прогонів). */
-export function setRelevanceTarget(searchId: number, target: string): void {
-  db.prepare('UPDATE searches SET relevance_target = ? WHERE id = ?').run(target, searchId);
+export async function setRelevanceTarget(searchId: number, target: string): Promise<void> {
+  await dbRun('UPDATE searches SET relevance_target = ? WHERE id = ?', [target, searchId]);
 }
 
 /**
  * Синоніми query (docs/plans/search-synonyms.md) як alias-назви товару для AI-фільтра
  * релевантності — оголошення, що продає товар під будь-яким із синонімів, теж релевантне.
  */
-export function getRelevanceAliases(searchId: number): string[] {
-  const row = db.prepare('SELECT query_synonyms FROM searches WHERE id = ?').get(searchId) as
-    | { query_synonyms: string | null }
-    | undefined;
+export async function getRelevanceAliases(searchId: number): Promise<string[]> {
+  const row = await dbGet<{ query_synonyms: string | null }>(
+    'SELECT query_synonyms FROM searches WHERE id = ?',
+    [searchId],
+  );
   if (!row) return [];
   try {
     const parsed = JSON.parse(row.query_synonyms || '[]');
@@ -62,18 +68,17 @@ export function getRelevanceAliases(searchId: number): string[] {
 }
 
 /** Завантажує оголошення за id (або всі пошуку, якщо ids порожній). */
-export function loadListings(searchId: number, ids: number[]): ListingRow[] {
+export async function loadListings(searchId: number, ids: number[]): Promise<ListingRow[]> {
   if (ids.length === 0) {
-    return db
-      .prepare('SELECT id, title, description, params FROM listings WHERE search_id = ?')
-      .all(searchId) as ListingRow[];
+    return dbAll<ListingRow>('SELECT id, title, description, params FROM listings WHERE search_id = ?', [
+      searchId,
+    ]);
   }
   const placeholders = ids.map(() => '?').join(',');
-  return db
-    .prepare(
-      `SELECT id, title, description, params FROM listings WHERE search_id = ? AND id IN (${placeholders})`,
-    )
-    .all(searchId, ...ids) as ListingRow[];
+  return dbAll<ListingRow>(
+    `SELECT id, title, description, params FROM listings WHERE search_id = ? AND id IN (${placeholders})`,
+    [searchId, ...ids],
+  );
 }
 
 /**
@@ -82,15 +87,14 @@ export function loadListings(searchId: number, ids: number[]): ListingRow[] {
  * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт PICK_CANDIDATES_LIMIT.
  * Предикат збігається з вкладкою «Найкращі кандидати» в UI.
  */
-export function loadPickCandidates(searchId: number): PickCandidate[] {
-  return db
-    .prepare(
-      `SELECT id, title, price, city, params, description, pros
+export async function loadPickCandidates(searchId: number): Promise<PickCandidate[]> {
+  return dbAll<PickCandidate>(
+    `SELECT id, title, price, city, params, description, pros
        FROM listings
        WHERE search_id = ? AND cons = '' AND status NOT IN ('disabled','rejected')
          AND filtered_out = 0 AND ai_relevant IS NOT 0
        ORDER BY CASE WHEN price IS NULL THEN 1 ELSE 0 END, price ASC
        LIMIT ?`,
-    )
-    .all(searchId, PICK_CANDIDATES_LIMIT) as PickCandidate[];
+    [searchId, PICK_CANDIDATES_LIMIT],
+  );
 }

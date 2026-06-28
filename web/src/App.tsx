@@ -4,8 +4,11 @@ import { Toaster } from './components/ui/toaster';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
 import { Searches } from './components/searches';
 import { ListingsTable } from './pages/ListingsTable';
+import { AuthGate } from './auth/AuthGate';
 
-export function App() {
+// Тіло застосунку — рендериться лише після проходження гейта, тож захищені ендпойнти
+// (зокрема автооновлення) не бʼються до логіну.
+function Dashboard() {
   useAutoRefresh();
 
   return (
@@ -20,3 +23,10 @@ export function App() {
   );
 }
 
+export function App() {
+  return (
+    <AuthGate>
+      <Dashboard />
+    </AuthGate>
+  );
+}

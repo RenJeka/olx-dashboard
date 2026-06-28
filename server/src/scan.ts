@@ -1,4 +1,5 @@
 // CLI-скан без UI: npm run scan -- --search <id> [--deep|--verify]
+import { initDb } from './db/db.js';
 import { runScan, runVerify } from './scanner/index.js';
 
 function parseSearchId(argv: string[]): number | null {
@@ -24,6 +25,7 @@ if (deep && verify) {
 }
 
 try {
+  await initDb(); // схема застосовується тут (не як side-effect імпорту db.ts)
   if (verify) {
     const result = await runVerify(searchId);
     console.log(
