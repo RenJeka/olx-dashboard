@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from './base';
+import { api, apiBlob } from './base';
 import { downloadBlob } from '../utils/download';
 import type {
   AnalysisStatus,
@@ -115,16 +115,11 @@ export async function fetchAnalyzePackageZip(
   ids: number[],
 ): Promise<void> {
   // POST (не GET): тисячі ids у query-рядку перевищують ліміт довжини заголовків (431).
-  const res = await fetch(`/api/searches/${searchId}/analyze/package.zip`, {
+  const blob = await apiBlob(`/api/searches/${searchId}/analyze/package.zip`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mode, ids }),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  downloadBlob(await res.blob(), `analysis-${mode}-search-${searchId}.zip`);
+  downloadBlob(blob, `analysis-${mode}-search-${searchId}.zip`);
 }
 
 /** Парс однієї вставленої відповіді matching + мерж у накопичене. */
@@ -182,11 +177,9 @@ export async function exportPreview(
   format: 'xlsx' | 'json',
   rows: { id: number; criteria: string[] }[],
 ): Promise<void> {
-  const res = await fetch(`/api/searches/${searchId}/analyze/export`, {
+  const blob = await apiBlob(`/api/searches/${searchId}/analyze/export`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ format, mode, rows }),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  downloadBlob(await res.blob(), `analysis-${mode}.${format}`);
+  downloadBlob(blob, `analysis-${mode}.${format}`);
 }

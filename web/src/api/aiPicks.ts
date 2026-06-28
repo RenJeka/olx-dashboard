@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from './base';
+import { api, apiBlob } from './base';
 import { downloadBlob } from '../utils/download';
 import type { PickItem, PickResult } from '../types';
 
@@ -10,12 +10,8 @@ export function fetchAiPicksPrompt(searchId: number): Promise<{ prompt: string }
 
 /** ZIP-пакет ручного режиму для великих пулів (prompt.txt + candidates/chunk-NNN.json) через blob. */
 export async function fetchAiPicksPackageZip(searchId: number): Promise<void> {
-  const res = await fetch(`/api/searches/${searchId}/ai-picks/package.zip`);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  downloadBlob(await res.blob(), `ai-picks-search-${searchId}.zip`);
+  const blob = await apiBlob(`/api/searches/${searchId}/ai-picks/package.zip`);
+  downloadBlob(blob, `ai-picks-search-${searchId}.zip`);
 }
 
 /** Авто-ранжування через OpenRouter. НЕ пише в БД — повертає picks для перегляду. */
