@@ -2,8 +2,19 @@ import type { SearchConfig, RawListing } from '../../types.js';
 import { USER_AGENT } from '../constants.js';
 import { GRAPHQL_URL, PAGE_LIMIT, LISTING_SEARCH_QUERY } from './constants.js';
 import type { SearchParameter, ListingError, GraphqlResponse } from './types.js';
-import { slugify } from '../utils.js';
+import { slugify, sleep, randomDelayMs } from '../utils.js';
 import { GraphqlListingMapper } from './mapper.js';
+
+/**
+ * Скільки разів повторити запит при ТРАНЗІЄНТНОМУ збої (мережа / HTTP 429,5xx / не-JSON
+ * анти-бот-інтерстіціал). Один блип серед десятків запитів глибокого скану валив увесь
+ * прохід (інцидент 2026-06-30: deep-скан після «Аналізу» падав із проковтнутою причиною
+ * GraphQL і оманливою HTML-помилкою «рендериться через JS»). Детерміновані помилки
+ * (400/404, ListingError вікна пагінації, помилка схеми) НЕ ретраяться.
+ */
+const MAX_ATTEMPTS = 3;
+/** HTTP-статуси, які вважаємо тимчасовими й вартими повтору. */
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 export interface BuildParamsOptions {
   sortBy?: string;
@@ -91,51 +102,98 @@ export class GraphqlClient {
     opts?: BuildParamsOptions,
   ): Promise<PageResult> {
     const searchParameters = this.buildSearchParameters(search, offset, opts);
-
-    const res = await fetch(GRAPHQL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'Accept-Language': 'uk',
-        Origin: 'https://www.olx.ua',
-        Referer: referer,
-        'X-Client': 'DESKTOP',
-        'User-Agent': USER_AGENT,
-      },
-      body: JSON.stringify({
-        query: LISTING_SEARCH_QUERY,
-        variables: { searchParameters },
-      }),
+    const body = JSON.stringify({
+      query: LISTING_SEARCH_QUERY,
+      variables: { searchParameters },
     });
 
-    if (!res.ok) {
-      throw new Error(`OLX GraphQL повернув HTTP ${res.status} для offset=${offset}`);
+    // Один транзієнтний збій (мережа / 429 / 5xx / анти-бот не-JSON) не повинен валити
+    // увесь скан: повторюємо до MAX_ATTEMPTS з бекофом. Детерміновані помилки кидаються одразу.
+    let lastTransient = '';
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(GRAPHQL_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'Accept-Language': 'uk',
+            Origin: 'https://www.olx.ua',
+            Referer: referer,
+            'X-Client': 'DESKTOP',
+            'User-Agent': USER_AGENT,
+          },
+          body,
+        });
+      } catch (err) {
+        // Мережевий збій (reset/timeout/DNS) — транзієнтний.
+        lastTransient = `мережева помилка: ${err instanceof Error ? err.message : String(err)}`;
+        if (attempt < MAX_ATTEMPTS) {
+          await this.backoff(attempt);
+          continue;
+        }
+        throw new Error(
+          `OLX GraphQL недоступний (offset=${offset}) після ${MAX_ATTEMPTS} спроб: ${lastTransient}`,
+        );
+      }
+
+      if (!res.ok) {
+        if (RETRYABLE_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
+          lastTransient = `HTTP ${res.status}`;
+          await this.backoff(attempt);
+          continue;
+        }
+        throw new Error(`OLX GraphQL повернув HTTP ${res.status} для offset=${offset}`);
+      }
+
+      // Анти-бот-інтерстіціал інколи приходить як 200 з HTML-тілом — це теж транзієнтно.
+      const text = await res.text();
+      let json: GraphqlResponse;
+      try {
+        json = JSON.parse(text) as GraphqlResponse;
+      } catch {
+        lastTransient = `не-JSON відповідь (${res.headers.get('content-type') ?? '?'}, ${text.length} б)`;
+        if (attempt < MAX_ATTEMPTS) {
+          await this.backoff(attempt);
+          continue;
+        }
+        throw new Error(
+          `OLX GraphQL віддав не-JSON для offset=${offset} після ${MAX_ATTEMPTS} спроб: ${lastTransient}`,
+        );
+      }
+
+      if (json.errors && json.errors.length > 0) {
+        throw new Error(
+          `OLX GraphQL: помилка схеми/запиту — ${json.errors.map((e) => e.message).join('; ')}`,
+        );
+      }
+
+      const result = json.data?.clientCompatibleListings;
+
+      if (!result) {
+        throw new Error('OLX GraphQL: відповідь без data.clientCompatibleListings');
+      }
+
+      if (result.__typename === 'ListingError') {
+        return { items: [], visibleTotalCount: null, listingError: result.error };
+      }
+
+      return {
+        items: result.data.map((item) => this.mapper.mapListing(item)),
+        visibleTotalCount: result.metadata?.visible_total_count ?? null,
+        listingError: null,
+      };
     }
 
-    const json = (await res.json()) as GraphqlResponse;
+    // Недосяжно (цикл або повертає, або кидає), але задовольняє контроль типів.
+    throw new Error(`OLX GraphQL: вичерпано спроби (offset=${offset}): ${lastTransient}`);
+  }
 
-    if (json.errors && json.errors.length > 0) {
-      throw new Error(
-        `OLX GraphQL: помилка схеми/запиту — ${json.errors.map((e) => e.message).join('; ')}`,
-      );
-    }
-
-    const result = json.data?.clientCompatibleListings;
-
-    if (!result) {
-      throw new Error('OLX GraphQL: відповідь без data.clientCompatibleListings');
-    }
-
-    if (result.__typename === 'ListingError') {
-      return { items: [], visibleTotalCount: null, listingError: result.error };
-    }
-
-    return {
-      items: result.data.map((item) => this.mapper.mapListing(item)),
-      visibleTotalCount: result.metadata?.visible_total_count ?? null,
-      listingError: null,
-    };
+  /** Бекоф між повторами транзієнтного збою: ~1.2с, ~2.5с (+джитер) — ввічливо до OLX. */
+  private backoff(attempt: number): Promise<void> {
+    const base = attempt * 1000;
+    return sleep(randomDelayMs(base, base + 1500));
   }
 
   /** Перетворює об'єкт помилки GraphQL на текстове повідомлення. */

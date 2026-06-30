@@ -440,13 +440,20 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
         result = splitResult;
       } catch (graphqlErr) {
         const graphqlMessage = graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
-        const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
-          onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
-          shouldAbort: ctx.shouldAbort,
-        });
-        raw = htmlResult.listings;
-        result = { ...htmlResult, warning: [`graphql failed: ${graphqlMessage}; fallback html OK`, htmlResult.warning].filter(Boolean).join('; ') };
-        usedGraphql = false;
+        try {
+          const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
+            onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
+            shouldAbort: ctx.shouldAbort,
+          });
+          raw = htmlResult.listings;
+          result = { ...htmlResult, warning: [`graphql failed: ${graphqlMessage}; fallback html OK`, htmlResult.warning].filter(Boolean).join('; ') };
+          usedGraphql = false;
+        } catch (htmlErr) {
+          // Обидва методи впали — НЕ ковтаємо причину GraphQL (інакше спливає лише оманлива
+          // HTML-помилка «рендериться через JS»). Дзеркалить контракт fetchWithFallback.
+          const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
+          throw new Error(`graphql failed: ${graphqlMessage}; html fallback failed: ${htmlMessage}`);
+        }
       }
 
       for (const item of raw) merged.set(item.olxId, item);

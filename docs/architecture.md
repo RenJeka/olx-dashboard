@@ -523,15 +523,24 @@ flowchart LR
 
 - Ланцюжок стратегій: **GraphQL → HTML (автоматично в scanner) → `__NEXT_DATA__` →
   headed Playwright** (останні два не реалізовані — рішення людини).
-- GraphQL-помилки (HTTP ≠ 200, `errors[]`, `ListingError`) → виняток → scanner пробує
-  `HtmlOlxFetcher`; при успіху fallback скан вважається успішним, а в `scan_runs.warning`
-  пишеться позначка `graphql failed: ...; fallback html OK`.
+- **Ретрай транзієнтних збоїв (`client.fetchPage`, 2026-06-30):** мережа / HTTP `429`/`5xx` /
+  `200` з не-JSON тілом (анти-бот) повторюються до 3 спроб із бекофом ПЕРШ ніж кидати виняток —
+  один блип серед десятків запитів deep-скану не валить прохід. Детерміновані помилки
+  (`400`/`404`, `errors[]`, `ListingError`) кидаються одразу.
+- GraphQL-помилки (HTTP ≠ 200, `errors[]`, `ListingError` після вичерпання ретраю) → виняток →
+  scanner пробує `HtmlOlxFetcher`; при успіху fallback скан вважається успішним, а в
+  `scan_runs.warning` пишеться позначка `graphql failed: ...; fallback html OK`.
 - Падіння обох стратегій не валить процес: повна помилка у `scan_runs.error` (поле `warning`
-  лишається `NULL`), скан failed, попередні дані лишаються.
-- Частковий успіх GraphQL (вікно пагінації `offset≤1000` вичерпано посеред скану,
-  `docs/plans/graphql-offset-window.md`) — скан вважається успішним, зібрані дані
-  зберігаються, `warning` (`graphql window cap hit at offset=<N>`) пишеться у
-  `scan_runs.warning`.
+  лишається `NULL`), скан failed, попередні дані лишаються. **`runDeepScanFromPlan` (запуск з
+  плану) тепер теж формує об'єднану помилку** `graphql failed: ...; html fallback failed: ...`
+  — раніше inline-fallback ковтав причину GraphQL і спливала лише оманлива HTML-помилка
+  (інцидент 2026-06-30, `olx-api.md` §6).
+- Частковий успіх GraphQL — скан вважається успішним, зібрані дані зберігаються, `warning`
+  пишеться у `scan_runs.warning`. Два випадки: (1) вікно пагінації `offset≤1000` вичерпано
+  посеред скану (`graphql window cap hit at offset=<N>`, `docs/plans/graphql-offset-window.md`);
+  (2) **транзієнтний виняток посеред пагінації** (вичерпані ретраї) за наявності зібраних даних
+  — `fetchSearch` → `graphql transient fail at offset=<N>: <причина>`, `scanSingleBucket` →
+  `capHit`; throw лишається лише коли даних ще нема (`offset=0`), щоб HTML-fallback дістав шанс.
 - **Розрізнення `error` vs `warning`:** `scan_runs.error` — ТІЛЬКИ реальний збій (обидві
   стратегії впали); частковий успіх (multi-query синоніми, price-split, HTML-fallback, window
   cap) → `scan_runs.warning`. UI показує перше червоним («Помилка»), друге — amber

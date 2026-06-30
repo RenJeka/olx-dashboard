@@ -17,7 +17,7 @@ import {
   PRICE_SORT_CANDIDATES,
 } from './constants.js';
 import type { PriceBucket, SplitPlan } from './types.js';
-import type { GraphqlClient } from './client.js';
+import type { GraphqlClient, PageResult } from './client.js';
 
 export function estimatePages(count: number): number {
   return Math.min(MAX_PAGES, Math.max(1, Math.ceil(count / PAGE_LIMIT)));
@@ -295,9 +295,18 @@ export class SplitScanner {
         break;
       }
       const offset = p * PAGE_LIMIT;
-      const page = await this.client.fetchPage(opts.search, offset, opts.referer, {
-        priceRange: { from: opts.bucket.from, to: opts.bucket.to },
-      });
+      let page: PageResult;
+      try {
+        page = await this.client.fetchPage(opts.search, offset, opts.referer, {
+          priceRange: { from: opts.bucket.from, to: opts.bucket.to },
+        });
+      } catch {
+        // Транзієнтний збій вичерпав ретраї — припиняємо допагінацію цього бакету частковим
+        // успіхом (page0 бакету вже зібрано в scanBuckets, зіллється з рештою). Не валимо весь
+        // split-скан і не відкидаємо вже зібрані бакети.
+        capHit = true;
+        break;
+      }
       requestsUsed++;
       opts.onProgress?.({
         done: requestsUsed,

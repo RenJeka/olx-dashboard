@@ -25,6 +25,7 @@ import { PAGE_LIMIT, MAX_PAGES } from './constants.js';
 import type { SplitPlan } from './types.js';
 
 import { GraphqlClient } from './client.js';
+import type { PageResult } from './client.js';
 import { SplitScanner } from './split.js';
 export { estimatePages } from './split.js';
 
@@ -51,7 +52,20 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         break;
       }
       const offset = i * PAGE_LIMIT;
-      const page = await this.client.fetchPage(search, offset, referer);
+      let page: PageResult;
+      try {
+        page = await this.client.fetchPage(search, offset, referer);
+      } catch (err) {
+        // Транзієнтний збій вичерпав ретраї (client.fetchPage). Якщо вже є зібрані дані —
+        // зупиняємось частковим успіхом (як для ListingError вікна пагінації нижче): не валимо
+        // весь скан і не тягнемо HTML-fallback. Якщо даних ще нема (offset=0) — кидаємо, щоб
+        // HTML-fallback дістав шанс.
+        if (offset > 0 && all.length > 0) {
+          warning = `graphql transient fail at offset=${offset}: ${err instanceof Error ? err.message : String(err)}`;
+          break;
+        }
+        throw err;
+      }
 
       if (page.listingError) {
         if (offset > 0 && all.length > 0) {
