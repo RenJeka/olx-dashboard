@@ -1,4 +1,5 @@
-import { db } from '../db/db.js';
+import type { InValue } from '@libsql/client';
+import { db, dbAll } from '../db/db.js';
 import type { RawListing } from '../types.js';
 
 interface CandidateRow {
@@ -11,8 +12,9 @@ interface CandidateRow {
 
 const COVERAGE_NOTE_PREFIX = 'auto-disabled: coverage miss_count=';
 
-const UPDATE_CANDIDATE_SQL =
-  'UPDATE listings SET miss_count = ?, status = ?, note = ? WHERE id = ?';
+// Гілка «промах без disable» чіпає ЛИШЕ miss_count — status/note не змінюються, тож не
+// тягнемо їх у SET (інакше перезапис індексу idx_listings_search_status на кожному інкременті).
+const UPDATE_CANDIDATE_SQL = 'UPDATE listings SET miss_count = ? WHERE id = ?';
 // Гілка disable додатково перезаписує olx_status='inactive' — щоб колонка «Активність» у
 // таблиці була чесною (інакше лишалося б застигле 'active' від останнього скану, що бачив
 // оголошення). docs/plans/honest-olx-status.md.
@@ -95,37 +97,29 @@ export async function applyScanStatuses(
       windowFloor === null ? [searchId, ...fetchedIds] : [searchId, ...fetchedIds, windowFloor];
   }
 
-  // Інтерактивна транзакція: читання кандидатів + умовні UPDATE-и атомарно (як db.transaction).
-  const tx = await db.transaction('write');
-  try {
-    const result = await tx.execute({ sql: candidatesSql, args: candidatesArgs });
-    const candidates = result.rows as unknown as CandidateRow[];
+  // Кандидати читаються одним SELECT; усі UPDATE-и збираються в JS і пишуться ОДНИМ
+  // db.batch (атомарно, як транзакція) — без N мережевих round-trip на кожен рядок (Turso).
+  const candidates = await dbAll<CandidateRow>(candidatesSql, candidatesArgs);
 
-    let disabledCount = 0;
-    for (const candidate of candidates) {
-      const missCount = candidate.miss_count + 1;
-      const becomesDisabled =
-        missCount >= threshold &&
-        (candidate.status_source === 'auto' || candidate.status === 'rejected');
+  let disabledCount = 0;
+  const statements: { sql: string; args: InValue[] }[] = [];
+  for (const candidate of candidates) {
+    const missCount = candidate.miss_count + 1;
+    const becomesDisabled =
+      missCount >= threshold &&
+      (candidate.status_source === 'auto' || candidate.status === 'rejected');
 
-      if (becomesDisabled) {
-        disabledCount++;
-        await tx.execute({
-          sql: UPDATE_DISABLED_SQL,
-          args: [missCount, appendCoverageNote(candidate.note, threshold), candidate.id],
-        });
-      } else {
-        await tx.execute({
-          sql: UPDATE_CANDIDATE_SQL,
-          args: [missCount, candidate.status, candidate.note, candidate.id],
-        });
-      }
+    if (becomesDisabled) {
+      disabledCount++;
+      statements.push({
+        sql: UPDATE_DISABLED_SQL,
+        args: [missCount, appendCoverageNote(candidate.note, threshold), candidate.id],
+      });
+    } else {
+      statements.push({ sql: UPDATE_CANDIDATE_SQL, args: [missCount, candidate.id] });
     }
-
-    await tx.commit();
-    return { disabled_count: disabledCount };
-  } catch (err) {
-    await tx.rollback();
-    throw err;
   }
+
+  if (statements.length > 0) await db.batch(statements, 'write');
+  return { disabled_count: disabledCount };
 }
