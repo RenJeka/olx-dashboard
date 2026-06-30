@@ -51,4 +51,9 @@ export async function dbRun(sql: string, args: InArgs = []): Promise<ResultSet> 
 export async function initDb(): Promise<void> {
   const schema = readFileSync(SCHEMA_PATH, 'utf-8');
   await db.executeMultiple(schema);
+
+  // Міграція: прибрати індекс по last_seen_at на вже задеплоєних БД. Цей індекс
+  // перезаписувався на кожному upsert (last_seen_at = now), множачи Turso "rows written";
+  // verify-прохід P1 обходиться без нього (docs/plans/turso-write-optimization.md).
+  await db.execute('DROP INDEX IF EXISTS idx_listings_search_lastseen');
 }

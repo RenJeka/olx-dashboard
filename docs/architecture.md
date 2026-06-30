@@ -85,7 +85,12 @@ flowchart LR
    рядок — один bulk-`SELECT` наявних полів по `olx_id` (чанками), злиття COALESCE-значень і
    `filtered_out` рахуються в пам'яті, а всі upsert-и (з уже вписаним `filtered_out`) ідуть
    одним `db.batch('write')` (атомарно, як транзакція). Скан на N оголошень — ~2 round-trip
-   замість ~4N.
+   замість ~4N. **Діф перед записом** (`plans/turso-write-optimization.md`): bulk-`SELECT`
+   тягне й бізнес-поля, і `hasBusinessChange()` лишає у `db.batch` повний UPSERT **лише** для
+   нових / HTML / реально змінених GraphQL-рядків; незмінні рядки отримують дешевий `last_seen_at`/
+   `miss_count` touch (`TOUCH_PREFIX`/`TOUCH_SUFFIX`) з throttle once/day (SQL-WHERE пропускає
+   ще «свіжі» рядки → 0 записів). Це різко зменшує Turso "rows written" (раніше кожен незмінний
+   рядок коштував таблиця+3 індекси за скан).
 5. Якщо фетчер був GraphQL (не fallback), скан успішний і **повний** (без warning часткового
    результату — напр. «window cap hit») — `statusEngine.applyScanStatuses(searchId,
    fetched, exhausted, threshold)` застосовує вікно покриття (`miss_count`/disable, §6.1
@@ -95,7 +100,9 @@ flowchart LR
    `docs/plans/coverage-window-fix.md`). **`threshold`** пропорційний надійності скану:
    глибокий → `1`, звичайний → `2` (`scanner/scanFinalize.ts`: `missThreshold`); при disable
    також пишеться `olx_status='inactive'` — щоб колонка «Активність» була чесною
-   (`docs/plans/honest-olx-status.md`).
+   (`docs/plans/honest-olx-status.md`). UPDATE-и кандидатів ідуть одним `db.batch` (а не
+   `tx.execute` на рядок — N round-trip), а гілка «промах без disable» чіпає лише `miss_count`,
+   не перезаписуючи індекс `status` (`plans/turso-write-optimization.md`).
 6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`). Розрізнення
    **частковий успіх vs збій**: успішний скан (навіть з застереженням — multi-query/split/
    HTML-fallback) пише застереження у `scan_runs.warning`, а `error` лишає `NULL`; падіння
@@ -213,9 +220,11 @@ flowchart LR
 - `params` зберігається сирим JSON.
 - `filtered_out` — прапорець локальних фільтрів (`local_filters`), рядок не видаляється.
 - Індекси `listings`: `idx_listings_search_status` (список/фільтр), `idx_listings_search_refresh`
-  (`search_id, last_refresh_at` — кандидати вікна покриття у `statusEngine`),
-  `idx_listings_search_lastseen` (`search_id, last_seen_at` — verify-прохід P1). `olx_id` UNIQUE
-  уже проіндексований (bulk-upsert лукапи).
+  (`search_id, last_refresh_at` — кандидати вікна покриття у `statusEngine`). `olx_id` UNIQUE
+  уже проіндексований (bulk-upsert лукапи). Індекс по `last_seen_at` **навмисно прибрано**
+  (`plans/turso-write-optimization.md`): він перезаписувався на кожному скані (бо `last_seen_at`
+  оновлюється завжди) і множив Turso "rows written"; verify-прохід P1 обходиться scan+sort.
+  DROP наявного — у `initDb` (`db.ts`).
 - `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/projects.md`).
 - `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
