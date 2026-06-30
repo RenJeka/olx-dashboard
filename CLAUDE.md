@@ -152,13 +152,21 @@
     списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
   - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
     нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
-  - **Консистентність обсягу:** видимість рядка в таблиці й обсяг AI-аналізу (плюси/мінуси,
-    AI Picks) керуються ОДНИМ предикатом — `web/src/utils/listingVisibility.ts`
-    (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`). Scope майстра «Весь пошук»/«Таб»
-    = рівно стільки рядків, скільки в дужках вкладки (нерелевантні/відфільтровані виключені,
-    керується перемикачами над таблицею; «Вибрані» — точний ручний вибір, без фільтрів). Кандидати
-    AI Picks (`loadPickCandidates`, фронт `useAiPicksFlow`) теж виключають `ai_relevant=0`
-    (`ai_relevant IS NOT 0` — лишає 1 та NULL).
+  - **Консистентність обсягу (єдиний селектор «Обсяг», `docs/plans/ai-scope-selector.md`):** усі три
+    етапи AI (фільтр релевантності, майстер «Плюси/Мінуси», AI Picks) використовують ОДИН спільний
+    селектор `web/src/components/analysis/ScopeSelector.tsx` із 4 завжди-видимими обсягами (`AiScope`
+    у `web/src/utils/aiScope.ts`): **all** = геть усі рядки пошуку (вкл. відфільтровані/нерелевантні);
+    **tab** = рівно те, що зараз показано в таблиці активної вкладки (`isListingVisible` — з шумовими
+    перемикачами); **selected** = позначені чекбоксами; **candidates** = «Найкращі кандидати»
+    (`isAiPickCandidate`). Лічильники/ID — `getScopeCounts`/`getScopeIds`; дефолт — `getDefaultScope`
+    (AI Picks → `candidates`, інакше selected→tab→all). Предикати видимості лишаються єдиним джерелом —
+    `web/src/utils/listingVisibility.ts` (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`),
+    спільний хук — `web/src/hooks/analysis/useAiScope.ts`. **Важливо:** «Весь пошук» тепер = ВСІ рядки
+    (раніше виключав нерелевантні/відфільтровані) — за рішенням користувача. Кандидати AI Picks
+    (`loadPickCandidates`) виключають `ai_relevant=0` (`ai_relevant IS NOT 0` — лишає 1 та NULL); коли
+    обсяг ≠ candidates, фронт шле `ids` обраного обсягу, і ендпойнти AI Picks
+    (`prompt`/`package.zip` — **POST**; `rank`/`import`) звужують пул цими `ids` (сортування за ціною
+    й ліміт лишаються).
   - **Ручний ZIP** (для агентного CLI типу Antigravity зі слабкою моделлю): крім `prompt.txt` +
     `descriptions/chunk-NNN.json` (лише кандидати після пре-фільтра) кладе готові `merge.py`/
     `verify.py` (`server/src/analysis/relevance_merge.py`/`relevance_verify.py`). Промпт —
@@ -219,6 +227,7 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/plans/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
 - `docs/plans/search-synonyms.md` — план синонімів пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) із прогресом.
 - `docs/plans/honest-olx-status.md` — чесна колонка «Активність» (`olx_status`): поріг disable deep=1/normal=2, перезапис `olx_status` death-детекторами (coverage→`inactive`, verify→`removed`), бейдж+свіжість у UI.
+- `docs/plans/ai-scope-selector.md` — єдиний селектор «Обсяг» (`AiScope`/`ScopeSelector`/`useAiScope`) для всіх 3 етапів AI: all/tab/selected/candidates; «Весь пошук» = геть усі рядки; AI Picks приймає `ids` обсягу.
 - Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 

@@ -42,7 +42,12 @@ export function AiToolsHub({ search, selectedIds }: Props) {
         open={mode === 'analysis'}
         onClose={close}
       />
-      <AiPicksDialog search={search} open={mode === 'picks'} onClose={close} />
+      <AiPicksDialog
+        search={search}
+        selectedIds={selectedIds}
+        open={mode === 'picks'}
+        onClose={close}
+      />
     </>
   );
 }

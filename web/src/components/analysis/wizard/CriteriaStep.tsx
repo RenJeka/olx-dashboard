@@ -13,10 +13,9 @@ import {
   LuPlus,
 } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
+import { ScopeSelector } from '../ScopeSelector';
 import { Tooltip } from '../../ui/tooltip';
-import { STATUS_LABELS } from '../../../utils/status';
 import { sortAlpha } from '../../../utils/sort';
-import { AI_PICKS_LABEL } from '../../../constants';
 import type { useWizard } from '../../../hooks/analysis/useWizard';
 
 type Actions = ReturnType<typeof useWizard>;
@@ -32,7 +31,7 @@ export function CriteriaStep({ w }: Props) {
     scope, setScope,
     available, selected,
     customInput, setCustomInput,
-    modeLabel, chosenCount, tabCount, allIds,
+    modeLabel, chosenCount, counts,
     apiAvailable,
     toggleCriterion, addCustom,
     handleGenerateCriteria, generateCriteriaIsPending,
@@ -41,53 +40,23 @@ export function CriteriaStep({ w }: Props) {
     handleImportCriteria, importCriteriaIsPending,
     goToMatching, saveCriteriaIsPending,
     reset, bindSearch, computeDefaultScope,
-    statusFilter, selectedIds,
+    statusFilter,
   } = w;
 
   return (
     <Stack gap={4}>
-      {/* Перемикачі режиму та scope */}
-      <HStack gap={4} wrap="wrap">
-        <HStack gap={1}>
-          <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="danger" onClick={() => setMode('cons')}>
-            Мінуси
-          </Button>
-          <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="success" onClick={() => setMode('pros')}>
-            Плюси
-          </Button>
-        </HStack>
-        <HStack gap={1}>
-          <Button
-            size="xs"
-            variant={scope === 'selected' ? 'solid' : 'outline'}
-            colorPalette="accent"
-            disabled={selectedIds.length === 0}
-            onClick={() => setScope('selected')}
-          >
-            Вибрані ({selectedIds.length})
-          </Button>
-          {statusFilter !== 'all' && (
-            <Button
-              size="xs"
-              variant={scope === 'tab' ? 'solid' : 'outline'}
-              colorPalette="accent"
-              onClick={() => setScope('tab')}
-            >
-              {statusFilter === 'ai_picks' ? AI_PICKS_LABEL : STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS]} ({tabCount})
-            </Button>
-          )}
-          <Button size="xs" variant={scope === 'all' ? 'solid' : 'outline'} colorPalette="accent" onClick={() => setScope('all')}>
-            Весь пошук ({allIds.length})
-          </Button>
-        </HStack>
+      {/* Перемикач режиму */}
+      <HStack gap={1}>
+        <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="danger" onClick={() => setMode('cons')}>
+          Мінуси
+        </Button>
+        <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="success" onClick={() => setMode('pros')}>
+          Плюси
+        </Button>
       </HStack>
 
-      {scope !== 'selected' && (
-        <Text textStyle="xs" color="fg.muted">
-          В аналіз потрапляють лише видимі оголошення — стільки ж, скільки в дужках вкладки.
-          Нерелевантні та відфільтровані виключені (керується перемикачами над таблицею).
-        </Text>
-      )}
+      {/* Перемикач обсягу */}
+      <ScopeSelector value={scope} onChange={setScope} counts={counts} statusFilter={statusFilter} />
 
       <Text textStyle="sm" color="fg.muted">
         Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.

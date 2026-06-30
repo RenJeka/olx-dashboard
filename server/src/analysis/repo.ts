@@ -86,8 +86,23 @@ export async function loadListings(searchId: number, ids: number[]): Promise<Lis
  * (`ai_relevant IS NOT 0` лишає 1 та NULL-«не перевірено», відсікає нерелевантні),
  * відсортовані за ціною ASC (NULL-ціна в кінці), ліміт PICK_CANDIDATES_LIMIT.
  * Предикат збігається з вкладкою «Найкращі кандидати» в UI.
+ *
+ * Якщо передано `ids` (обсяг із UI ≠ «Найкращі кандидати»), пул беруть ЛИШЕ з цих ID
+ * без дефолтного предиката (користувач свідомо обрав інший обсяг); сортування за ціною
+ * й ліміт лишаються.
  */
-export async function loadPickCandidates(searchId: number): Promise<PickCandidate[]> {
+export async function loadPickCandidates(searchId: number, ids?: number[]): Promise<PickCandidate[]> {
+  if (ids && ids.length > 0) {
+    const placeholders = ids.map(() => '?').join(',');
+    return dbAll<PickCandidate>(
+      `SELECT id, title, price, city, params, description, pros
+         FROM listings
+         WHERE search_id = ? AND id IN (${placeholders})
+         ORDER BY CASE WHEN price IS NULL THEN 1 ELSE 0 END, price ASC
+         LIMIT ?`,
+      [searchId, ...ids, PICK_CANDIDATES_LIMIT],
+    );
+  }
   return dbAll<PickCandidate>(
     `SELECT id, title, price, city, params, description, pros
        FROM listings

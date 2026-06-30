@@ -266,10 +266,10 @@ flowchart LR
 | `POST` | `/api/searches/:id/analyze/import` | ✅ — парс однієї вставленої відповіді + верифікація + мерж у накопичене |
 | `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
 | `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта); `merge='append'` (дефолт UI — додати до наявних без дублів) \| `'replace'` (перезаписати) |
-| `GET` | `/api/searches/:id/ai-picks/prompt` | ✅ — готовий промпт ручного режиму (один файл, пули ≤50 кандидатів) |
-| `GET` | `/api/searches/:id/ai-picks/package.zip` | ✅ — ZIP-пакет ручного режиму для пулів >50: `prompt.txt` (2-етапні map-reduce інструкції) + `candidates/chunk-NNN.json` (по 50) |
-| `POST` | `/api/searches/:id/ai-picks/rank` | ✅ — авто-режим (OpenRouter) → `PickResult {picks, summary}`, НЕ пише в БД; 409 без `OPENROUTER_API_KEY` |
-| `POST` | `/api/searches/:id/ai-picks/import` | ✅ — парс вставленої відповіді ручного режиму → `PickResult`, НЕ пише в БД |
+| `POST` | `/api/searches/:id/ai-picks/prompt` | ✅ — готовий промпт ручного режиму (один файл, пули ≤50 кандидатів); body `{ids?}` обсягу (порожній → дефолтний пул кандидатів) |
+| `POST` | `/api/searches/:id/ai-picks/package.zip` | ✅ — ZIP-пакет ручного режиму для пулів >50: `prompt.txt` (2-етапні map-reduce інструкції) + `candidates/chunk-NNN.json` (по 50); body `{ids?}` обсягу |
+| `POST` | `/api/searches/:id/ai-picks/rank` | ✅ — авто-режим (OpenRouter) → `PickResult {picks, summary}`, НЕ пише в БД; 409 без `OPENROUTER_API_KEY`; body `{model?, ids?}` обсягу |
+| `POST` | `/api/searches/:id/ai-picks/import` | ✅ — парс вставленої відповіді ручного режиму → `PickResult`, НЕ пише в БД; body `{raw, ids?}` обсягу |
 | `POST` | `/api/searches/:id/ai-picks/commit` | ✅ — запис `ai_rank`/`ai_pick_reason`/`ai_ranked_at`; скидає попередні результати пошуку перед записом нових |
 | `GET/PUT` | `/api/searches/:id/relevance/target` | ✅ Семантичний фільтр — читання/збереження `searches.relevance_target` (порожній → `query` як передзаповнення) |
 | `POST` | `/api/searches/:id/relevance/preview` | ✅ — розбивка пре-фільтра для UI: `{total, candidates, autoRejected}` (скільки піде в ШІ vs авто-відсіється), НЕ пише в БД |

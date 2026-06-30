@@ -1,6 +1,7 @@
 import { Box, Button, Stack, Text } from '@chakra-ui/react';
 import { LuSparkles } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
+import { ScopeSelector } from '../ScopeSelector';
 import type { useAiPicksFlow } from '../../../hooks/useAiPicksFlow';
 
 type Flow = ReturnType<typeof useAiPicksFlow>;
@@ -12,6 +13,10 @@ interface Props {
 /** Крок idle: вибір режиму запуску AI-ранжування (авто або ручний). */
 export function AiPicksIdleStep({ flow }: Props) {
   const {
+    scope,
+    setScope,
+    counts,
+    statusFilter,
     candidateCount,
     promptCount,
     useZip,
@@ -57,10 +62,11 @@ export function AiPicksIdleStep({ flow }: Props) {
 
   return (
     <Stack gap={4}>
+      <ScopeSelector value={scope} onChange={setScope} counts={counts} statusFilter={statusFilter} />
+
       <Text textStyle="sm" color="fg.muted">
-        Кандидати для ранжування: оголошення без мінусів, активні, не відфільтровані.
-        Знайдено <strong>{candidateCount}</strong> кандидатів, у промпт піде{' '}
-        <strong>{promptCount}</strong> найдешевших (ліміт {PICK_CANDIDATES_LIMIT}).
+        У пул ранжування піде <strong>{candidateCount}</strong> оголошень обраного обсягу, з них у
+        промпт — <strong>{promptCount}</strong> найдешевших (ліміт {PICK_CANDIDATES_LIMIT}).
         AI обере та відсортує топ-{PICK_TOP_N} найкращих.
       </Text>
 

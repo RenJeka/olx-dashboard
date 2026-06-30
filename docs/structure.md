@@ -100,7 +100,7 @@ olx-dashboard/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
-│           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt + .../ai-picks/package.zip (ZIP map-reduce, пули >50) + POST .../ai-picks/rank(авто)/import(ручний)/commit
+│           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
@@ -174,6 +174,7 @@ olx-dashboard/
         │   │   ├── index.ts                 # барель-експорт головних діалогів (AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog)
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
         │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
+        │   │   ├── ScopeSelector.tsx        # спільний селектор «Обсяг» (all/tab/selected/candidates) — однаковий на всіх 3 етапах AI
         │   │   ├── relevance/               # workflow «Семантична класифікація (AI Фільтр)»
 │   │   │   ├── RelevanceFilterDialog.tsx # оболонка діалогу (DialogRoot)
 │   │   │   ├── RelevanceSetupForm.tsx    # форма запуску (авто + ручний ZIP)
@@ -185,7 +186,7 @@ olx-dashboard/
         │   │   └── wizard/                 # workflow «AI-аналіз» (4-етапний майстер мінуси/плюси)
         │   │       ├── AnalysisWizardDialog.tsx # оболонка діалогу (DialogRoot + степер + switch по кроках)
         │   │       ├── WizardStepper.tsx    # UI степеру (4 кроки: критерії→пошук→перевірка→вставка)
-        │   │       ├── CriteriaStep.tsx     # крок 1: вибір режиму/scope, критеріїв, генерація
+        │   │       ├── CriteriaStep.tsx     # крок 1: режим (Мінуси/Плюси) + <ScopeSelector> + критерії, генерація
         │   │       ├── MatchingStep.tsx     # крок 2: авто-аналіз або ZIP + ручний імпорт
         │   │       ├── ReviewStep.tsx       # крок 3: перевірка (таблиця desktop / картки mobile)
         │   │       └── CommitStep.tsx       # крок 4: merge mode + запис у БД
@@ -240,7 +241,8 @@ olx-dashboard/
         │   ├── useAiPicksFlow.ts  # бізнес-логіка AI Вибір (стан step/picks, handleRun/Import/Commit)
         │   ├── analysis/          # AI-аналіз логіка (кроки майстра)
         │   │   ├── useWizard.ts        # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
-        │   │   ├── useAnalysisScope.ts # обчислення множин ID для аналізу (allIds, tabIds, effectiveIds)
+        │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
+        │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (генерація/імпорт/вибір критеріїв)
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
@@ -261,6 +263,7 @@ olx-dashboard/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
             ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
+            ├── aiScope.ts        # єдине джерело обсягу AI (AiScope all/tab/selected/candidates, getScopeIds/Counts, getDefaultScope, buildScopeLabel)
             ├── storage.ts        # збереження/завантаження стану сортування та розмірів колонок таблиці у localStorage
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів

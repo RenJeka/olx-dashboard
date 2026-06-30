@@ -15,12 +15,14 @@ import type { Search } from '../../../types';
 
 interface Props {
   search: Search;
+  /** Id вибраних рядків (чекбокси) — для обсягу «Вибрані». */
+  selectedIds: number[];
   open: boolean;
   onClose: () => void;
 }
 
-export function AiPicksDialog({ search, open, onClose }: Props) {
-  const flow = useAiPicksFlow(search);
+export function AiPicksDialog({ search, selectedIds, open, onClose }: Props) {
+  const flow = useAiPicksFlow(search, selectedIds, open);
 
   return (
     <DialogRoot

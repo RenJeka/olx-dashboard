@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  HStack,
   Input,
   Progress,
   Stack,
@@ -9,8 +8,8 @@ import {
 } from '@chakra-ui/react';
 import { LuSparkles, LuDownload } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
+import { ScopeSelector } from '../ScopeSelector';
 import type { useRelevanceFlow } from '../../../hooks/useRelevanceFlow';
-import { useListingsUiStore } from '../../../stores/listingsUiStore';
 
 interface Props {
   flow: ReturnType<typeof useRelevanceFlow>;
@@ -21,7 +20,6 @@ interface Props {
  */
 export function RelevanceSetupForm({ flow }: Props) {
   const { state, actions, mutations } = flow;
-  const statusFilter = useListingsUiStore((s) => s.statusFilter);
   const candidatesCount = state.preview?.candidates ?? null;
 
   return (
@@ -43,39 +41,12 @@ export function RelevanceSetupForm({ flow }: Props) {
       </Box>
 
       <Box>
-        <Text textStyle="xs" color="fg.muted" mb={1}>
-          Обсяг
-        </Text>
-        <HStack gap={1} wrap="wrap">
-          {state.selectedIds.length > 0 && (
-            <Button
-              size="xs"
-              variant={state.scope === 'selected' ? 'solid' : 'outline'}
-              colorPalette="accent"
-              onClick={() => actions.setScope('selected')}
-            >
-              Вибрані ({state.selectedIds.length})
-            </Button>
-          )}
-          {statusFilter !== 'all' && statusFilter !== 'ai_picks' && (
-            <Button
-              size="xs"
-              variant={state.scope === 'tab' ? 'solid' : 'outline'}
-              colorPalette="accent"
-              onClick={() => actions.setScope('tab')}
-            >
-              Статус
-            </Button>
-          )}
-          <Button
-            size="xs"
-            variant={state.scope === 'all' ? 'solid' : 'outline'}
-            colorPalette="accent"
-            onClick={() => actions.setScope('all')}
-          >
-            Весь пошук ({state.listings?.length ?? 0})
-          </Button>
-        </HStack>
+        <ScopeSelector
+          value={state.scope}
+          onChange={actions.setScope}
+          counts={state.counts}
+          statusFilter={state.statusFilter}
+        />
         {state.preview && state.preview.autoRejected > 0 ? (
           <Text textStyle="xs" color="fg.muted" mt={1}>
             Всього <strong>{state.preview.total}</strong> · у ШІ піде{' '}
