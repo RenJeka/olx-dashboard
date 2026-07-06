@@ -93,16 +93,18 @@ export function buildRelevanceZipInstructions(target: string, aliases: string[] 
     '',
     packageContents([
       '`descriptions/chunk-NNN.json` — вхідні оголошення ({id, title, characteristics, description}).',
+      '`classifications/result-NNN.json` — ПОРОЖНІ заготовки (`[]`, по одній на чанк); ти їх заповнюєш.',
       '`merge.py`, `verify.py` — ГОТОВІ скрипти (Python, лише стандартна бібліотека). НЕ редагувати, ' +
         'НЕ переписувати, НЕ копіювати їхню логіку.',
     ]),
     '',
-    'КРОК 1 — Класифікація (map). Для КОЖНОГО файлу `descriptions/chunk-NNN.json` ОКРЕМО:',
-    '   1. Прочитай один chunk-NNN.json.',
+    'КРОК 1 — Класифікація (map). У теці `classifications/` уже лежить ПОРОЖНІЙ `result-NNN.json` (`[]`)',
+    'на КОЖЕН чанк — це ЗАГОТОВКИ, які ти заповнюєш (не створюй нових). Для КОЖНОГО чанку ОКРЕМО:',
+    '   1. Прочитай `descriptions/chunk-NNN.json`.',
     '   2. Класифікуй КОЖНЕ оголошення (relevant true/false + коротка причина).',
-    '   3. Створи теку `classifications/` і запиши `classifications/result-NNN.json` (ТОЙ САМИЙ',
-    '      номер NNN) — РІВНО валідний JSON-масив [{"id","relevant","reason"}], без markdown',
-    '      і тексту навколо. Кожен id із чанку МАЄ бути у файлі.',
+    '   3. ЗАПОВНИ парний `classifications/result-NNN.json` (ТОЙ САМИЙ номер NNN) — заміни `[]` на',
+    '      РІВНО валідний JSON-масив [{"id","relevant","reason"}], без markdown і тексту навколо.',
+    '      Кожен id із чанку МАЄ бути у файлі.',
     '   4. Перейди до наступного чанку. Обробляй по одному — так не впираєшся в ліміт довжини',
     '      відповіді й не тримаєш усе в памʼяті.',
     '',
@@ -113,8 +115,8 @@ export function buildRelevanceZipInstructions(target: string, aliases: string[] 
     '   і `python verify.py`. Коли verify.py пише «ПРОЙДЕНО» — ти ЗАКІНЧИВ.',
     '',
     forbidden([
-      'створювати будь-які інші файли/скрипти, крім `classifications/result-NNN.json` (жодних ' +
-        'scan/check/draft/proximity/helper-скриптів, проміжних .txt-дампів, «brain»-нотаток);',
+      'створювати НОВІ файли/теки/скрипти — ти ЛИШЕ заповнюєш наявні `classifications/result-NNN.json` ' +
+        '(жодних scan/check/draft/proximity/helper-скриптів, проміжних .txt-дампів, «brain»-нотаток);',
       'редагувати/переписувати `merge.py` чи `verify.py`;',
       `${FORBID_RESEARCH}, класифікувати чанк двічі; пропускати оголошення.`,
     ]),

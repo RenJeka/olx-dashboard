@@ -131,9 +131,13 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       archive.append(readFileSync(RELEVANCE_MERGE_PY_PATH), { name: 'merge.py' });
       archive.append(readFileSync(RELEVANCE_VERIFY_PY_PATH), { name: 'verify.py' });
       chunk(candidates, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
-        const name = `descriptions/chunk-${String(idx + 1).padStart(3, '0')}.json`;
+        const nnn = String(idx + 1).padStart(3, '0');
         const content = JSON.stringify(buildChunkListings(group), null, JSON_EXPORT_INDENT);
-        archive.append(content, { name });
+        archive.append(content, { name: `descriptions/chunk-${nnn}.json` });
+        // Порожня заготовка проміжного файлу-класифікації на КОЖЕН чанк: слабкій моделі легше
+        // заповнити наявний файл (гарантована назва/шлях, видно чек-лист), ніж створювати з нуля;
+        // незаповнені (`[]`) спіймає verify.py як БРАКУЄ id (як у AI Вибір, docs/ai-flow.md).
+        archive.append('[]\n', { name: `classifications/result-${nnn}.json` });
       });
       void archive.finalize();
 

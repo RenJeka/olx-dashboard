@@ -283,7 +283,7 @@ flowchart LR
 | `GET/PUT` | `/api/searches/:id/relevance/target` | ✅ Семантичний фільтр — читання/збереження `searches.relevance_target` (порожній → `query` як передзаповнення) |
 | `POST` | `/api/searches/:id/relevance/preview` | ✅ — розбивка пре-фільтра для UI: `{total, candidates, autoRejected}` (скільки піде в ШІ vs авто-відсіється), НЕ пише в БД |
 | `POST` | `/api/searches/:id/relevance/analyze` | ✅ — авто-класифікація «лот продає <товар>?» (пре-фільтр + чанки по 12), `{results, errors}`, НЕ пише в БД; без ключа → 409 |
-| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + готові `merge.py`/`verify.py` + `descriptions/chunk-NNN.json` (лише кандидати по 50). Покрокова процедура для агентного CLI (Antigravity): класифікуй чанк → `classifications/result-NNN.json` → `merge.py` → `verify.py` |
+| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + готові `merge.py`/`verify.py` + `descriptions/chunk-NNN.json` (лише кандидати по 50) + ПОРОЖНІ заготовки `classifications/result-NNN.json` (`[]`, по одній на чанк — агент заповнює). Покрокова процедура для агентного CLI (Antigravity): заповни result-NNN.json → `merge.py` → `verify.py` |
 | `POST` | `/api/searches/:id/relevance/import` | ✅ — парс вставленої відповіді + інжект авто-відсіяних (пре-фільтр за scope `ids`) + мерж у накопичене за `id` |
 | `POST` | `/api/searches/:id/relevance/commit` | ✅ — запис `ai_relevant`/`ai_relevant_*`; рядки з `ai_relevant_source='manual'` НЕ перетираються |
 | `GET` | `/health` | ✅ |
