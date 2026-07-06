@@ -2,6 +2,16 @@ import type { PickCandidate, PickItem, PickResult } from '../types.js';
 import { DEFAULT_MODEL, PICK_TOP_N } from './constants.js';
 import { chat } from './openrouter.js';
 import { hasApiKey } from './config.js';
+import {
+  FORBID_CONSOLE,
+  FORBID_REPROCESS,
+  FORBID_RESEARCH,
+  fallbackBlock,
+  forbidden,
+  mechanicalIntro,
+  packageContents,
+  resultLine,
+} from './manualZip.js';
 
 const MAX_PARAMS = 8;
 const MAX_DESC_CHARS = 1200;
@@ -50,31 +60,44 @@ const PICK_SELECTION_CRITERIA = `1. Повний опис, вказані хар
 3. Вказані плюси (поле pros)
 4. Місто та наявність фото (photo)`;
 
+/** Роль + завдання (спільне для інлайн-промпту авто-режиму й ZIP-інструкції). */
+function pickRoleAndTask(topN: number): string {
+  return [
+    'Ти — AI-помічник для вибору найкращих оголошень про покупку.',
+    'Тобі надається список оголошень без явних мінусів.',
+    `Твоє завдання — ВИБРАТИ ТОП-${topN} НАЙКРАЩИХ кандидатів і відсортувати їх від`,
+    `найкращого (rank=1) до найгіршого (rank=${topN}), коротко пояснивши чому кожен туди потрапив.`,
+    `Якщо кандидатів менше ${topN} — повернути всіх, відсортованих за рейтингом.`,
+    'Відкидай решту. Якщо жоден не відповідає критеріям якості — можеш повернути порожній масив.',
+  ].join('\n');
+}
+
 export function buildPickPrompt(candidates: PickCandidate[], topN: number = PICK_TOP_N): string {
   const items = toPickItems(candidates);
 
-  return `Ти — AI-помічник для вибору найкращих оголошень про покупку.
-Тобі надається список оголошень без явних мінусів.
-Твоє завдання — ВИБРАТИ ТОП-${topN} НАЙКРАЩИХ кандидатів і відсортувати їх від
-найкращого (rank=1) до найгіршого (rank=${topN}), коротко пояснивши чому кожен туди потрапив.
-Якщо кандидатів менше ${topN} — повернути всіх, відсортованих за рейтингом.
-Відкидай решту. Якщо жоден не відповідає критеріям якості — можеш повернути порожній масив.
-
-Критерії відбору (за пріоритетом):
-${PICK_SELECTION_CRITERIA}
-
-Поверни відповідь СТРОГО у форматі JSON (без markdown):
-${PICK_RESPONSE_FORMAT}
-
-Оголошення для аналізу (${candidates.length} шт.):
-${JSON.stringify(items, null, 2)}`;
+  return [
+    pickRoleAndTask(topN),
+    '',
+    'Критерії відбору (за пріоритетом):',
+    PICK_SELECTION_CRITERIA,
+    '',
+    'Поверни відповідь СТРОГО у форматі JSON (без markdown):',
+    PICK_RESPONSE_FORMAT,
+    '',
+    `Оголошення для аналізу (${candidates.length} шт.):`,
+    JSON.stringify(items, null, 2),
+  ].join('\n');
 }
 
 /**
  * Інструкції для ZIP-пакета ручного режиму AI Вибір (`prompt.txt`).
- * На відміну від matching (детерміністичний `analyze.py`), відбір тут — це судження,
- * яке завжди робить LLM/агент: 2-етапний map-reduce (номінація з кожного чанку →
- * фінальний топ із номінантів), щоб не перевищити контекст одним величезним промптом.
+ *
+ * На відміну від matching (детерміністичний `analyze.py`) відбір — це СУДЖЕННЯ, тож
+ * детермінованого движка тут немає; але МЕХАНІКА уніфікована з кроком AI Фільтр: map-reduce
+ * НА ФАЙЛАХ (без скриптів). Map: кожен чанк → `nominations/nominees-NNN.json` (проміжні
+ * файли переживають втрату контексту слабких агентних моделей). Reduce: агент читає всі
+ * nominees-файли й САМ пише `output.json` (reduce — теж судження, скрипт не потрібен).
+ * Нічого в консоль — результат лише у файлі (як кроки 1–2). Спільні блоки — з `manualZip.ts`.
  */
 export function buildPickManualZipInstructions(
   totalCandidates: number,
@@ -82,23 +105,57 @@ export function buildPickManualZipInstructions(
   nomineesPerChunk: number,
   topN: number,
 ): string {
-  return `Завдання у 2 етапи: вибір найкращих оголошень для покупки.
-
-У цьому пакеті ${totalCandidates} кандидатів (без мінусів, без PII продавця), розбитих на
-${totalChunks} файлів candidates/chunk-NNN.json.
-
-ЕТАП 1 (для кожного з ${totalChunks} файлів окремо):
-Прочитай кандидатів файлу і визнач до ${nomineesPerChunk} найкращих за критеріями:
-${PICK_SELECTION_CRITERIA}
-Запам'ятай обраних (id + коротке пояснення) — це промiжний результат, нічого не виводь
-користувачу на цьому етапі, просто переходь до наступного файлу.
-
-ЕТАП 2 (лише після опрацювання УСІХ ${totalChunks} файлів):
-Серед усіх номінантів з усіх файлів обери і відсортуй фінальний ТОП-${topN}
-(rank=1 — найкращий). Якщо номінантів менше ${topN} — повернути всіх.
-
-Виведи СТРОГО ОДИН JSON-результат (без markdown, без проміжних кроків етапу 1):
-${PICK_RESPONSE_FORMAT}`;
+  return [
+    pickRoleAndTask(topN),
+    '',
+    mechanicalIntro(
+      'обрати найкращих кандидатів за критеріями нижче (це судження — детермінованого движка ' +
+        'тут немає, тож обирає сам агент, але механіка — жорстко за кроками).',
+      { chunked: true },
+    ),
+    '',
+    `У пакеті ${totalCandidates} кандидатів (без мінусів, без PII продавця), розбитих на ${totalChunks} файлів.`,
+    packageContents([
+      '`candidates/chunk-NNN.json` — вхідні кандидати ({id, title, price, city, params, description, pros}).',
+    ]),
+    '',
+    'Критерії відбору (за пріоритетом):',
+    PICK_SELECTION_CRITERIA,
+    '',
+    'КРОК 1 — Номінація (map). Для КОЖНОГО файлу `candidates/chunk-NNN.json` ОКРЕМО:',
+    '   1. Прочитай один chunk-NNN.json.',
+    `   2. Обери до ${nomineesPerChunk} найкращих кандидатів ЦЬОГО чанку за критеріями вище.`,
+    '   3. Створи теку `nominations/` і запиши `nominations/nominees-NNN.json` (ТОЙ САМИЙ номер',
+    '      NNN) — РІВНО валідний JSON-масив [{"id": <число>, "reason": "<коротко чому>"}], без',
+    '      markdown і тексту навколо. Нічого не виводь у консоль.',
+    '   4. Перейди до наступного чанку. Обробляй по одному — так не впираєшся в ліміт довжини',
+    '      відповіді й не тримаєш усе в памʼяті.',
+    '',
+    `КРОК 2 — Фінальний відбір (reduce, ЛИШЕ після опрацювання УСІХ ${totalChunks} чанків):`,
+    '   1. Прочитай ВСІ файли `nominations/nominees-*.json`.',
+    `   2. Серед усіх номінантів обери й відсортуй фінальний ТОП-${topN} (rank=1 — найкращий).`,
+    `      Якщо номінантів менше ${topN} — візьми всіх.`,
+    '   3. Запиши результат у `output.json` РІВНО за схемою нижче. Нічого не виводь у консоль.',
+    '',
+    forbidden([
+      'створювати будь-які інші файли/скрипти, крім `nominations/nominees-NNN.json` та ' +
+        '`output.json` (жодних scan/check/helper-скриптів, проміжних .txt-дампів, «brain»-нотаток);',
+      `${FORBID_RESEARCH};`,
+      `${FORBID_REPROCESS};`,
+      `${FORBID_CONSOLE}.`,
+    ]),
+    '',
+    resultLine('коли фінальний топ записано'),
+    '',
+    fallbackBlock(
+      'якщо ти НЕ можеш створювати файли',
+      'опрацюй усі чанки за один прохід (номінація в памʼяті → фінальний топ) і поверни ОДИН ' +
+        'JSON за схемою нижче. Помічних файлів/скриптів не створюй.',
+    ),
+    '',
+    'Формат `output.json` (і відповіді у fallback) — СТРОГО валідний JSON без markdown:',
+    PICK_RESPONSE_FORMAT,
+  ].join('\n');
 }
 
 export function parsePickResponse(raw: string, validIds: number[]): PickResult {
