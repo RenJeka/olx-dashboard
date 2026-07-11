@@ -52,6 +52,7 @@ olx-dashboard/
 │       │   ├── searchLoader.ts # loadSearch (SQLite → SearchConfig), dedupeQueries
 │       │   ├── fetchOrchestrator.ts # fetchWithFallback (GraphQL→HTML), fetchAllQueries (синоніми + злиття по olxId)
 │       │   ├── scanRunLifecycle.ts  # withScanRun — спільний lifecycle scan_runs (insert/progress/error/abort)
+│       │   ├── scanPersister.ts    # ScanPersister — інкрементальне збереження по ходу скану (flushSafe/flush, дедуп olx_id)
 │       │   ├── scanFinalize.ts     # finalizeScanResult (upsert→statuses→facet→update), refreshCategoryFacet
 │       │   ├── runScan.ts    # runScan (normal/deep): fetchAllQueries → finalizeScanResult
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
@@ -311,4 +312,5 @@ olx-dashboard/
 | Проекти (групування пошуків в акордеони) | `server/src/routes/projects.ts`, `searches.project_id` (`server/src/db/schema.sql`/`db.ts`), `web/src/api/projects.ts`, `web/src/components/searches/{SearchesPanel,ProjectAccordionItem,ProjectCreateDialog,ProjectEditDialog,ProjectDeleteDialog,SearchRowMenu}.tsx` + `docs/plans/projects.md` |
 | Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner/scanFinalize.ts` (виклик `deep?1:2`), `server/src/scanner/verifyScan.ts` (verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
 | Оптимізація запису у Turso (діф перед upsert, прибраний індекс `last_seen`, батч statusEngine) | `server/src/scraper/normalizer.ts` (`hasBusinessChange`, `TOUCH_PREFIX`/`TOUCH_SUFFIX`, touch once/day), `server/src/scraper/statusEngine.ts` (`db.batch`), `server/src/db/{schema.sql,db.ts}` (DROP `idx_listings_search_lastseen`) + `docs/plans/turso-write-optimization.md` |
+| Стійкість великих сканів (інкрементальне збереження, порятунок часткових даних при збої) | `server/src/scanner/scanPersister.ts` (`ScanPersister`), `FetchOptions.onListings` (`server/src/types/scan.ts`), flush-точки у `server/src/scraper/graphql/{fetcher,split}.ts`, порятунок варіанта/бісекції у `server/src/scanner/{fetchOrchestrator,analyzeScan}.ts` + `server/src/scraper/graphql/split.ts` (`probeWarning`), чанкування `db.batch` у `normalizer.ts` + `docs/plans/scan-failure-recovery.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

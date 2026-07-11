@@ -149,9 +149,26 @@ export async function fetchAllQueries(
         }
       : undefined;
 
-    const result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
+    let result: Awaited<ReturnType<typeof fetchWithFallback>>;
+    try {
+      result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
+    } catch (err) {
+      // Збій пізнього варіанта (напр. анти-бот OLX після сотень запитів: GraphQL 403 і
+      // HTML-fallback теж упав) НЕ валить скан — усе зібране попередніми варіантами
+      // зберігається, скан завершується достроково з warning
+      // (docs/plans/scan-failure-recovery.md). Перший варіант без даних → чесна помилка.
+      if (merged.size === 0) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      notes.push(
+        `«${variant}»: збій (${message}) — скан завершено достроково, зібране попередніми варіантами збережено`,
+      );
+      break;
+    }
 
     for (const item of result.raw) merged.set(item.olxId, item);
+    // Інкрементальне збереження після кожного варіанта (покриває HTML-fallback і звичайні
+    // скани, де фетчер не флашить сам) — persister дедуплікує вже збережене.
+    await options?.onListings?.(result.raw);
     requestsUsed += result.requestsUsed;
     rawTotal += result.rawCount;
     if (!result.usedGraphql) usedGraphql = false;

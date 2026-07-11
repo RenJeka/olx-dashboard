@@ -3,6 +3,7 @@ import { fetchCategoryOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
 import { applyScanStatuses } from '../scraper/statusEngine.js';
 import type { SearchConfig, ScanResult, RawListing } from '../types.js';
+import type { ScanPersister } from './scanPersister.js';
 
 /**
  * Best-effort оновлення дерева категорій OLX (facet) для пошуку після успішного скану.
@@ -46,6 +47,12 @@ export interface FinalizeInput {
   missThreshold: number;
   /** Пропустити оновлення category_facet (напр. якщо був HTML-fallback без GraphQL). */
   skipCategoryRefresh?: boolean;
+  /**
+   * Інкрементальний persister цього скану (docs/plans/scan-failure-recovery.md): фінальний
+   * flush дозаписує ще не збережене, лічильники found/new_count беруться накопиченими за
+   * весь скан (проміжні флаші вже записали частину). Без нього — одноразовий upsert як раніше.
+   */
+  persister?: ScanPersister;
 }
 
 const UPDATE_VISIBLE_TOTAL_SQL = 'UPDATE searches SET visible_total_count = ? WHERE id = ?';
@@ -61,10 +68,16 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   const {
     searchId, runId, search, raw, rawTotal, requestsUsed,
     usedGraphql, exhausted, partial, bucketsUsed, aborted,
-    notes, missThreshold, skipCategoryRefresh,
+    notes, missThreshold, skipCategoryRefresh, persister,
   } = input;
 
-  const upsertResult = await upsertListings(searchId, raw);
+  let upsertResult: Pick<ScanResult, 'found' | 'new_count'>;
+  if (persister) {
+    await persister.flush(raw);
+    upsertResult = persister.totals;
+  } else {
+    upsertResult = await upsertListings(searchId, raw);
+  }
 
   const stopped = aborted;
   const effectivePartial = partial || stopped;

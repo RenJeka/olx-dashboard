@@ -88,6 +88,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         all.push(item);
       }
 
+      // Інкрементальне збереження (docs/plans/scan-failure-recovery.md) — лише deep:
+      // звичайний скан (≤3 запити) пише один раз у finalize, без зайвих Turso-записів.
+      if (deep) await options?.onListings?.(page.items);
+
       requestsUsed = i + 1;
       options?.onProgress?.({ done: requestsUsed, total: target });
 
@@ -141,10 +145,12 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const referer = this.client.buildReferer(search.query);
     const onProgress = options?.onProgress;
     const scanResult = await this.splitScanner.scanBuckets(
-      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress, options?.shouldAbort,
+      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress,
+      options?.shouldAbort, options?.onListings,
     );
 
     const warnings = [`split: ${plan.buckets.length} price buckets; coverage window skipped`];
+    if (plan.probeWarning) warnings.push(plan.probeWarning);
     if (scanResult.capHit) {
       warnings.push('деякі діапазони вперлися в ліміт запитів — дані можуть бути неповними');
     }

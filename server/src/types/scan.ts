@@ -150,6 +150,13 @@ export interface FetchOptions {
    * вже зібране з `aborted: true` (кнопка «Зупинити», docs/plans/deep-scan-stop-and-history.md).
    */
   shouldAbort?: () => boolean;
+  /**
+   * Інкрементальне збереження (docs/plans/scan-failure-recovery.md): фетчер віддає
+   * новозібрані оголошення по ходу скану (сторінка deep-скану / ціновий бакет / варіант
+   * синоніма), щоб збій наприкінці довгого скану не втрачав усе зібране. Реалізація
+   * (`ScanPersister.flushSafe`) дедуплікує повтори й НЕ кидає помилок.
+   */
+  onListings?: (items: RawListing[]) => Promise<void> | void;
 }
 
 /**

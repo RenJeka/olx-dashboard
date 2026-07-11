@@ -111,6 +111,21 @@ flowchart LR
    amber «Попередження».
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
+> **Стійкість великих сканів (`docs/plans/scan-failure-recovery.md`):** зібране пишеться в БД
+> НЕ лише наприкінці — `scanner/scanPersister.ts` (`ScanPersister`) flush-ить оголошення
+> ітераціями по ходу скану через `FetchOptions.onListings`: після кожної сторінки deep-скану
+> (`GraphqlOlxFetcher.fetchSearch`, лише deep — звичайний скан пише один раз, без зайвих
+> Turso-записів), кожного цінового бакету (`SplitScanner.scanBuckets`: rootItems + побакетно)
+> і кожного варіанта синоніма (`fetchAllQueries`/`runDeepScanFromPlan`). Persister дедуплікує
+> вже збережені `olx_id` (без подвійних записів/подвійного `new_count`); проміжний
+> `flushSafe` ковтає транзієнтні збої БД (незбережене доїде з наступним flush), фінальний
+> `flush` у `finalizeScanResult` кидає чесно. **Порятунок часткових даних:** збій пізнього
+> варіанта запиту (напр. анти-бот 403 після сотень запитів, коли і GraphQL, і HTML-fallback
+> впали) або збій посеред бісекції цін (`bisectPriceRange` → `SplitPlan.probeWarning`) більше
+> НЕ валить скан — він завершується частковим успіхом (`warning`, вікно покриття
+> пропускається), а все зібране лишається в БД. `upsertListings` додатково чанкує
+> `db.batch` (≤500 statements), щоб гігантський фінальний батч не падав через розмір payload.
+
 > **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
 > непорожній, `scanner/fetchOrchestrator.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
 > крок 3, послідовно з паузою 3–6с між варіантами) і зливає видачі по `olxId` в один

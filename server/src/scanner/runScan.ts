@@ -3,6 +3,7 @@ import { loadSearch } from './searchLoader.js';
 import { fetchAllQueries } from './fetchOrchestrator.js';
 import { withScanRun } from './scanRunLifecycle.js';
 import { finalizeScanResult } from './scanFinalize.js';
+import { ScanPersister } from './scanPersister.js';
 
 /**
  * Запускає сканування пошуку: fetcher (GraphQL → HTML fallback) → normalizer → запис scan_run.
@@ -22,11 +23,16 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
   const kind = options?.deep ? 'deep' : 'normal';
 
   return withScanRun(searchId, kind, async (ctx) => {
+    // Інкрементальне збереження: зібране flush-иться в БД по ходу скану, щоб збій
+    // наприкінці довгого проходу не втрачав усе (docs/plans/scan-failure-recovery.md).
+    const persister = new ScanPersister(searchId);
+
     const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed, rawCount, aborted } =
       await fetchAllQueries(search, {
         deep: options?.deep,
         onProgress: ctx.onProgress,
         shouldAbort: ctx.shouldAbort,
+        onListings: (items) => persister.flushSafe(items),
       });
 
     // Для runScan: якщо GraphQL-fallback → не оновлюємо facet.
@@ -46,6 +52,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       missThreshold: options?.deep ? 1 : 2,
       skipCategoryRefresh: !usedGraphql,
       visibleTotalCount,
+      persister,
     });
   });
 }

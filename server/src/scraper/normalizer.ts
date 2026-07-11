@@ -59,6 +59,15 @@ const SELECT_EXISTING_FIELDS =
 /** Розмір чанка для IN-списку (ліміт змінних SQLite — 999). */
 const IN_CHUNK = 500;
 
+/**
+ * Максимум statements на один db.batch. Великий deep-скан може принести тисячі UPSERT-ів —
+ * один гігантський batch до Turso (мережевий payload у мегабайти) ризикує впасти цілком
+ * уже ПІСЛЯ успішного збору (docs/plans/scan-failure-recovery.md). Чанки жертвують
+ * атомарністю всього набору (кожен чанк — окрема транзакція), що безпечно: upsert по
+ * olx_id ідемпотентний, а частково записаний скан кращий за втрачений.
+ */
+const BATCH_CHUNK = 500;
+
 // district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
 // вже зібрані GraphQL-дані.
@@ -438,8 +447,11 @@ export async function upsertListings(
     statements.push({ sql: `${TOUCH_PREFIX}${placeholders}${TOUCH_SUFFIX}`, args: chunk });
   }
 
-  // Один round-trip: усі UPSERT-и + touch виконуються атомарно (libSQL batch = транзакція).
-  if (statements.length > 0) await db.batch(statements, 'write');
+  // UPSERT-и + touch — batch-ами (libSQL batch = транзакція) чанками ≤BATCH_CHUNK:
+  // типовий скан вміщається в один round-trip, дуже великий не впирається в ліміт payload.
+  for (let i = 0; i < statements.length; i += BATCH_CHUNK) {
+    await db.batch(statements.slice(i, i + BATCH_CHUNK), 'write');
+  }
 
   return { found: raw.length, new_count: newCount };
 }

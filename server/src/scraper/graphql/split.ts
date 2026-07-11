@@ -74,12 +74,28 @@ export class SplitScanner {
       search, referer, lo, hi.upperBound, requestsUsed, onProgress, options?.shouldAbort,
     );
 
+    // Бісекція впала на самому початку (жодного бакету) → звичайний deep без розбиття;
+    // впала посеред → скануємо вже знайдені бакети частковим покриттям (probeWarning).
+    if (bisection.probeError && bisection.buckets.length === 0) {
+      return {
+        rootCount,
+        buckets: [],
+        rootItems: rootPage.items,
+        requestsUsed: bisection.requestsUsed,
+        noSplit: true,
+        fallbackReason: `bisection failed: ${bisection.probeError}`,
+      };
+    }
+
     return {
       rootCount,
       buckets: bisection.buckets,
       rootItems: rootPage.items,
       requestsUsed: bisection.requestsUsed,
       noSplit: false,
+      probeWarning: bisection.probeError
+        ? `бісекцію цін перервано (${bisection.probeError}) — покриття часткове`
+        : undefined,
     };
   }
 
@@ -94,6 +110,7 @@ export class SplitScanner {
     startRequestsUsed: number,
     onProgress?: FetchOptions['onProgress'],
     shouldAbort?: () => boolean,
+    onListings?: FetchOptions['onListings'],
   ): Promise<{
     listings: RawListing[];
     requestsUsed: number;
@@ -104,6 +121,7 @@ export class SplitScanner {
     let requestsUsed = startRequestsUsed;
     const merged = new Map<number, RawListing>();
     for (const item of rootItems) merged.set(item.olxId, item);
+    await onListings?.(rootItems);
 
     const remainingEstimate = buckets.reduce(
       (sum, b) => sum + Math.max(0, estimatePages(b.count) - 1),
@@ -122,6 +140,7 @@ export class SplitScanner {
       }
       const bucket = buckets[bi]!;
       for (const item of bucket.page0) merged.set(item.olxId, item);
+      await onListings?.(bucket.page0);
 
       if (bucket.count <= PAGE_LIMIT || bucket.page0.length < PAGE_LIMIT) {
         continue;
@@ -140,6 +159,7 @@ export class SplitScanner {
       });
 
       for (const item of scanResult.items) merged.set(item.olxId, item);
+      await onListings?.(scanResult.items);
       requestsUsed = scanResult.requestsUsed;
 
       if (scanResult.aborted) {
@@ -225,18 +245,29 @@ export class SplitScanner {
     startRequestsUsed: number,
     onProgress?: FetchOptions['onProgress'],
     shouldAbort?: () => boolean,
-  ): Promise<{ buckets: PriceBucket[]; requestsUsed: number }> {
+  ): Promise<{ buckets: PriceBucket[]; requestsUsed: number; probeError?: string }> {
     let requestsUsed = startRequestsUsed;
     const buckets: PriceBucket[] = [];
     const queue: Array<{ from: number; to: number }> = [{ from: lo, to: hi }];
+    let probeError: string | undefined;
 
     while (queue.length > 0) {
       if (requestsUsed >= MAX_TOTAL_REQUESTS) break;
       if (shouldAbort?.()) break;
       const interval = queue.shift()!;
-      const page = await this.client.fetchPage(search, 0, referer, {
-        priceRange: { from: interval.from, to: interval.to },
-      });
+      let page: PageResult;
+      try {
+        page = await this.client.fetchPage(search, 0, referer, {
+          priceRange: { from: interval.from, to: interval.to },
+        });
+      } catch (err) {
+        // Збій вичерпав ретраї (мережа / 403 анти-бот) посеред бісекції — НЕ валимо весь
+        // варіант: перериваємо розбиття, скануємо вже знайдені бакети частковим покриттям
+        // (docs/plans/scan-failure-recovery.md). Жодного бакету ще немає → analyzeSplit
+        // поверне noSplit-fallback.
+        probeError = err instanceof Error ? err.message : String(err);
+        break;
+      }
       requestsUsed++;
 
       const count = page.listingError ? 0 : page.visibleTotalCount ?? 0;
@@ -260,7 +291,7 @@ export class SplitScanner {
       }
     }
 
-    return { buckets, requestsUsed };
+    return { buckets, requestsUsed, probeError };
   }
 
   /**
