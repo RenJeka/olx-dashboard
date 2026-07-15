@@ -1,4 +1,5 @@
 import type { SearchConfig, RawListing, FetchOptions } from '../../types.js';
+import { logWarn } from '../../logger.js';
 import { interruptibleSleep, randomDelayMs } from '../utils.js';
 import {
   BATCH_SIZE,
@@ -266,6 +267,11 @@ export class SplitScanner {
         // (docs/plans/scan-failure-recovery.md). Жодного бакету ще немає → analyzeSplit
         // поверне noSplit-fallback.
         probeError = err instanceof Error ? err.message : String(err);
+        logWarn('scanner', `bisect ₴${interval.from}–${interval.to}`, probeError, {
+          searchId: search.id,
+          query: search.query,
+          bucketsFound: buckets.length,
+        });
         break;
       }
       requestsUsed++;
@@ -331,10 +337,16 @@ export class SplitScanner {
         page = await this.client.fetchPage(opts.search, offset, opts.referer, {
           priceRange: { from: opts.bucket.from, to: opts.bucket.to },
         });
-      } catch {
+      } catch (err) {
         // Транзієнтний збій вичерпав ретраї — припиняємо допагінацію цього бакету частковим
         // успіхом (page0 бакету вже зібрано в scanBuckets, зіллється з рештою). Не валимо весь
         // split-скан і не відкидаємо вже зібрані бакети.
+        logWarn(
+          'scanner',
+          `bucket ₴${opts.bucket.from}–${opts.bucket.to} стор. ${p}/${pages}`,
+          err instanceof Error ? err.message : String(err),
+          { searchId: opts.search.id, query: opts.search.query },
+        );
         capHit = true;
         break;
       }

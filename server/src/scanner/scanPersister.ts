@@ -1,4 +1,5 @@
 import { upsertListings } from '../scraper/normalizer.js';
+import { logError } from '../logger.js';
 import type { RawListing, ScanResult } from '../types.js';
 
 /**
@@ -31,10 +32,10 @@ export class ScanPersister {
     try {
       await this.flush(items);
     } catch (err) {
-      console.error(
-        `[scan] проміжне збереження не вдалося (search=${this.searchId}, у черзі ${this.pending.size}):`,
-        err instanceof Error ? err.message : err,
-      );
+      logError('scanner', 'persister-flush', err, {
+        searchId: this.searchId,
+        pending: this.pending.size,
+      });
     }
   }
 

@@ -3,6 +3,7 @@ import { USER_AGENT } from '../constants.js';
 import { GRAPHQL_URL, PAGE_LIMIT, LISTING_SEARCH_QUERY } from './constants.js';
 import type { SearchParameter, ListingError, GraphqlResponse } from './types.js';
 import { slugify, sleep, randomDelayMs } from '../utils.js';
+import { logWarn } from '../../logger.js';
 import { GraphqlListingMapper } from './mapper.js';
 
 /**
@@ -130,6 +131,7 @@ export class GraphqlClient {
         // Мережевий збій (reset/timeout/DNS) — транзієнтний.
         lastTransient = `мережева помилка: ${err instanceof Error ? err.message : String(err)}`;
         if (attempt < MAX_ATTEMPTS) {
+          this.warnRetry(offset, attempt, lastTransient, search.query);
           await this.backoff(attempt);
           continue;
         }
@@ -141,6 +143,7 @@ export class GraphqlClient {
       if (!res.ok) {
         if (RETRYABLE_STATUSES.has(res.status) && attempt < MAX_ATTEMPTS) {
           lastTransient = `HTTP ${res.status}`;
+          this.warnRetry(offset, attempt, lastTransient, search.query);
           await this.backoff(attempt);
           continue;
         }
@@ -155,6 +158,7 @@ export class GraphqlClient {
       } catch {
         lastTransient = `не-JSON відповідь (${res.headers.get('content-type') ?? '?'}, ${text.length} б)`;
         if (attempt < MAX_ATTEMPTS) {
+          this.warnRetry(offset, attempt, lastTransient, search.query);
           await this.backoff(attempt);
           continue;
         }
@@ -188,6 +192,16 @@ export class GraphqlClient {
 
     // Недосяжно (цикл або повертає, або кидає), але задовольняє контроль типів.
     throw new Error(`OLX GraphQL: вичерпано спроби (offset=${offset}): ${lastTransient}`);
+  }
+
+  /**
+   * Транзієнтний ретрай — у журнал як warn: ранній сигнал «OLX почав відбивати запити»,
+   * навіть якщо скан зрештою вдасться (раніше такі блипи були повністю невидимі).
+   */
+  private warnRetry(offset: number, attempt: number, reason: string, query: string): void {
+    logWarn('graphql-client', `retry offset=${offset} attempt=${attempt}/${MAX_ATTEMPTS}`, reason, {
+      query,
+    });
   }
 
   /** Бекоф між повторами транзієнтного збою: ~1.2с, ~2.5с (+джитер) — ввічливо до OLX. */

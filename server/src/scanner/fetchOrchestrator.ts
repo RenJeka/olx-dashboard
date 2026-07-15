@@ -1,5 +1,6 @@
 import { GraphqlOlxFetcher } from '../scraper/graphql/index.js';
 import { HtmlOlxFetcher } from '../scraper/olxFetcher.js';
+import { logError } from '../logger.js';
 import { interruptibleSleep, randomDelayMs } from '../scraper/utils.js';
 import {
   BATCH_PAUSE_MIN_MS,
@@ -159,6 +160,10 @@ export async function fetchAllQueries(
       // (docs/plans/scan-failure-recovery.md). Перший варіант без даних → чесна помилка.
       if (merged.size === 0) throw err;
       const message = err instanceof Error ? err.message : String(err);
+      logError('scanner', `variant «${variant}» ${vi + 1}/${variants.length}`, err, {
+        searchId: search.id,
+        collectedSoFar: merged.size,
+      });
       notes.push(
         `«${variant}»: збій (${message}) — скан завершено достроково, зібране попередніми варіантами збережено`,
       );

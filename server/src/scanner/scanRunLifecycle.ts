@@ -1,4 +1,5 @@
 import { dbRun } from '../db/db.js';
+import { logError } from '../logger.js';
 import type { ScanProgress } from '../types.js';
 import { abortFlags } from './abortControl.js';
 
@@ -74,6 +75,9 @@ export async function withScanRun<T>(
     return await body({ runId, shouldAbort, onProgress });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Центральна точка збою скану: у технічний журнал зі stack і прив'язкою до run
+    // (scan_runs.error нижче зберігає лише текст — доменний підсумок).
+    logError('scanner', `${kind}-scan run#${runId}`, err, { searchId, runId, kind });
     await dbRun(FINALIZE_ERROR_SQL, [new Date().toISOString(), message, runId]);
     throw err;
   } finally {

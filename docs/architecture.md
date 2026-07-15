@@ -126,6 +126,23 @@ flowchart LR
 > пропускається), а все зібране лишається в БД. `upsertListings` додатково чанкує
 > `db.batch` (≤500 statements), щоб гігантський фінальний батч не падав через розмір payload.
 
+> **Логування (`docs/plans/logging-system.md`):** єдиний сервіс `server/src/logger.ts` на базі
+> **pino** (той самий інстанс передається у Fastify через `loggerInstance` — HTTP-логи й наші
+> в одному потоці; у dev консоль читабельна через `pino-pretty`, вмикається лише якщо пакет
+> резолвиться). `logError(scope, stage, err, details?)` / `logWarn(...)` пишуть у stdout **і**
+> у таблицю `app_logs` (fire-and-forget, збій запису журналу не рекурсує й не валить логіку);
+> `scope` = модуль (`scanner`/`graphql-client`/`analysis`/`verify`/`http`/`process`),
+> `stage` = крок data flow (`bisect ₴0–5000`, `variant «x» 2/4`, `POST /api/…`). info/debug у
+> БД НЕ пишуться (Turso rows written). Глобальні перехоплювачі: `app.setErrorHandler` (5xx →
+> журнал зі stage=метод+URL), `unhandledRejection`/`uncaughtException`. Центральна точка збою
+> скану — catch у `withScanRun` (`scanRunLifecycle.ts`, з `searchId`/`runId`); додатково
+> журналюються раніше невидимі місця: транзієнтні ретраї GraphQL (ранній сигнал «OLX
+> відбиває»), збої бісекції/бакетів/варіантів, best-effort facet, verify-проби, невдалі спроби
+> OpenRouter. Retention — 14 днів (чистка на старті). Перегляд — `GET /api/logs`
+> (+`DELETE`) і діалог «Журнал» у хедері (`web/src/components/LogsDialog.tsx`: фільтри
+> level/scope, розгортання stack/details, авто-оновлення 5с). `scan_runs.error`/`warning`
+> лишаються доменним підсумком скану; записи журналу лінкуються через `runId` у details.
+
 > **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
 > непорожній, `scanner/fetchOrchestrator.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
 > крок 3, послідовно з паузою 3–6с між варіантами) і зливає видачі по `olxId` в один

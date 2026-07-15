@@ -25,6 +25,7 @@ import { graphqlFetcher, htmlFetcher } from './fetchOrchestrator.js';
 import { withScanRun } from './scanRunLifecycle.js';
 import { finalizeScanResult } from './scanFinalize.js';
 import { ScanPersister } from './scanPersister.js';
+import { logError } from '../logger.js';
 import { runScan } from './runScan.js';
 
 // ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ────────────
@@ -466,6 +467,11 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
           // Збій пізнього варіанта НЕ валить скан: усе зібране (і вже flush-нуте) лишається,
           // скан завершується достроково з warning (docs/plans/scan-failure-recovery.md).
           if (merged.size > 0) {
+            logError('scanner', `plan-variant «${variant}» ${vi + 1}/${variants.length}`, htmlErr, {
+              searchId,
+              graphqlMessage,
+              collectedSoFar: merged.size,
+            });
             notes.push(
               `«${variant}»: збій (${combined}) — скан завершено достроково, зібране попередніми варіантами збережено`,
             );

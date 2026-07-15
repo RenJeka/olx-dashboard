@@ -91,6 +91,23 @@ CREATE TABLE IF NOT EXISTS price_history (
   observed_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Технічний журнал застосунку (docs/plans/logging-system.md): warn+error з усіх модулів.
+-- НЕ плутати зі scan_runs.error/warning (доменний підсумок скану) — сюди пишуть
+-- logError/logWarn із server/src/logger.ts, зокрема проміжні/best-effort збої, які
+-- раніше були невидимі. info/debug у БД НЕ пишуться (лише stdout) — бережемо Turso writes.
+CREATE TABLE IF NOT EXISTS app_logs (
+  id INTEGER PRIMARY KEY,
+  ts TEXT NOT NULL,                  -- ISO-час (з мілісекундами, пишеться з JS)
+  level TEXT NOT NULL,               -- warn | error
+  scope TEXT NOT NULL,               -- модуль: scanner | graphql-client | analysis | verify | http | process
+  stage TEXT,                        -- крок data flow: "bisect ₴0–5000", "variant «x» 2/4", "POST /api/…"
+  message TEXT NOT NULL,
+  details TEXT                       -- JSON: stack, searchId, runId, довільний контекст
+);
+
+-- Перегляд журналу — завжди ORDER BY ts DESC; retention видаляє за ts.
+CREATE INDEX IF NOT EXISTS idx_app_logs_ts ON app_logs(ts);
+
 CREATE TABLE IF NOT EXISTS scan_runs (
   id INTEGER PRIMARY KEY,
   search_id INTEGER REFERENCES searches(id),

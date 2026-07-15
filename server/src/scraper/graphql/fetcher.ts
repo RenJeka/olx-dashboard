@@ -12,6 +12,7 @@ import type {
   FetchOptions,
 } from '../../types.js';
 
+import { logWarn } from '../../logger.js';
 import { interruptibleSleep, randomDelayMs } from '../utils.js';
 import {
   BATCH_SIZE,
@@ -62,6 +63,11 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         // HTML-fallback дістав шанс.
         if (offset > 0 && all.length > 0) {
           warning = `graphql transient fail at offset=${offset}: ${err instanceof Error ? err.message : String(err)}`;
+          logWarn('scanner', `fetch-page offset=${offset}`, warning, {
+            searchId: search.id,
+            query: search.query,
+            collected: all.length,
+          });
           break;
         }
         throw err;

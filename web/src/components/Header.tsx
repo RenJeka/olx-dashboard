@@ -5,6 +5,7 @@ import { TbHeartRateMonitor } from 'react-icons/tb';
 import { SearchActionPanel } from './searches/SearchActionPanel';
 import { AiToolsHub } from './analysis';
 import { SettingsDrawer } from './settings';
+import { LogsDialog } from './LogsDialog';
 import { Tooltip } from './ui/tooltip';
 import { useSearches } from '../api';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -83,6 +84,7 @@ export function Header() {
           )}
           {selectedSearch && <SearchActionPanel search={selectedSearch} />}
           {selectedSearch && <AiToolsHub search={selectedSearch} selectedIds={selectedIds} />}
+          <LogsDialog />
           <SettingsDrawer />
           <Tooltip content="Вийти">
             <IconButton

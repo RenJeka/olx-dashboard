@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { logWarn } from '../logger.js';
 import { SELECTORS, REQUEST_HEADERS } from './selectors.js';
 
 export type ProbeVerdict = 'alive' | 'dead' | 'unknown';
@@ -50,7 +51,10 @@ export async function probeListingPage(url: string): Promise<ProbeResult> {
     }
 
     return { verdict: 'unknown', httpStatus, description: null, sellerName: null };
-  } catch {
+  } catch (err) {
+    // Мережевий збій проби → unknown (статус не змінюється), але слід у журналі лишаємо:
+    // масові такі збої = OLX відбиває verify-прохід.
+    logWarn('verify', 'probe-page', err instanceof Error ? err.message : String(err), { url });
     return { verdict: 'unknown', httpStatus: null, description: null, sellerName: null };
   }
 }

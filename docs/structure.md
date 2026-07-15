@@ -35,6 +35,7 @@ olx-dashboard/
 │   ├── .env.example          # OPENROUTER_API_KEY + TURSO_DATABASE_URL/TURSO_AUTH_TOKEN/WEB_ORIGIN
 │   └── src/
 │       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
+│       ├── logger.ts         # єдиний сервіс логування (pino): getLogger(scope), logError/logWarn(scope, stage, …) → stdout + app_logs, retention 14 днів
 │       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
 │       ├── auth/             # Google OAuth «ворота» single-user (docs/plans/google-oauth-gate.md)
 │       │   ├── config.ts     # env: GOOGLE_CLIENT_ID/ALLOWED_EMAILS/SESSION_SECRET, кукі-флаги, isAuthDisabled, assertAuthConfigured (fail-fast)
@@ -101,6 +102,7 @@ olx-dashboard/
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
+│           ├── logs.ts       # GET /api/logs (журнал app_logs: фільтри level/scope) + DELETE /api/logs (очистити)
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
@@ -312,5 +314,6 @@ olx-dashboard/
 | Проекти (групування пошуків в акордеони) | `server/src/routes/projects.ts`, `searches.project_id` (`server/src/db/schema.sql`/`db.ts`), `web/src/api/projects.ts`, `web/src/components/searches/{SearchesPanel,ProjectAccordionItem,ProjectCreateDialog,ProjectEditDialog,ProjectDeleteDialog,SearchRowMenu}.tsx` + `docs/plans/projects.md` |
 | Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner/scanFinalize.ts` (виклик `deep?1:2`), `server/src/scanner/verifyScan.ts` (verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
 | Оптимізація запису у Turso (діф перед upsert, прибраний індекс `last_seen`, батч statusEngine) | `server/src/scraper/normalizer.ts` (`hasBusinessChange`, `TOUCH_PREFIX`/`TOUCH_SUFFIX`, touch once/day), `server/src/scraper/statusEngine.ts` (`db.batch`), `server/src/db/{schema.sql,db.ts}` (DROP `idx_listings_search_lastseen`) + `docs/plans/turso-write-optimization.md` |
+| Логування (журнал помилок зі scope/stage, перегляд в UI) | `server/src/logger.ts` (pino, `logError`/`logWarn`), `app_logs` у `server/src/db/schema.sql`, `server/src/routes/logs.ts`, глобальні перехоплювачі в `server/src/index.ts` (`setErrorHandler`, `unhandledRejection`/`uncaughtException`), `web/src/api/logs.ts`, `web/src/components/LogsDialog.tsx` (кнопка в `Header.tsx`) + `docs/plans/logging-system.md` |
 | Стійкість великих сканів (інкрементальне збереження, порятунок часткових даних при збої) | `server/src/scanner/scanPersister.ts` (`ScanPersister`), `FetchOptions.onListings` (`server/src/types/scan.ts`), flush-точки у `server/src/scraper/graphql/{fetcher,split}.ts`, порятунок варіанта/бісекції у `server/src/scanner/{fetchOrchestrator,analyzeScan}.ts` + `server/src/scraper/graphql/split.ts` (`probeWarning`), чанкування `db.batch` у `normalizer.ts` + `docs/plans/scan-failure-recovery.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

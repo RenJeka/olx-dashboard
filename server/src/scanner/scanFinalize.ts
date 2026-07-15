@@ -1,4 +1,5 @@
 import { dbRun } from '../db/db.js';
+import { logWarn } from '../logger.js';
 import { fetchCategoryOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
 import { applyScanStatuses } from '../scraper/statusEngine.js';
@@ -20,8 +21,11 @@ export async function refreshCategoryFacet(searchId: number, query: string): Pro
         searchId,
       ]);
     }
-  } catch {
-    // best-effort — дерево категорій не критичне для скану
+  } catch (err) {
+    // best-effort — дерево категорій не критичне для скану; але збій має бути видимим у журналі
+    logWarn('scanner', 'category-facet', err instanceof Error ? err.message : String(err), {
+      searchId,
+    });
   }
 }
 

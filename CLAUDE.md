@@ -16,6 +16,12 @@
   (промпт + чанки описів) — **`archiver`** (+ `@types/archiver`), друга узгоджена нова
   залежність `server/`: у Node немає вбудованого ZIP-writer. `.env` — через
   `process.loadEnvFile` (міні-лоадер у `server/src/analysis/config.ts`), без нової залежності.
+- **Логування:** **pino** (узгоджена залежність `server/` — той самий пакет, що всередині
+  Fastify; передається через `loggerInstance`) + `pino-pretty` (devDep). Єдиний сервіс —
+  `server/src/logger.ts`: `logError`/`logWarn(scope, stage, …)` → stdout + таблиця `app_logs`
+  (лише warn+error; info/debug у БД не пишуться — Turso). Кожен запис журналу несе `scope`
+  (модуль) і `stage` (крок data flow). Перегляд — діалог «Журнал» у хедері (`GET /api/logs`).
+  Деталі — `docs/plans/logging-system.md`.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
 ## Метод збору даних (КРИТИЧНО — підтверджено живими запитами 2026-06-10)
