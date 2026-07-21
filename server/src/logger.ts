@@ -54,6 +54,14 @@ export function getLogger(scope: string): Logger {
 const INSERT_LOG_SQL =
   'INSERT INTO app_logs (ts, level, scope, stage, message, details) VALUES (?, ?, ?, ?, ?, ?)';
 
+/** Збій самого журналювання — лише у stdout, БЕЗ рекурсії назад у app_logs. */
+function reportLoggerFailure(action: string, err: unknown): void {
+  rootLogger.warn(
+    { scope: 'logger' },
+    `${action} не вдалося: ${err instanceof Error ? err.message : String(err)}`,
+  );
+}
+
 /** Fire-and-forget запис у app_logs; збій — лише у stdout (без рекурсії в журнал). */
 function persist(
   level: 'warn' | 'error',
@@ -64,12 +72,7 @@ function persist(
 ): void {
   const detailsJson = Object.keys(details).length > 0 ? JSON.stringify(details) : null;
   void dbRun(INSERT_LOG_SQL, [new Date().toISOString(), level, scope, stage, message, detailsJson])
-    .catch((err) => {
-      rootLogger.warn(
-        { scope: 'logger' },
-        `запис у app_logs не вдався: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    });
+    .catch((err) => reportLoggerFailure('запис у app_logs', err));
 }
 
 /**
@@ -103,11 +106,8 @@ export function logWarn(
 /** Retention: видалити записи, старші за LOG_RETENTION_DAYS. Викликається на старті сервера. */
 export async function cleanupOldLogs(): Promise<void> {
   try {
-    await dbRun(`DELETE FROM app_logs WHERE ts < datetime('now', '-${LOG_RETENTION_DAYS} days')`);
+    await dbRun("DELETE FROM app_logs WHERE ts < datetime('now', ?)", [`-${LOG_RETENTION_DAYS} days`]);
   } catch (err) {
-    rootLogger.warn(
-      { scope: 'logger' },
-      `retention-чистка app_logs не вдалася: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    reportLoggerFailure('retention-чистка app_logs', err);
   }
 }

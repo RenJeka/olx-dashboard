@@ -21,7 +21,7 @@ import type {
   RawListing,
 } from '../types.js';
 import { loadSearch, dedupeQueries } from './searchLoader.js';
-import { graphqlFetcher, htmlFetcher } from './fetchOrchestrator.js';
+import { graphqlFetcher, htmlFetcher, variantFailureNote } from './fetchOrchestrator.js';
 import { withScanRun } from './scanRunLifecycle.js';
 import { finalizeScanResult } from './scanFinalize.js';
 import { ScanPersister } from './scanPersister.js';
@@ -472,9 +472,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
               graphqlMessage,
               collectedSoFar: merged.size,
             });
-            notes.push(
-              `«${variant}»: збій (${combined}) — скан завершено достроково, зібране попередніми варіантами збережено`,
-            );
+            notes.push(variantFailureNote(variant, combined));
             partial = true;
             break;
           }

@@ -18,6 +18,16 @@ export const graphqlFetcher = new GraphqlOlxFetcher();
 export const htmlFetcher = new HtmlOlxFetcher();
 
 /**
+ * Нота порятунку варіанта (docs/plans/scan-failure-recovery.md): збій пізнього варіанта
+ * (синоніма) завершує скан достроково, зібране попередніми варіантами лишається в БД.
+ * Спільна для звичайного (`fetchAllQueries`) і планового (`runDeepScanFromPlan`) сканів,
+ * щоб текст warning був однаковий.
+ */
+export function variantFailureNote(variant: string, message: string): string {
+  return `«${variant}»: збій (${message}) — скан завершено достроково, зібране попередніми варіантами збережено`;
+}
+
+/**
  * Викликає GraphqlOlxFetcher; якщо він кидає помилку — fallback на HtmlOlxFetcher.
  * Якщо впав і fallback — кидає об'єднану помилку (обидва методи недоступні).
  */
@@ -164,9 +174,7 @@ export async function fetchAllQueries(
         searchId: search.id,
         collectedSoFar: merged.size,
       });
-      notes.push(
-        `«${variant}»: збій (${message}) — скан завершено достроково, зібране попередніми варіантами збережено`,
-      );
+      notes.push(variantFailureNote(variant, message));
       break;
     }
 
