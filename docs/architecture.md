@@ -85,7 +85,12 @@ flowchart LR
    рядок — один bulk-`SELECT` наявних полів по `olx_id` (чанками), злиття COALESCE-значень і
    `filtered_out` рахуються в пам'яті, а всі upsert-и (з уже вписаним `filtered_out`) ідуть
    одним `db.batch('write')` (атомарно, як транзакція). Скан на N оголошень — ~2 round-trip
-   замість ~4N.
+   замість ~4N. **Діф перед записом** (`plans/turso-write-optimization.md`): bulk-`SELECT`
+   тягне й бізнес-поля, і `hasBusinessChange()` лишає у `db.batch` повний UPSERT **лише** для
+   нових / HTML / реально змінених GraphQL-рядків; незмінні рядки отримують дешевий `last_seen_at`/
+   `miss_count` touch (`TOUCH_PREFIX`/`TOUCH_SUFFIX`) з throttle once/day (SQL-WHERE пропускає
+   ще «свіжі» рядки → 0 записів). Це різко зменшує Turso "rows written" (раніше кожен незмінний
+   рядок коштував таблиця+3 індекси за скан).
 5. Якщо фетчер був GraphQL (не fallback), скан успішний і **повний** (без warning часткового
    результату — напр. «window cap hit») — `statusEngine.applyScanStatuses(searchId,
    fetched, exhausted, threshold)` застосовує вікно покриття (`miss_count`/disable, §6.1
@@ -95,7 +100,9 @@ flowchart LR
    `docs/plans/coverage-window-fix.md`). **`threshold`** пропорційний надійності скану:
    глибокий → `1`, звичайний → `2` (`scanner/scanFinalize.ts`: `missThreshold`); при disable
    також пишеться `olx_status='inactive'` — щоб колонка «Активність» була чесною
-   (`docs/plans/honest-olx-status.md`).
+   (`docs/plans/honest-olx-status.md`). UPDATE-и кандидатів ідуть одним `db.batch` (а не
+   `tx.execute` на рядок — N round-trip), а гілка «промах без disable» чіпає лише `miss_count`,
+   не перезаписуючи індекс `status` (`plans/turso-write-optimization.md`).
 6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`). Розрізнення
    **частковий успіх vs збій**: успішний скан (навіть з застереженням — multi-query/split/
    HTML-fallback) пише застереження у `scan_runs.warning`, а `error` лишає `NULL`; падіння
@@ -213,9 +220,11 @@ flowchart LR
 - `params` зберігається сирим JSON.
 - `filtered_out` — прапорець локальних фільтрів (`local_filters`), рядок не видаляється.
 - Індекси `listings`: `idx_listings_search_status` (список/фільтр), `idx_listings_search_refresh`
-  (`search_id, last_refresh_at` — кандидати вікна покриття у `statusEngine`),
-  `idx_listings_search_lastseen` (`search_id, last_seen_at` — verify-прохід P1). `olx_id` UNIQUE
-  уже проіндексований (bulk-upsert лукапи).
+  (`search_id, last_refresh_at` — кандидати вікна покриття у `statusEngine`). `olx_id` UNIQUE
+  уже проіндексований (bulk-upsert лукапи). Індекс по `last_seen_at` **навмисно прибрано**
+  (`plans/turso-write-optimization.md`): він перезаписувався на кожному скані (бо `last_seen_at`
+  оновлюється завжди) і множив Turso "rows written"; verify-прохід P1 обходиться scan+sort.
+  DROP наявного — у `initDb` (`db.ts`).
 - `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/projects.md`).
 - `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
@@ -267,14 +276,14 @@ flowchart LR
 | `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
 | `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта); `merge='append'` (дефолт UI — додати до наявних без дублів) \| `'replace'` (перезаписати) |
 | `POST` | `/api/searches/:id/ai-picks/prompt` | ✅ — готовий промпт ручного режиму (один файл, пули ≤50 кандидатів); body `{ids?}` обсягу (порожній → дефолтний пул кандидатів) |
-| `POST` | `/api/searches/:id/ai-picks/package.zip` | ✅ — ZIP-пакет ручного режиму для пулів >50: `prompt.txt` (2-етапні map-reduce інструкції) + `candidates/chunk-NNN.json` (по 50); body `{ids?}` обсягу |
+| `POST` | `/api/searches/:id/ai-picks/package.zip` | ✅ — ZIP-пакет ручного режиму для пулів >50: `prompt.txt` (map-reduce НА ФАЙЛАХ без скриптів, уніфіковано з кроками 1–2 через `manualZip.ts`) + `candidates/chunk-NNN.json` (по 50) + ПОРОЖНІ заготовки `nominations/nominees-NNN.json` (`[]`, по одній на чанк — агент заповнює, тоді сам пише `output.json`); body `{ids?}` обсягу |
 | `POST` | `/api/searches/:id/ai-picks/rank` | ✅ — авто-режим (OpenRouter) → `PickResult {picks, summary}`, НЕ пише в БД; 409 без `OPENROUTER_API_KEY`; body `{model?, ids?}` обсягу |
 | `POST` | `/api/searches/:id/ai-picks/import` | ✅ — парс вставленої відповіді ручного режиму → `PickResult`, НЕ пише в БД; body `{raw, ids?}` обсягу |
 | `POST` | `/api/searches/:id/ai-picks/commit` | ✅ — запис `ai_rank`/`ai_pick_reason`/`ai_ranked_at`; скидає попередні результати пошуку перед записом нових |
 | `GET/PUT` | `/api/searches/:id/relevance/target` | ✅ Семантичний фільтр — читання/збереження `searches.relevance_target` (порожній → `query` як передзаповнення) |
 | `POST` | `/api/searches/:id/relevance/preview` | ✅ — розбивка пре-фільтра для UI: `{total, candidates, autoRejected}` (скільки піде в ШІ vs авто-відсіється), НЕ пише в БД |
 | `POST` | `/api/searches/:id/relevance/analyze` | ✅ — авто-класифікація «лот продає <товар>?» (пре-фільтр + чанки по 12), `{results, errors}`, НЕ пише в БД; без ключа → 409 |
-| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + готові `merge.py`/`verify.py` + `descriptions/chunk-NNN.json` (лише кандидати по 50). Покрокова процедура для агентного CLI (Antigravity): класифікуй чанк → `classifications/result-NNN.json` → `merge.py` → `verify.py` |
+| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + готові `merge.py`/`verify.py` + `descriptions/chunk-NNN.json` (лише кандидати по 50) + ПОРОЖНІ заготовки `classifications/result-NNN.json` (`[]`, по одній на чанк — агент заповнює). Покрокова процедура для агентного CLI (Antigravity): заповни result-NNN.json → `merge.py` → `verify.py` |
 | `POST` | `/api/searches/:id/relevance/import` | ✅ — парс вставленої відповіді + інжект авто-відсіяних (пре-фільтр за scope `ids`) + мерж у накопичене за `id` |
 | `POST` | `/api/searches/:id/relevance/commit` | ✅ — запис `ai_relevant`/`ai_relevant_*`; рядки з `ai_relevant_source='manual'` НЕ перетираються |
 | `GET` | `/health` | ✅ |

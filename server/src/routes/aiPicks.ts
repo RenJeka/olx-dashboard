@@ -65,8 +65,13 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
         { name: 'prompt.txt' },
       );
       chunks.forEach((group, idx) => {
-        const name = `candidates/chunk-${String(idx + 1).padStart(3, '0')}.json`;
-        archive.append(JSON.stringify(toPickItems(group), null, JSON_EXPORT_INDENT), { name });
+        const nnn = String(idx + 1).padStart(3, '0');
+        archive.append(JSON.stringify(toPickItems(group), null, JSON_EXPORT_INDENT), {
+          name: `candidates/chunk-${nnn}.json`,
+        });
+        // Порожня заготовка проміжного файлу-номінантів на КОЖЕН чанк: слабкій моделі легше
+        // заповнити наявний файл (гарантована назва/шлях, видно чек-лист), ніж створювати з нуля.
+        archive.append('[]\n', { name: `nominations/nominees-${nnn}.json` });
       });
       void archive.finalize();
 

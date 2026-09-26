@@ -78,8 +78,11 @@ CREATE TABLE IF NOT EXISTS listings (
 CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);
 -- Вікно покриття (statusEngine): кандидати за search_id + last_refresh_at >= windowFloor.
 CREATE INDEX IF NOT EXISTS idx_listings_search_refresh ON listings(search_id, last_refresh_at);
--- Verify-прохід P1: давно не бачені (search_id + ORDER BY last_seen_at ASC).
-CREATE INDEX IF NOT EXISTS idx_listings_search_lastseen ON listings(search_id, last_seen_at);
+-- Індекс по last_seen_at НАВМИСНО прибрано (docs/plans/turso-write-optimization.md):
+-- last_seen_at оновлюється на кожному скані → індекс перезаписувався на КОЖНОМУ записі
+-- рядка, множачи Turso "rows written" ×N. Verify-прохід P1 (search_id + last_seen_at,
+-- ≤ кілька тисяч рядків на пошук) обходиться scan+sort без помітних втрат. DROP наявного
+-- індексу на вже задеплоєних БД — у initDb (db.ts).
 
 CREATE TABLE IF NOT EXISTS price_history (
   id INTEGER PRIMARY KEY,

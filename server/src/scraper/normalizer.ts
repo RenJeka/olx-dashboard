@@ -1,4 +1,4 @@
-import type { InValue } from '@libsql/client';
+import type { InStatement } from '@libsql/client';
 import { db, dbAll, dbGet } from '../db/db.js';
 import { evaluateFilteredOut } from './localFilters.js';
 import { parseOlxDate } from './dateParser.js';
@@ -46,9 +46,15 @@ function parseLocationDate(raw?: string): {
 
 const SEARCH_LOCAL_FILTERS_SQL = 'SELECT local_filters FROM searches WHERE id = ?';
 
-// Поля наявних рядків, потрібні для злиття (COALESCE) перед обчисленням filtered_out у JS.
-// `id` НЕ потрібен — filtered_out тепер пишеться у тому ж UPSERT (не окремим UPDATE by id).
-const SELECT_EXISTING_FIELDS = 'olx_id, description, params, pros, cons, seller_name, category_id';
+// Поля наявних рядків: для злиття (COALESCE) перед filtered_out + для діфу «чи реально щось
+// змінилось» (docs/plans/turso-write-optimization.md). Якщо у GraphQL-рядка жодне бізнес-поле
+// не змінилось — повний UPSERT пропускаємо (лишається дешевий touch last_seen_at/miss_count),
+// щоб не множити Turso "rows written" на 4 (таблиця + 3 індекси) за кожен незмінний рядок.
+// `id` НЕ потрібен — filtered_out пишеться у тому ж UPSERT (не окремим UPDATE by id).
+const SELECT_EXISTING_FIELDS =
+  'olx_id, title, url, price, currency, city, district, seller_type, params, category_id, ' +
+  'category_type, photo_url, photo_urls, description, seller_name, contact_name, olx_status, ' +
+  'posted_at, last_refresh_at, status, status_source, filtered_out, pros, cons';
 
 /** Розмір чанка для IN-списку (ліміт змінних SQLite — 999). */
 const IN_CHUNK = 500;
@@ -133,14 +139,107 @@ const UPSERT_SQL = `
     filtered_out  = @filtered_out
 `;
 
-/** Наявні поля рядка, потрібні для злиття перед обчисленням filtered_out. */
+// Дешевий «touch» для GraphQL-рядків без бізнес-змін: оновити лише last_seen_at + скинути
+// miss_count (оголошення є у видачі). Throttle once/day — WHERE пропускає рядки, ще «свіжі»
+// й уже з miss_count=0 (датою бачено сьогодні), тож для них write взагалі не виконується.
+// last_seen_at без індексу (його прибрано) — це 1 table-write/рядок без index-write.
+const TOUCH_PREFIX = `UPDATE listings SET last_seen_at = datetime('now'), miss_count = 0 WHERE olx_id IN (`;
+const TOUCH_SUFFIX = `) AND (miss_count != 0 OR last_seen_at IS NULL OR last_seen_at < datetime('now', '-1 day'))`;
+
+/** Наявні поля рядка: для злиття COALESCE (filtered_out) + діфу бізнес-змін перед upsert. */
 interface ExistingFields {
-  description: string | null;
+  title: string | null;
+  url: string | null;
+  price: number | null;
+  currency: string | null;
+  city: string | null;
+  district: string | null;
+  seller_type: string | null;
   params: string | null;
+  category_id: number | null;
+  category_type: string | null;
+  photo_url: string | null;
+  photo_urls: string | null;
+  description: string | null;
+  seller_name: string | null;
+  contact_name: string | null;
+  olx_status: string | null;
+  posted_at: string | null;
+  last_refresh_at: string | null;
+  status: string;
+  status_source: string;
+  filtered_out: number;
   pros: string | null;
   cons: string | null;
-  seller_name: string | null;
-  category_id: number | null;
+}
+
+/** Обчислені (нормалізовані + злиті) значення GraphQL-рядка — для діфу проти ExistingFields. */
+interface ComputedFields {
+  title: string | null;
+  url: string | null;
+  price: number | null;
+  currency: string;
+  city: string | null;
+  district: string | null;
+  sellerType: string | null;
+  params: string | null;
+  categoryId: number | null;
+  categoryType: string | null;
+  photoUrl: string | null;
+  photoUrls: string | null;
+  description: string | null;
+  sellerName: string | null;
+  contactName: string | null;
+  olxStatus: string | null;
+  postedAt: string | null;
+  lastRefreshAt: string | null;
+  filteredOut: number;
+  olxStatusInactive: boolean;
+}
+
+/**
+ * Чи реально щось змінилось у GraphQL-рядку проти збереженого — дзеркало семантики UPSERT_SQL.
+ * `true` (= потрібен повний upsert), якщо: будь-яке завжди-перезаписуване поле відрізняється;
+ * GraphQL-дата відрізняється; filtered_out відрізняється; COALESCE-поле має новий НЕ-null,
+ * що відрізняється; або статусний CASE дав би перехід (миттєвий disable / auto-реактивація).
+ * За будь-якого сумніву віддаємо перевагу повному upsert — зайвий запис безпечний, пропуск ні.
+ */
+function hasBusinessChange(e: ExistingFields, c: ComputedFields): boolean {
+  // Завжди-перезаписувані (без COALESCE) — зміна, якщо значення відрізняється.
+  if (c.title !== e.title) return true;
+  if (c.url !== e.url) return true;
+  if (c.price !== e.price) return true;
+  if (c.currency !== e.currency) return true;
+  if (c.city !== e.city) return true;
+  if (c.photoUrl !== e.photo_url) return true;
+  // GraphQL-перезаписувані дати (posted_at/last_refresh_at).
+  if (c.postedAt !== e.posted_at) return true;
+  if (c.lastRefreshAt !== e.last_refresh_at) return true;
+  // filtered_out (перерахований у JS на злитих значеннях).
+  if (c.filteredOut !== e.filtered_out) return true;
+  // COALESCE-поля: новий НЕ-null, що відрізняється від наявного → перезапис.
+  if (c.olxStatus !== null && c.olxStatus !== e.olx_status) return true;
+  if (c.description !== null && c.description !== e.description) return true;
+  if (c.sellerName !== null && c.sellerName !== e.seller_name) return true;
+  if (c.contactName !== null && c.contactName !== e.contact_name) return true;
+  if (c.district !== null && c.district !== e.district) return true;
+  if (c.sellerType !== null && c.sellerType !== e.seller_type) return true;
+  if (c.params !== null && c.params !== e.params) return true;
+  if (c.categoryId !== null && c.categoryId !== e.category_id) return true;
+  if (c.categoryType !== null && c.categoryType !== e.category_type) return true;
+  if (c.photoUrls !== null && c.photoUrls !== e.photo_urls) return true;
+  // Статусні переходи (дзеркало CASE-гілок status у UPSERT_SQL):
+  // миттєвий disable за olx_status≠active для auto/rejected, ще не disabled.
+  if (
+    c.olxStatusInactive &&
+    e.status !== 'disabled' &&
+    (e.status_source === 'auto' || e.status === 'rejected')
+  ) {
+    return true;
+  }
+  // auto-реактивація: disabled-auto знову живий → 'new'.
+  if (!c.olxStatusInactive && e.status === 'disabled' && e.status_source === 'auto') return true;
+  return false;
 }
 
 /**
@@ -156,16 +255,7 @@ async function loadExistingByOlxId(olxIds: number[]): Promise<Map<number, Existi
       `SELECT ${SELECT_EXISTING_FIELDS} FROM listings WHERE olx_id IN (${placeholders})`,
       chunk,
     );
-    for (const r of rows) {
-      map.set(r.olx_id, {
-        description: r.description,
-        params: r.params,
-        pros: r.pros,
-        cons: r.cons,
-        seller_name: r.seller_name,
-        category_id: r.category_id,
-      });
-    }
+    for (const r of rows) map.set(r.olx_id, r);
   }
   return map;
 }
@@ -203,7 +293,9 @@ export async function upsertListings(
   // Дублі в межах одного raw (одне оголошення на кількох сторінках) рахуються як новий один раз,
   // як і в попередній EXISTS-логіці (друга поява вже «існує»).
   const seen = new Set<number>();
-  const statements: { sql: string; args: Record<string, InValue> }[] = [];
+  const statements: InStatement[] = [];
+  // olx_id GraphQL-рядків без бізнес-змін — їм лише дешевий touch (без повного upsert).
+  const touchOlxIds: number[] = [];
 
   for (const item of raw) {
     const existing = existingMap.get(item.olxId);
@@ -251,11 +343,18 @@ export async function upsertListings(
 
     const olxStatusInactive = hasStructuredData && olxStatus != null && olxStatus !== 'active';
     const categoryId = hasStructuredData ? (item.categoryId ?? null) : null;
+    const categoryType = hasStructuredData ? (item.categoryType ?? null) : null;
+    const lastRefreshAt = hasStructuredData ? (item.lastRefreshAt ?? null) : null;
+    const titleVal = item.title || null;
+    const urlVal = item.url || null;
+    const photoUrl = item.photoUrl ?? null;
+    const photoUrls =
+      item.photoUrls && item.photoUrls.length > 0 ? JSON.stringify(item.photoUrls) : null;
 
     // Злиті значення — дзеркало COALESCE в UPSERT_SQL (новий ?? наявний), щоб filtered_out
     // збігався з тим, що реально опиниться у рядку після upsert.
     const filteredOut = evaluateFilteredOut(localFilters, {
-      title: item.title || null,
+      title: titleVal,
       description: description ?? existing?.description ?? null,
       params: params ?? existing?.params ?? '{}',
       price,
@@ -265,14 +364,48 @@ export async function upsertListings(
       cons: existing?.cons ?? '',
       category_id: categoryId ?? existing?.category_id ?? null,
     });
+    const filteredOutInt = filteredOut ? 1 : 0;
+
+    // Класифікація запису: повний UPSERT лише для нових / HTML-fallback / реально змінених
+    // GraphQL-рядків. Незмінні GraphQL-рядки → дешевий touch (docs/plans/turso-write-optimization.md).
+    const needsUpsert =
+      existing === undefined ||
+      !hasStructuredData ||
+      hasBusinessChange(existing, {
+        title: titleVal,
+        url: urlVal,
+        price,
+        currency,
+        city,
+        district,
+        sellerType,
+        params,
+        categoryId,
+        categoryType,
+        photoUrl,
+        photoUrls,
+        description,
+        sellerName,
+        contactName,
+        olxStatus,
+        postedAt,
+        lastRefreshAt,
+        filteredOut: filteredOutInt,
+        olxStatusInactive,
+      });
+
+    if (!needsUpsert) {
+      touchOlxIds.push(item.olxId);
+      continue;
+    }
 
     statements.push({
       sql: UPSERT_SQL,
       args: {
         olx_id: item.olxId,
         search_id: searchId,
-        title: item.title || null,
-        url: item.url || null,
+        title: titleVal,
+        url: urlVal,
         price,
         currency,
         city,
@@ -280,26 +413,33 @@ export async function upsertListings(
         seller_type: sellerType,
         params,
         category_id: categoryId,
-        category_type: hasStructuredData ? (item.categoryType ?? null) : null,
-        photo_url: item.photoUrl ?? null,
-        photo_urls:
-          item.photoUrls && item.photoUrls.length > 0 ? JSON.stringify(item.photoUrls) : null,
+        category_type: categoryType,
+        photo_url: photoUrl,
+        photo_urls: photoUrls,
         description,
         seller_name: sellerName,
         contact_name: contactName,
         olx_status: olxStatus,
         posted_at: postedAt,
-        last_refresh_at: hasStructuredData ? (item.lastRefreshAt ?? null) : null,
+        last_refresh_at: lastRefreshAt,
         is_graphql: hasStructuredData ? 1 : 0,
         olx_status_inactive: olxStatusInactive ? 1 : 0,
         status_note: olxStatusInactive ? `auto-disabled: olx_status=${olxStatus}` : '',
-        filtered_out: filteredOut ? 1 : 0,
+        filtered_out: filteredOutInt,
       },
     });
   }
 
-  // Один round-trip: усі UPSERT-и виконуються атомарно (libSQL batch = транзакція).
-  await db.batch(statements, 'write');
+  // Дешевий touch незмінних рядків — чанками (ліміт IN). WHERE у TOUCH_SUFFIX додатково
+  // відсіює рядки, ще «свіжі» за last_seen_at (throttle once/day) — для них write не виконується.
+  for (let i = 0; i < touchOlxIds.length; i += IN_CHUNK) {
+    const chunk = touchOlxIds.slice(i, i + IN_CHUNK);
+    const placeholders = chunk.map(() => '?').join(', ');
+    statements.push({ sql: `${TOUCH_PREFIX}${placeholders}${TOUCH_SUFFIX}`, args: chunk });
+  }
+
+  // Один round-trip: усі UPSERT-и + touch виконуються атомарно (libSQL batch = транзакція).
+  if (statements.length > 0) await db.batch(statements, 'write');
 
   return { found: raw.length, new_count: newCount };
 }

@@ -1,6 +1,6 @@
 import '../env.js'; // ПЕРШИМ: гарантує .env у process.env до читання TURSO_* нижче.
 import { createClient, type InArgs, type ResultSet } from '@libsql/client';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,9 +16,24 @@ const DEFAULT_LOCAL_DB = join(__dirname, '..', '..', 'data', 'olx.db');
  * - у проді — TURSO_DATABASE_URL (`libsql://…`) + TURSO_AUTH_TOKEN (для `file:` токен не потрібен).
  * libSQL — SQLite-сумісний, тож схема/SQL/бізнес-логіка не змінюються.
  */
+// Порожній рядок у .env (`TURSO_DATABASE_URL=`) — це «не задано», не валідний URL.
+// `??` спіймав би лише undefined, тож нормалізуємо порожні/пробільні значення до undefined.
+const envOrUndefined = (v: string | undefined): string | undefined => {
+  const trimmed = v?.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const dbUrl = envOrUndefined(process.env.TURSO_DATABASE_URL) ?? `file:${DEFAULT_LOCAL_DB}`;
+
+// libSQL не створює батьківський каталог для `file:` — гарантуємо його для локальної БД,
+// інакше перший запуск на чистому клоні падає з SQLITE_CANTOPEN (код 14).
+if (dbUrl.startsWith('file:')) {
+  mkdirSync(dirname(dbUrl.slice('file:'.length)), { recursive: true });
+}
+
 export const db = createClient({
-  url: process.env.TURSO_DATABASE_URL ?? `file:${DEFAULT_LOCAL_DB}`,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+  url: dbUrl,
+  authToken: envOrUndefined(process.env.TURSO_AUTH_TOKEN),
 });
 
 // ── Тонкі async-обгортки навколо db.execute ──────────────────────────────────
@@ -51,4 +66,9 @@ export async function dbRun(sql: string, args: InArgs = []): Promise<ResultSet> 
 export async function initDb(): Promise<void> {
   const schema = readFileSync(SCHEMA_PATH, 'utf-8');
   await db.executeMultiple(schema);
+
+  // Міграція: прибрати індекс по last_seen_at на вже задеплоєних БД. Цей індекс
+  // перезаписувався на кожному upsert (last_seen_at = now), множачи Turso "rows written";
+  // verify-прохід P1 обходиться без нього (docs/plans/turso-write-optimization.md).
+  await db.execute('DROP INDEX IF EXISTS idx_listings_search_lastseen');
 }
