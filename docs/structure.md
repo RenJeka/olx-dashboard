@@ -11,7 +11,7 @@ olx-dashboard/
 ├── package-lock.json
 ├── tsconfig.base.json        # спільні strict-опції TS (без module/moduleResolution)
 ├── .gitignore                # + server/data/*.db, *.db-shm, *.db-wal
-├── CLAUDE.md                 # канон інваріантів/конвенцій для агентів
+├── AGENTS.md                 # канон інваріантів/конвенцій для агентів (читають Claude Code, Codex тощо)
 ├── README.md                 # огляд + швидкий старт
 │
 ├── docs/

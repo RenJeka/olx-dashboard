@@ -2,7 +2,7 @@
 
 Персональна single-user система моніторингу оголошень **OLX.ua**: збір через GraphQL API OLX
 (fallback — HTML) → SQLite → React-таблиця зі статусами/нотатками/історією цін (за етапами)
-та експортом у Notion. Локальний запуск, без зовнішніх сервісів.
+та експортом у Notion. Локальний запуск або деплой Render + Turso (див. нижче).
 
 ## Стек
 
@@ -55,10 +55,12 @@ npm run scan -- --search <id>
 
 ## Стан
 
-Реалізовано **Етап 1 (MVP)**: scraper (GraphQL — основний, HTML — fallback) + SQLite + REST
-(CRUD пошуків, scan, listings) + React-таблиця на Chakra UI v3 (сортування, видимість колонок,
-темна/світла тема через Drawer налаштувань; колонки «Опис»/«Продавець»/«Активність», лічильник
-«Результатів: N»). Наступні етапи (статуси, нотатки, історія цін, Notion, cron) — у документації нижче.
+- ✅ **Етап 1 (MVP):** GraphQL-збір (HTML — fallback), upsert, REST, React-таблиця на Chakra UI v3.
+- ✅ **Етап 2:** статуси (ручні + auto-disable/reactivate), нотатки, інлайн-едіт, локальні фільтри, verify-прохід.
+- ✅ **Поза етапами:** глибокий скан з авто-розбиттям по ціні й двофазним аналізом, синоніми пошуку,
+  проєкти, дерево категорій OLX, AI (плюси/мінуси, фільтр релевантності, AI Picks), Turso + Render,
+  Google OAuth, журнал помилок, відновлення часткових сканів.
+- ⏳ **Етап 3:** спарклайни `price_history` + MD-експорт. **Етап 4:** Notion-експорт + node-cron.
 
 ## Документація
 
@@ -70,4 +72,4 @@ npm run scan -- --search <id>
 - [`docs/plans/initial-mvp.md`](docs/plans/initial-mvp.md) — план Етапу 1 із прогресом
 - [`docs/plans/graphql-migration.md`](docs/plans/graphql-migration.md) — план міграції збору на GraphQL
 - [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) — покрокове налаштування Google OAuth (Google Console, env-змінні, локал, Render)
-- [`CLAUDE.md`](CLAUDE.md) — інваріанти й конвенції (обовʼязкові при змінах)
+- [`AGENTS.md`](AGENTS.md) — інваріанти й конвенції (обовʼязкові при змінах)

@@ -1,14 +1,38 @@
-# CLAUDE.md — olx-monitor
+# AGENTS.md — olx-monitor
 
-Персональна система моніторингу оголошень OLX.ua: збір → SQLite → React-таблиця зі статусами/нотатками/історією цін, експорт у Notion. Single-user, локальний запуск.
+> Єдине джерело інструкцій для AI-агентів (Claude Code, Codex, Antigravity тощо). Окремого CLAUDE.md немає.
+
+Персональна система моніторингу оголошень OLX.ua: збір → SQLite/libSQL → React-таблиця зі статусами/нотатками/історією цін, експорт у Notion. Single-user: локальний запуск або деплой Render + Turso за Google-OAuth «воротами».
 
 ## Стек (не відхилятися без явного запиту)
 
 - **Monorepo:** npm workspaces — `server/` + `web/`.
-- **Backend:** Node.js 20+, TypeScript, **Fastify**, **better-sqlite3** (синхронний), **cheerio** (парсинг), **node-cron** (опц.).
+- **Backend:** Node.js 20+, TypeScript, **Fastify**, **`@libsql/client`** (асинхронний; локально —
+  файл `server/data/olx.db`, у проді — Turso через `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`;
+  хелпери `dbAll`/`dbRun` у `server/src/db/db.ts`), **cheerio** (парсинг), **node-cron** (опц., ще не підключений).
+  better-sqlite3 більше НЕ використовується (міграція — `docs/plans/render-turso-phase0.md`).
+- **Turso-економія:** кожен зайвий рядок читання/запису коштує квоти — батчити запити, не
+  додавати індекси на часто оновлювані колонки (`docs/plans/turso-write-optimization.md`,
+  `docs/plans/inventar-db-calls.md`, скіл `turso-reads-playbook`).
+- **Auth:** Google OAuth single-user gate — `@fastify/jwt` + `@fastify/cookie` + `jose` (сервер,
+  `server/src/auth/*`), `@react-oauth/google` (фронт, `web/src/auth/*`). Allowlist email, без
+  таблиці users. Локально — `AUTH_DISABLED=true`. Деталі — `docs/google-oauth-setup.md`.
 - **Frontend:** React 18 + **Vite** + **TanStack Table v8** + **TanStack Query v5** + **Chakra UI v3** (`@chakra-ui/react`, провайдер/тостер/тултіп — сніпети у `web/src/components/ui/`).
+- **State management:** **Zustand** (узгоджена залежність `web/`, in-memory без persist) — для клієнтського UI-стану, який пересікає кілька компонентів без prop drilling. Стори: `web/src/stores/listingsUiStore.ts` (вкладка фільтра статусів), `web/src/stores/analysisWizardStore.ts` (прогрес AI-Flow).
 - **Іконки:** `react-icons/lu` (набір Lucide) — стандартний вибір для Chakra UI v3.
 - **Notion:** `@notionhq/client`.
+- **LLM-аналіз:** OpenRouter через звичайний `fetch` (без SDK); Excel-експорт — **`exceljs`**
+  (узгоджена нова залежність `server/`, обрано замість `xlsx`/SheetJS: той має
+  невиправлені high-severity CVE й перейшов на платну модель). ZIP-пакет ручного режиму
+  (промпт + чанки описів) — **`archiver`** (+ `@types/archiver`), друга узгоджена нова
+  залежність `server/`: у Node немає вбудованого ZIP-writer. `.env` — через
+  `process.loadEnvFile` (міні-лоадер у `server/src/analysis/config.ts`), без нової залежності.
+- **Логування:** **pino** (узгоджена залежність `server/` — той самий пакет, що всередині
+  Fastify; передається через `loggerInstance`) + `pino-pretty` (devDep). Єдиний сервіс —
+  `server/src/logger.ts`: `logError`/`logWarn(scope, stage, …)` → stdout + таблиця `app_logs`
+  (лише warn+error; info/debug у БД не пишуться — Turso). Кожен запис журналу несе `scope`
+  (модуль) і `stage` (крок data flow). Перегляд — діалог «Журнал» у хедері (`GET /api/logs`).
+  Деталі — `docs/plans/logging-system.md`.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
 ## Метод збору даних (КРИТИЧНО — підтверджено живими запитами 2026-06-10)
@@ -18,15 +42,65 @@
 - **Fallback №1: HTML** — `fetch` на URL пошуку `https://www.olx.ua/d/uk/list/q-<slug>/?...` → парсинг server-rendered HTML через cheerio (`server/src/scraper/olxFetcher.ts`). Scanner вмикає його автоматично при падінні GraphQL. БЕЗ браузера/Playwright. Деталі URL/заголовків — `docs/olx-api.md` §3.
 - Селектори HTML-fallback (тримати в одному файлі `server/src/scraper/selectors.ts`):
   - картка `[data-cy="l-card"]`, назва `h6, h4` (OLX мігрував заголовок з `h6` на `h4` — тримати обидва), ціна `[data-testid="ad-price"]`, лінк `a[href]` (відносний → префікс `https://www.olx.ua`), дата/локація `[data-testid="location-date"]`, порожньо `[data-cy="empty-state"]`.
-  - detail: характеристики `[data-cy="ad-params"] li`, опис `[data-testid="ad_description"]`, бізнес `[data-testid="trader-title"]`.
+  - detail: характеристики `[data-cy="ad-params"] li`, опис `[data-testid="ad_description"]`, продавець `[data-testid="user-profile-user-name"]` (бізнес — fallback `[data-testid="trader-title"]`).
 - Ввічливість (обидва методи, **звичайний скан**): 1–2 с затримка між запитами/сторінками, **≤3 запити** на скан.
 - **Глибокий скан** (ручна кнопка «Глибокий скан» в UI поруч зі «Сканувати», або CLI `--deep`) —
   одноразовий поглиблений прохід для нарощування покриття БД: батчі по 3 запити (як звичайний
-  скан), пауза **3–6 с** між батчами, ціль `min(50, ceil(visible_total_count / 40))` запитів
-  (`50` — абсолютний запобіжник). Рання зупинка, якщо сторінка повернула `< 40`/порожньо —
-  як і в звичайному скані. Прогрес (`requests_done`/`requests_total` у `scan_runs`) пишеться
-  через `FetchOptions.onProgress` і віддається `GET /api/searches/:id/scan-status` для
+  скан), пауза **3–6 с** між батчами, ціль `min(26, ceil(visible_total_count / 40))` запитів
+  (`26` = `MAX_PAGES` — межа вікна пагінації GraphQL OLX, `offset ≤ 1000`, верифіковано
+  2026-06-12; `50` лишається стартовою оцінкою `DEEP_SAFETY_CAP` до 1-го запиту, але кап
+  завжди `26`). Рання зупинка, якщо сторінка повернула `< 40`/порожньо — як і в звичайному
+  скані. Якщо GraphQL впирається у вікно пагінації посеред скану (`ListingError` на
+  `offset > 0` з уже зібраними даними) — скан завершується частковим успіхом
+  (`exhausted=false`, `warning` у `scan_runs.error`), HTML-fallback не запускається.
+  Прогрес (`requests_done`/`requests_total` у `scan_runs`) пишеться через
+  `FetchOptions.onProgress` і віддається `GET /api/searches/:id/scan-status` для
   поллінгу фронтендом. Деталі — `docs/olx-api.md` §2.9.
+- **Авто-розбиття по ціні (всередині глибокого скану):** якщо `visible_total_count > 1000`
+  (вікно пагінації), глибокий скан автоматично ділить ціновий діапазон адаптивною бісекцією
+  на під-діапазони ≤ вікна, сканує кожен і зливає через дедуп `olx_id`. Верхня межа без явної
+  `to` — `probeMaxPrice` (зондування ціною спадно, **самоперевіряється**: сортування за ціною
+  в OLX GraphQL не верифіковане live; якщо не спрацювало — звичайний deep + попередження).
+  Запобіжники: `MAX_BUCKETS=60`, `MAX_TOTAL_REQUESTS=400` (на варіант query; підняті з 40/200
+  для повного покриття дуже великих пошуків, `docs/plans/deep-scan-stop-and-history.md`),
+  паузи 3–6с між батчами/бакетами. Якщо ліміт усе одно впирається — `scanFromPlan` ставить
+  `warning` (capHit), скан `partial`. **Вікно покриття для split-скану НЕ запускається** (union
+  кількох діапазонів не відсортований глобально за refresh — `warning` робить скан `partial`).
+  Реалізація — `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`);
+  план/деталі — `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
+- **Двофазний глибокий скан — аналіз → звіт → підтверджений запуск (`docs/plans/two-phase-deep-scan.md`):**
+  окрема кнопка «Аналіз перед сканом» у UI (поруч зі «Глибокий скан», який лишається незмінним —
+  одноразовий безперервний прохід) запускає лише легку probe-фазу: `GraphqlOlxFetcher.analyzeSplit`
+  (root-запит + `probeMaxPrice` + бісекція на бакети) по основному `query` й кожному синоніму,
+  **без допагінації бакетів**. Результат — `ScanPlan` (DTO `server/src/types.ts`/`web/src/types/index.ts`):
+  розбивка по варіантах запиту, цінові бакети, ETA (`remainingRequests * DEEP_SCAN_SECONDS_PER_REQUEST`),
+  оцінка `estimatedNew` (вибіркова, з уже завантажених `page0`, проти БД через `selectKnownOlxIds`).
+  План кешується сервером у пам'яті (`Map<planToken, …>`, TTL 30 хв — `PLAN_TTL_MIN`/`SCAN_PLAN_TTL_MIN`,
+  `scanner.ts`) і повертається фронту лише як токен — підтверджений запуск зі звіту
+  (`POST /scan/run-plan` → `runDeepScanFromPlan`) **перевикористовує** вже зібрані межі
+  бакетів/`page0` через `GraphqlOlxFetcher.scanFromPlan`, без повторного зондування.
+  **Валідність звіту для UI — часова, не прив'язана до in-memory кешу** (`isAnalysisFresh` за
+  `scan_runs.finished_at`): звіт лишається запускним протягом TTL навіть після закриття діалогу
+  чи перезапуску сервера. Якщо швидкий план із кешу зник (TTL-edge/рестарт/повторний запуск), а
+  аналіз ще свіжий — `runDeepScanFromPlan` робить повний глибокий скан із повторним зондуванням
+  (`runScan deep`) замість помилки; зрозуміла помилка («План застарів — повторіть аналіз», без
+  500) лишається лише для справді протермінованого (> TTL) аналізу. Аналітичні прогони
+  (`scan_runs.kind='analyze'`) виключені з банера `last_scan`. Реалізація —
+  `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts`
+  (`analyzeScan`/`runDeepScanFromPlan`),
+  `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` (звіт, сигнатурний елемент —
+  «ціновий спектр»).
+- **Зупинка скану + прозорість дедупу + історія аналізу (`docs/plans/deep-scan-stop-and-history.md`):**
+  кнопка «Зупинити» у `ScanProgressPanel` (для всіх сканів) → `POST /scan/stop` →
+  `scanner.requestStopScan` ставить abort-прапорець (`Map<searchId>`), який фетчери опитують через
+  `FetchOptions.shouldAbort` перед кожним запитом. Зібране **все одно зберігається** (`upsert`),
+  скан стає `partial` (вікно покриття пропускається), `scan_runs.warning='Зупинено…'`,
+  `ScanResult.stopped=true`. **Прозорість дедупу:** `scan_runs.raw_found` (сирих до cross-variant
+  дедупу) + `ScanResult.rawFound`; UI показує «сирих / унікальних / злито дублів» — пояснює розрив
+  «N в аналізі → менше у скані» (аналіз сумує `visible_total_count` синонімів без зняття перетину).
+  **Історія:** `analyzeScan` зберігає повний `ScanPlan` у `scan_runs.scan_plan`; `GET /last-analysis`
+  (+`planValid` через `isPlanCached`) → фронт показує останній звіт при повторному заході в «Аналіз
+  перед сканом» із кнопкою «Зробити новий аналіз».
 - Усі стратегії — за інтерфейсом `OlxFetcher` (`server/src/types.ts`, `fetchSearch(search, options?: FetchOptions)`);
   подальші fallback (`__NEXT_DATA__` → headed Playwright) — лише за рішенням людини.
 - REST `api/v1/offers/` існує (дзеркало GraphQL, видно в `links` відповіді) — використовуємо GraphQL-варіант.
@@ -38,18 +112,105 @@
 
 Ключові інваріанти:
 - `listings.olx_id` UNIQUE — ключ дедуплікації (upsert по ньому).
-- `status` ∈ `new|interested|contacted|disabled` (CHECK у схемі).
+- `status` ∈ `new|interested|contacted|rejected|disabled` (CHECK у схемі); `rejected` — лише ручний статус («не цікаво»).
 - `status_source` ∈ `auto|manual`.
+- `miss_count` — лічильник послідовних сканів без цього оголошення у вікні покриття (механіка — нижче).
 - `params` — сирий JSON (характеристики різняться між категоріями; колонки UI динамічні).
 
 ## Бізнес-логіка (інваріанти, не порушувати)
 
-- **Upsert:** новий `olx_id` → insert (`status='new'`). Існуючий → update полів + `last_seen_at`; якщо ціна змінилась — рядок у `price_history`.
-- **Auto-disable:** після скану listings цього search, відсутні у свіжій видачі **2 скани поспіль** → `status='disabled', status_source='auto'`. Буфер у 2 скани обовʼязковий (захист від збою API).
-- **Ручний override:** якщо `status_source='manual'` — auto-логіка НЕ перетирає статус.
-- **Auto-reactivate:** зникле й знову зʼявлене (якщо не manual-disabled) → назад у `new`.
-- **filtered_out:** локальні range-правила ставлять прапорець, НЕ видаляють рядок.
+- **Upsert:** новий `olx_id` → insert (`status='new'`, окрім миттєвого `olx_status`-disable нижче). Існуючий → update полів + `last_seen_at`; якщо ціна змінилась — рядок у `price_history`.
+- **Auto-disable — вікно покриття (coverage window):** працює на осі **`last_refresh_at`** (дата підняття; НЕ `posted_at` — «підняті» старі оголошення йдуть угорі видачі й розтягнули б вікно на роки: інцидент 2026-06-12, 395 хибних disable, `docs/plans/coverage-window-fix.md`). Усі GraphQL-запити збору передають `sort_by=created_at:desc` (фактичний порядок видачі — `last_refresh_time DESC`, промо поза порядком; `docs/olx-api.md` §2.5). Після **повного** успішного **GraphQL**-скану (HTML-fallback і часткові скани з warning — напр. «window cap hit» — цю логіку НЕ запускають) — `windowFloor = lastRefreshAt` ОСТАННЬОГО отриманого оголошення (низ останньої сторінки; не `min()` — промо розтягнули б вікно), або `NULL`, якщо видача вичерпана (`exhausted`) — тоді вікно = вся видача; немає осі (порожня видача) → прохід пропускається. Кандидати на `miss_count += 1` — рядки цього `search_id` зі `status != 'disabled'`, відсутні в цьому скані, з `last_refresh_at >= windowFloor` (рядки з `last_refresh_at IS NULL` — «хвіст»/старі — не кандидати ніколи, їх перевіряє verify); присутнім — `miss_count = 0`. При `miss_count >= threshold` і (`status_source='auto'` АБО `status='rejected'`) → `status='disabled'`, `olx_status='inactive'` (щоб колонка «Активність» була чесною — інакше лишалося б застигле `'active'`) + позначка `auto-disabled: coverage miss_count=<threshold>` у `note` (кожен auto-disable має пояснення причини в нотатці). **`threshold` залежить від глибини скану:** глибокий скан бачить усю видачу → `1` (1 промах = достатній доказ смерті); звичайний (≤3 запити, лише верхівка) → `2` (буфер проти дрижання видачі); `scanner.ts` передає `options.deep ? 1 : 2`. Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner.ts`.
+- **`olx_status` миттєвий auto-disable:** якщо GraphQL повернув `olx_status ≠ 'active'` для рядка зі `status_source='auto'` АБО `status='rejected'` → миттєво `status='disabled'`, у `note` додається позначка `auto-disabled: olx_status=<значення>` (маркер для ручної перевірки тепер задокументований у `docs/olx-api.md` §3.4 — такі рядки потрапляють у verify-прохід і підтверджуються/спростовуються прямою пробою сторінки).
+- **Verify-прохід (реалізовано, A3):** ручний прохід (кнопка «Перевірити неактивні» / CLI `--verify`) по кандидатах ≤50 сторінок за прохід — P1 (давно не бачені: `last_seen_at` старше 3 днів і (`status_source='auto'` АБО `status='rejected'`), включно з `status='disabled'` для реактивації, `ORDER BY last_seen_at ASC`) + P2 (рядки без `description`, ще не в P1, `ORDER BY posted_at DESC`); той самий батч-патерн, що й глибокий скан. Маркер неактивності (верифіковано live 2026-06-12, `docs/olx-api.md` §3.4): HTTP `410`/`404` → `dead` (auto/rejected → `disabled`, `olx_status='removed'` — підтверджено пробою, позначка `auto-disabled: verify http=<код>` у `note`); `200` + `[data-testid="ad_description"]` → `alive` (оновлює `last_seen_at`/`miss_count=0`, auto-reactivate `disabled→new` з `olx_status='active'`, дозаповнює `description`/`seller_name` лише якщо в БД `NULL`); інше → `unknown` (без змін). Реалізація — `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `server/src/scanner.ts`.
+- **Ручний override:** будь-яка ручна зміна статусу (`PATCH /api/listings/:id`) → `status_source='manual'`, `miss_count=0`. Якщо `status_source='manual'` — auto-логіка (вікно покриття, `olx_status`, verify) НЕ перетирає статус, окрім переходу `rejected → disabled` (зникнення з OLX — факт сильніший за ручну оцінку).
+- **Ручний override «Активності» (`olx_status`):** `PATCH /api/listings/:id` приймає `olx_status` (`active`/`inactive`/`removed`/`null`) — інлайн-select «Активність» у таблиці. **Разова підказка БЕЗ захисту** (на відміну від `status`/`ai_relevant`): окремої колонки-джерела немає, тож наступний GraphQL-скан/verify, що побачить оголошення, перепише значення реальним від OLX (для `NULL`-рядків поза видачею ручне значення зберігається — скан їх не торкається). `docs/plans/honest-olx-status.md`.
+- **Auto-reactivate:** auto-disabled оголошення знову з'явилося в GraphQL-видачі з `olx_status='active'` (або verify підтвердив живе) → назад у `new`, `miss_count=0`. Manual-disabled НЕ реактивується автоматично.
+- **filtered_out:** `local_filters` (стоп-слова у title+description, числові діапазони по `params`) ставлять прапорець, НЕ видаляють рядок. Зміна `local_filters` (`PATCH /api/searches/:id`) → синхронний ретроактивний перерахунок `filtered_out` для всіх рядків пошуку.
 - **Notion-синк:** one-way (app → Notion), match по `olx_id`. Двосторонній — поза скоупом.
+- **LLM-аналіз (мінуси/плюси, план `docs/plans/llm-analysis.md`):** аналіз описів через
+  4-етапний майстер (кнопка «AI» у хедері). **Ніколи не авто** — лише вручну за тригером
+  (жодного зі сканів/автооновлення/cron). Два рівноправні рушії: **авто** (OpenRouter,
+  `google/gemini-2.5-flash-lite` дефолт) і **повний ручний** (копіювання промпту → будь-який
+  безкоштовний чат → вставка відповіді → сервер парсить); ключ повністю опціональний.
+  Інваріанти:
+  - **Критерії — на рівні пошуку** (`searches.analysis_criteria`, JSON `{cons:[], pros:[]}`).
+    **Мінуси/плюси — на рівні оголошення** (`listings.cons`/`pros`, TEXT `• criterion\n• …`,
+    сумісно з ручним едітом `ProsConsCell`).
+  - **`evidence` (дослівний фрагмент) у БД НЕ зберігається.** LLM повертає `{criterion,
+    evidence}`; сервер верифікує `evidence` як підрядок опису (анти-галюцинація); у БД пише
+    лише масив `criterion`.
+  - **PII продавця в промпт не йде** (тільки `id/title/description/params`).
+  - Ключ OpenRouter — лише в `server/.env` (`OPENROUTER_API_KEY`), ніколи в код/git.
+  - Промпти — єдине джерело `server/src/analysis/prompts.ts` (спільне для авто й ручного).
+  - Зміна `title`/`description` після аналізу → `analysis_stale=1` (бейдж «застарілий
+    аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.
+  - Чанкування: авто — дрібні батчі (12), ручний ZIP-пакет — фіксовано 50 оголошень на файл
+    `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
+    `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, фронт —
+    `web/src/components/analysis/*`.
+- **Семантичний фільтр релевантності (план `docs/plans/semantic-relevance-filter.md`):** OLX шукає
+  й за `description` (через «АБО»), тож у видачу потрапляють чохли/запчастини/згадки. Окремий ручний
+  AI-крок (кнопка «AI Фільтр» у хедері) класифікує кожне оголошення за питанням «чи цей лот ПРОДАЄ
+  товар `<цільовий товар>`?» і ставить `listings.ai_relevant` (1=продає, 0=ні, NULL=не перевірено).
+  Інваріанти:
+  - **Цільовий товар — на рівні пошуку** (`searches.relevance_target`, порожній → `query`),
+    редагований у діалозі. Вердикт — на рівні оголошення (`ai_relevant`/`ai_relevant_reason`/
+    `ai_relevant_at`/`ai_relevant_source`).
+  - **Ніколи не авто** — лише вручну за кнопкою (не зі сканів/cron), як плюси/мінуси.
+  - **Ручний override** (бейдж у таблиці / `PATCH /api/listings/:id` з `ai_relevant`) ставить
+    `ai_relevant_source='manual'` і НЕ перетирається авто-прогоном (commit пропускає manual).
+  - **PII продавця в промпт не йде** (тільки `id/title/params/description`).
+  - **Евристичний пре-фільтр перед ШІ** (`prefilterCandidates`, ідея з Antigravity CLI): для
+    цілей «бренд + номер моделі» відсіює оголошення, де бренд і номер моделі НЕ поруч
+    (`RELEVANCE_PROXIMITY_WINDOW=4`; модель «5»/«5s», не «15»/«50») — у ШІ йдуть лише кандидати,
+    відсіяні одразу `relevant=false`. **Обережний:** ціль без номера моделі/бренду або «відкинуло
+    б усе» → всі до ШІ (краще false-positive у ШІ, ніж мовчазний false-negative). Відсіяні видно у
+    списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
+  - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
+    нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
+  - **Консистентність обсягу (єдиний селектор «Обсяг», `docs/plans/ai-scope-selector.md`):** усі три
+    етапи AI (фільтр релевантності, майстер «Плюси/Мінуси», AI Picks) використовують ОДИН спільний
+    селектор `web/src/components/analysis/ScopeSelector.tsx` із 4 завжди-видимими обсягами (`AiScope`
+    у `web/src/utils/aiScope.ts`): **all** = геть усі рядки пошуку (вкл. відфільтровані/нерелевантні);
+    **tab** = рівно те, що зараз показано в таблиці активної вкладки (`isListingVisible` — з шумовими
+    перемикачами); **selected** = позначені чекбоксами; **candidates** = «Найкращі кандидати»
+    (`isAiPickCandidate`). Лічильники/ID — `getScopeCounts`/`getScopeIds`; дефолт — `getDefaultScope`
+    (AI Picks → `candidates`, інакше selected→tab→all). Предикати видимості лишаються єдиним джерелом —
+    `web/src/utils/listingVisibility.ts` (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`),
+    спільний хук — `web/src/hooks/analysis/useAiScope.ts`. **Важливо:** «Весь пошук» тепер = ВСІ рядки
+    (раніше виключав нерелевантні/відфільтровані) — за рішенням користувача. Кандидати AI Picks
+    (`loadPickCandidates`) виключають `ai_relevant=0` (`ai_relevant IS NOT 0` — лишає 1 та NULL); коли
+    обсяг ≠ candidates, фронт шле `ids` обраного обсягу, і ендпойнти AI Picks
+    (`prompt`/`package.zip` — **POST**; `rank`/`import`) звужують пул цими `ids` (сортування за ціною
+    й ліміт лишаються).
+  - **Ручний ZIP** (для агентного CLI типу Antigravity зі слабкою моделлю): крім `prompt.txt` +
+    `descriptions/chunk-NNN.json` (лише кандидати після пре-фільтра) кладе готові `merge.py`/
+    `verify.py` (`server/src/analysis/relevance_merge.py`/`relevance_verify.py`). Промпт —
+    жорстка покрокова процедура (класифікуй чанк → `classifications/result-NNN.json` → `merge.py`
+    → `verify.py`): обробка по чанку обходить ліміт відповіді, заборона власних скриптів усуває
+    «brain»-файли. `POST /relevance/preview` дає UI розбивку total/candidates/autoRejected.
+    Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
+    `web/src/components/analysis/RelevanceFilterDialog.tsx`.
+- **Синоніми пошукового запиту (план `docs/plans/search-synonyms.md`):** на OLX той самий товар
+  часто шукають за різними словами («біговел»/«велобіг»). Один «Пошук» може мати список
+  синонімів `query` (`searches.query_synonyms`, JSON-масив), редагованих у модалі «Варіанти
+  пошуку» (відкривається з форми створення пошуку й з 3-dot меню існуючого). Інваріанти:
+  - **Скан — автоматично**, без окремої кнопки: `scanner.fetchAllQueries()` сканує основний
+    `query` + кожен синонім окремо (пауза 3–6с між варіантами, як батчі deep-скану), зливає
+    видачі по `olx_id` в один `search_id` (upsert уже дедуплікує глобально).
+  - **Вікно покриття (auto-disable) ЗАВЖДИ пропускається**, якщо синонімів >0 (`partial=true`,
+    як split-скан) — union кількох незалежних видач не відсортований глобально за
+    `last_refresh_at`, тож вісь вікна невалідна. Живість таких оголошень перевіряє verify-прохід.
+  - **Синоніми = alias-назви товару для AI-фільтра релевантності** (`getRelevanceAliases`) —
+    лот, що продає товар під будь-яким із синонімів, теж релевантний; пре-фільтр бренд+модель
+    рахує union токенів target+aliases (лише розширює коло кандидатів, ніколи не звужує).
+  - **Генерація** — окремі stateless-ендпойнти `POST /api/search-synonyms/prompt|generate|import`
+    (не прив'язані до `searchId` — працюють ще до збереження пошуку), той самий патерн
+    авто+ручний (ManualAssistant), що й критерії LLM-аналізу.
+  - Реалізація — `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`,
+    `server/src/analysis/{prompts,parse,relevance,repo}.ts`, фронт —
+    `web/src/components/SearchVariantsDialog.tsx`.
 
 ## Команди
 
@@ -61,12 +222,32 @@ npm run build
 npm run scan -- --search <id>   # CLI-скан без UI (для крону/дебагу)
 ```
 
+### Локальний запуск (перший раз)
+
+1. `npm install` (Node 20+).
+2. `cp server/.env.example server/.env` → мінімум `AUTH_DISABLED=true`, `AUTH_COOKIE_SECURE=false`;
+   `TURSO_DATABASE_URL` порожній → локальний файл `server/data/olx.db` (створюється сам).
+   `OPENROUTER_API_KEY` — опційно (авто-режим AI). `web/.env` локально не потрібен (Vite-проксі
+   веде `/api` на `:3001`).
+3. `npm run dev` → http://localhost:5173.
+
+**Міграції схеми:** `initDb()` лише виконує `schema.sql` (`CREATE TABLE IF NOT EXISTS`) — нові
+колонки в УЖЕ наявну БД автоматично НЕ додаються. Додаючи колонку в `schema.sql`, для існуючих БД
+(локальна/Turso) потрібен явний `ALTER TABLE … ADD COLUMN` (ідемпотентно, через `PRAGMA table_info`).
+Симптом пропуску — `SQLITE_ERROR: no such column: …` у роутах.
+
+### Деплой
+
+Render (Web Service для API + Static Site для `web/`) + Turso — покроково у
+`docs/deploy-render-turso.md`; env фронта — `VITE_GOOGLE_CLIENT_ID`, `VITE_API_BASE`; сервера —
+`WEB_ORIGIN`, `GOOGLE_CLIENT_ID`, `ALLOWED_EMAILS`, `SESSION_SECRET`, `TURSO_*`.
+
 ## Конвенції
 
 - TypeScript strict. Без `any` у доменних типах (scraper/db/logic).
 - Доменні типи — `server/src/types.ts`, типи фронтенду — `web/src/types/index.ts`. Шарити між беком і фронтом через дублювання DTO (без складних build-зчеплень).
 - Помилки скрейпінгу не валять процес: лог у `scan_runs.error`, скан позначається failed, попередні дані лишаються.
-- Секрети (`NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID`) — лише в `.env`, ніколи в код/git. `server/data/*.db` — gitignored.
+- Секрети (`NOTION_TOKEN`, `NOTION_PARENT_PAGE_ID`, `TURSO_AUTH_TOKEN`, `SESSION_SECRET`, `OPENROUTER_API_KEY`) — лише в `.env`, ніколи в код/git. `server/data/*.db` — gitignored.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
 - Після реалізації змін пропонувати текст git commit повідомлення ангійською мовою (тільки текст).
 
@@ -75,17 +256,34 @@ npm run scan -- --search <id>   # CLI-скан без UI (для крону/де
 - `docs/architecture.md` — технічна архітектура, потік даних, модулі, стан API.
 - `docs/olx-api.md` — деталі запитів до OLX (URL/параметри/заголовки/селектори/fallback); оновлювати при будь-якій зміні розмітки чи параметрів OLX.
 - `docs/structure.md` — дерево файлів/папок і орієнтири «куди дивитись».
+- `docs/ai-flow.md` — короткий огляд AI-аналізу мінусів/плюсів (майстер, авто/ручний рушії, append/replace).
 - `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
+- `docs/deploy-render-turso.md` — деплой Render + Turso; `docs/google-oauth-setup.md` — налаштування Google OAuth.
+- `docs/plans/logging-system.md`, `docs/plans/scan-failure-recovery.md` — журнал помилок і відновлення часткових сканів.
 - `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
 - `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
+- `docs/plans/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
+- `docs/plans/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
+- `docs/plans/search-synonyms.md` — план синонімів пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) із прогресом.
+- `docs/plans/honest-olx-status.md` — чесна колонка «Активність» (`olx_status`): поріг disable deep=1/normal=2, перезапис `olx_status` death-детекторами (coverage→`inactive`, verify→`removed`), бейдж+свіжість у UI.
+- `docs/plans/ai-scope-selector.md` — єдиний селектор «Обсяг» (`AiScope`/`ScopeSelector`/`useAiScope`) для всіх 3 етапів AI: all/tab/selected/candidates; «Весь пошук» = геть усі рядки; AI Picks приймає `ids` обсягу.
+- Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 
 1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/graphql-migration.md`; міграція UI на Chakra UI v3 + Drawer налаштувань (тема, видимість колонок) + колонки «Опис»/«Продавець»/«Активність» (`olx_status`) і лічильник «Результатів: N».
-2. Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри.
+2. ✅ **Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри + verify-прохід:**
+   реалізовано (`docs/plans/stage-2-statuses-and-filters.md`, `docs/plans/verify-pass.md`):
+   статуси/нотатки/bulk-дії, вікно покриття, `olx_status`-disable, локальні фільтри, панель
+   дій пошуку, автооновлення, verify-прохід (A3) для давно не бачених оголошень і
+   дозаповнення опису/продавця.
 3. price_history + спарклайни + MD-експорт для аналізу в Claude.
 4. Notion-експорт + node-cron + журнал scan_runs.
+
+> Поза чергою (за окремим запитом): ✅ **LLM-аналіз мінусів/плюсів** — майстер «AI» (OpenRouter
+> + повний ручний режим), `docs/plans/llm-analysis.md`. Критерії на рівні пошуку, мінуси/плюси
+> на рівні оголошення; ніколи не авто.
 
 ## Що питати перед дією
 

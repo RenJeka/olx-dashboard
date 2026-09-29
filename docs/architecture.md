@@ -3,7 +3,7 @@
 > Технічний огляд реалізації. Канон вимог і рішень — у [`olx-monitor-spec.md`](./olx-monitor-spec.md).
 > Деталі запитів до OLX (URL, параметри, заголовки, селектори) — у [`olx-api.md`](./olx-api.md).
 > Дерево файлів і призначення кожного модуля — у [`structure.md`](./structure.md).
-> Інваріанти й конвенції, обовʼязкові при змінах, — у [`../CLAUDE.md`](../CLAUDE.md).
+> Інваріанти й конвенції, обовʼязкові при змінах, — у [`../AGENTS.md`](../AGENTS.md).
 
 ## 1. Огляд
 
@@ -245,7 +245,7 @@ flowchart LR
 [`olx-monitor-spec.md` §5](./olx-monitor-spec.md)). Таблиці: `projects`, `searches`, `listings`,
 `price_history`, `scan_runs`.
 
-Ключові інваріанти (повний перелік — у [`../CLAUDE.md`](../CLAUDE.md)):
+Ключові інваріанти (повний перелік — у [`../AGENTS.md`](../AGENTS.md)):
 - `listings.olx_id` UNIQUE — ключ дедуплікації (upsert).
 - `status` ∈ `new|interested|contacted|rejected|disabled`; `status_source` ∈ `auto|manual`;
   `miss_count` — лічильник сканів поспіль без оголошення у вікні покриття.
