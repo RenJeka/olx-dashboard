@@ -2,9 +2,9 @@
 
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 >
-> **Для виконавця:** інваріанти — у [`../../CLAUDE.md`](../../CLAUDE.md) (цей план їх частково
+> **Для виконавця:** інваріанти — у [`AGENTS.md`](../../../AGENTS.md) (цей план їх частково
 > ЗМІНЮЄ — див. «Зміни канону» внизу; зміни узгоджені з користувачем 2026-06-11).
-> Деталі OLX-запитів — [`../olx-api.md`](../olx-api.md). Схема — `server/src/db/schema.sql`.
+> Деталі OLX-запитів — [`../olx-api.md`](../../olx-api.md). Схема — `server/src/db/schema.sql`.
 > Нічого не вигадуй поза цими файлами й цим планом; якщо чогось бракує — зупинись і спитай.
 
 ## Context
@@ -187,7 +187,7 @@ stateDiagram-v2
 - [x] `olx-api.md` §3.4: маркер неактивності задокументовано (410/404/200+`ad_description`,
   селектори опису/продавця, дата верифікації 2026-06-12).
 
-  > Реалізовано повністю за `docs/plans/verify-pass.md` (групи A–E). Кандидати: P1
+  > Реалізовано повністю за `docs/plans/old/verify-pass.md` (групи A–E). Кандидати: P1
   > (`last_seen_at` < 3 дні, `status_source='auto'` або `status='rejected'`, включно з
   > `disabled` для реактивації) + P2 (`description IS NULL`, ще не в P1) — повний обсяг,
   > рішення користувача 2026-06-12. UI: картка «Перевірити неактивні (N)» в
@@ -310,7 +310,7 @@ stateDiagram-v2
   Помилка (включно з fallback-позначкою) → toast type warning з суттю.
 - [x] Verify повертає окремий `VerifyResult {checked, alive, dead, unknown, reactivated,
   disabled_count, backfilled}` — НЕ через `ScanResult` (окремий ендпойнт/тип, A3,
-  `docs/plans/verify-pass.md`).
+  `docs/plans/old/verify-pass.md`).
 
   > Реалізовано (часткова B4 на момент написання — verify-логіка була за A3, тепер
   > реалізована повністю, див. нижче): новий `SearchActionPanel.tsx`, рендериться в
@@ -324,7 +324,7 @@ stateDiagram-v2
   > існуючий `useScanStatus()`-поллінг (як було для deep, тепер і для normal).
   > Toast після завершення — success з текстом за режимом (включає
   > `disabled_count` з оновленого `ScanResult`); помилка — toast type error.
-  > «Перевірити неактивні (N)» — після реалізації A3 (`docs/plans/verify-pass.md`)
+  > «Перевірити неактивні (N)» — після реалізації A3 (`docs/plans/old/verify-pass.md`)
   > картка активна: `N = stats.verify_candidates`, onClick → `useVerify()`, прогрес
   > через `useScanStatus`/`scanKind='verify'`, тост-підсумок «Перевірено N · живих N ·
   > мертвих N · реактивовано N · вимкнено N · дозаповнено N».
@@ -379,7 +379,7 @@ stateDiagram-v2
 - [ ] **Перевірити неактивні** — аналогічний діалог: «Буде відкрито до {N} сторінок
   давно не бачених оголошень (~{оцінка} хв). Мертві → disabled, живі → оновлення/
   реактивація. Продовжити?» + «Більше не питати» (`skipVerifyConfirm`).
-  _(Скасовано рішенням `docs/plans/verify-pass.md` D2 — дія без підтвердження, як
+  _(Скасовано рішенням `docs/plans/old/verify-pass.md` D2 — дія без підтвердження, як
   швидкий скан.)_
 - [x] Обидва діалоги переюзають один компонент `ConfirmActionDialog` (title, body,
   confirmLabel, skipKey).
@@ -391,7 +391,7 @@ stateDiagram-v2
   > `DEEP_SCAN_SECONDS_PER_REQUEST`), якщо не встановлено `skipDeepScanConfirm`;
   > підтвердження з «Більше не питати» зберігає прапорець через
   > `saveSkipDeepScanConfirm()`. Діалог «Перевірити неактивні» — свідомо НЕ
-  > реалізований: за рішенням `docs/plans/verify-pass.md` (D2) дія виконується без
+  > реалізований: за рішенням `docs/plans/old/verify-pass.md` (D2) дія виконується без
   > підтвердження (як швидкий скан), `skipVerifyConfirm` не додавався.
   > Перевірено: `tsc -b`, production `vite build`, dev-сервер boot — чисто. Повна
   > UI-перевірка (відкриття діалогів, бейдж, перемикач у Settings) — рекомендована
@@ -424,7 +424,7 @@ stateDiagram-v2
 
 ## Група C — Документація
 
-- [x] `CLAUDE.md` — «Зміни канону» (див. нижче) перенести в секцію інваріантів.
+- [x] `AGENTS.md` — «Зміни канону» (див. нижче) перенести в секцію інваріантів.
 - [x] `docs/olx-monitor-spec.md` §6 — нова діаграма статусів + вікно покриття + verify.
 - [x] `docs/architecture.md` — statusEngine/verifier/localFilters у таблиці модулів,
   нові ендпойнти, сценарій verify.
@@ -434,13 +434,13 @@ stateDiagram-v2
 
   > §3.4 тепер заповнено фактичним маркером (HTTP 410/404 → `dead`, 200 +
   > `[data-testid="ad_description"]` → `alive`; верифіковано live 2026-06-12, деталі —
-  > `docs/plans/verify-pass.md`). Решта пунктів — повністю виконано: CLAUDE.md
+  > `docs/plans/old/verify-pass.md`). Решта пунктів — повністю виконано: AGENTS.md
   > («Бізнес-логіка» переписана з усіма інваріантами Етапу 2), spec §6/§6.1-6.3/§7,
   > architecture.md (§3-7), structure.md (дерево + орієнтири).
 
-## Зміни канону (для перенесення в CLAUDE.md)
+## Зміни канону (для перенесення в AGENTS.md)
 
-> ✅ Перенесено в `CLAUDE.md` (розділи «Схема БД» та «Бізнес-логіка»).
+> ✅ Перенесено в `AGENTS.md` (розділи «Схема БД» та «Бізнес-логіка»).
 
 1. Статуси: `new|interested|contacted|rejected|disabled`; `rejected` — лише ручний.
 2. Auto-disable: **вікно покриття** (windowFloor по `posted_at` поточного скану) +

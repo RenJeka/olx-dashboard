@@ -53,7 +53,7 @@
 - [ ] Частина 1: підняти запобіжники, додати `raw_found`, tracking + UI прозорості дедупу.
 - [ ] Частина 2: abort-механізм, `POST /scan/stop`, кнопка «Зупинити», частковий персист.
 - [ ] Частина 3: колонка `scan_plan`, `GET /last-analysis`, показ останнього аналізу + «Новий аналіз».
-- [ ] Оновити `docs/architecture.md`, `docs/structure.md`, `CLAUDE.md`.
+- [ ] Оновити `docs/architecture.md`, `docs/structure.md`, `AGENTS.md`.
 - [ ] `npm run build` без помилок.
 
 ## Тест-кейси

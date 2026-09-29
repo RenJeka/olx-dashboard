@@ -47,7 +47,7 @@
 - [x] AI Picks клієнт: проброс `selectedIds`, scope-стан (дефолт `candidates`), `<ScopeSelector>`
 - [x] AI Picks API-клієнт: `ids` + prompt/package GET→POST
 - [x] Сервер: `loadPickCandidates(id, ids?)` + 4 ендпойнти
-- [x] Документація: CLAUDE.md (інваріант), architecture.md, structure.md, ai-flow.md
+- [x] Документація: AGENTS.md (інваріант), architecture.md, structure.md, ai-flow.md
 - [x] `npm run build` без помилок
 
 ## Test-cases

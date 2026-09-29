@@ -11,7 +11,7 @@
 > відповіді (`.temp/olx-response.json`, верифіковано 2026-06-10). `.temp/` —
 > gitignored, тому цей файл — постійна копія знань про доступні поля.
 >
-> Робочий query (`server/src/scraper/graphqlOlxFetcher.ts`, див.
+> Робочий query (`server/src/scraper/graphql/constants.ts`, див.
 > [`olx-api.md`](./olx-api.md) §2.4) запитує лише підмножину нижче — будь-яке
 > поле з цього каталогу можна додати в query за потреби (наприклад, для Етапу 2/3).
 >

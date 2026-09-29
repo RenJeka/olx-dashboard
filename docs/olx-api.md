@@ -8,7 +8,7 @@
 > Верифіковано живими запитами: **2026-06-10**; dataflow фронтенду OLX — **2026-06-11** (§2.10).
 >
 > Повʼязане: [`architecture.md`](./architecture.md), [`olx-monitor-spec.md`](./olx-monitor-spec.md) §4,
-> план міграції: [`plans/graphql-migration.md`](./plans/graphql-migration.md),
+> план міграції: [`plans/graphql-migration.md`](./plans/old/graphql-migration.md),
 > повний довідник полів відповіді: [`olx-graphql-fields-reference.md`](./olx-graphql-fields-reference.md).
 
 ---
@@ -150,7 +150,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
   **`last_refresh_time` DESC** (дата підняття/оновлення), НЕ за `created_time`: «підняті»
   старі оголошення йдуть угорі. Перші 2–3 позиції сторінки — промо поза порядком, далі
   строгий спуск. Тому вісь вікна покриття statusEngine — `last_refresh_at`
-  (`docs/plans/coverage-window-fix.md`).
+  (`docs/plans/old/coverage-window-fix.md`).
 
 Приклад повного body (верифікований; збережений у `.temp/graphql-test-body.json`):
 
@@ -236,7 +236,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 | `location.city.name` / `district.name` | `city` / `district` | |
 | `photos[0].link` | `photo_url` | замінити `{width}x{height}` → конкретний розмір, напр. `400x300` |
 | `business` | `seller_type` | `true`→`business`, `false`→`private` |
-| `category.id` / `category.type` | `category_id` / `category_type` | id категорії оголошення + слаг типу. Для фільтра «Категорії» (`docs/plans/category-counts-and-filter.md`): `category_id` дає локальні лічильники/фільтрацію; назви+ієрархію+OLX-лічильники бере facet (§2.11) |
+| `category.id` / `category.type` | `category_id` / `category_type` | id категорії оголошення + слаг типу. Для фільтра «Категорії» (`docs/plans/old/category-counts-and-filter.md`): `category_id` дає локальні лічильники/фільтрацію; назви+ієрархію+OLX-лічильники бере facet (§2.11) |
 | `params[]` (без price) | `params` | плаский JSON `{key: label}` |
 | `description` | `description` | HTML з `<br />`; на фронті рендериться як plain text |
 | `user.name` | `seller_name` | |
@@ -259,7 +259,7 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 кидаються ОДРАЗУ, без ретраю: інші 4xx (`400`/`404`), `errors[]` (схема), `ListingError`
 (невалідні параметри/вікно пагінації).
 
-Після вичерпання ретраїв — виняток; `scanner.ts` запише в `scan_runs.error` і (якщо
+Після вичерпання ретраїв — виняток; `scanner/` (`scanRunLifecycle.ts`) запише в `scan_runs.error` і (якщо
 доступний) спробує HTML-fallback. **Виняток посеред пагінації, коли дані вже частково
 зібрані**, тепер дає **частковий успіх** (як для `ListingError` — §2.9), а не повний
 fallback (див. нижче).
@@ -295,7 +295,7 @@ fallback (див. нижче).
 - **Частковий успіх при вікні пагінації**: якщо `ListingError` (вікно `offset ≤ 1000`)
   трапився на `offset > 0` і вже є зібрані оголошення — скан **не** падає і **не** йде
   у HTML-fallback; повертається частковий результат (`exhausted=false`, `warning:
-  "graphql window cap hit at offset=<N>"`), який `scanner.ts` пише у `scan_runs.error`
+  "graphql window cap hit at offset=<N>"`), який `scanner/` пише у `scan_runs.error`
   поряд із фактичною помилкою/fallback-нотою.
 - **Частковий успіх при транзієнтному збої (2026-06-30):** той самий принцип діє і для
   **кинутого** винятку (вичерпані ретраї §2.8 — мережа/429/5xx/не-JSON) посеред пагінації.
@@ -319,8 +319,8 @@ fallback (див. нижче).
 покрити всю видачу (~1040 верхніх оголошень — стеля). Глибокий скан тоді **автоматично**
 ділить ціновий діапазон на під-діапазони, кожен ≤ вікна, сканує кожен окремо й зливає в
 той самий пошук через дедуп `olxId` (`upsertListings`, `ON CONFLICT(olx_id)`). Реалізація —
-`graphqlOlxFetcher.ts`: `fetchSearchSplit` (оркестратор), `fetchPage` (один POST),
-`probeMaxPrice` (зондування верхньої межі). План — `docs/plans/price-range-split.md`.
+`scraper/graphql/split.ts`: `fetchSearchSplit` (оркестратор), `fetchPage` (один POST),
+`probeMaxPrice` (зондування верхньої межі). План — `docs/plans/old/price-range-split.md`.
 
 - **Тригер**: всередині наявної кнопки «Глибокий скан» (окремої кнопки немає). Скан робить
   один зондувальний запит кореня; якщо `visible_total_count ≤ SPLIT_THRESHOLD (1000)` —
@@ -353,7 +353,7 @@ fallback (див. нижче).
 - Результат містить `bucketsUsed` (кількість листів-бакетів; `>1` — було розбиття) у
   `FetchSearchResult`/`ScanResult` (для toast/звіту).
 
-#### Двофазний deep-скан — аналіз → звіт → підтверджений запуск (`docs/plans/two-phase-deep-scan.md`)
+#### Двофазний deep-скан — аналіз → звіт → підтверджений запуск (`docs/plans/old/two-phase-deep-scan.md`)
 
 Усе вище (root-зондування → `probeMaxPrice` → бісекція → допагінація бакетів) виконує
 **швидкий** «Глибокий скан» одним непереривним проходом. Окрема дія «Аналіз перед сканом»
@@ -444,7 +444,7 @@ laquesis (A/B-тести olxcdn.com).
 
 ### 2.11 Дерево категорій (facet метаданих пошуку) — верифіковано live 2026-06-23
 
-Для фільтра «Категорії» (`docs/plans/category-counts-and-filter.md`) дерево категорій із
+Для фільтра «Категорії» (`docs/plans/old/category-counts-and-filter.md`) дерево категорій із
 **назвами + ієрархією + лічильниками** тягнеться ОДНИМ запитом:
 
 ```
@@ -460,7 +460,7 @@ GET https://www.olx.ua/api/v1/offers/metadata/search/?query=<q>&facets=[{"field"
 
 Числовий `id` збігається з per-listing `category.id` (§2.7) — facet годиться як джерело назв для
 нашого `listings.category_id`. Реалізація — `server/src/scraper/olxCategories.ts`
-(`fetchCategoryOptions`), тягнеться `scanner.ts` після успішного скану й кешується в
+(`fetchCategoryOptions`), тягнеться `scanner/scanFinalize.ts` після успішного скану й кешується в
 `searches.category_facet`.
 
 **Що НЕ працює (перевірено live):** `…/api/v1/categories/` → deprecated / access denied;
@@ -523,7 +523,7 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 
 > Верифіковано живими запитами **2026-06-12** (4 проби з паузами 1.5 с, включно з 2
 > реальними зниклими оголошеннями). Реалізація — `server/src/scraper/verifier.ts`
-> (`probeListingPage`), `docs/plans/verify-pass.md`.
+> (`probeListingPage`), `docs/plans/old/verify-pass.md`.
 
 **Запит:**
 
@@ -606,7 +606,7 @@ DOM-селектори простіші й достатні).
 2. GraphQL віддає 200, але поля `null` — схему розширили/перейменували; онови query.
 3. HTML-fallback: картки є, поля порожні → звір селектори §3.2, онови `selectors.ts`.
 4. Карток в HTML нема взагалі → перевір `__NEXT_DATA__` (§4.1).
-5. Після фіксу — онови ЦЕЙ файл (журнал §6) і `CLAUDE.md`, якщо змінився канон.
+5. Після фіксу — онови ЦЕЙ файл (журнал §6) і `AGENTS.md`, якщо змінився канон.
 
 > Як зняти свіжий дамп: DevTools → Network → фільтр `graphql` → пошук на сайті →
 > Copy as cURL / Copy request payload. ⚠️ Дампи містять живі кукі сесії — зберігати
@@ -623,8 +623,8 @@ DOM-селектори простіші й достатні).
 | 2026-06-10 | Підтверджено: introspection (`__schema`) на `/apigateway/graphql` вимкнено (`GRAPHQL_VALIDATION_FAILED`) | каталог полів зібрано вручну з live-дампів — `olx-graphql-fields-reference.md` |
 | 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
 | 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |
-| 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |
-| 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/verify-pass.md` |
-| 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/coverage-window-fix.md` |
+| 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/old/graphql-offset-window.md` |
+| 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/old/verify-pass.md` |
+| 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/old/coverage-window-fix.md` |
 | 2026-06-30 | Глибокий скан після «Аналізу перед скануванням» падав із оманливою HTML-помилкою «Карток не знайдено… рендериться через JS». Наживо підтверджено: GraphQL і HTML працюють (200, 50 карток; `__NEXT_DATA__` зник, але `[data-cy="l-card"]` є). Реальна причина — ОДИН транзієнтний GraphQL-збій (429/5xx/не-JSON) посеред пагінації валив увесь скан (`fetchPage` без ретраю), а `runDeepScanFromPlan` ковтав причину GraphQL (inline HTML-fallback без try/catch) | ретрай транзієнтних збоїв у `client.fetchPage` (3 спроби, бекоф; детерміновані 4xx/схема/ListingError — без ретраю); об'єднана помилка `graphql failed:…; html fallback failed:…` у `runDeepScanFromPlan`; частковий успіх при транзієнтному винятку посеред пагінації (`fetchSearch`/`scanSingleBucket`) замість обвалу — §2.8/§2.9 |
-| 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/price-range-split.md`, §2.9 |
+| 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/old/price-range-split.md`, §2.9 |

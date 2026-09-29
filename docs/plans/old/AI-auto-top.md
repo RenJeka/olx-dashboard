@@ -283,7 +283,7 @@ columnHelper.accessor('ai_rank', {
 | `web/src/utils/storage.ts` | `defaults.ai_rank = false` у `loadColumnVisibility` |
 | `web/src/components/analysis/AiPicksDialog.tsx` | новий (DialogRoot, idle/running/done) |
 | `web/src/components/analysis/AiRankCard.tsx` | новий (Box borderWidth, не Card.Root) |
-| `docs/plans/AI-auto-top.md` | цей файл |
+| `docs/plans/old/AI-auto-top.md` | цей файл |
 | `docs/architecture.md` | оновити після реалізації |
 | `docs/structure.md` | оновити після реалізації |
 

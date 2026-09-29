@@ -13,7 +13,7 @@
 акаунтах), щоб запускати віддалений CI/CD і перевіряти зміни на реальному сервері. Render free
 не має постійного диска, тож локальний файл `better-sqlite3` там не виживе. **Схвалена зміна
 стеку** (`docs/plans/render-and-turso-prompt.md`): замінити `better-sqlite3` на `@libsql/client`
-(Turso). libSQL — SQLite-сумісний, тож заборона PostgreSQL з CLAUDE.md не порушується.
+(Turso). libSQL — SQLite-сумісний, тож заборона PostgreSQL з AGENTS.md не порушується.
 
 **Змінюється ТІЛЬКИ механізм доступу до БД.** Бізнес-логіка (вікно покриття/`miss_count`,
 upsert по `olx_id`, статуси, auto-disable/reactivate), схема БД і метод збору з OLX —
@@ -109,7 +109,7 @@ Named-args (`@col`) лишаємо в SQL, передаємо обʼєкт у `a
 - [ ] **Звірка (зроблено):** усі колонки з `addColumnIfMissing` уже присутні в `schema.sql` →
   дозаповнювати схему НЕ треба. Якщо під час реалізації знайдеться розбіжність — правити
   `schema.sql`, НЕ повертати ALTER-логіку.
-- [ ] Перевірити, що `scripts/copyAssets.mjs` копіює `schema.sql` у `dist` (initDb читає з диску).
+- [ ] Перевірити, що `server/scripts/copyAssets.mjs` копіює `schema.sql` у `dist` (initDb читає з диску).
 
 ### Крок 4 — `index.ts`
 - [ ] `await initDb()` перед `app.listen`.

@@ -55,7 +55,7 @@ Self-healing: повернення у видачу живим → `normalizer.ts
 - [x] `web/src/components/table/columns.tsx`: мапінг `ACTIVITY_BADGE` (active/inactive/removed),
       тултіп зі свіжістю (`formatRelativeTime(last_seen_at)`), заголовок «Активність»,
       `TOGGLEABLE_COLUMNS` label «Активність». DTO вже містить `olx_status`/`last_seen_at`/`miss_count`.
-- [x] Документація: `CLAUDE.md` (інваріанти coverage/verify), `docs/olx-api.md` §3.4
+- [x] Документація: `AGENTS.md` (інваріанти coverage/verify), `docs/olx-api.md` §3.4
       (синтетичні значення), `docs/architecture.md` (потік olx_status), цей план.
 
 ## Доповнення: ручний override «Активності» (scope «Підказка»)

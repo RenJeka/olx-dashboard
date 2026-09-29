@@ -50,7 +50,7 @@ Frontend:
 - [x] `web/src/components/table/ListingsTableRow.tsx` — бейдж/іконка для `ai_relevant === 0`.
 
 Docs:
-- [x] `docs/architecture.md`, `docs/structure.md`, `CLAUDE.md` — новий модуль/роут/колонки/інваріант.
+- [x] `docs/architecture.md`, `docs/structure.md`, `AGENTS.md` — новий модуль/роут/колонки/інваріант.
 
 ## Евристичний пре-фільтр перед ШІ (додано, ідея з Antigravity CLI)
 

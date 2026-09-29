@@ -37,7 +37,7 @@
 
 ## Метод збору даних (КРИТИЧНО — підтверджено живими запитами 2026-06-10)
 
-- **Основний: GraphQL** — `POST https://www.olx.ua/apigateway/graphql`, query `ListingSearchQuery` → `clientCompatibleListings(searchParameters)`. Працює **без кукі, без auth, без токенів**. Дає ціну числом, ISO-дати, `params`, `business`. Усі деталі (заголовки, body, ключі `searchParameters`, приклади, маппінг полів у БД) — у `docs/olx-api.md` §2; реалізація — `server/src/scraper/graphqlOlxFetcher.ts`.
+- **Основний: GraphQL** — `POST https://www.olx.ua/apigateway/graphql`, query `ListingSearchQuery` → `clientCompatibleListings(searchParameters)`. Працює **без кукі, без auth, без токенів**. Дає ціну числом, ISO-дати, `params`, `business`. Усі деталі (заголовки, body, ключі `searchParameters`, приклади, маппінг полів у БД) — у `docs/olx-api.md` §2; реалізація — `server/src/scraper/graphql/` (`client.ts` — запит, `mapper.ts` — маппінг, `fetcher.ts` — `GraphqlOlxFetcher`).
 - Range-фільтри GraphQL: `searchParameters` елемент `{key: "filter_float_<name>:from|:to", value: "<число-рядком>"}` (верифіковано для `price`).
 - **Fallback №1: HTML** — `fetch` на URL пошуку `https://www.olx.ua/d/uk/list/q-<slug>/?...` → парсинг server-rendered HTML через cheerio (`server/src/scraper/olxFetcher.ts`). Scanner вмикає його автоматично при падінні GraphQL. БЕЗ браузера/Playwright. Деталі URL/заголовків — `docs/olx-api.md` §3.
 - Селектори HTML-fallback (тримати в одному файлі `server/src/scraper/selectors.ts`):
@@ -62,13 +62,13 @@
   `to` — `probeMaxPrice` (зондування ціною спадно, **самоперевіряється**: сортування за ціною
   в OLX GraphQL не верифіковане live; якщо не спрацювало — звичайний deep + попередження).
   Запобіжники: `MAX_BUCKETS=60`, `MAX_TOTAL_REQUESTS=400` (на варіант query; підняті з 40/200
-  для повного покриття дуже великих пошуків, `docs/plans/deep-scan-stop-and-history.md`),
+  для повного покриття дуже великих пошуків, `docs/plans/old/deep-scan-stop-and-history.md`),
   паузи 3–6с між батчами/бакетами. Якщо ліміт усе одно впирається — `scanFromPlan` ставить
   `warning` (capHit), скан `partial`. **Вікно покриття для split-скану НЕ запускається** (union
   кількох діапазонів не відсортований глобально за refresh — `warning` робить скан `partial`).
-  Реалізація — `graphqlOlxFetcher.ts` (`fetchSearchSplit`/`fetchPage`/`probeMaxPrice`);
-  план/деталі — `docs/plans/price-range-split.md`, `docs/olx-api.md` §2.9.
-- **Двофазний глибокий скан — аналіз → звіт → підтверджений запуск (`docs/plans/two-phase-deep-scan.md`):**
+  Реалізація — `server/src/scraper/graphql/split.ts` (`fetchSearchSplit`/`probeMaxPrice`), `client.ts` (`fetchPage`);
+  план/деталі — `docs/plans/old/price-range-split.md`, `docs/olx-api.md` §2.9.
+- **Двофазний глибокий скан — аналіз → звіт → підтверджений запуск (`docs/plans/old/two-phase-deep-scan.md`):**
   окрема кнопка «Аналіз перед сканом» у UI (поруч зі «Глибокий скан», який лишається незмінним —
   одноразовий безперервний прохід) запускає лише легку probe-фазу: `GraphqlOlxFetcher.analyzeSplit`
   (root-запит + `probeMaxPrice` + бісекція на бакети) по основному `query` й кожному синоніму,
@@ -76,7 +76,7 @@
   розбивка по варіантах запиту, цінові бакети, ETA (`remainingRequests * DEEP_SCAN_SECONDS_PER_REQUEST`),
   оцінка `estimatedNew` (вибіркова, з уже завантажених `page0`, проти БД через `selectKnownOlxIds`).
   План кешується сервером у пам'яті (`Map<planToken, …>`, TTL 30 хв — `PLAN_TTL_MIN`/`SCAN_PLAN_TTL_MIN`,
-  `scanner.ts`) і повертається фронту лише як токен — підтверджений запуск зі звіту
+  `server/src/scanner/analyzeScan.ts`) і повертається фронту лише як токен — підтверджений запуск зі звіту
   (`POST /scan/run-plan` → `runDeepScanFromPlan`) **перевикористовує** вже зібрані межі
   бакетів/`page0` через `GraphqlOlxFetcher.scanFromPlan`, без повторного зондування.
   **Валідність звіту для UI — часова, не прив'язана до in-memory кешу** (`isAnalysisFresh` за
@@ -86,11 +86,11 @@
   (`runScan deep`) замість помилки; зрозуміла помилка («План застарів — повторіть аналіз», без
   500) лишається лише для справді протермінованого (> TTL) аналізу. Аналітичні прогони
   (`scan_runs.kind='analyze'`) виключені з банера `last_scan`. Реалізація —
-  `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner.ts`
+  `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner/analyzeScan.ts`
   (`analyzeScan`/`runDeepScanFromPlan`),
   `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` (звіт, сигнатурний елемент —
   «ціновий спектр»).
-- **Зупинка скану + прозорість дедупу + історія аналізу (`docs/plans/deep-scan-stop-and-history.md`):**
+- **Зупинка скану + прозорість дедупу + історія аналізу (`docs/plans/old/deep-scan-stop-and-history.md`):**
   кнопка «Зупинити» у `ScanProgressPanel` (для всіх сканів) → `POST /scan/stop` →
   `scanner.requestStopScan` ставить abort-прапорець (`Map<searchId>`), який фетчери опитують через
   `FetchOptions.shouldAbort` перед кожним запитом. Зібране **все одно зберігається** (`upsert`),
@@ -120,15 +120,15 @@
 ## Бізнес-логіка (інваріанти, не порушувати)
 
 - **Upsert:** новий `olx_id` → insert (`status='new'`, окрім миттєвого `olx_status`-disable нижче). Існуючий → update полів + `last_seen_at`; якщо ціна змінилась — рядок у `price_history`.
-- **Auto-disable — вікно покриття (coverage window):** працює на осі **`last_refresh_at`** (дата підняття; НЕ `posted_at` — «підняті» старі оголошення йдуть угорі видачі й розтягнули б вікно на роки: інцидент 2026-06-12, 395 хибних disable, `docs/plans/coverage-window-fix.md`). Усі GraphQL-запити збору передають `sort_by=created_at:desc` (фактичний порядок видачі — `last_refresh_time DESC`, промо поза порядком; `docs/olx-api.md` §2.5). Після **повного** успішного **GraphQL**-скану (HTML-fallback і часткові скани з warning — напр. «window cap hit» — цю логіку НЕ запускають) — `windowFloor = lastRefreshAt` ОСТАННЬОГО отриманого оголошення (низ останньої сторінки; не `min()` — промо розтягнули б вікно), або `NULL`, якщо видача вичерпана (`exhausted`) — тоді вікно = вся видача; немає осі (порожня видача) → прохід пропускається. Кандидати на `miss_count += 1` — рядки цього `search_id` зі `status != 'disabled'`, відсутні в цьому скані, з `last_refresh_at >= windowFloor` (рядки з `last_refresh_at IS NULL` — «хвіст»/старі — не кандидати ніколи, їх перевіряє verify); присутнім — `miss_count = 0`. При `miss_count >= threshold` і (`status_source='auto'` АБО `status='rejected'`) → `status='disabled'`, `olx_status='inactive'` (щоб колонка «Активність» була чесною — інакше лишалося б застигле `'active'`) + позначка `auto-disabled: coverage miss_count=<threshold>` у `note` (кожен auto-disable має пояснення причини в нотатці). **`threshold` залежить від глибини скану:** глибокий скан бачить усю видачу → `1` (1 промах = достатній доказ смерті); звичайний (≤3 запити, лише верхівка) → `2` (буфер проти дрижання видачі); `scanner.ts` передає `options.deep ? 1 : 2`. Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner.ts`.
+- **Auto-disable — вікно покриття (coverage window):** працює на осі **`last_refresh_at`** (дата підняття; НЕ `posted_at` — «підняті» старі оголошення йдуть угорі видачі й розтягнули б вікно на роки: інцидент 2026-06-12, 395 хибних disable, `docs/plans/old/coverage-window-fix.md`). Усі GraphQL-запити збору передають `sort_by=created_at:desc` (фактичний порядок видачі — `last_refresh_time DESC`, промо поза порядком; `docs/olx-api.md` §2.5). Після **повного** успішного **GraphQL**-скану (HTML-fallback і часткові скани з warning — напр. «window cap hit» — цю логіку НЕ запускають) — `windowFloor = lastRefreshAt` ОСТАННЬОГО отриманого оголошення (низ останньої сторінки; не `min()` — промо розтягнули б вікно), або `NULL`, якщо видача вичерпана (`exhausted`) — тоді вікно = вся видача; немає осі (порожня видача) → прохід пропускається. Кандидати на `miss_count += 1` — рядки цього `search_id` зі `status != 'disabled'`, відсутні в цьому скані, з `last_refresh_at >= windowFloor` (рядки з `last_refresh_at IS NULL` — «хвіст»/старі — не кандидати ніколи, їх перевіряє verify); присутнім — `miss_count = 0`. При `miss_count >= threshold` і (`status_source='auto'` АБО `status='rejected'`) → `status='disabled'`, `olx_status='inactive'` (щоб колонка «Активність» була чесною — інакше лишалося б застигле `'active'`) + позначка `auto-disabled: coverage miss_count=<threshold>` у `note` (кожен auto-disable має пояснення причини в нотатці). **`threshold` залежить від глибини скану:** глибокий скан бачить усю видачу → `1` (1 промах = достатній доказ смерті); звичайний (≤3 запити, лише верхівка) → `2` (буфер проти дрижання видачі); `server/src/scanner/runScan.ts` передає `options.deep ? 1 : 2`. Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `server/src/scanner/scanFinalize.ts`.
 - **`olx_status` миттєвий auto-disable:** якщо GraphQL повернув `olx_status ≠ 'active'` для рядка зі `status_source='auto'` АБО `status='rejected'` → миттєво `status='disabled'`, у `note` додається позначка `auto-disabled: olx_status=<значення>` (маркер для ручної перевірки тепер задокументований у `docs/olx-api.md` §3.4 — такі рядки потрапляють у verify-прохід і підтверджуються/спростовуються прямою пробою сторінки).
-- **Verify-прохід (реалізовано, A3):** ручний прохід (кнопка «Перевірити неактивні» / CLI `--verify`) по кандидатах ≤50 сторінок за прохід — P1 (давно не бачені: `last_seen_at` старше 3 днів і (`status_source='auto'` АБО `status='rejected'`), включно з `status='disabled'` для реактивації, `ORDER BY last_seen_at ASC`) + P2 (рядки без `description`, ще не в P1, `ORDER BY posted_at DESC`); той самий батч-патерн, що й глибокий скан. Маркер неактивності (верифіковано live 2026-06-12, `docs/olx-api.md` §3.4): HTTP `410`/`404` → `dead` (auto/rejected → `disabled`, `olx_status='removed'` — підтверджено пробою, позначка `auto-disabled: verify http=<код>` у `note`); `200` + `[data-testid="ad_description"]` → `alive` (оновлює `last_seen_at`/`miss_count=0`, auto-reactivate `disabled→new` з `olx_status='active'`, дозаповнює `description`/`seller_name` лише якщо в БД `NULL`); інше → `unknown` (без змін). Реалізація — `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `server/src/scanner.ts`.
+- **Verify-прохід (реалізовано, A3):** ручний прохід (кнопка «Перевірити неактивні» / CLI `--verify`) по кандидатах ≤50 сторінок за прохід — P1 (давно не бачені: `last_seen_at` старше 3 днів і (`status_source='auto'` АБО `status='rejected'`), включно з `status='disabled'` для реактивації, `ORDER BY last_seen_at ASC`) + P2 (рядки без `description`, ще не в P1, `ORDER BY posted_at DESC`); той самий батч-патерн, що й глибокий скан. Маркер неактивності (верифіковано live 2026-06-12, `docs/olx-api.md` §3.4): HTTP `410`/`404` → `dead` (auto/rejected → `disabled`, `olx_status='removed'` — підтверджено пробою, позначка `auto-disabled: verify http=<код>` у `note`); `200` + `[data-testid="ad_description"]` → `alive` (оновлює `last_seen_at`/`miss_count=0`, auto-reactivate `disabled→new` з `olx_status='active'`, дозаповнює `description`/`seller_name` лише якщо в БД `NULL`); інше → `unknown` (без змін). Реалізація — `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `server/src/scanner/verifyScan.ts`.
 - **Ручний override:** будь-яка ручна зміна статусу (`PATCH /api/listings/:id`) → `status_source='manual'`, `miss_count=0`. Якщо `status_source='manual'` — auto-логіка (вікно покриття, `olx_status`, verify) НЕ перетирає статус, окрім переходу `rejected → disabled` (зникнення з OLX — факт сильніший за ручну оцінку).
-- **Ручний override «Активності» (`olx_status`):** `PATCH /api/listings/:id` приймає `olx_status` (`active`/`inactive`/`removed`/`null`) — інлайн-select «Активність» у таблиці. **Разова підказка БЕЗ захисту** (на відміну від `status`/`ai_relevant`): окремої колонки-джерела немає, тож наступний GraphQL-скан/verify, що побачить оголошення, перепише значення реальним від OLX (для `NULL`-рядків поза видачею ручне значення зберігається — скан їх не торкається). `docs/plans/honest-olx-status.md`.
+- **Ручний override «Активності» (`olx_status`):** `PATCH /api/listings/:id` приймає `olx_status` (`active`/`inactive`/`removed`/`null`) — інлайн-select «Активність» у таблиці. **Разова підказка БЕЗ захисту** (на відміну від `status`/`ai_relevant`): окремої колонки-джерела немає, тож наступний GraphQL-скан/verify, що побачить оголошення, перепише значення реальним від OLX (для `NULL`-рядків поза видачею ручне значення зберігається — скан їх не торкається). `docs/plans/old/honest-olx-status.md`.
 - **Auto-reactivate:** auto-disabled оголошення знову з'явилося в GraphQL-видачі з `olx_status='active'` (або verify підтвердив живе) → назад у `new`, `miss_count=0`. Manual-disabled НЕ реактивується автоматично.
 - **filtered_out:** `local_filters` (стоп-слова у title+description, числові діапазони по `params`) ставлять прапорець, НЕ видаляють рядок. Зміна `local_filters` (`PATCH /api/searches/:id`) → синхронний ретроактивний перерахунок `filtered_out` для всіх рядків пошуку.
 - **Notion-синк:** one-way (app → Notion), match по `olx_id`. Двосторонній — поза скоупом.
-- **LLM-аналіз (мінуси/плюси, план `docs/plans/llm-analysis.md`):** аналіз описів через
+- **LLM-аналіз (мінуси/плюси, план `docs/plans/old/llm-analysis.md`):** аналіз описів через
   4-етапний майстер (кнопка «AI» у хедері). **Ніколи не авто** — лише вручну за тригером
   (жодного зі сканів/автооновлення/cron). Два рівноправні рушії: **авто** (OpenRouter,
   `google/gemini-2.5-flash-lite` дефолт) і **повний ручний** (копіювання промпту → будь-який
@@ -147,9 +147,9 @@
     аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.
   - Чанкування: авто — дрібні батчі (12), ручний ZIP-пакет — фіксовано 50 оголошень на файл
     `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
-    `server/src/routes/analysis.ts`, `server/src/export/xlsx.ts`, фронт —
+    `server/src/routes/analysis/`, `server/src/export/xlsx.ts`, фронт —
     `web/src/components/analysis/*`.
-- **Семантичний фільтр релевантності (план `docs/plans/semantic-relevance-filter.md`):** OLX шукає
+- **Семантичний фільтр релевантності (план `docs/plans/old/semantic-relevance-filter.md`):** OLX шукає
   й за `description` (через «АБО»), тож у видачу потрапляють чохли/запчастини/згадки. Окремий ручний
   AI-крок (кнопка «AI Фільтр» у хедері) класифікує кожне оголошення за питанням «чи цей лот ПРОДАЄ
   товар `<цільовий товар>`?» і ставить `listings.ai_relevant` (1=продає, 0=ні, NULL=не перевірено).
@@ -191,8 +191,8 @@
     → `verify.py`): обробка по чанку обходить ліміт відповіді, заборона власних скриптів усуває
     «brain»-файли. `POST /relevance/preview` дає UI розбивку total/candidates/autoRejected.
     Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
-    `web/src/components/analysis/RelevanceFilterDialog.tsx`.
-- **Синоніми пошукового запиту (план `docs/plans/search-synonyms.md`):** на OLX той самий товар
+    `web/src/components/analysis/relevance/RelevanceFilterDialog.tsx`.
+- **Синоніми пошукового запиту (план `docs/plans/old/search-synonyms.md`):** на OLX той самий товар
   часто шукають за різними словами («біговел»/«велобіг»). Один «Пошук» може мати список
   синонімів `query` (`searches.query_synonyms`, JSON-масив), редагованих у модалі «Варіанти
   пошуку» (відкривається з форми створення пошуку й з 3-dot меню існуючого). Інваріанти:
@@ -208,9 +208,9 @@
   - **Генерація** — окремі stateless-ендпойнти `POST /api/search-synonyms/prompt|generate|import`
     (не прив'язані до `searchId` — працюють ще до збереження пошуку), той самий патерн
     авто+ручний (ManualAssistant), що й критерії LLM-аналізу.
-  - Реалізація — `server/src/scanner.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`,
+  - Реалізація — `server/src/scanner/fetchOrchestrator.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`,
     `server/src/analysis/{prompts,parse,relevance,repo}.ts`, фронт —
-    `web/src/components/SearchVariantsDialog.tsx`.
+    `web/src/components/searches/SearchVariantsDialog.tsx`.
 
 ## Команди
 
@@ -220,6 +220,7 @@ npm run dev:server
 npm run dev:web
 npm run build
 npm run scan -- --search <id>   # CLI-скан без UI (для крону/дебагу)
+npm run docs:check              # перевірка посилань у документації (має бути 0 битих)
 ```
 
 ### Локальний запуск (перший раз)
@@ -260,21 +261,23 @@ Render (Web Service для API + Static Site для `web/`) + Turso — покр
 - `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
 - `docs/deploy-render-turso.md` — деплой Render + Turso; `docs/google-oauth-setup.md` — налаштування Google OAuth.
 - `docs/plans/logging-system.md`, `docs/plans/scan-failure-recovery.md` — журнал помилок і відновлення часткових сканів.
-- `docs/plans/initial-mvp.md` — план Етапу 1 із прогресом.
-- `docs/plans/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
-- `docs/plans/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
-- `docs/plans/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
-- `docs/plans/search-synonyms.md` — план синонімів пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) із прогресом.
-- `docs/plans/honest-olx-status.md` — чесна колонка «Активність» (`olx_status`): поріг disable deep=1/normal=2, перезапис `olx_status` death-детекторами (coverage→`inactive`, verify→`removed`), бейдж+свіжість у UI.
+- `docs/plans/old/initial-mvp.md` — план Етапу 1 із прогресом.
+- `docs/plans/old/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
+- `docs/plans/old/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
+- `docs/plans/old/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
+- `docs/plans/old/search-synonyms.md` — план синонімів пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) із прогресом.
+- `docs/plans/old/honest-olx-status.md` — чесна колонка «Активність» (`olx_status`): поріг disable deep=1/normal=2, перезапис `olx_status` death-детекторами (coverage→`inactive`, verify→`removed`), бейдж+свіжість у UI.
 - `docs/plans/ai-scope-selector.md` — єдиний селектор «Обсяг» (`AiScope`/`ScopeSelector`/`useAiScope`) для всіх 3 етапів AI: all/tab/selected/candidates; «Весь пошук» = геть усі рядки; AI Picks приймає `ids` обсягу.
 - Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
+- Після переміщення/перейменування файлів коду чи документів — `npm run docs:check` і виправити биті посилання
+  (виконані плани переносити в `docs/plans/old/`; шляхи до коду в них не переписуються — це історичний знімок).
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 
-1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + React-таблиця. Спільна логіка скану — `server/src/scanner.ts` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/graphql-migration.md`; міграція UI на Chakra UI v3 + Drawer налаштувань (тема, видимість колонок) + колонки «Опис»/«Продавець»/«Активність» (`olx_status`) і лічильник «Результатів: N».
+1. ✅ **MVP (зроблено):** OlxFetcher (HTML+cheerio) + schema + upsert + `POST /searches/:id/scan` + React-таблиця. Спільна логіка скану — `server/src/scanner/` (роут + CLI). Доповнення: міграція збору на GraphQL (`GraphqlOlxFetcher` основний, HTML — fallback) — див. `docs/plans/old/graphql-migration.md`; міграція UI на Chakra UI v3 + Drawer налаштувань (тема, видимість колонок) + колонки «Опис»/«Продавець»/«Активність» (`olx_status`) і лічильник «Результатів: N».
 2. ✅ **Статуси (ручні + auto-disable) + нотатки + інлайн-едіт + локальні range-фільтри + verify-прохід:**
-   реалізовано (`docs/plans/stage-2-statuses-and-filters.md`, `docs/plans/verify-pass.md`):
+   реалізовано (`docs/plans/old/stage-2-statuses-and-filters.md`, `docs/plans/old/verify-pass.md`):
    статуси/нотатки/bulk-дії, вікно покриття, `olx_status`-disable, локальні фільтри, панель
    дій пошуку, автооновлення, verify-прохід (A3) для давно не бачених оголошень і
    дозаповнення опису/продавця.
@@ -282,7 +285,7 @@ Render (Web Service для API + Static Site для `web/`) + Turso — покр
 4. Notion-експорт + node-cron + журнал scan_runs.
 
 > Поза чергою (за окремим запитом): ✅ **LLM-аналіз мінусів/плюсів** — майстер «AI» (OpenRouter
-> + повний ручний режим), `docs/plans/llm-analysis.md`. Критерії на рівні пошуку, мінуси/плюси
+> + повний ручний режим), `docs/plans/old/llm-analysis.md`. Критерії на рівні пошуку, мінуси/плюси
 > на рівні оголошення; ніколи не авто.
 
 ## Що питати перед дією

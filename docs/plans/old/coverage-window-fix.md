@@ -2,8 +2,8 @@
 
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 >
-> **Для виконавця:** деталі OLX — у [`../olx-api.md`](../olx-api.md) §2; інваріанти — у
-> [`../../CLAUDE.md`](../../CLAUDE.md) (цей план їх ЗМІНЮЄ — секція «Вікно покриття»).
+> **Для виконавця:** деталі OLX — у [`../olx-api.md`](../../olx-api.md) §2; інваріанти — у
+> [`AGENTS.md`](../../../AGENTS.md) (цей план їх ЗМІНЮЄ — секція «Вікно покриття»).
 > Нічого не вигадуй поза цими файлами; бракує інформації — зупинись і спитай.
 
 ## Context — що зламалося (діагностовано 2026-06-12)
@@ -52,7 +52,7 @@ coverage-disable отримує пояснення в `note` (прозоріст
 - `server/src/scraper/statusEngine.ts` — вікно по `last_refresh_at`, note-маркер при disable
 - `server/src/scanner.ts` — не запускати `applyScanStatuses` для часткових сканів
 - одноразовий SQL-скрипт відновлення (виконується вручну, не комітиться)
-- `CLAUDE.md`, `docs/olx-api.md` §2 + журнал §6, `docs/architecture.md`
+- `AGENTS.md`, `docs/olx-api.md` §2 + журнал §6, `docs/architecture.md`
 
 ## Група A — Збір: сортування + збереження refresh-дати
 
@@ -100,7 +100,7 @@ coverage-disable отримує пояснення в `note` (прозоріст
 - [x] **D1.** `docs/olx-api.md` §2: ключ `sort_by=created_at:desc` (працює; `order` —
   ігнорується; сортування фактично за `last_refresh_time DESC`, промо поза порядком) +
   рядок у журнал §6.
-- [x] **D2.** `CLAUDE.md`: інваріант «Auto-disable — вікно покриття» переписати: вісь —
+- [x] **D2.** `AGENTS.md`: інваріант «Auto-disable — вікно покриття» переписати: вісь —
   `last_refresh_at`, `windowFloor` = refresh останнього отриманого, скани передають
   `sort_by=created_at:desc`, часткові скани (warning) auto-disable НЕ запускають,
   note-маркер `auto-disabled: coverage miss_count=2`.

@@ -90,7 +90,7 @@ Signature-елемент — **«ціновий спектр»**: горизон
 - [x] `SearchActionPanel.tsx`: підключення діалогу-звіту.
 
 ### G. Документація
-- [x] Оновити `CLAUDE.md` (опис глибокого скану), `docs/architecture.md`,
+- [x] Оновити `AGENTS.md` (опис глибокого скану), `docs/architecture.md`,
   `docs/structure.md`, `docs/olx-api.md` §2.9.
 
 ## Test-cases (ручна перевірка користувачем)

@@ -74,7 +74,7 @@ flowchart LR
 
 **Усі деталі запиту/відповіді, таблиця ключів `searchParameters`, маппінг полів у БД —
 [`olx-api.md`](./olx-api.md) §2 (канон для реалізації).** Реалізація:
-`server/src/scraper/graphqlOlxFetcher.ts`.
+`server/src/scraper/graphql/`.
 
 Існує також REST-дзеркало `https://www.olx.ua/api/v1/offers?offset=&limit=&query=...`
 (видно в `links` GraphQL-відповіді) — підтверджено для olx.ua; використовуємо GraphQL-варіант.
@@ -247,14 +247,14 @@ stateDiagram-v2
 
 Працює **лише для повних GraphQL-сканів** (HTML-fallback і часткові скани з warning —
 напр. вікно пагінації — цю логіку НЕ запускають, лише оновлюють `last_seen_at`
-присутнім). Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner.ts`.
+присутнім). Реалізація — `server/src/scraper/statusEngine.ts`, викликається з `scanner/scanFinalize.ts`.
 
 Вісь вікна — **`last_refresh_at`** (дата підняття): запити збору передають
 `sort_by=created_at:desc`, але OLX фактично сортує видачу за `last_refresh_time DESC`
 (verified live 2026-06-12, `docs/olx-api.md` §2.5). `posted_at` (= `created_time`)
 для вікна НЕпридатний — «підняті» старі оголошення йдуть угорі видачі та розтягують
 вікно на роки (інцидент 2026-06-12: 395 хибних disable —
-`docs/plans/coverage-window-fix.md`).
+`docs/plans/old/coverage-window-fix.md`).
 
 Після повного успішного скану (normal або deep):
 1. `windowFloor = lastRefreshAt` **останнього** отриманого оголошення (низ останньої
@@ -282,7 +282,7 @@ stateDiagram-v2
 п. 6.3). Auto-reactivate: якщо
 auto-disabled рядок знову прийшов з `olx_status='active'` → `status='new'`, `miss_count=0`.
 
-### 6.3 Verify-прохід (реалізовано, A3 — `docs/plans/verify-pass.md`)
+### 6.3 Verify-прохід (реалізовано, A3 — `docs/plans/old/verify-pass.md`)
 
 - Тригер: кнопка «Перевірити неактивні (N)» у панелі дій пошуку + CLI `--verify`.
 - Кандидати (разом ≤ **50** за прохід): P1 — `last_seen_at < datetime('now','-3 days')`
@@ -355,7 +355,7 @@ auto-disabled рядок знову прийшов з `olx_status='active'` → 
 
 ```
 olx-monitor/
-├── CLAUDE.md
+├── AGENTS.md
 ├── package.json              # workspaces: server, web
 ├── server/
 │   ├── src/

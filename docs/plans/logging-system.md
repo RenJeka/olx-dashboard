@@ -53,7 +53,7 @@
   (probe unknown), `analysis/openrouter.ts` (невдалі спроби).
 - Web: `web/src/types/core.ts` (+`AppLogEntry`), `web/src/api/logs.ts` (**новий**),
   `web/src/components/LogsDialog.tsx` (**новий**), `web/src/components/Header.tsx` (кнопка).
-- Документація: `docs/architecture.md`, `docs/structure.md`, `CLAUDE.md` (стек: pino).
+- Документація: `docs/architecture.md`, `docs/structure.md`, `AGENTS.md` (стек: pino).
 
 ## Кроки
 
@@ -64,7 +64,7 @@
 - [x] `routes/logs.ts`: GET (фільтри) + DELETE.
 - [x] Інструментація точок скану/скрейпера/аналізу (scope/stage).
 - [x] Web: тип + api-хук + LogsDialog + кнопка в Header.
-- [x] Оновити docs/architecture.md, docs/structure.md, CLAUDE.md.
+- [x] Оновити docs/architecture.md, docs/structure.md, AGENTS.md.
 - [x] `tsc` server + web build — зелені; смоук logger/retention на файловій БД.
 
 ## Test-cases (ручні)

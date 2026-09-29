@@ -2,8 +2,8 @@
 
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 >
-> **Для виконавця:** деталі OLX — у [`../olx-api.md`](../olx-api.md) (§3 — HTML, §3.4 — маркер
-> неактивності); інваріанти — у [`../../CLAUDE.md`](../../CLAUDE.md). Нічого не вигадуй поза
+> **Для виконавця:** деталі OLX — у [`../olx-api.md`](../../olx-api.md) (§3 — HTML, §3.4 — маркер
+> неактивності); інваріанти — у [`AGENTS.md`](../../../AGENTS.md). Нічого не вигадуй поза
 > цими файлами; бракує інформації — зупинись і спитай.
 
 ## Context
@@ -44,8 +44,8 @@
 - `server/src/scan.ts` — CLI-прапорець `--verify`
 - `web/src/types/index.ts`, `web/src/api/client.ts` — DTO + хук `useVerify()`
 - `web/src/components/SearchActionPanel.tsx` — активувати картку «Перевірити неактивні»
-- `docs/olx-api.md` §3.4 + журнал §6, `CLAUDE.md`, `docs/architecture.md`,
-  `docs/structure.md`, `docs/plans/stage-2-statuses-and-filters.md` (відмітка A3)
+- `docs/olx-api.md` §3.4 + журнал §6, `AGENTS.md`, `docs/architecture.md`,
+  `docs/structure.md`, `docs/plans/old/stage-2-statuses-and-filters.md` (відмітка A3)
 
 ## Група A — Проба сторінки (`scraper/verifier.ts`)
 
@@ -93,7 +93,7 @@
 - [x] **B3. Оновлення за вердиктом** (транзакція):
   - **dead** → якщо `status_source='auto' OR status='rejected'`: `status='disabled'`, до
     `note` дописати `auto-disabled: verify http=<410|404>` (патерн olx_status-disable).
-    Manual-статуси НЕ чіпати (інваріант CLAUDE.md).
+    Manual-статуси НЕ чіпати (інваріант AGENTS.md).
   - **alive** → `last_seen_at = now`, `miss_count = 0`; якщо було `disabled` +
     `status_source='auto'` → `status='new'` (auto-reactivate); **backfill**:
     `description`/`seller_name` записати, ЛИШЕ якщо в БД `NULL` (не перетирати
@@ -162,21 +162,21 @@
 - [x] **E1.** `docs/olx-api.md` §3.4: маркер неактивності (410/404/200+`ad_description`,
   селектор продавця; верифіковано live 2026-06-12, текстові маркери ненадійні); рядок у
   журнал §6.
-- [x] **E2.** `CLAUDE.md`: verify-прохід — реалізовано (прибрати «ще НЕ реалізовано» і
+- [x] **E2.** `AGENTS.md`: verify-прохід — реалізовано (прибрати «ще НЕ реалізовано» і
   «СТОП і питання користувачу»; коротко: маркер = HTTP 410/404, кандидати P1+P2, кап 50).
 - [x] **E3.** `docs/architecture.md` (модуль `verifier.ts`, `runVerify`, новий ендпойнт,
   потік) + `docs/structure.md` (нові файли/рядки таблиці «куди дивитись») + відмітка A3 у
-  `docs/plans/stage-2-statuses-and-filters.md`.
+  `docs/plans/old/stage-2-statuses-and-filters.md`.
 
   > Реалізовано: `docs/olx-api.md` §3.4 заповнено фактичним маркером (410/404 →
   > `dead`, 200 + `ad_description` → `alive`, селектори опису/продавця) + новий рядок
-  > у журналі §6 (2026-06-12). `CLAUDE.md` — verify-прохід позначено реалізованим
+  > у журналі §6 (2026-06-12). `AGENTS.md` — verify-прохід позначено реалізованим
   > (P1/P2-кандидати, batch-патерн, verdict→дія, посилання на `verifier.ts`/`runVerify`),
   > прибрано «ще НЕ реалізовано»/«СТОП і питання». `docs/architecture.md` —
   > verify-сценарій, модулі `verifier.ts`/`scanner.ts` (`runVerify`), ендпойнт
   > `POST /verify`, `/stats.verify_candidates`, фронтенд (`useVerify`,
   > `SearchActionPanel`). `docs/structure.md` — `verifier.ts` у дереві + рядок
-  > «куди дивитись». A3 у `docs/plans/stage-2-statuses-and-filters.md` позначено
+  > «куди дивитись». A3 у `docs/plans/old/stage-2-statuses-and-filters.md` позначено
   > `[x]` з описом фактичної реалізації.
 
 ## Test-cases (виконує користувач)

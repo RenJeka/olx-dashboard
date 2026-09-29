@@ -60,7 +60,7 @@ OLX Dashboard — single-user React + Chakra UI v3 застосунок, яки�
 
 ## Група 1 — Спільний хук + план-документ
 
-- [x] Створити `docs/plans/mobile-responsive-layout.md` (цей файл).
+- [x] Створити `docs/plans/old/mobile-responsive-layout.md` (цей файл).
 - [x] Створити `web/src/hooks/useIsMobile.ts`:
   ```ts
   export function useIsMobile(): boolean {

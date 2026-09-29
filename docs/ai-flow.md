@@ -74,13 +74,13 @@ reduce — теж судження, яке агент робить сам, чи�
 - **Крок 1 (Фільтр):** `server/src/analysis/relevance.ts` (`buildRelevancePrompt` /
   `buildRelevanceZipInstructions` / `prefilterCandidates`), скрипти `relevance_merge.py` /
   `relevance_verify.py`, роут `server/src/routes/relevance.ts`, план
-  `docs/plans/semantic-relevance-filter.md`.
+  `docs/plans/old/semantic-relevance-filter.md`.
 - **Крок 2 (Мінуси/плюси):** `server/src/analysis/prompts.ts` (`buildMatchingPrompt` /
   `buildManualZipInstructions`), рушій `analyze.py`, парс `parse.ts`, роути
-  `server/src/routes/analysis/*`, план `docs/plans/llm-analysis.md`.
+  `server/src/routes/analysis/*`, план `docs/plans/old/llm-analysis.md`.
 - **Крок 3 (Вибір):** `server/src/analysis/aiPicks.ts` (`buildPickPrompt` /
   `buildPickManualZipInstructions` / `parsePickResponse`), роут `server/src/routes/aiPicks.ts`,
-  план `docs/plans/AI-auto-top.md`.
+  план `docs/plans/old/AI-auto-top.md`.
 
 ## Майстер «Мінуси/плюси» (крок 2) — 4 кроки UI
 

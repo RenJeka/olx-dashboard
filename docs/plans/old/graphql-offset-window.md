@@ -2,8 +2,8 @@
 
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 >
-> **Для виконавця:** деталі GraphQL — у [`../olx-api.md`](../olx-api.md) §2; інваріанти —
-> у [`../../CLAUDE.md`](../../CLAUDE.md). Нічого не вигадуй поза цими файлами; бракує
+> **Для виконавця:** деталі GraphQL — у [`../olx-api.md`](../../olx-api.md) §2; інваріанти —
+> у [`AGENTS.md`](../../../AGENTS.md). Нічого не вигадуй поза цими файлами; бракує
 > інформації — зупинись і спитай.
 
 ## Context
@@ -43,7 +43,7 @@
 - `server/src/scanner.ts` — об'єднання `warning` у `scan_runs.error`
 - `server/src/migratePostedAt.ts` — **новий**: одноразова міграція наявних рядків
 - `server/package.json` + кореневий `package.json` — npm-скрипт міграції
-- `docs/olx-api.md`, `CLAUDE.md`, `docs/architecture.md`, `docs/structure.md` — документація
+- `docs/olx-api.md`, `AGENTS.md`, `docs/architecture.md`, `docs/structure.md` — документація
 
 ## Група A — Вікно пагінації GraphQL (`graphqlOlxFetcher.ts`)
 
@@ -97,7 +97,7 @@
 - [x] **C1.** `docs/olx-api.md` §2.9: задокументувати ліміт `offset ≤ 1000` (верифіковано
   2026-06-12: 1000 OK, 1040 → 400 «Data validation error occurred»); ціль глибокого скану
   → `min(26, ceil(visible_total_count / 40))`; запис у журнал §6.
-- [x] **C2.** `CLAUDE.md`: у розділі «Глибокий скан» ціль → `min(26, ceil(visible_total_count
+- [x] **C2.** `AGENTS.md`: у розділі «Глибокий скан» ціль → `min(26, ceil(visible_total_count
   / 40))` (26 = межа вікна пагінації OLX, верифіковано 2026-06-12); прибрати/уточнити
   «50 — абсолютний запобіжник» (DEEP_SAFETY_CAP лишається як стартова оцінка до 1-го
   запиту, але кап тепер 26).

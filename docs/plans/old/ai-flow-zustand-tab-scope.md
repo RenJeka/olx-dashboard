@@ -3,7 +3,7 @@
 ## Context
 
 Користувач просить три зміни в майстрі AI-аналізу (`AnalysisWizardDialog`) і прямо обрав
-**Zustand** як state-manager (раніше в проєкті його не було; CLAUDE.md забороняє Redux, але
+**Zustand** як state-manager (раніше в проєкті його не було; AGENTS.md забороняє Redux, але
 Zustand не згадано — додаємо за явним підтвердженням користувача) та **in-memory**
 збереження прогресу (переживає закриття/повторне відкриття модалки в межах сесії; губиться
 при повному refresh сторінки):
@@ -45,7 +45,7 @@ Zustand не згадано — додаємо за явним підтверд�
 ### 0. Залежність + документ плану (першими)
 - `npm install zustand -w web` (додати в `web/package.json`). Якщо реєстр недоступний у
   remote-середовищі — повідомити користувача (це блокер для всього підходу).
-- Створити цей файл як `docs/plans/ai-flow-zustand-tab-scope.md` (копія цього плану).
+- Створити цей файл як `docs/plans/old/ai-flow-zustand-tab-scope.md` (копія цього плану).
 
 ### 1. Нові Zustand-стори (`web/src/stores/`)
 - **`listingsUiStore.ts`** → `useListingsUiStore`: `statusFilter: ListingStatus | 'all'`
@@ -95,7 +95,7 @@ Zustand не згадано — додаємо за явним підтверд�
 - Прибрати функцію `resetForReopen()`.
 
 ### 4. Документація
-- **CLAUDE.md** — у секції «Стек» додати Zustand як узгоджений state-manager для клієнтського
+- **AGENTS.md** — у секції «Стек» додати Zustand як узгоджений state-manager для клієнтського
   UI-стану (вкладка фільтра + прогрес AI-Flow); зазначити in-memory (без persist).
 - **docs/architecture.md** — нова секція/нотатка про `web/src/stores/` (два стори, призначення),
   оновити опис `AnalysisWizardDialog` (scope=вкладка, вибір лише на кроці 1, збереження
