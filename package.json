@@ -14,7 +14,9 @@
     "build": "npm -w server run build && npm -w web run build",
     "scan": "npm -w server run scan --",
     "migrate:posted-at": "npm -w server run migrate:posted-at",
-    "docs:check": "node scripts/check-doc-links.mjs"
+    "docs:check": "node scripts/check-doc-links.mjs",
+    "typecheck": "npm -w server exec -- tsc -p tsconfig.json --noEmit && npm -w web exec -- tsc -b --noEmit",
+    "check": "npm run typecheck && npm run docs:check"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

@@ -9,13 +9,14 @@
 ## 1. Огляд
 
 Персональна single-user система моніторингу оголошень OLX.ua: збір через GraphQL API OLX
-(fallback — HTML) → SQLite → React-таблиця. Локальний запуск, без зовнішніх сервісів
-(Notion/cron — пізніші етапи).
+(fallback — HTML) → SQLite/libSQL → React-таблиця + AI-аналіз описів. Локальний запуск
+(файл БД) або деплой Render + Turso за Google-OAuth «воротами» (Notion/cron — Етап 4).
 
-Поточний стан: **реалізовано Етап 1 (MVP)**, включно з міграцією збору на GraphQL
+Поточний стан: **реалізовано Етапи 1–2** і низку фіч поза етапами (див.
+[`olx-monitor-spec.md` §3–4](./olx-monitor-spec.md)); історично Етап 1 включав міграцію збору на GraphQL
 (основний метод; HTML — fallback, [`plans/graphql-migration.md`](./plans/old/graphql-migration.md))
-і міграцією фронтенду на Chakra UI v3. Етапи 2–4 — у
-[`olx-monitor-spec.md` §12](./olx-monitor-spec.md).
+і міграцію фронтенду на Chakra UI v3. Етапи 3–4 — у
+[`olx-monitor-spec.md` §4](./olx-monitor-spec.md).
 
 ## 2. Стек
 
@@ -242,11 +243,10 @@ flowchart LR
 
 ## 5. Схема БД
 
-Канон — [`server/src/db/schema.sql`](../server/src/db/schema.sql) (детальний опис полів у
-[`olx-monitor-spec.md` §5](./olx-monitor-spec.md)). Таблиці: `projects`, `searches`, `listings`,
+Канон — [`server/src/db/schema.sql`](../server/src/db/schema.sql) (коментарі до полів — у самому файлі; доменні правила — [`business-rules.md`](./business-rules.md)). Таблиці: `projects`, `searches`, `listings`,
 `price_history`, `scan_runs`.
 
-Ключові інваріанти (повний перелік — у [`../AGENTS.md`](../AGENTS.md)):
+Ключові інваріанти (коротко — [`../AGENTS.md`](../AGENTS.md), механіка — [`business-rules.md`](./business-rules.md)):
 - `listings.olx_id` UNIQUE — ключ дедуплікації (upsert).
 - `status` ∈ `new|interested|contacted|rejected|disabled`; `status_source` ∈ `auto|manual`;
   `miss_count` — лічильник сканів поспіль без оголошення у вікні покриття.
@@ -270,9 +270,8 @@ flowchart LR
 - LLM-аналіз (план `plans/llm-analysis.md`): `searches.analysis_criteria` (JSON `{cons:[],
   pros:[]}` — обрані критерії пошуку); `listings.pros`/`cons` (масив criterion, TEXT
   `• …\n• …`), `analysis_at`/`analysis_source` (`api`|`import`)/`analysis_model`/
-  `analysis_stale`. Нові колонки додаються через `addColumnIfMissing` **після**
-  `migrateListingsTable()` (rebuild не переносить їх → інакше крах на старій v1-БД).
-  `evidence` у БД не зберігається. `normalizer` ставить `analysis_stale=1`, якщо
+  `analysis_stale`. Нові колонки для вже наявних БД — лише явним `ALTER TABLE … ADD COLUMN` (`initDb` виконує тільки
+  `schema.sql`, див. `AGENTS.md` → «Міграції схеми»). `evidence` у БД не зберігається. `normalizer` ставить `analysis_stale=1`, якщо
   `analysis_at` непорожній і title/опис змінились (бейдж «застарілий аналіз»).
 
 ## 6. REST API

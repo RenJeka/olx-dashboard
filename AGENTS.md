@@ -40,7 +40,7 @@
 
 **Дані й статуси:**
 - Канонічна схема — `server/src/db/schema.sql` (не дублювати в коді). `listings.olx_id` UNIQUE —
-  ключ дедуплікації; upsert по ньому; зміна ціни → рядок у `price_history`.
+  ключ дедуплікації; upsert по ньому. `price_history` (зміна ціни) — ⏳ Етап 3, кодом ще не пишеться.
 - `status` ∈ `new|interested|contacted|rejected|disabled`, `status_source` ∈ `auto|manual`.
 - **Ручне завжди сильніше за авто:** `status_source='manual'` не перетирається auto-логікою
   (виняток — `rejected → disabled`); manual-disabled не реактивується автоматично; ручні
@@ -71,6 +71,8 @@ npm run dev:server | dev:web
 npm run build                   # tsc server + tsc/vite web (перевірка типів)
 npm run scan -- --search <id>   # CLI-скан без UI (--deep, --verify)
 npm run docs:check              # биті посилання в документації (має бути 0)
+npm run typecheck               # tsc --noEmit для server і web
+npm run check                   # typecheck + docs:check — перед комітом
 ```
 
 **Перший запуск:** `npm install` → `cp server/.env.example server/.env` (мінімум
@@ -81,8 +83,9 @@ npm run docs:check              # биті посилання в докумен�
 колонки в наявну БД (локальну/Turso) **не додаються**; потрібен явний ідемпотентний
 `ALTER TABLE … ADD COLUMN`. Симптом пропуску — `SQLITE_ERROR: no such column`.
 
-**Тести:** автоматичних тестів поки немає; перевірка — `npm run build` (типи) + ручні test-cases
-із плану; UI/E2E — сабагент `playwright-tester` (лише за явним запитом).
+**Перевірка:** автоматичних тестів поки немає; мінімум — `npm run check`, далі smoke API / UI за
+`docs/development.md` (драбина перевірок, Definition of Done). UI/E2E — сабагент
+`playwright-tester`, лише за явним запитом.
 
 ## Конвенції
 
@@ -110,8 +113,9 @@ npm run docs:check              # биті посилання в докумен�
 | Як ми ходимо в OLX (GraphQL, HTML, пагінація, селектори), що робити, якщо OLX щось змінив? | [`docs/olx-api.md`](docs/olx-api.md) (§5 — чекліст) |
 | Які поля повертає GraphQL OLX? | [`docs/olx-graphql-fields-reference.md`](docs/olx-graphql-fields-reference.md) |
 | Як працюють AI-кроки (фільтр, мінуси/плюси, AI Вибір), рушії, обсяг, ZIP? | [`docs/ai-flow.md`](docs/ai-flow.md) |
+| Як вести задачу, чим перевіряти, коли «готово», як безпечно з OLX і БД? | [`docs/development.md`](docs/development.md) |
 | Кольори/токени UI (світла/темна тема)? | [`docs/styles.md`](docs/styles.md) |
-| Вихідні вимоги продукту, ризики, етапи? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
+| Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
 | Деплой / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
 | Що зараз у роботі / бекло? | [`docs/plans/`](docs/plans/) (активні плани), [`docs/plans/TODO`](docs/plans/TODO) |
 | Чому щось зроблено саме так (історія рішень)? | [`docs/plans/old/`](docs/plans/old/README.md) |

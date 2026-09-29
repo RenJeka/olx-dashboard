@@ -7,7 +7,7 @@
 
 ```
 olx-dashboard/
-├── package.json              # root workspace: скрипти dev/build/scan/migrate:posted-at/docs:check, deps: concurrently
+├── package.json              # root workspace: скрипти dev/build/scan/migrate:posted-at/docs:check/typecheck/check, deps: concurrently
 ├── package-lock.json
 ├── tsconfig.base.json        # спільні strict-опції TS (без module/moduleResolution)
 ├── .gitignore                # + server/data/*.db, *.db-shm, *.db-wal
@@ -17,9 +17,10 @@ olx-dashboard/
 │   └── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (docs/plans/old — лише лінки на доки)
 │
 ├── docs/
-│   ├── olx-monitor-spec.md           # канонічна специфікація (вимоги, схема, етапи)
+│   ├── olx-monitor-spec.md           # специфікація продукту: вимоги ✅/⏳, етапи, поза скоупом, ризики
 │   ├── architecture.md               # технічна архітектура (цей рівень опису)
 │   ├── olx-api.md                    # API OLX: GraphQL (основний) + HTML fallback
+│   ├── development.md                # процес: цикл задачі, драбина перевірок, DoD, робота з OLX/БД
 │   ├── business-rules.md             # доменна механіка: скани, вікно покриття, verify, override, синоніми
 │   ├── ai-flow.md                    # AI-кроки (фільтр, мінуси/плюси, AI Вибір) + детальні AI-інваріанти
 │   ├── styles.md                     # семантичні токени Chakra UI v3
