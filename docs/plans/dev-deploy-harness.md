@@ -34,7 +34,7 @@
 
 - `.github/workflows/ci.yml`, `.github/dependabot.yml` (нові)
 - `render.yaml` (новий), `.nvmrc` (новий), `package.json` (`engines`, `smoke`)
-- `scripts/smoke.mjs` (новий)
+- scripts/smoke.mjs (новий)
 - `docs/deploy-render-turso.md`, `docs/development.md`, `AGENTS.md` (команди, CI), `docs/structure.md`
 
 ## Кроки
