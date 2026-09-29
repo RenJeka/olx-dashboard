@@ -51,7 +51,7 @@ npm run scan -- --search <id>
      AI-аналіз» (дефолт `google/gemini-2.5-flash-lite`).
 
 `server/.env` ігнорується git (закомічено лише `.env.example`). Аналіз запускається **тільки
-вручну** (ніколи зі сканів/автооновлення). Деталі — `docs/plans/llm-analysis.md`.
+вручну** (ніколи зі сканів/автооновлення). Деталі — `docs/plans/old/llm-analysis.md`.
 
 ## Стан
 
@@ -66,10 +66,13 @@ npm run scan -- --search <id>
 
 - [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) — канонічна специфікація (вимоги, схема БД, етапи, ризики)
 - [`docs/architecture.md`](docs/architecture.md) — технічна архітектура та потік даних
+- [`docs/development.md`](docs/development.md) — процес розробки, драбина перевірок, Definition of Done
+- [`docs/business-rules.md`](docs/business-rules.md) — доменна механіка: скани, вікно покриття, verify, ручний override, синоніми
+- [`docs/ai-flow.md`](docs/ai-flow.md) — AI-кроки: фільтр релевантності, мінуси/плюси, AI Вибір
 - [`docs/olx-api.md`](docs/olx-api.md) — API OLX: GraphQL (основний метод) + HTML fallback (параметри, заголовки, приклади, dataflow фронтенду OLX)
 - [`docs/olx-graphql-fields-reference.md`](docs/olx-graphql-fields-reference.md) — довідник усіх полів GraphQL-відповіді OLX
 - [`docs/structure.md`](docs/structure.md) — структура файлів і папок
-- [`docs/plans/initial-mvp.md`](docs/plans/initial-mvp.md) — план Етапу 1 із прогресом
-- [`docs/plans/graphql-migration.md`](docs/plans/graphql-migration.md) — план міграції збору на GraphQL
+- [`docs/plans/old/initial-mvp.md`](docs/plans/old/initial-mvp.md) — план Етапу 1 із прогресом
+- [`docs/plans/old/graphql-migration.md`](docs/plans/old/graphql-migration.md) — план міграції збору на GraphQL
 - [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) — покрокове налаштування Google OAuth (Google Console, env-змінні, локал, Render)
 - [`AGENTS.md`](AGENTS.md) — інваріанти й конвенції (обовʼязкові при змінах)

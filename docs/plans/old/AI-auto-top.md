@@ -1,5 +1,7 @@
 # AI Вибір позицій — план реалізації
 
+> **Статус:** ✅ виконано (2026-06-19).
+
 ## Контекст
 
 Користувач уже має LLM-аналіз мінусів/плюсів для оголошень. Мета — додати окремий таб «AI Вибір», який автоматично відфільтровує оголошення **без мінусів**, сортує їх за ціною і відправляє на AI-ранжування через OpenRouter. AI читає описи/параметри/плюси і повертає впорядкований список із поясненнями (чому оголошення гарне або не ідеальне). Результат відображається як **картки з поясненнями** у діалозі та **нова колонка «AI Ранг»** у самій таблиці.
@@ -283,7 +285,7 @@ columnHelper.accessor('ai_rank', {
 | `web/src/utils/storage.ts` | `defaults.ai_rank = false` у `loadColumnVisibility` |
 | `web/src/components/analysis/AiPicksDialog.tsx` | новий (DialogRoot, idle/running/done) |
 | `web/src/components/analysis/AiRankCard.tsx` | новий (Box borderWidth, не Card.Root) |
-| `docs/plans/AI-auto-top.md` | цей файл |
+| `docs/plans/old/AI-auto-top.md` | цей файл |
 | `docs/architecture.md` | оновити після реалізації |
 | `docs/structure.md` | оновити після реалізації |
 

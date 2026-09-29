@@ -1,12 +1,12 @@
 > ⚠️ **Історичний документ.** Це промпт-скаффолд Етапу 1 (виконано 2026-06-10). Формулювання
-> про метод збору застаріли: актуальний канон — GraphQL-first (див. `CLAUDE.md` і
+> про метод збору застаріли: актуальний канон — GraphQL-first (див. `AGENTS.md` і
 > `docs/olx-api.md`). Не використовувати цей файл як інструкцію — лишено для історії
 > та чекпоінтів Етапів 2–4 внизу.
 
 ## Промпт (встав у Claude Code)
 
 ```
-Прочитай CLAUDE.md і olx-monitor-spec.md у корені — це канон. Не відхиляйся від стеку, методу збору, схеми БД та інваріантів, описаних там.
+Прочитай AGENTS.md і olx-monitor-spec.md у корені — це канон. Не відхиляйся від стеку, методу збору, схеми БД та інваріантів, описаних там.
 
 Збудуй ТІЛЬКИ Етап 1 (MVP). Не реалізовуй статуси-логіку, нотатки, price_history, Notion чи cron — це наступні етапи.
 
@@ -14,7 +14,7 @@
 1. Monorepo: npm workspaces (server/ + web/), корневий package.json зі скриптами dev / dev:server / dev:web / build / scan.
 2. server/src/db/schema.sql — рівно 4 таблиці зі специфікації. db.ts застосовує схему при старті (CREATE TABLE IF NOT EXISTS), better-sqlite3, файл server/data/olx.db.
 3. server/src/scraper/:
-   - selectors.ts — усі OLX-селектори в одному місці (з CLAUDE.md).
+   - selectors.ts — усі OLX-селектори в одному місці (з AGENTS.md).
    - olxFetcher.ts — реалізує interface OlxFetcher через fetch + cheerio. Будує URL пошуку з SearchConfig (query + api_filters + range у форматі search[filter_float_*:from/:to]). Обовʼязкові заголовки (UA/Referer/X-Client). Затримка 1–2с, ≤3 сторінки. Повертає RawListing[].
    - normalizer.ts — нормалізує ціну ("6 000 грн." → 6000 + currency), абсолютизує лінк, upsert по olx_id, оновлює last_seen_at. price_history поки НЕ чіпай (таблиця є, запис — Етап 3). filtered_out поки 0.
 4. server/src/routes/searches.ts — CRUD searches + POST /api/searches/:id/scan (виклик fetcher → normalizer → запис scan_run, повертає {found, new_count}). listings.ts — GET /api/searches/:id/listings.
@@ -38,7 +38,7 @@
 
 Коли MVP працює (бачиш оголошення в таблиці, повторний скан не дублює):
 
-- **Етап 2:** `Реалізуй Етап 2 зі спеки: статуси (ручні + auto-disable з буфером 2 скани + auto-reactivate, поважаючи status_source=manual), нотатки, інлайн-едіт через PATCH /api/listings/:id, локальні range-фільтри (filtered_out). Дотримуйся інваріантів у CLAUDE.md.`
+- **Етап 2:** `Реалізуй Етап 2 зі спеки: статуси (ручні + auto-disable з буфером 2 скани + auto-reactivate, поважаючи status_source=manual), нотатки, інлайн-едіт через PATCH /api/listings/:id, локальні range-фільтри (filtered_out). Дотримуйся інваріантів у AGENTS.md.`
 - **Етап 3:** `Реалізуй Етап 3: запис price_history при зміні ціни в normalizer, GET /api/listings/:id/price-history, спарклайн у таблиці, GET /api/listings/:id/export/markdown (+bulk) для аналізу в Claude.`
 - **Етап 4:** `Реалізуй Етап 4: Notion-експорт (@notionhq/client, one-way, match по olx_id), node-cron (off за замовчуванням, per-search cron_enabled), журнал scan_runs у UI.`
 

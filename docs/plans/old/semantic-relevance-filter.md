@@ -1,5 +1,7 @@
 # План: Семантичний фільтр релевантності (AI «чи продає лот <запит>?»)
 
+> **Статус:** ✅ виконано (2026-06-23).
+
 ## Контекст
 
 OLX GraphQL шукає не лише за `title`, а й за `description` (ймовірно через «АБО»): оголошення
@@ -50,7 +52,7 @@ Frontend:
 - [x] `web/src/components/table/ListingsTableRow.tsx` — бейдж/іконка для `ai_relevant === 0`.
 
 Docs:
-- [x] `docs/architecture.md`, `docs/structure.md`, `CLAUDE.md` — новий модуль/роут/колонки/інваріант.
+- [x] `docs/architecture.md`, `docs/structure.md`, `AGENTS.md` — новий модуль/роут/колонки/інваріант.
 
 ## Евристичний пре-фільтр перед ШІ (додано, ідея з Antigravity CLI)
 

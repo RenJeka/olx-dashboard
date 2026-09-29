@@ -16,7 +16,7 @@ High-level огляд усіх AI-кроків OLX Dashboard: як влашто�
 - **Ніколи не авто** — лише за кнопкою; жоден скан / автооновлення / cron їх не тригерять.
 - **PII продавця в промпт не йде** (тільки `id/title/params/description`, для кроку 3 ще `price/city/pros`).
 - **Обсяг** — єдиний `ScopeSelector` (весь пошук / у таблиці / вибрані / найкращі кандидати),
-  `docs/plans/ai-scope-selector.md`.
+  `docs/plans/old/ai-scope-selector.md`.
 - **Два рівноправні рушії** (нижче): авто (OpenRouter) і ручний (ZIP-пакет для агента).
 - **Ключ OpenRouter** — лише в `server/.env` (`OPENROUTER_API_KEY`), опціональний.
 - **Промпти — єдине джерело** у `server/src/analysis/` (спільне для авто й ручного).
@@ -74,13 +74,13 @@ reduce — теж судження, яке агент робить сам, чи�
 - **Крок 1 (Фільтр):** `server/src/analysis/relevance.ts` (`buildRelevancePrompt` /
   `buildRelevanceZipInstructions` / `prefilterCandidates`), скрипти `relevance_merge.py` /
   `relevance_verify.py`, роут `server/src/routes/relevance.ts`, план
-  `docs/plans/semantic-relevance-filter.md`.
+  `docs/plans/old/semantic-relevance-filter.md`.
 - **Крок 2 (Мінуси/плюси):** `server/src/analysis/prompts.ts` (`buildMatchingPrompt` /
   `buildManualZipInstructions`), рушій `analyze.py`, парс `parse.ts`, роути
-  `server/src/routes/analysis/*`, план `docs/plans/llm-analysis.md`.
+  `server/src/routes/analysis/*`, план `docs/plans/old/llm-analysis.md`.
 - **Крок 3 (Вибір):** `server/src/analysis/aiPicks.ts` (`buildPickPrompt` /
   `buildPickManualZipInstructions` / `parsePickResponse`), роут `server/src/routes/aiPicks.ts`,
-  план `docs/plans/AI-auto-top.md`.
+  план `docs/plans/old/AI-auto-top.md`.
 
 ## Майстер «Мінуси/плюси» (крок 2) — 4 кроки UI
 
@@ -99,3 +99,73 @@ reduce — теж судження, яке агент робить сам, чи�
 - Мінуси/плюси на рівні оголошення (`listings.cons`/`pros`, TEXT `• пункт\n• пункт`), сумісно з
   ручним едітом у `ProsConsCell`. Критерії — на рівні пошуку.
 - Ручний override вердикту (`ai_relevant` / статус / ранг) не перетирається авто-прогоном.
+
+## Детальні інваріанти кроків
+
+> Перенесено з `AGENTS.md` (2026-09-29). Синоніми як alias-назви для AI-фільтра —
+> [`business-rules.md`](./business-rules.md) §2.
+
+- **LLM-аналіз (мінуси/плюси, план `docs/plans/old/llm-analysis.md`):** аналіз описів через
+  4-етапний майстер (кнопка «AI» у хедері). **Ніколи не авто** — лише вручну за тригером
+  (жодного зі сканів/автооновлення/cron). Два рівноправні рушії: **авто** (OpenRouter,
+  `google/gemini-2.5-flash-lite` дефолт) і **повний ручний** (копіювання промпту → будь-який
+  безкоштовний чат → вставка відповіді → сервер парсить); ключ повністю опціональний.
+  Інваріанти:
+  - **Критерії — на рівні пошуку** (`searches.analysis_criteria`, JSON `{cons:[], pros:[]}`).
+    **Мінуси/плюси — на рівні оголошення** (`listings.cons`/`pros`, TEXT `• criterion\n• …`,
+    сумісно з ручним едітом `ProsConsCell`).
+  - **`evidence` (дослівний фрагмент) у БД НЕ зберігається.** LLM повертає `{criterion,
+    evidence}`; сервер верифікує `evidence` як підрядок опису (анти-галюцинація); у БД пише
+    лише масив `criterion`.
+  - **PII продавця в промпт не йде** (тільки `id/title/description/params`).
+  - Ключ OpenRouter — лише в `server/.env` (`OPENROUTER_API_KEY`), ніколи в код/git.
+  - Промпти — єдине джерело `server/src/analysis/prompts.ts` (спільне для авто й ручного).
+  - Зміна `title`/`description` після аналізу → `analysis_stale=1` (бейдж «застарілий
+    аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.
+  - Чанкування: авто — дрібні батчі (12), ручний ZIP-пакет — фіксовано 50 оголошень на файл
+    `descriptions/chunk-NNN.json`. Реалізація — `server/src/analysis/*`,
+    `server/src/routes/analysis/`, `server/src/export/xlsx.ts`, фронт —
+    `web/src/components/analysis/*`.
+- **Семантичний фільтр релевантності (план `docs/plans/old/semantic-relevance-filter.md`):** OLX шукає
+  й за `description` (через «АБО»), тож у видачу потрапляють чохли/запчастини/згадки. Окремий ручний
+  AI-крок (кнопка «AI Фільтр» у хедері) класифікує кожне оголошення за питанням «чи цей лот ПРОДАЄ
+  товар `<цільовий товар>`?» і ставить `listings.ai_relevant` (1=продає, 0=ні, NULL=не перевірено).
+  Інваріанти:
+  - **Цільовий товар — на рівні пошуку** (`searches.relevance_target`, порожній → `query`),
+    редагований у діалозі. Вердикт — на рівні оголошення (`ai_relevant`/`ai_relevant_reason`/
+    `ai_relevant_at`/`ai_relevant_source`).
+  - **Ніколи не авто** — лише вручну за кнопкою (не зі сканів/cron), як плюси/мінуси.
+  - **Ручний override** (бейдж у таблиці / `PATCH /api/listings/:id` з `ai_relevant`) ставить
+    `ai_relevant_source='manual'` і НЕ перетирається авто-прогоном (commit пропускає manual).
+  - **PII продавця в промпт не йде** (тільки `id/title/params/description`).
+  - **Евристичний пре-фільтр перед ШІ** (`prefilterCandidates`, ідея з Antigravity CLI): для
+    цілей «бренд + номер моделі» відсіює оголошення, де бренд і номер моделі НЕ поруч
+    (`RELEVANCE_PROXIMITY_WINDOW=4`; модель «5»/«5s», не «15»/«50») — у ШІ йдуть лише кандидати,
+    відсіяні одразу `relevant=false`. **Обережний:** ціль без номера моделі/бренду або «відкинуло
+    б усе» → всі до ШІ (краще false-positive у ШІ, ніж мовчазний false-negative). Відсіяні видно у
+    списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
+  - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
+    нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
+  - **Консистентність обсягу (єдиний селектор «Обсяг», `docs/plans/old/ai-scope-selector.md`):** усі три
+    етапи AI (фільтр релевантності, майстер «Плюси/Мінуси», AI Picks) використовують ОДИН спільний
+    селектор `web/src/components/analysis/ScopeSelector.tsx` із 4 завжди-видимими обсягами (`AiScope`
+    у `web/src/utils/aiScope.ts`): **all** = геть усі рядки пошуку (вкл. відфільтровані/нерелевантні);
+    **tab** = рівно те, що зараз показано в таблиці активної вкладки (`isListingVisible` — з шумовими
+    перемикачами); **selected** = позначені чекбоксами; **candidates** = «Найкращі кандидати»
+    (`isAiPickCandidate`). Лічильники/ID — `getScopeCounts`/`getScopeIds`; дефолт — `getDefaultScope`
+    (AI Picks → `candidates`, інакше selected→tab→all). Предикати видимості лишаються єдиним джерелом —
+    `web/src/utils/listingVisibility.ts` (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`),
+    спільний хук — `web/src/hooks/analysis/useAiScope.ts`. **Важливо:** «Весь пошук» тепер = ВСІ рядки
+    (раніше виключав нерелевантні/відфільтровані) — за рішенням користувача. Кандидати AI Picks
+    (`loadPickCandidates`) виключають `ai_relevant=0` (`ai_relevant IS NOT 0` — лишає 1 та NULL); коли
+    обсяг ≠ candidates, фронт шле `ids` обраного обсягу, і ендпойнти AI Picks
+    (`prompt`/`package.zip` — **POST**; `rank`/`import`) звужують пул цими `ids` (сортування за ціною
+    й ліміт лишаються).
+  - **Ручний ZIP** (для агентного CLI типу Antigravity зі слабкою моделлю): крім `prompt.txt` +
+    `descriptions/chunk-NNN.json` (лише кандидати після пре-фільтра) кладе готові `merge.py`/
+    `verify.py` (`server/src/analysis/relevance_merge.py`/`relevance_verify.py`). Промпт —
+    жорстка покрокова процедура (класифікуй чанк → `classifications/result-NNN.json` → `merge.py`
+    → `verify.py`): обробка по чанку обходить ліміт відповіді, заборона власних скриптів усуває
+    «brain»-файли. `POST /relevance/preview` дає UI розбивку total/candidates/autoRejected.
+    Реалізація — `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`, фронт —
+    `web/src/components/analysis/relevance/RelevanceFilterDialog.tsx`.

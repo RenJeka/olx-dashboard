@@ -1,10 +1,12 @@
 # План: міграція збору даних на GraphQL API OLX
 
+> **Статус:** ✅ виконано (2026-06-17).
+
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 >
 > **Для виконавця:** це головна інструкція. Усі деталі запиту/відповіді GraphQL (ендпойнт,
-> заголовки, body, приклади, маппінг полів) — у [`../olx-api.md`](../olx-api.md). Інваріанти,
-> які не можна порушувати, — у [`../../CLAUDE.md`](../../CLAUDE.md). Нічого не вигадуй поза
+> заголовки, body, приклади, маппінг полів) — у [`../olx-api.md`](../../olx-api.md). Інваріанти,
+> які не можна порушувати, — у [`AGENTS.md`](../../../AGENTS.md). Нічого не вигадуй поза
 > цими двома файлами; якщо чогось бракує — зупинись і спитай.
 
 ## Context
@@ -39,12 +41,12 @@
 - [x] `class GraphqlOlxFetcher implements OlxFetcher` (метод `fetchSearch(search: SearchConfig)`):
   - [x] Константа `GRAPHQL_URL = 'https://www.olx.ua/apigateway/graphql'`; **скорочений**
     GraphQL-query `ListingSearchQuery` — точний текст і робочий приклад body є в
-    [`../olx-api.md` §2.4](../olx-api.md). Поля: `id, title, url, status, created_time,
+    [`../olx-api.md` §2.4](../../olx-api.md). Поля: `id, title, url, status, created_time,
     last_refresh_time, business, location{city{name} district{name}}, photos{link},
     params{key name type value{... on PriceParam{value currency label} ... on GenericParam{key label}}}`
     + `metadata{total_elements}` + гілка `... on ListingError{error{code title detail}}`.
-  - [x] Заголовки запиту — таблиця в [`../olx-api.md` §2.3](../olx-api.md). Без кукі.
-  - [x] `searchParameters` з `SearchConfig` — мапінг у [`../olx-api.md` §2.2](../olx-api.md):
+  - [x] Заголовки запиту — таблиця в [`../olx-api.md` §2.3](../../olx-api.md). Без кукі.
+  - [x] `searchParameters` з `SearchConfig` — мапінг у [`../olx-api.md` §2.2](../../olx-api.md):
     `query`, `offset`, `limit: "40"`, ranges → `filter_float_<name>:from/:to`,
     enums → `filter_enum_<name>[0]` (best-effort), `privateOnly` → `owner_type=private` (best-effort).
   - [x] Пагінація: offset 0/40/80, **≤3 запити**, затримка 1–2 с між ними (патерн
@@ -77,7 +79,7 @@
 ## Група B — Документація (виконано заздалегідь, звірити після реалізації)
 
 - [x] `docs/olx-api.md` — переписано: GraphQL основний метод, HTML — fallback №1
-- [x] `CLAUDE.md` — канон оновлено (GraphQL-first)
+- [x] `AGENTS.md` — канон оновлено (GraphQL-first)
 - [x] `docs/olx-monitor-spec.md` — §3/§4/§13 оновлено
 - [x] `docs/architecture.md` — потік даних, модулі, fallback-ланцюжок
 - [x] `docs/structure.md` — додано `graphqlOlxFetcher.ts`

@@ -1,5 +1,7 @@
 # План: підтримка мобільної версії розмітки (responsive layout)
 
+> **Статус:** ✅ виконано (2026-06-17) · невідмічені пункти (10) — ручні test-cases, не прогнані/не зафіксовані.
+
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі,
 > `[x]` — готово.
 
@@ -60,7 +62,7 @@ OLX Dashboard — single-user React + Chakra UI v3 застосунок, яки�
 
 ## Група 1 — Спільний хук + план-документ
 
-- [x] Створити `docs/plans/mobile-responsive-layout.md` (цей файл).
+- [x] Створити `docs/plans/old/mobile-responsive-layout.md` (цей файл).
 - [x] Створити `web/src/hooks/useIsMobile.ts`:
   ```ts
   export function useIsMobile(): boolean {

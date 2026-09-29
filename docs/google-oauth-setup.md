@@ -120,7 +120,7 @@ AUTH_DISABLED=true
 ## 4. Деплой на Render
 
 > Передумова: фронтенд і API вже задеплоєні на Render (статичний сайт + Web Service).
-> Детальніше — у `docs/plans/render-turso-phase0.md`.
+> Детальніше — у `docs/plans/old/render-turso-phase0.md`.
 
 ### 4.1 Env-змінні для API (Web Service на Render)
 

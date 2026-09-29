@@ -1,12 +1,14 @@
 # Initial MVP — OLX Dashboard (Етап 1)
 
+> **Статус:** ✅ виконано (2026-06-17) · невідмічені пункти (2) — ручні test-cases, не прогнані/не зафіксовані.
+
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 
 ## Context
 
-Репозиторій порожній (початковий коміт + `CLAUDE.md` + `docs/`). Завдання — за промптом
+Репозиторій порожній (початковий коміт + `AGENTS.md` + `docs/`). Завдання — за промптом
 `docs/claude-code-scaffold-prompt.md` збудувати **тільки Етап 1 (MVP)** згідно канону
-(`CLAUDE.md` + `docs/olx-monitor-spec.md`): monorepo, scraper (fetch+cheerio), SQLite-схема
+(`AGENTS.md` + `docs/olx-monitor-spec.md`): monorepo, scraper (fetch+cheerio), SQLite-схема
 з 4 таблиць, upsert-нормалізація, REST (CRUD searches + scan + listings), CLI-скан і сира
 React-таблиця.
 

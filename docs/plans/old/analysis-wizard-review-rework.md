@@ -1,9 +1,11 @@
 # План: AI-майстер — переробка кроку 3 (Перевірка) + ZIP-пакет ручного режиму (крок 2)
 
+> **Статус:** ✅ виконано (2026-06-17) · невідмічені пункти (10) — ручні test-cases, не прогнані/не зафіксовані.
+
 > Прогрес: познач `[x]` коли пункт виконано. Легенда: `[ ]` — заплановано, `[~]` — у роботі, `[x]` — готово.
 >
 > **Для виконавця:** базовий план LLM-аналізу — [`llm-analysis.md`](./llm-analysis.md)
-> (повністю виконано, не редагується). Інваріанти — [`../../CLAUDE.md`](../../CLAUDE.md).
+> (повністю виконано, не редагується). Інваріанти — [`AGENTS.md`](../../../AGENTS.md).
 
 ## Context
 
@@ -139,7 +141,7 @@
 
 ## Група 5 — Документація
 
-- [x] Цей файл (`docs/plans/analysis-wizard-review-rework.md`).
+- [x] Цей файл (`docs/plans/old/analysis-wizard-review-rework.md`).
 - [x] `docs/architecture.md` §6: рядок `GET /api/searches/:id/analyze/package?mode=&ids=` →
   `GET /api/searches/:id/analyze/package.zip?mode=&ids=` (ZIP: `prompt.txt` +
   `descriptions/chunk-NNN.json`, 50/чанк).
@@ -147,7 +149,7 @@
 - [x] `docs/structure.md`: оновлено однорядкові описи `prompts.ts`/`text.ts`/`constants.ts`/
   `routes/analysis.ts`/`client.ts`/`AnalysisWizardDialog.tsx`/`ManualAssistant.tsx`, додано
   `archiver`/`exceljs` у `package.json` (server).
-- [x] `CLAUDE.md`: додано `archiver` як другий узгоджений виняток нових залежностей (поруч з
+- [x] `AGENTS.md`: додано `archiver` як другий узгоджений виняток нових залежностей (поруч з
   `exceljs`) — обґрунтування: ZIP-пакет ручного режиму (Node не має вбудованого ZIP-writer).
 
 ## Верифікація / test-cases
@@ -182,7 +184,7 @@
 
 ## Коміти
 1. `feat: rework manual analysis package as ZIP (prompt + chunked description files)` —
-   Група 1 + 2 + `archiver` + CLAUDE.md.
+   Група 1 + 2 + `archiver` + AGENTS.md.
 2. `feat: rework AI wizard step 3 — table layout, filtering, manual criteria toggle, evidence highlighting` —
    Група 3 + 4.
 3. `docs: update architecture/structure for analysis wizard rework` — Група 5.

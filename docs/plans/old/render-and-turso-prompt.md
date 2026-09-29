@@ -1,15 +1,19 @@
+# Промпт: Phase 0 — підготовка до Render + Turso
+
+> **Статус:** ✅ виконано (2026-06-23) · історичний промпт-завдання для агента; виконано в `render-turso-phase0.md`.
+
 Ти працюєш над моїм проєктом olx-dashboard (monorepo npm workspaces: server/ + web/).
-Обовʼязково прочитай CLAUDE.md і docs/architecture.md перед початком — дотримуйся всіх
+Обовʼязково прочитай AGENTS.md і docs/architecture.md перед початком — дотримуйся всіх
 інваріантів і конвенцій звідти.
 
 # Завдання: Phase 0 — підготувати застосунок до деплою на Render + Turso
 
 Це СХВАЛЕНА мною зміна стеку persistence-шару: better-sqlite3 → @libsql/client (Turso).
-libSQL — SQLite-сумісний, тож заборона PostgreSQL з CLAUDE.md не порушується; бізнес-логіка,
+libSQL — SQLite-сумісний, тож заборона PostgreSQL з AGENTS.md не порушується; бізнес-логіка,
 схема БД і метод збору з OLX НЕ змінюються — міняється ТІЛЬКИ механізм доступу до БД.
 
 ## Спочатку — ПЛАН, без коду
-Згідно з конвенцією репо: ПЕРШИМ кроком створи docs/plans/render-turso-phase0.md
+Згідно з конвенцією репо: ПЕРШИМ кроком створи docs/plans/old/render-turso-phase0.md
 у форматі наявних планів (Контекст → Файли → Кроки з чекбоксами → Test-cases → Ризики).
 Перелічи В НЬОМУ кожен файл і кожне місце правки. Зупинись і дай мені план на рев'ю
 ПЕРЕД будь-якими змінами коду.
@@ -84,7 +88,7 @@ OUT (НЕ робити в Phase 0): render.yaml, Static Site, rewrite-прави
   await initDb();
   await app.listen({ port: PORT, host: '0.0.0.0' });
 
-## Обмеження / конвенції (з CLAUDE.md)
+## Обмеження / конвенції (з AGENTS.md)
 - TypeScript strict, без 'any' у scraper/db/logic.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
 - НЕ міняти бізнес-інваріанти: вікно покриття (miss_count/last_refresh_at), upsert по olx_id
@@ -104,4 +108,4 @@ OUT (НЕ робити в Phase 0): render.yaml, Static Site, rewrite-прави
 6. CLI: npm run scan -w server -- --search <id> і --verify працюють (теж async).
 7. (Якщо є акаунт Turso) ті самі сценарії проти реального Turso URL + authToken.
 
-Почни з плану в docs/plans/render-turso-phase0.md і дай його мені на підтвердження.
+Почни з плану в docs/plans/old/render-turso-phase0.md і дай його мені на підтвердження.

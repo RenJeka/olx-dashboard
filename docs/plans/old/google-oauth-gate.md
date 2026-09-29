@@ -1,11 +1,11 @@
 # Google OAuth «ворота» — single-user gate доступу
 
-> Статус: **У РОБОТІ**.
+> **Статус:** ✅ виконано (2026-06-25) · кроки відмічено 2026-09-29 за фактом коду (`server/src/auth/*`, `web/src/auth/*`, PR #26).
 
 ## Контекст (навіщо)
 
 Застосунок не має жодної авторизації — усі `/api/*` відкриті, немає сесій/кукі/користувачів.
-CLAUDE.md фіксує продукт як «Single-user, локальний запуск». Мета — виставити дашборд на
+AGENTS.md фіксує продукт як «Single-user, локальний запуск». Мета — виставити дашборд на
 **публічний хостинг (Render: фронт — Static Site, API — окремий сервіс)** і пускати **лише
 власника** через Google-логін.
 
@@ -73,11 +73,11 @@ CLAUDE.md фіксує продукт як «Single-user, локальний з�
 
 ## Кроки
 
-- [ ] `docs/plans/google-oauth-gate.md` (цей файл) — першим.
-- [ ] `server/`: deps + `auth/{config,plugin,routes}.ts` + `index.ts` + `.env.example`.
-- [ ] `web/`: deps + `auth/{useAuth,AuthGate}.tsx` + `base.ts` + `main.tsx` + `App.tsx` + `.env.example`.
-- [ ] `docs/architecture.md` + `docs/structure.md` — нові модулі/ендпойнти/залежності.
-- [ ] `npm run build` зелений; smoke-тест гейта (нижче).
+- [x] `docs/plans/old/google-oauth-gate.md` (цей файл) — першим.
+- [x] `server/`: deps + `auth/{config,plugin,routes}.ts` + `index.ts` + `.env.example`.
+- [x] `web/`: deps + `auth/{useAuth,AuthGate}.tsx` + `base.ts` + `main.tsx` + `App.tsx` + `.env.example`.
+- [x] `docs/architecture.md` + `docs/structure.md` — нові модулі/ендпойнти/залежності.
+- [x] `npm run build` зелений; smoke-тест гейта (нижче).
 
 ## Test-cases
 

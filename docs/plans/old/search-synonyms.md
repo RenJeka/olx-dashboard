@@ -1,5 +1,7 @@
 # План: Синоніми пошукового запиту («варіанти пошуку»)
 
+> **Статус:** ✅ виконано (2026-06-23) · невідмічені пункти (7) — ручні test-cases, не прогнані/не зафіксовані.
+
 ## Контекст
 
 OLX-оголошення того самого товару називають по-різному («біговел», «велобіг», «ранбайк»…).
@@ -38,7 +40,7 @@ AI-аналіз) і розпорошує оголошення між кільк�
 `server/src/analysis/repo.ts`, `server/src/analysis/relevance.ts`, `server/src/routes/relevance.ts`,
 `server/src/routes/searches.ts` (+ роут-індекс), `web/src/types/index.ts`, `web/src/api/client.ts`,
 `web/src/components/Searches.tsx`.
-**Документація:** `CLAUDE.md`, `docs/architecture.md`, `docs/structure.md`, `docs/olx-api.md`.
+**Документація:** `AGENTS.md`, `docs/architecture.md`, `docs/structure.md`, `docs/olx-api.md`.
 
 ## Кроки
 
@@ -73,7 +75,7 @@ AI-аналіз) і розпорошує оголошення між кільк�
 - [x] `web/src/components/Searches.tsx`: форма створення — стейт `synonyms`, кнопка «Варіанти пошуку…» біля поля «Запит», `submit` передає `query_synonyms`; `SearchRow` — відкриття діалогу через пункт 3-dot меню (+ лічильник синонімів).
 
 ### G. Документація
-- [x] `CLAUDE.md` (секція збору/інваріантів), `docs/architecture.md`, `docs/structure.md`.
+- [x] `AGENTS.md` (секція збору/інваріантів), `docs/architecture.md`, `docs/structure.md`.
 
 ## Що НЕ чіпати
 
