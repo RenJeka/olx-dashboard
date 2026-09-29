@@ -26,7 +26,7 @@
 |---|---|---|---|
 | 1 | Типи (strict) | `npm run typecheck` (server `tsc --noEmit` + web `tsc -b --noEmit`) | завжди |
 | 2 | Посилання в документації | `npm run docs:check` | завжди (0 битих) |
-| 1+2 | Разом | `npm run check` | перед комітом |
+| 1+2 | Разом (+ `skills:check`) | `npm run check` | перед комітом |
 | 3 | Збірка | `npm run build` | зміни в конфігах TS/Vite, залежностях, `server/scripts/` |
 | 4 | Smoke API | `npm run dev` + запити нижче | зміни на сервері |
 | 5 | UI / E2E | сабагент `playwright-tester` із конкретними test-cases з плану | зміни в UI — **лише за явним запитом людини** |
@@ -76,7 +76,27 @@ curl -s -o /dev/null -w "%{http_code}\n" localhost:3001/api/logs
 - [ ] Непрогнані ручні test-cases названо в статусі плану, а не відмічено наосліп.
 - [ ] Запропоновано текст коміту англійською.
 
-## 6. Автотести — майбутнє
+## 6. Скіли: зміни й перевірка
+
+Скіли редагуються лише в `skills/` (див. [`skills/README.md`](../skills/README.md)); після змін —
+`npm run skills:sync`. Обгортки перевіряються автоматично (`skills:check`, `docs:check`).
+
+**Claude Code** (автоматично, headless):
+
+```bash
+claude -p "Invoke the project skill refactor-plan via the Skill tool. Do NOT change code. Reply: CANONICAL_PATH=<file with full instructions>; FIRST_HEADING=<its first heading>" --allowedTools "Skill Read Glob" --max-turns 8
+# очікується: CANONICAL_PATH=skills/refactor-plan/SKILL.md; FIRST_HEADING=# Refactor Plan
+```
+
+**Antigravity** (вручну, у чаті агента в цьому репозиторії):
+> Use the refactor-plan skill. Do not change any code. Tell me the path of the file with its full
+> instructions and quote the first heading of that file.
+
+Очікується: скіл знайдено, шлях `skills/refactor-plan/SKILL.md`, заголовок `# Refactor Plan`.
+Якщо Antigravity скіла не бачить — перевірити, з якої теки він читає скіли (очікується
+`.agents/skills/`), і за потреби додати ціль у `scripts/sync-skills.mjs` (`TARGET_DIRS`).
+
+## 7. Автотести — майбутнє
 
 Тестового фреймворку ще немає; додавання (напр. **Vitest** — природний вибір для Vite +
 TypeScript) — нова залежність, тож лише після підтвердження людиною. Пріоритети покриття, від

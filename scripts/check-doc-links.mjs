@@ -12,14 +12,17 @@ import { dirname, join, normalize } from 'node:path';
 const HISTORICAL_DIR = 'docs/plans/old/';
 const MD_LINK = /\]\(([^)\s#]+)(?:#[^)]*)?\)/g;
 const CODE_PATH =
-  /`((?:\.\.?\/)*(?:docs|server|web|scripts|\.claude|\.agents)\/[^`\s*<>{}|]+?\.(?:md|ts|tsx|sql|py|json|mjs))`/g;
+  /`((?:\.\.?\/)*(?:docs|server|web|scripts|skills|\.claude|\.agents)\/[^`\s*<>{}|]+?\.(?:md|ts|tsx|sql|py|json|mjs))`/g;
 
 // «голі» шляхи до документів без бектиків (напр. у коментарях дерева structure.md)
 const BARE_DOC = /(?<![\w/.`-])(docs\/[\w./-]+?\.md)(?![\w`])/g;
 
 const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 process.chdir(root);
-const files = execSync('git ls-files "*.md" "docs/plans/TODO"', { encoding: 'utf8' })
+// Відстежувані + нові (ще не додані), без ігнорованих.
+const files = execSync('git ls-files --cached --others --exclude-standard "*.md" "docs/plans/TODO"', {
+  encoding: 'utf8',
+})
   .split('\n')
   .filter(Boolean);
 

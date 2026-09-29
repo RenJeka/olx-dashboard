@@ -1,6 +1,6 @@
 # План: харнес документації з точкою входу в `AGENTS.md`
 
-> **Статус:** 🟢 активний (з 2026-09-29) · етапи 1–4, 6–7 виконано; лишився 5 (одна тека скілів).
+> **Статус:** 🟢 активний (з 2026-09-29) · етапи 1–7 виконано; лишилась ручна перевірка скілів в Antigravity.
 
 ## Контекст
 
@@ -48,7 +48,14 @@
 - [x] Скоротити `AGENTS.md` до карти (294 → ~136 рядків): короткі інваріанти + таблиця «питання →
       документ»; механіка сканів/статусів/схеми дослівно → новий `docs/business-rules.md`,
       детальні AI-інваріанти → `docs/ai-flow.md` («Детальні інваріанти кроків»).
-- [ ] Одна тека скілів, прибрати дублікат.
+- [x] Скіли: єдине джерело `skills/<name>/` (корінь репо); `.claude/skills/` (Claude Code) і
+      `.agents/skills/` (Antigravity) — лише тонкі обгортки (frontmatter `name`/`description` +
+      «прочитай `skills/<name>/SKILL.md`»), що генеруються `scripts/sync-skills.mjs` з маніфесту
+      `skills/skills.json` (цілі для кожного скіла). `simplify` — лише `.agents` (конфлікт з
+      вбудованим `/simplify` Claude Code). `npm run skills:sync` / `skills:check` (у `check`).
+- [x] Перевірка: `skills:check` + `docs:check` зелені; Claude Code у headless-режимі (`claude -p`)
+      бачить скіли й доходить до канонічного файлу (refactor-plan) і до `references/` (chakra-ui-builder).
+- [ ] Antigravity — ручна перевірка людиною (промпт — `docs/development.md` §6).
 - [x] Розвести ролі: `olx-monitor-spec.md` — продукт (концепція, вимоги зі статусом ✅/⏳, етапи з
       критеріями готовності, поза скоупом, ризики); `architecture.md` — поточна реалізація;
       `business-rules.md` — доменні правила; `AGENTS.md` — карта. Зі spec прибрати застарілі дублі

@@ -72,7 +72,8 @@ npm run build                   # tsc server + tsc/vite web (перевірка 
 npm run scan -- --search <id>   # CLI-скан без UI (--deep, --verify)
 npm run docs:check              # биті посилання в документації (має бути 0)
 npm run typecheck               # tsc --noEmit для server і web
-npm run check                   # typecheck + docs:check — перед комітом
+npm run check                   # typecheck + docs:check + skills:check — перед комітом
+npm run skills:sync             # перегенерувати обгортки скілів після зміни skills/
 ```
 
 **Перший запуск:** `npm install` → `cp server/.env.example server/.env` (мінімум
@@ -119,7 +120,7 @@ npm run check                   # typecheck + docs:check — перед комі
 | Деплой / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
 | Що зараз у роботі / бекло? | [`docs/plans/`](docs/plans/) (активні плани), [`docs/plans/TODO`](docs/plans/TODO) |
 | Чому щось зроблено саме так (історія рішень)? | [`docs/plans/old/`](docs/plans/old/README.md) |
-| Скіли й сабагенти проєкту | `.claude/skills/`, `.agents/skills/`, `.claude/agents/playwright-tester.md` |
+| Скіли й сабагенти проєкту | [`skills/`](skills/README.md) — єдине джерело; `.claude/skills/` і `.agents/skills/` — згенеровані обгортки (не редагувати); сабагент `.claude/agents/playwright-tester.md` |
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 

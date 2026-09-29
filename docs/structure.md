@@ -7,14 +7,19 @@
 
 ```
 olx-dashboard/
-├── package.json              # root workspace: скрипти dev/build/scan/migrate:posted-at/docs:check/typecheck/check, deps: concurrently
+├── package.json              # root workspace: скрипти dev/build/scan/migrate:posted-at/docs:check/typecheck/check/skills:sync/skills:check, deps: concurrently
 ├── package-lock.json
 ├── tsconfig.base.json        # спільні strict-опції TS (без module/moduleResolution)
 ├── .gitignore                # + server/data/*.db, *.db-shm, *.db-wal
 ├── AGENTS.md                 # канон інваріантів/конвенцій для агентів (читають Claude Code, Codex тощо)
 ├── README.md                 # огляд + швидкий старт
 ├── scripts/
-│   └── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (docs/plans/old — лише лінки на доки)
+│   ├── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (docs/plans/old — лише лінки на доки)
+│   └── sync-skills.mjs       # `npm run skills:sync|skills:check`: обгортки скілів з skills/ у .claude/ і .agents/
+├── skills/                   # ЄДИНЕ джерело скілів (<name>/SKILL.md + references/), skills.json — цілі, README.md
+├── .claude/skills/           # згенеровані обгортки для Claude Code (не редагувати)
+├── .claude/agents/           # сабагент playwright-tester (UI/E2E за запитом)
+├── .agents/skills/           # згенеровані обгортки для Antigravity (не редагувати)
 │
 ├── docs/
 │   ├── olx-monitor-spec.md           # специфікація продукту: вимоги ✅/⏳, етапи, поза скоупом, ризики

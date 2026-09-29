@@ -1,0 +1,13 @@
+{
+  "$comment": "Маніфест скілів: для кожного скіла з skills/<name>/ — у які інструменти генерувати тонку обгортку. claude → .claude/skills/, agents → .agents/skills/ (Antigravity). Після змін: npm run skills:sync.",
+  "skills": {
+    "chakra-ui-builder": ["claude", "agents"],
+    "chakra-ui-migrate": ["claude", "agents"],
+    "chakra-ui-refactor": ["claude", "agents"],
+    "turso-reads-playbook": ["claude", "agents"],
+    "refactor": ["claude", "agents"],
+    "refactor-plan": ["claude", "agents"],
+    "refactor-method-complexity-reduce": ["claude", "agents"],
+    "simplify": ["agents"]
+  }
+}
