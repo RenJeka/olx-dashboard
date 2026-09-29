@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AnalysisMode, AnalyzedListing } from '../types';
+import type { AiScope } from '../utils/aiScope';
 
 type Updater<T> = T | ((prev: T) => T);
 
@@ -9,7 +10,8 @@ function applyUpdater<T>(prev: T, updaterOrValue: Updater<T>): T {
     : updaterOrValue;
 }
 
-export type AnalysisScope = 'selected' | 'all' | 'tab';
+/** Обсяг майстра = спільний `AiScope` (вкл. «candidates»). */
+export type AnalysisScope = AiScope;
 
 interface AnalysisWizardState {
   boundSearchId: number | null;

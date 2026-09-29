@@ -1,7 +1,7 @@
 import type { MatchedItem } from '../types';
 import type { AnalysisScope } from '../stores/analysisWizardStore';
-import { AI_PICKS_LABEL } from '../constants';
-import { STATUS_LABELS } from './status';
+import type { StatusFilter } from './listingVisibility';
+import { buildScopeLabel as buildAiScopeLabel } from './aiScope';
 
 export function computeDefaultScope(selectedIds: number[], statusFilter: string): AnalysisScope {
   if (selectedIds.length > 0) return 'selected';
@@ -18,10 +18,5 @@ export function isIncludedFn(overrides: Map<string, boolean>, id: number, item: 
 }
 
 export function buildScopeLabel(scope: AnalysisScope, statusFilter: string): string {
-  if (scope === 'selected') return 'Вибрані';
-  if (scope === 'tab' && statusFilter === 'ai_picks') return AI_PICKS_LABEL;
-  if (scope === 'tab' && statusFilter !== 'all') {
-    return STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS];
-  }
-  return 'Весь пошук';
+  return buildAiScopeLabel(scope, statusFilter as StatusFilter);
 }

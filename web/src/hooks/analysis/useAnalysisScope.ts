@@ -2,14 +2,14 @@ import { useMemo } from 'react';
 import { useListingsUiStore } from '../../stores/listingsUiStore';
 import { useListings } from '../../api';
 import { useListingsMap } from '../useListingsMap';
-import { isListingVisible, passesNoiseFilters } from '../../utils/listingVisibility';
 import { buildScopeLabel } from '../../utils/analysis';
+import { getScopeCounts, getScopeIds, type ScopeContext } from '../../utils/aiScope';
 import type { AnalysisScope } from '../../stores/analysisWizardStore';
 
 /**
- * Хук для обчислення множин ідентифікаторів (scope) для AI-аналізу.
- * Визначає, які саме оголошення підуть в аналіз (вибрані, всі видимі на вкладці тощо),
- * зважаючи на налаштування локальних фільтрів та приховування "шуму".
+ * Хук обчислення обсягу (scope) для майстра AI-аналізу. Будує спільний `ScopeContext`
+ * і дістає ID/лічильники через `utils/aiScope`. «Весь пошук» = геть усі рядки,
+ * «таб» = рівно те, що показано в таблиці активної вкладки.
  */
 export function useAnalysisScope(searchId: number, selectedIds: number[], open: boolean, scope: AnalysisScope) {
   const { data: listings } = useListings(open ? searchId : null);
@@ -19,33 +19,16 @@ export function useAnalysisScope(searchId: number, selectedIds: number[], open: 
   const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
   const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
 
-  // «Весь пошук» = всі рядки, видимі за «шумовими» перемикачами
-  const allIds = useMemo(
-    () =>
-      (listings ?? [])
-        .filter((l) => passesNoiseFilters(l, showFilteredOut, showIrrelevant))
-        .map((l) => l.id),
-    [listings, showFilteredOut, showIrrelevant],
+  const ctx: ScopeContext = useMemo(
+    () => ({ listings, selectedIds, statusFilter, showFilteredOut, showIrrelevant }),
+    [listings, selectedIds, statusFilter, showFilteredOut, showIrrelevant],
   );
 
-  // «Таб» = рядки поточної вкладки
-  const tabIds = useMemo(
-    () =>
-      statusFilter === 'all'
-        ? allIds
-        : (listings ?? [])
-            .filter((l) => isListingVisible(l, statusFilter, showFilteredOut, showIrrelevant))
-            .map((l) => l.id),
-    [listings, statusFilter, showFilteredOut, showIrrelevant, allIds],
-  );
+  const counts = useMemo(() => getScopeCounts(ctx), [ctx]);
+  const allIds = useMemo(() => getScopeIds('all', ctx), [ctx]);
+  const tabIds = useMemo(() => getScopeIds('tab', ctx), [ctx]);
+  const effectiveIds = useMemo(() => getScopeIds(scope, ctx), [scope, ctx]);
 
-  const effectiveIds = useMemo(() => {
-    if (scope === 'selected') return selectedIds;
-    if (scope === 'tab') return tabIds;
-    return allIds;
-  }, [scope, selectedIds, allIds, tabIds]);
-
-  const tabCount = statusFilter !== 'all' ? tabIds.length : 0;
   const scopeLabel = buildScopeLabel(scope, statusFilter);
 
   return {
@@ -54,7 +37,8 @@ export function useAnalysisScope(searchId: number, selectedIds: number[], open: 
     allIds,
     tabIds,
     effectiveIds,
-    tabCount,
+    counts,
+    tabCount: counts.tab,
     scopeLabel,
     statusFilter,
     selectedIds,

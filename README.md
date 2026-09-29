@@ -2,12 +2,12 @@
 
 Персональна single-user система моніторингу оголошень **OLX.ua**: збір через GraphQL API OLX
 (fallback — HTML) → SQLite → React-таблиця зі статусами/нотатками/історією цін (за етапами)
-та експортом у Notion. Локальний запуск, без зовнішніх сервісів.
+та експортом у Notion. Локальний запуск або деплой Render + Turso (див. нижче).
 
 ## Стек
 
 - **Monorepo:** npm workspaces — `server/` + `web/`
-- **Backend:** Node.js 20+, TypeScript, Fastify 5, better-sqlite3, cheerio
+- **Backend:** Node.js 20+, TypeScript, Fastify 5, @libsql/client (Turso/SQLite), cheerio
 - **Frontend:** React 18, Vite 6, TanStack Query/Table, Chakra UI v3 (+ next-themes, react-icons/lu)
 - **Збір даних:** GraphQL `POST /apigateway/graphql` (основний) + `fetch`/cheerio HTML-fallback (без браузера/Playwright)
 
@@ -18,9 +18,15 @@ npm install          # залежності обох воркспейсів
 npm run dev          # server :3001 + web :5173 паралельно
 ```
 
-Відкрий http://localhost:5173 → створи пошук (напр. query `iphone 13`, ціна 8000–15000) →
-натисни **Scan** → оголошення зʼявляться в таблиці. Повторний Scan не дублює рядки
-(дедуплікація по `olx_id`).
+> **Авторизація (Google OAuth):** дашборд захищений логіном — пускає лише тебе. Перед першим
+> запуском налаштуй Client ID та `.env` файли. Детальна покрокова інструкція →
+> **[`docs/google-oauth-setup.md`](docs/google-oauth-setup.md)**.
+>
+> Якщо хочеш запускати локально без логіну (для розробки): `AUTH_DISABLED=true` у `server/.env`.
+
+Відкрий http://localhost:5173 → увійди через Google → створи пошук (напр. query `iphone 13`,
+ціна 8000–15000) → натисни **Scan** → оголошення зʼявляться в таблиці. Повторний Scan не
+дублює рядки (дедуплікація по `olx_id`).
 
 CLI-скан без UI:
 
@@ -49,10 +55,12 @@ npm run scan -- --search <id>
 
 ## Стан
 
-Реалізовано **Етап 1 (MVP)**: scraper (GraphQL — основний, HTML — fallback) + SQLite + REST
-(CRUD пошуків, scan, listings) + React-таблиця на Chakra UI v3 (сортування, видимість колонок,
-темна/світла тема через Drawer налаштувань; колонки «Опис»/«Продавець»/«Активність», лічильник
-«Результатів: N»). Наступні етапи (статуси, нотатки, історія цін, Notion, cron) — у документації нижче.
+- ✅ **Етап 1 (MVP):** GraphQL-збір (HTML — fallback), upsert, REST, React-таблиця на Chakra UI v3.
+- ✅ **Етап 2:** статуси (ручні + auto-disable/reactivate), нотатки, інлайн-едіт, локальні фільтри, verify-прохід.
+- ✅ **Поза етапами:** глибокий скан з авто-розбиттям по ціні й двофазним аналізом, синоніми пошуку,
+  проєкти, дерево категорій OLX, AI (плюси/мінуси, фільтр релевантності, AI Picks), Turso + Render,
+  Google OAuth, журнал помилок, відновлення часткових сканів.
+- ⏳ **Етап 3:** спарклайни `price_history` + MD-експорт. **Етап 4:** Notion-експорт + node-cron.
 
 ## Документація
 
@@ -63,4 +71,5 @@ npm run scan -- --search <id>
 - [`docs/structure.md`](docs/structure.md) — структура файлів і папок
 - [`docs/plans/initial-mvp.md`](docs/plans/initial-mvp.md) — план Етапу 1 із прогресом
 - [`docs/plans/graphql-migration.md`](docs/plans/graphql-migration.md) — план міграції збору на GraphQL
-- [`CLAUDE.md`](CLAUDE.md) — інваріанти й конвенції (обовʼязкові при змінах)
+- [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) — покрокове налаштування Google OAuth (Google Console, env-змінні, локал, Render)
+- [`AGENTS.md`](AGENTS.md) — інваріанти й конвенції (обовʼязкові при змінах)

@@ -1,6 +1,16 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './base';
-import type { Search, SearchStats, NewSearchInput, SearchPatchResult, LocalFilters } from '../types';
+import { useListings } from './listings';
+import { computeListingStats } from '../utils/searchStats';
+import type {
+  Search,
+  SearchStats,
+  LastScanResponse,
+  NewSearchInput,
+  SearchPatchResult,
+  LocalFilters,
+} from '../types';
 
 export function useSearches() {
   return useQuery({
@@ -56,13 +66,27 @@ export function useReorderSearches() {
   });
 }
 
-/** Статистика для панелі дій: скільки в базі, скільки "давно не бачених", останній скан. */
+/**
+ * Статистика для панелі дій. `last_scan` — зі звуженого `/stats` (1 рядок scan_runs); агрегати
+ * `in_db`/`stale_count`/`verify_candidates` рахуються на клієнті з кешу `['listings', searchId]`
+ * (`useListings` дедуплікується з таблицею — зайвого запиту немає), щоб не робити 408-рядковий
+ * прохід на сервері. docs/plans/turso-stats-clientside.md.
+ */
 export function useSearchStats(searchId: number | null) {
-  return useQuery({
+  const lastScanQuery = useQuery({
     queryKey: ['search-stats', searchId],
-    queryFn: () => api<SearchStats>(`/api/searches/${searchId}/stats`),
+    queryFn: () => api<LastScanResponse>(`/api/searches/${searchId}/stats`),
     enabled: searchId != null,
   });
+
+  const { data: listings } = useListings(searchId);
+  const derived = useMemo(() => computeListingStats(listings), [listings]);
+
+  const data: SearchStats | undefined = lastScanQuery.data
+    ? { ...derived, last_scan: lastScanQuery.data.last_scan }
+    : undefined;
+
+  return { ...lastScanQuery, data };
 }
 
 /** Загальне редагування пошуку (назва/запит/api_filters/синоніми) — docs/plans/search-row-edit.md. */

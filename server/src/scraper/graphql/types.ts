@@ -99,4 +99,10 @@ export interface SplitPlan {
   noSplit: boolean;
   /** Чому `noSplit=true` без природньої малості — `scanFromPlan` додає це у warning. */
   fallbackReason?: string;
+  /**
+   * Бісекцію перервано збоєм посеред розбиття (docs/plans/scan-failure-recovery.md) —
+   * бакети покривають лише частину цінового діапазону. `scanFromPlan` додає це у warning
+   * (скан стає частковим), аналітичний звіт показує як попередження.
+   */
+  probeWarning?: string;
 }

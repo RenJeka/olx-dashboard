@@ -38,7 +38,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!hasApiKey()) {
       return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
@@ -49,12 +49,12 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    const criteria = getSavedCriteria(id)[req.body.mode];
+    const criteria = (await getSavedCriteria(id))[req.body.mode];
     if (criteria.length === 0) {
       return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
     }
 
-    const listings = loadListings(id, ids);
+    const listings = await loadListings(id, ids);
     const descriptions = descriptionMap(listings);
     const model = req.body.model ?? DEFAULT_MODEL;
 
@@ -85,17 +85,17 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+      if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
       if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
 
-      const criteria = getSavedCriteria(id)[req.body.mode];
+      const criteria = (await getSavedCriteria(id))[req.body.mode];
       if (criteria.length === 0) {
         return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
 
-      const listings = loadListings(id, ids);
+      const listings = await loadListings(id, ids);
       const mode = req.body.mode;
 
       const archive = new ZipArchive();
@@ -123,12 +123,12 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; raw?: string; accumulated?: AnalyzedListing[] };
   }>('/api/searches/:id/analyze/import', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
 
-    const criteria = getSavedCriteria(id)[req.body.mode];
-    const listings = loadListings(id, []);
+    const criteria = (await getSavedCriteria(id))[req.body.mode];
+    const listings = await loadListings(id, []);
     const descriptions = descriptionMap(listings);
 
     let parsed: AnalyzedListing[];
@@ -151,14 +151,14 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { format?: string; mode?: string; rows?: { id?: number; criteria?: string[] }[] };
   }>('/api/searches/:id/analyze/export', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!getSearch(id)) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     const mode: AnalysisMode = isMode(req.body.mode) ? req.body.mode : 'cons';
     const reqRows = Array.isArray(req.body.rows) ? req.body.rows : [];
     const label = MODE_LABEL[mode];
 
     // Підтягуємо назву/опис з БД за id (зберігаючи порядок та критерії з запиту).
     const ids = reqRows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
-    const byId = new Map(loadListings(id, ids).map((l) => [l.id, l]));
+    const byId = new Map((await loadListings(id, ids)).map((l) => [l.id, l]));
     const rows = reqRows.map((r) => {
       const l = byId.get(Number(r.id));
       return {

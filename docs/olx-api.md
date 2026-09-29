@@ -251,8 +251,18 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
 - `__typename: "ListingError"` → `error{code title detail status, validation[]}` —
   невалідні `searchParameters`.
 
-Усі три — кидати виняток; `scanner.ts` запише в `scan_runs.error` і (якщо доступний)
-спробує HTML-fallback.
+**Ретрай транзієнтних збоїв (`client.fetchPage`, 2026-06-30):** перш ніж кидати виняток,
+запит **повторюється до 3 спроб** з бекофом (~1.2с/2.5с+джитер) на ТИМЧАСОВИХ умовах:
+мережева помилка (reset/timeout/DNS), HTTP `429`/`500`/`502`/`503`/`504`, або **200 з
+не-JSON тілом** (анти-бот-інтерстіціал — інколи приходить замість JSON). Один блип серед
+десятків запитів глибокого скану більше не валить увесь прохід. **Детерміновані** помилки
+кидаються ОДРАЗУ, без ретраю: інші 4xx (`400`/`404`), `errors[]` (схема), `ListingError`
+(невалідні параметри/вікно пагінації).
+
+Після вичерпання ретраїв — виняток; `scanner.ts` запише в `scan_runs.error` і (якщо
+доступний) спробує HTML-fallback. **Виняток посеред пагінації, коли дані вже частково
+зібрані**, тепер дає **частковий успіх** (як для `ListingError` — §2.9), а не повний
+fallback (див. нижче).
 
 ### 2.9 Пагінація і ввічливість
 
@@ -287,6 +297,13 @@ query ListingSearchQuery($searchParameters: [SearchParameter!] = []) {
   у HTML-fallback; повертається частковий результат (`exhausted=false`, `warning:
   "graphql window cap hit at offset=<N>"`), який `scanner.ts` пише у `scan_runs.error`
   поряд із фактичною помилкою/fallback-нотою.
+- **Частковий успіх при транзієнтному збої (2026-06-30):** той самий принцип діє і для
+  **кинутого** винятку (вичерпані ретраї §2.8 — мережа/429/5xx/не-JSON) посеред пагінації.
+  `fetchSearch` на `offset > 0` за наявності даних → `warning:
+  "graphql transient fail at offset=<N>: <причина>"` і зупинка (без throw, без HTML-fallback);
+  `scanSingleBucket` → `capHit` (page0 бакету вже зібрано, зіллється з рештою). Якщо ж даних
+  ще нема (`offset = 0`) — виняток кидається, щоб HTML-fallback дістав шанс. Будь-який такий
+  партіал → `partial=true` → вікно покриття (auto-disable) пропускається.
 - **HTML-fallback** (`HtmlOlxFetcher`) не має `visible_total_count` — для глибокого
   одразу `target = DEEP_SAFETY_CAP = 50`, без уточнення; той самий батч-патерн пауз.
 - **Прогрес**: після кожного запиту/сторінки `FetchOptions.onProgress(done, total)` пише
@@ -578,7 +595,14 @@ DOM-селектори простіші й достатні).
    - `graphql failed: ...; fallback html OK` — GraphQL зламався, HTML витягнув. Розбери
      повідомлення: `ListingError` (помінялись параметри?) чи `errors[]` (помінялась схема —
      звір query §2.4 з актуальним у DevTools сайту).
-   - повна помилка — впали обидва методи; у тексті буде зразок HTML від fallback.
+   - `graphql failed: ...; html fallback failed: ...` — впали обидва методи; **причина
+     GraphQL завжди в тексті** (і у звичайному скані, і у запуску з плану — `runDeepScanFromPlan`
+     більше не ковтає її, 2026-06-30). Дивись саме частину `graphql failed:`, а не оманливу
+     HTML-помилку «рендериться через JS» (картки в HTML зазвичай Є — `__NEXT_DATA__` OLX прибрав,
+     але `[data-cy="l-card"]` лишилися).
+   - `... транзієнт ... після 3 спроб` / `graphql transient fail at offset=<N>` — тимчасовий
+     збій (429/5xx/не-JSON) пережив ретрай (§2.8). Якщо часто — OLX тротлить: збільш паузи
+     (`BATCH_PAUSE_*`) або зменш частоту сканів; це НЕ «зміна розмітки».
 2. GraphQL віддає 200, але поля `null` — схему розширили/перейменували; онови query.
 3. HTML-fallback: картки є, поля порожні → звір селектори §3.2, онови `selectors.ts`.
 4. Карток в HTML нема взагалі → перевір `__NEXT_DATA__` (§4.1).
@@ -602,4 +626,5 @@ DOM-селектори простіші й достатні).
 | 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/graphql-offset-window.md` |
 | 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/verify-pass.md` |
 | 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/coverage-window-fix.md` |
+| 2026-06-30 | Глибокий скан після «Аналізу перед скануванням» падав із оманливою HTML-помилкою «Карток не знайдено… рендериться через JS». Наживо підтверджено: GraphQL і HTML працюють (200, 50 карток; `__NEXT_DATA__` зник, але `[data-cy="l-card"]` є). Реальна причина — ОДИН транзієнтний GraphQL-збій (429/5xx/не-JSON) посеред пагінації валив увесь скан (`fetchPage` без ретраю), а `runDeepScanFromPlan` ковтав причину GraphQL (inline HTML-fallback без try/catch) | ретрай транзієнтних збоїв у `client.fetchPage` (3 спроби, бекоф; детерміновані 4xx/схема/ListingError — без ретраю); об'єднана помилка `graphql failed:…; html fallback failed:…` у `runDeepScanFromPlan`; частковий успіх при транзієнтному винятку посеред пагінації (`fetchSearch`/`scanSingleBucket`) замість обвалу — §2.8/§2.9 |
 | 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/price-range-split.md`, §2.9 |

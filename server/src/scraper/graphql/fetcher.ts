@@ -12,6 +12,7 @@ import type {
   FetchOptions,
 } from '../../types.js';
 
+import { logWarn } from '../../logger.js';
 import { interruptibleSleep, randomDelayMs } from '../utils.js';
 import {
   BATCH_SIZE,
@@ -25,6 +26,7 @@ import { PAGE_LIMIT, MAX_PAGES } from './constants.js';
 import type { SplitPlan } from './types.js';
 
 import { GraphqlClient } from './client.js';
+import type { PageResult } from './client.js';
 import { SplitScanner } from './split.js';
 export { estimatePages } from './split.js';
 
@@ -51,7 +53,25 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         break;
       }
       const offset = i * PAGE_LIMIT;
-      const page = await this.client.fetchPage(search, offset, referer);
+      let page: PageResult;
+      try {
+        page = await this.client.fetchPage(search, offset, referer);
+      } catch (err) {
+        // Транзієнтний збій вичерпав ретраї (client.fetchPage). Якщо вже є зібрані дані —
+        // зупиняємось частковим успіхом (як для ListingError вікна пагінації нижче): не валимо
+        // весь скан і не тягнемо HTML-fallback. Якщо даних ще нема (offset=0) — кидаємо, щоб
+        // HTML-fallback дістав шанс.
+        if (offset > 0 && all.length > 0) {
+          warning = `graphql transient fail at offset=${offset}: ${err instanceof Error ? err.message : String(err)}`;
+          logWarn('scanner', `fetch-page offset=${offset}`, warning, {
+            searchId: search.id,
+            query: search.query,
+            collected: all.length,
+          });
+          break;
+        }
+        throw err;
+      }
 
       if (page.listingError) {
         if (offset > 0 && all.length > 0) {
@@ -73,6 +93,10 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         seen.add(item.olxId);
         all.push(item);
       }
+
+      // Інкрементальне збереження (docs/plans/scan-failure-recovery.md) — лише deep:
+      // звичайний скан (≤3 запити) пише один раз у finalize, без зайвих Turso-записів.
+      if (deep) await options?.onListings?.(page.items);
 
       requestsUsed = i + 1;
       options?.onProgress?.({ done: requestsUsed, total: target });
@@ -127,10 +151,12 @@ export class GraphqlOlxFetcher implements OlxFetcher {
     const referer = this.client.buildReferer(search.query);
     const onProgress = options?.onProgress;
     const scanResult = await this.splitScanner.scanBuckets(
-      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress, options?.shouldAbort,
+      search, referer, plan.rootItems, plan.buckets, plan.requestsUsed, onProgress,
+      options?.shouldAbort, options?.onListings,
     );
 
     const warnings = [`split: ${plan.buckets.length} price buckets; coverage window skipped`];
+    if (plan.probeWarning) warnings.push(plan.probeWarning);
     if (scanResult.capHit) {
       warnings.push('деякі діапазони вперлися в ліміт запитів — дані можуть бути неповними');
     }

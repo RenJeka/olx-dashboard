@@ -1,4 +1,5 @@
 // OpenRouter-клієнт (авто-режим). Звичайний fetch, без нової залежності.
+import { logWarn } from '../logger.js';
 import { getApiKey } from './config.js';
 import {
   OPENROUTER_ERROR_DETAIL_MAX_CHARS,
@@ -78,6 +79,12 @@ export async function chat(messages: ChatMessage[], options: ChatOptions): Promi
       return stripCodeFence(content);
     } catch (err) {
       lastErr = err;
+      logWarn(
+        'analysis',
+        `openrouter attempt=${attempt + 1}/${OPENROUTER_MAX_ATTEMPTS}`,
+        err instanceof Error ? err.message : String(err),
+        { model: options.model },
+      );
     }
   }
 

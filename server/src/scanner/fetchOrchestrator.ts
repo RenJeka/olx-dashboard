@@ -1,5 +1,6 @@
 import { GraphqlOlxFetcher } from '../scraper/graphql/index.js';
 import { HtmlOlxFetcher } from '../scraper/olxFetcher.js';
+import { logError } from '../logger.js';
 import { interruptibleSleep, randomDelayMs } from '../scraper/utils.js';
 import {
   BATCH_PAUSE_MIN_MS,
@@ -15,6 +16,16 @@ import { dedupeQueries } from './searchLoader.js';
 
 export const graphqlFetcher = new GraphqlOlxFetcher();
 export const htmlFetcher = new HtmlOlxFetcher();
+
+/**
+ * Нота порятунку варіанта (docs/plans/scan-failure-recovery.md): збій пізнього варіанта
+ * (синоніма) завершує скан достроково, зібране попередніми варіантами лишається в БД.
+ * Спільна для звичайного (`fetchAllQueries`) і планового (`runDeepScanFromPlan`) сканів,
+ * щоб текст warning був однаковий.
+ */
+export function variantFailureNote(variant: string, message: string): string {
+  return `«${variant}»: збій (${message}) — скан завершено достроково, зібране попередніми варіантами збережено`;
+}
 
 /**
  * Викликає GraphqlOlxFetcher; якщо він кидає помилку — fallback на HtmlOlxFetcher.
@@ -149,9 +160,28 @@ export async function fetchAllQueries(
         }
       : undefined;
 
-    const result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
+    let result: Awaited<ReturnType<typeof fetchWithFallback>>;
+    try {
+      result = await fetchWithFallback(variantSearch, { ...options, onProgress: onVariantProgress });
+    } catch (err) {
+      // Збій пізнього варіанта (напр. анти-бот OLX після сотень запитів: GraphQL 403 і
+      // HTML-fallback теж упав) НЕ валить скан — усе зібране попередніми варіантами
+      // зберігається, скан завершується достроково з warning
+      // (docs/plans/scan-failure-recovery.md). Перший варіант без даних → чесна помилка.
+      if (merged.size === 0) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      logError('scanner', `variant «${variant}» ${vi + 1}/${variants.length}`, err, {
+        searchId: search.id,
+        collectedSoFar: merged.size,
+      });
+      notes.push(variantFailureNote(variant, message));
+      break;
+    }
 
     for (const item of result.raw) merged.set(item.olxId, item);
+    // Інкрементальне збереження після кожного варіанта (покриває HTML-fallback і звичайні
+    // скани, де фетчер не флашить сам) — persister дедуплікує вже збережене.
+    await options?.onListings?.(result.raw);
     requestsUsed += result.requestsUsed;
     rawTotal += result.rawCount;
     if (!result.usedGraphql) usedGraphql = false;

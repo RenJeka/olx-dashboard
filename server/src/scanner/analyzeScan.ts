@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { db } from '../db/db.js';
+import { dbGet, dbRun } from '../db/db.js';
 import { estimatePages } from '../scraper/graphql/fetcher.js';
 import { MAX_PAGES } from '../scraper/graphql/constants.js';
 import type { SplitPlan } from '../scraper/graphql/types.js';
@@ -21,9 +21,11 @@ import type {
   RawListing,
 } from '../types.js';
 import { loadSearch, dedupeQueries } from './searchLoader.js';
-import { graphqlFetcher, htmlFetcher } from './fetchOrchestrator.js';
+import { graphqlFetcher, htmlFetcher, variantFailureNote } from './fetchOrchestrator.js';
 import { withScanRun } from './scanRunLifecycle.js';
 import { finalizeScanResult } from './scanFinalize.js';
+import { ScanPersister } from './scanPersister.js';
+import { logError } from '../logger.js';
 import { runScan } from './runScan.js';
 
 // ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ────────────
@@ -72,11 +74,9 @@ export function isAnalysisFresh(finishedAt: string | null | undefined): boolean 
   return Number.isFinite(t) && Date.now() - t < PLAN_TTL_MS;
 }
 
-// ── Prepared statement для фіналізації analyze-скану ─────────────────────────
-const finalizeAnalyzeStmt = db.prepare(
-  `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, scan_plan = ?, error = NULL,
-     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
-);
+// ── SQL для фіналізації analyze-скану ────────────────────────────────────────
+const FINALIZE_ANALYZE_SQL = `UPDATE scan_runs SET finished_at = ?, found = 0, new_count = 0, warning = ?, scan_plan = ?, error = NULL,
+     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
 /**
  * Обробляє один варіант query в циклі analyze-скану: probe + агрегація метрик.
@@ -116,6 +116,8 @@ async function analyzeVariant(
   let warning: string | undefined;
   try {
     plan = await graphqlFetcher.analyzeSplit(variantSearch, { onProgress: onVariantProgress, shouldAbort });
+    // Бісекцію перервано збоєм посеред розбиття — покриття бакетів часткове, показуємо у звіті.
+    if (plan.probeWarning) warning = `«${variant}»: ${plan.probeWarning}`;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     warning = `«${variant}»: аналіз GraphQL не вдався (${message}) — повний скан спробує ще раз і перейде на HTML, якщо потрібно`;
@@ -157,7 +159,7 @@ async function analyzeVariant(
         sampleUnique++;
       }
     }
-    const known = selectKnownOlxIds(sampleItems.map((it) => it.olxId));
+    const known = await selectKnownOlxIds(sampleItems.map((it) => it.olxId));
     knownSampleCount = known.size;
     sampleTotal = sampleItems.length;
   }
@@ -194,7 +196,7 @@ async function analyzeVariant(
  * на стадії `runDeepScanFromPlan`, якщо повторна спроба теж впаде.
  */
 export async function analyzeScan(searchId: number, options?: { deep?: boolean }): Promise<ScanPlan> {
-  const search = loadSearch(searchId);
+  const search = await loadSearch(searchId);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }
@@ -290,13 +292,12 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
       : null;
 
     // Калібрування реальними даними: останній завершений нормальний скан (не аналітичний).
-    const lastScan = db
-      .prepare(
-        `SELECT raw_found, found FROM scan_runs
-         WHERE search_id = ? AND kind != 'analyze' AND finished_at IS NOT NULL AND found IS NOT NULL
-         ORDER BY finished_at DESC LIMIT 1`,
-      )
-      .get(searchId) as { raw_found: number | null; found: number | null } | undefined;
+    const lastScan = await dbGet<{ raw_found: number | null; found: number | null }>(
+      `SELECT raw_found, found FROM scan_runs
+       WHERE search_id = ? AND kind != 'analyze' AND finished_at IS NOT NULL AND found IS NOT NULL
+       ORDER BY finished_at DESC LIMIT 1`,
+      [searchId],
+    );
 
     const partial =
       variants.length > 1 ||
@@ -323,12 +324,12 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
 
     // Зберігаємо повний ScanPlan у scan_runs.scan_plan — для перегляду останнього аналізу
     // після закриття діалогу (GET /last-analysis, docs/plans/deep-scan-stop-and-history.md).
-    finalizeAnalyzeStmt.run(
+    await dbRun(FINALIZE_ANALYZE_SQL, [
       new Date().toISOString(),
       warnings.length > 0 ? warnings.join('; ') : null,
       JSON.stringify(scanPlan),
       ctx.runId,
-    );
+    ]);
 
     return scanPlan;
   });
@@ -366,13 +367,12 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
   cleanupExpiredPlans();
   const cached = planCache.get(planToken);
   if (!cached || cached.searchId !== searchId) {
-    const lastAnalyze = db
-      .prepare(
-        `SELECT finished_at FROM scan_runs
-         WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
-         ORDER BY id DESC LIMIT 1`,
-      )
-      .get(searchId) as { finished_at: string | null } | undefined;
+    const lastAnalyze = await dbGet<{ finished_at: string | null }>(
+      `SELECT finished_at FROM scan_runs
+       WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
+       ORDER BY id DESC LIMIT 1`,
+      [searchId],
+    );
     if (lastAnalyze && isAnalysisFresh(lastAnalyze.finished_at)) {
       return runScan(searchId, { deep: true });
     }
@@ -380,12 +380,15 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
   }
   planCache.delete(planToken);
 
-  const search = loadSearch(searchId);
+  const search = await loadSearch(searchId);
   if (!search) {
     throw new Error(`Search ${searchId} не знайдено`);
   }
 
   return withScanRun(searchId, 'deep', async (ctx) => {
+    // Інкрементальне збереження: зібране flush-иться в БД по ходу скану, щоб збій
+    // наприкінці довгого проходу не втрачав усе (docs/plans/scan-failure-recovery.md).
+    const persister = new ScanPersister(searchId);
     const variants = cached.plans;
     const merged = new Map<number, RawListing>();
     let requestsUsed = 0;
@@ -436,24 +439,50 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       let raw: RawListing[];
       let result: { visibleTotalCount: number | null; requestsUsed: number; exhausted: boolean; warning?: string; bucketsUsed?: number; aborted?: boolean };
       try {
+        // `deep: true` обов'язковий: noSplit-варіанти делегуються fetchSearch, і без нього
+        // той працював би у звичайному режимі (3 сторінки замість повної допагінації).
         const splitResult = await graphqlFetcher.scanFromPlan(variantSearch, entry.plan, {
+          deep: true,
           onProgress: onVariantProgress,
           shouldAbort: ctx.shouldAbort,
+          onListings: (items) => persister.flushSafe(items),
         });
         raw = splitResult.listings;
         result = splitResult;
       } catch (graphqlErr) {
         const graphqlMessage = graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
-        const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
-          onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
-          shouldAbort: ctx.shouldAbort,
-        });
-        raw = htmlResult.listings;
-        result = { ...htmlResult, warning: [`graphql failed: ${graphqlMessage}; fallback html OK`, htmlResult.warning].filter(Boolean).join('; ') };
-        usedGraphql = false;
+        try {
+          const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
+            onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
+            shouldAbort: ctx.shouldAbort,
+          });
+          raw = htmlResult.listings;
+          result = { ...htmlResult, warning: [`graphql failed: ${graphqlMessage}; fallback html OK`, htmlResult.warning].filter(Boolean).join('; ') };
+          usedGraphql = false;
+        } catch (htmlErr) {
+          // Обидва методи впали — НЕ ковтаємо причину GraphQL (інакше спливає лише оманлива
+          // HTML-помилка «рендериться через JS»). Дзеркалить контракт fetchWithFallback.
+          const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
+          const combined = `graphql failed: ${graphqlMessage}; html fallback failed: ${htmlMessage}`;
+          // Збій пізнього варіанта НЕ валить скан: усе зібране (і вже flush-нуте) лишається,
+          // скан завершується достроково з warning (docs/plans/scan-failure-recovery.md).
+          if (merged.size > 0) {
+            logError('scanner', `plan-variant «${variant}» ${vi + 1}/${variants.length}`, htmlErr, {
+              searchId,
+              graphqlMessage,
+              collectedSoFar: merged.size,
+            });
+            notes.push(variantFailureNote(variant, combined));
+            partial = true;
+            break;
+          }
+          throw new Error(combined);
+        }
       }
 
       for (const item of raw) merged.set(item.olxId, item);
+      // Інкрементальне збереження після варіанта — покриває HTML-fallback (він не флашить сам).
+      await persister.flushSafe(raw);
       requestsUsed += result.requestsUsed;
       rawTotal += raw.length;
       if (!result.exhausted) allExhausted = false;
@@ -498,6 +527,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       visibleTotalCount,
       notes,
       missThreshold: 1, // план завжди походить від глибокого скану
+      persister,
     });
   });
 }

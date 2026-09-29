@@ -103,3 +103,23 @@ export interface StoredTableState {
   sorting: SortingState;
   pageSize: number;
 }
+
+/** Запис технічного журналу app_logs (docs/plans/logging-system.md) — GET /api/logs. */
+export interface AppLogEntry {
+  id: number;
+  ts: string;
+  level: 'warn' | 'error';
+  /** Модуль: scanner | graphql-client | analysis | verify | http | process | … */
+  scope: string;
+  /** Крок data flow, де сталося (напр. "bisect ₴0–5000", "variant «x» 2/4"). */
+  stage: string | null;
+  message: string;
+  /** JSON-рядок: stack, searchId, runId, довільний контекст. */
+  details: string | null;
+}
+
+/** Відповідь GET /api/logs: записи + перелік наявних scope для селектора фільтра. */
+export interface AppLogsResponse {
+  logs: AppLogEntry[];
+  scopes: string[];
+}

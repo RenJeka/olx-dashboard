@@ -11,7 +11,7 @@ olx-dashboard/
 ├── package-lock.json
 ├── tsconfig.base.json        # спільні strict-опції TS (без module/moduleResolution)
 ├── .gitignore                # + server/data/*.db, *.db-shm, *.db-wal
-├── CLAUDE.md                 # канон інваріантів/конвенцій для агентів
+├── AGENTS.md                 # канон інваріантів/конвенцій для агентів (читають Claude Code, Codex тощо)
 ├── README.md                 # огляд + швидкий старт
 │
 ├── docs/
@@ -26,14 +26,21 @@ olx-dashboard/
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
-│   ├── package.json          # deps: fastify, @fastify/cors, better-sqlite3, cheerio, exceljs, archiver
+│   ├── package.json          # deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
 │   ├── scripts/
 │   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/
-│   │   └── olx.db            # SQLite (gitignored, створюється при старті)
+│   │   └── olx.db            # локальна libSQL/SQLite БД (gitignored; file: дефолт, створюється initDb при старті)
+│   ├── .env.example          # OPENROUTER_API_KEY + TURSO_DATABASE_URL/TURSO_AUTH_TOKEN/WEB_ORIGIN
 │   └── src/
-│       ├── index.ts          # Fastify bootstrap, CORS :5173, /health, listen :3001
+│       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
+│       ├── logger.ts         # єдиний сервіс логування (pino): getLogger(scope), logError/logWarn(scope, stage, …) → stdout + app_logs, retention 14 днів
+│       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
+│       ├── auth/             # Google OAuth «ворота» single-user (docs/plans/google-oauth-gate.md)
+│       │   ├── config.ts     # env: GOOGLE_CLIENT_ID/ALLOWED_EMAILS/SESSION_SECRET, кукі-флаги, isAuthDisabled, assertAuthConfigured (fail-fast)
+│       │   ├── plugin.ts     # fastify-plugin (non-encapsulated): @fastify/cookie+@fastify/jwt, verifyGoogleIdToken (google-auth-library), глобальний onRequest-замок /api/*
+│       │   └── routes.ts     # POST /api/auth/google (verify→allowlist→сесійна кукі), GET /api/auth/me, POST /api/auth/logout
 │       ├── types/            # доменні типи (core, listings, scan, analysis) за принципом DDD
 │       │   ├── core.ts       # базові сутності (SearchConfig, Project, фільтри)
 │       │   ├── listings.ts   # оголошення, статуси
@@ -46,6 +53,7 @@ olx-dashboard/
 │       │   ├── searchLoader.ts # loadSearch (SQLite → SearchConfig), dedupeQueries
 │       │   ├── fetchOrchestrator.ts # fetchWithFallback (GraphQL→HTML), fetchAllQueries (синоніми + злиття по olxId)
 │       │   ├── scanRunLifecycle.ts  # withScanRun — спільний lifecycle scan_runs (insert/progress/error/abort)
+│       │   ├── scanPersister.ts    # ScanPersister — інкрементальне збереження по ходу скану (flushSafe/flush, дедуп olx_id)
 │       │   ├── scanFinalize.ts     # finalizeScanResult (upsert→statuses→facet→update), refreshCategoryFacet
 │       │   ├── runScan.ts    # runScan (normal/deep): fetchAllQueries → finalizeScanResult
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
@@ -53,20 +61,21 @@ olx-dashboard/
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
-│       │   ├── schema.sql    # КАНОН схеми БД (4 таблиці) — джерело істини
-│       │   └── db.ts         # відкриття БД, WAL, застосування schema.sql, міграції (addColumnIfMissing/migrateListingsTable)
+│       │   ├── schema.sql    # КАНОН схеми БД (5 таблиць) — джерело істини
+│       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/llm-analysis.md, доповнено docs/plans/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
 │       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getSavedCriteria/loadListings
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
+│       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
 │       │   ├── parse.ts      # парс відповідей LLM (критерії/matching/синоніми) + верифікація evidence (substring) + мерж результатів
 │       │   ├── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
-│       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (2-етапні map-reduce інструкції для ZIP ручного режиму)
-│       │   ├── relevance.ts  # семантичний фільтр: prefilterCandidates (евристичний пре-фільтр бренд+модель перед ШІ, тепер з aliases-синонімами), buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (docs/plans/semantic-relevance-filter.md, docs/plans/search-synonyms.md)
+│       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (map-reduce НА ФАЙЛАХ без скриптів: агент заповнює ПОРОЖНІ nominations/nominees-NNN.json заготовки в ZIP→сам пише output.json; уніфіковано з кроками 1–2 через manualZip.ts, docs/ai-flow.md)
+│       │   ├── relevance.ts  # семантичний фільтр: prefilterCandidates (евристичний пре-фільтр бренд+модель перед ШІ, тепер з aliases-синонімами), buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (ZIP пре-сідить ПОРОЖНІ classifications/result-NNN.json заготовки — агент заповнює; уніфіковано з AI Вибір через manualZip.ts, docs/ai-flow.md) (docs/plans/semantic-relevance-filter.md, docs/plans/search-synonyms.md)
 │       │   ├── relevance_merge.py  # ZIP-скрипт ручного режиму: classifications/result-*.json → output.json
 │       │   └── relevance_verify.py # ZIP-скрипт: перевірка, що output.json покриває всі id з descriptions/chunk-*.json
 │       ├── export/
@@ -91,10 +100,11 @@ olx-dashboard/
 │       │   ├── olxCategories.ts # fetchCategoryOptions(query): дерево категорій OLX (facet метаданих пошуку, olx-api.md §2.11) → CategoryOption[]; тягнеться scanner-ом, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
-│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats + PATCH (filters, query_synonyms, project_id)
+│           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
+│           ├── logs.ts       # GET /api/logs (журнал app_logs: фільтри level/scope) + DELETE /api/logs (очистити)
 │           ├── listings.ts   # GET /api/searches/:id/listings + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
-│           ├── aiPicks.ts    # AI Вибір: GET .../ai-picks/prompt + .../ai-picks/package.zip (ZIP map-reduce, пули >50) + POST .../ai-picks/rank(авто)/import(ручний)/commit
+│           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
@@ -110,9 +120,13 @@ olx-dashboard/
     ├── vite.config.ts        # react plugin, proxy /api → :3001
     ├── index.html            # точка входу Vite
     └── src/
-        ├── main.tsx          # ReactDOM + ChakraProvider + QueryClientProvider
-        ├── App.tsx           # компоновка сторінки (Header, Searches sidebar, ListingsTable);
-        │                      #   стан columnVisibility, автооновлення (useAutoRefresh)
+        ├── main.tsx          # ReactDOM + GoogleOAuthProvider + ChakraProvider + QueryClientProvider
+        ├── vite-env.d.ts     # типи import.meta.env (VITE_GOOGLE_CLIENT_ID, VITE_API_BASE) + vite/client
+        ├── App.tsx           # AuthGate-обгортка → Dashboard (Header, Searches sidebar, ListingsTable);
+        │                      #   useAutoRefresh лише після проходження гейта
+        ├── auth/             # Google OAuth «ворота» (docs/plans/google-oauth-gate.md)
+        │   ├── useAuth.ts    # useSession (GET /api/auth/me, слухає подію 401) + useLogin + useLogout
+        │   └── AuthGate.tsx  # гейт-екран із <GoogleLogin> (рендериться поки немає сесії)
         ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
         ├── theme/            # система стилів Chakra: єдина точка керування кольорами/розмірами
         │   ├── palette.ts    # ACCENT_BASE, FEEDBACK_BASE (success/warning/danger/info), THEME_PALETTES, STATUS_PALETTE
@@ -122,7 +136,7 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T>
+        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
@@ -164,6 +178,7 @@ olx-dashboard/
         │   │   ├── index.ts                 # барель-експорт головних діалогів (AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog)
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
         │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
+        │   │   ├── ScopeSelector.tsx        # спільний селектор «Обсяг» (all/tab/selected/candidates) — однаковий на всіх 3 етапах AI
         │   │   ├── relevance/               # workflow «Семантична класифікація (AI Фільтр)»
 │   │   │   ├── RelevanceFilterDialog.tsx # оболонка діалогу (DialogRoot)
 │   │   │   ├── RelevanceSetupForm.tsx    # форма запуску (авто + ручний ZIP)
@@ -175,7 +190,7 @@ olx-dashboard/
         │   │   └── wizard/                 # workflow «AI-аналіз» (4-етапний майстер мінуси/плюси)
         │   │       ├── AnalysisWizardDialog.tsx # оболонка діалогу (DialogRoot + степер + switch по кроках)
         │   │       ├── WizardStepper.tsx    # UI степеру (4 кроки: критерії→пошук→перевірка→вставка)
-        │   │       ├── CriteriaStep.tsx     # крок 1: вибір режиму/scope, критеріїв, генерація
+        │   │       ├── CriteriaStep.tsx     # крок 1: режим (Мінуси/Плюси) + <ScopeSelector> + критерії, генерація
         │   │       ├── MatchingStep.tsx     # крок 2: авто-аналіз або ZIP + ручний імпорт
         │   │       ├── ReviewStep.tsx       # крок 3: перевірка (таблиця desktop / картки mobile)
         │   │       └── CommitStep.tsx       # крок 4: merge mode + запис у БД
@@ -230,7 +245,8 @@ olx-dashboard/
         │   ├── useAiPicksFlow.ts  # бізнес-логіка AI Вибір (стан step/picks, handleRun/Import/Commit)
         │   ├── analysis/          # AI-аналіз логіка (кроки майстра)
         │   │   ├── useWizard.ts        # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
-        │   │   ├── useAnalysisScope.ts # обчислення множин ID для аналізу (allIds, tabIds, effectiveIds)
+        │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
+        │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (генерація/імпорт/вибір критеріїв)
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
@@ -251,6 +267,7 @@ olx-dashboard/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
             ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
+            ├── aiScope.ts        # єдине джерело обсягу AI (AiScope all/tab/selected/candidates, getScopeIds/Counts, getDefaultScope, buildScopeLabel)
             ├── storage.ts        # збереження/завантаження стану сортування та розмірів колонок таблиці у localStorage
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
@@ -261,6 +278,7 @@ olx-dashboard/
             ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
             ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
             ├── relevance.ts      # чисті функції для AI-фільтра (getEffectiveRelevanceIds, getRelevanceStats)
+            ├── searchStats.ts    # computeListingStats() — клієнтський аналог агрегату /stats (in_db/stale/verify) з масиву listings, щоб не робити 408-рядковий прохід на сервері (docs/plans/turso-stats-clientside.md)
             └── analysis.ts       # чисті функції для AI-аналізу (isIncludedFn, computeDefaultScope, buildScopeLabel)
 ```
 
@@ -275,6 +293,7 @@ olx-dashboard/
 | Порядок стратегій збору / fallback | `server/src/scanner/fetchOrchestrator.ts` |
 | Схема БД | `server/src/db/schema.sql` (+ `db.ts` для застосування) |
 | Нові API-ендпойнти | `server/src/routes/*.ts`, реєстрація в `server/src/index.ts` |
+| Авторизація (Google OAuth «ворота») | `server/src/auth/{config,plugin,routes}.ts`, `web/src/auth/{useAuth,AuthGate}.tsx`, `web/src/api/base.ts`, env `GOOGLE_CLIENT_ID`/`ALLOWED_EMAILS`/`SESSION_SECRET`/`AUTH_DISABLED`, `docs/plans/google-oauth-gate.md` |
 | Доменні типи | `server/src/types/` (бек), `web/src/types/` (фронт) |
 | Запити з фронту | `web/src/api/*` |
 | UI-сторінки | `web/src/pages/*.tsx`, `web/src/App.tsx` |
@@ -294,4 +313,7 @@ olx-dashboard/
 | Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner/fetchOrchestrator.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/search-synonyms.md` |
 | Проекти (групування пошуків в акордеони) | `server/src/routes/projects.ts`, `searches.project_id` (`server/src/db/schema.sql`/`db.ts`), `web/src/api/projects.ts`, `web/src/components/searches/{SearchesPanel,ProjectAccordionItem,ProjectCreateDialog,ProjectEditDialog,ProjectDeleteDialog,SearchRowMenu}.tsx` + `docs/plans/projects.md` |
 | Чесний статус активності (`olx_status`): поріг disable deep=1/normal=2, перезапис death-детекторами, бейдж+свіжість, ручний інлайн-override | `server/src/scraper/statusEngine.ts` (`threshold`, `olx_status='inactive'`), `server/src/scanner/scanFinalize.ts` (виклик `deep?1:2`), `server/src/scanner/verifyScan.ts` (verify `olx_status='removed'/'active'`), `server/src/routes/listings.ts` (PATCH `olx_status`), `web/src/components/table/ActivityCell.tsx` + `columns.tsx` (колонка «Активність») + `docs/plans/honest-olx-status.md` |
+| Оптимізація запису у Turso (діф перед upsert, прибраний індекс `last_seen`, батч statusEngine) | `server/src/scraper/normalizer.ts` (`hasBusinessChange`, `TOUCH_PREFIX`/`TOUCH_SUFFIX`, touch once/day), `server/src/scraper/statusEngine.ts` (`db.batch`), `server/src/db/{schema.sql,db.ts}` (DROP `idx_listings_search_lastseen`) + `docs/plans/turso-write-optimization.md` |
+| Логування (журнал помилок зі scope/stage, перегляд в UI) | `server/src/logger.ts` (pino, `logError`/`logWarn`), `app_logs` у `server/src/db/schema.sql`, `server/src/routes/logs.ts`, глобальні перехоплювачі в `server/src/index.ts` (`setErrorHandler`, `unhandledRejection`/`uncaughtException`), `web/src/api/logs.ts`, `web/src/components/LogsDialog.tsx` (кнопка в `Header.tsx`) + `docs/plans/logging-system.md` |
+| Стійкість великих сканів (інкрементальне збереження, порятунок часткових даних при збої) | `server/src/scanner/scanPersister.ts` (`ScanPersister`), `FetchOptions.onListings` (`server/src/types/scan.ts`), flush-точки у `server/src/scraper/graphql/{fetcher,split}.ts`, порятунок варіанта/бісекції у `server/src/scanner/{fetchOrchestrator,analyzeScan}.ts` + `server/src/scraper/graphql/split.ts` (`probeWarning`), чанкування `db.batch` у `normalizer.ts` + `docs/plans/scan-failure-recovery.md` |
 | Скрипти/воркспейси | кореневий `package.json` |

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from './base';
+import { api, apiBlob } from './base';
 import { downloadBlob } from '../utils/download';
 import type { RelevanceItem, RelevanceResponse } from '../types';
 
@@ -117,14 +117,9 @@ export async function fetchRelevancePackageZip(
   target: string,
   ids: number[],
 ): Promise<void> {
-  const res = await fetch(`/api/searches/${searchId}/relevance/package.zip`, {
+  const blob = await apiBlob(`/api/searches/${searchId}/relevance/package.zip`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ target, ids }),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  downloadBlob(await res.blob(), `relevance-search-${searchId}.zip`);
+  downloadBlob(blob, `relevance-search-${searchId}.zip`);
 }

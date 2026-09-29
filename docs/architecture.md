@@ -3,7 +3,7 @@
 > Технічний огляд реалізації. Канон вимог і рішень — у [`olx-monitor-spec.md`](./olx-monitor-spec.md).
 > Деталі запитів до OLX (URL, параметри, заголовки, селектори) — у [`olx-api.md`](./olx-api.md).
 > Дерево файлів і призначення кожного модуля — у [`structure.md`](./structure.md).
-> Інваріанти й конвенції, обовʼязкові при змінах, — у [`../CLAUDE.md`](../CLAUDE.md).
+> Інваріанти й конвенції, обовʼязкові при змінах, — у [`../AGENTS.md`](../AGENTS.md).
 
 ## 1. Огляд
 
@@ -21,7 +21,7 @@
 | Шар | Технологія |
 | --- | --- |
 | Monorepo | npm workspaces (`server/` + `web/`) |
-| Backend | Node.js 20+, TypeScript (strict), Fastify 5, better-sqlite3 (синхронний), cheerio |
+| Backend | Node.js 20+, TypeScript (strict), Fastify 5, @libsql/client (Turso/libSQL, async; локально `file:`), cheerio |
 | Frontend | React 18, Vite 6, TanStack Query v5, TanStack Table v8, Chakra UI v3 (+ next-themes) |
 | Збір даних | GraphQL `POST /apigateway/graphql` (основний); `fetch` + cheerio HTML-парсинг (fallback). БЕЗ браузера/Playwright |
 
@@ -42,7 +42,7 @@ flowchart LR
         GQ[scraper/graphql/<br/>GraphqlOlxFetcher — основний]
         FE[scraper/olxFetcher.ts<br/>HtmlOlxFetcher — fallback]
         NR[scraper/normalizer.ts<br/>parse + upsert]
-        DB[(db/db.ts<br/>better-sqlite3)]
+        DB[(db/db.ts<br/>@libsql/client — Turso/file:)]
         R1 --> SC
         SC --> GQ
         SC -. "якщо GraphQL упав" .-> FE
@@ -78,9 +78,19 @@ flowchart LR
    `options.onProgress(done, total)`, який scanner записує у
    `scan_runs.requests_done`/`requests_total`.
 4. `normalizer.upsertListings()` використовує структуровані поля (GraphQL) або парсить сирі
-   рядки (HTML), робить upsert по `olx_id` у транзакції, рахує `new_count`, оновлює
-   `filtered_out` (`localFilters.evaluateFilteredOut`) і — для GraphQL-даних — застосовує
-   миттєвий `olx_status`-disable/reactivate.
+   рядки (HTML), робить upsert по `olx_id`, рахує `new_count`, обчислює `filtered_out`
+   (`localFilters.evaluateFilteredOut`) і — для GraphQL-даних — застосовує миттєвий
+   `olx_status`-disable/reactivate. **Оптимізовано під Turso** (кожен `execute` — мережевий
+   round-trip): замість циклу «EXISTS → upsert → read-back → UPDATE filtered_out» на кожен
+   рядок — один bulk-`SELECT` наявних полів по `olx_id` (чанками), злиття COALESCE-значень і
+   `filtered_out` рахуються в пам'яті, а всі upsert-и (з уже вписаним `filtered_out`) ідуть
+   одним `db.batch('write')` (атомарно, як транзакція). Скан на N оголошень — ~2 round-trip
+   замість ~4N. **Діф перед записом** (`plans/turso-write-optimization.md`): bulk-`SELECT`
+   тягне й бізнес-поля, і `hasBusinessChange()` лишає у `db.batch` повний UPSERT **лише** для
+   нових / HTML / реально змінених GraphQL-рядків; незмінні рядки отримують дешевий `last_seen_at`/
+   `miss_count` touch (`TOUCH_PREFIX`/`TOUCH_SUFFIX`) з throttle once/day (SQL-WHERE пропускає
+   ще «свіжі» рядки → 0 записів). Це різко зменшує Turso "rows written" (раніше кожен незмінний
+   рядок коштував таблиця+3 індекси за скан).
 5. Якщо фетчер був GraphQL (не fallback), скан успішний і **повний** (без warning часткового
    результату — напр. «window cap hit») — `statusEngine.applyScanStatuses(searchId,
    fetched, exhausted, threshold)` застосовує вікно покриття (`miss_count`/disable, §6.1
@@ -90,7 +100,9 @@ flowchart LR
    `docs/plans/coverage-window-fix.md`). **`threshold`** пропорційний надійності скану:
    глибокий → `1`, звичайний → `2` (`scanner/scanFinalize.ts`: `missThreshold`); при disable
    також пишеться `olx_status='inactive'` — щоб колонка «Активність» була чесною
-   (`docs/plans/honest-olx-status.md`).
+   (`docs/plans/honest-olx-status.md`). UPDATE-и кандидатів ідуть одним `db.batch` (а не
+   `tx.execute` на рядок — N round-trip), а гілка «промах без disable» чіпає лише `miss_count`,
+   не перезаписуючи індекс `status` (`plans/turso-write-optimization.md`).
 6. `scan_runs` оновлюється (`finished_at`, `found`, `new_count`, `disabled_count`). Розрізнення
    **частковий успіх vs збій**: успішний скан (навіть з застереженням — multi-query/split/
    HTML-fallback) пише застереження у `scan_runs.warning`, а `error` лишає `NULL`; падіння
@@ -98,6 +110,38 @@ flowchart LR
    падає**. UI (`ActionPanelLastScan`) показує `error` як червону «Помилку», `warning` — як
    amber «Попередження».
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
+
+> **Стійкість великих сканів (`docs/plans/scan-failure-recovery.md`):** зібране пишеться в БД
+> НЕ лише наприкінці — `scanner/scanPersister.ts` (`ScanPersister`) flush-ить оголошення
+> ітераціями по ходу скану через `FetchOptions.onListings`: після кожної сторінки deep-скану
+> (`GraphqlOlxFetcher.fetchSearch`, лише deep — звичайний скан пише один раз, без зайвих
+> Turso-записів), кожного цінового бакету (`SplitScanner.scanBuckets`: rootItems + побакетно)
+> і кожного варіанта синоніма (`fetchAllQueries`/`runDeepScanFromPlan`). Persister дедуплікує
+> вже збережені `olx_id` (без подвійних записів/подвійного `new_count`); проміжний
+> `flushSafe` ковтає транзієнтні збої БД (незбережене доїде з наступним flush), фінальний
+> `flush` у `finalizeScanResult` кидає чесно. **Порятунок часткових даних:** збій пізнього
+> варіанта запиту (напр. анти-бот 403 після сотень запитів, коли і GraphQL, і HTML-fallback
+> впали) або збій посеред бісекції цін (`bisectPriceRange` → `SplitPlan.probeWarning`) більше
+> НЕ валить скан — він завершується частковим успіхом (`warning`, вікно покриття
+> пропускається), а все зібране лишається в БД. `upsertListings` додатково чанкує
+> `db.batch` (≤500 statements), щоб гігантський фінальний батч не падав через розмір payload.
+
+> **Логування (`docs/plans/logging-system.md`):** єдиний сервіс `server/src/logger.ts` на базі
+> **pino** (той самий інстанс передається у Fastify через `loggerInstance` — HTTP-логи й наші
+> в одному потоці; у dev консоль читабельна через `pino-pretty`, вмикається лише якщо пакет
+> резолвиться). `logError(scope, stage, err, details?)` / `logWarn(...)` пишуть у stdout **і**
+> у таблицю `app_logs` (fire-and-forget, збій запису журналу не рекурсує й не валить логіку);
+> `scope` = модуль (`scanner`/`graphql-client`/`analysis`/`verify`/`http`/`process`),
+> `stage` = крок data flow (`bisect ₴0–5000`, `variant «x» 2/4`, `POST /api/…`). info/debug у
+> БД НЕ пишуться (Turso rows written). Глобальні перехоплювачі: `app.setErrorHandler` (5xx →
+> журнал зі stage=метод+URL), `unhandledRejection`/`uncaughtException`. Центральна точка збою
+> скану — catch у `withScanRun` (`scanRunLifecycle.ts`, з `searchId`/`runId`); додатково
+> журналюються раніше невидимі місця: транзієнтні ретраї GraphQL (ранній сигнал «OLX
+> відбиває»), збої бісекції/бакетів/варіантів, best-effort facet, verify-проби, невдалі спроби
+> OpenRouter. Retention — 14 днів (чистка на старті). Перегляд — `GET /api/logs`
+> (+`DELETE`) і діалог «Журнал» у хедері (`web/src/components/LogsDialog.tsx`: фільтри
+> level/scope, розгортання stack/details, авто-оновлення 5с). `scan_runs.error`/`warning`
+> лишаються доменним підсумком скану; записи журналу лінкуються через `runId` у details.
 
 > **Синоніми пошукового запиту (`docs/plans/search-synonyms.md`):** якщо `searches.query_synonyms`
 > непорожній, `scanner/fetchOrchestrator.fetchAllQueries()` сканує основний `query` + кожен синонім окремо (як
@@ -169,7 +213,7 @@ flowchart LR
 
 | Модуль | Відповідальність |
 | --- | --- |
-| `db/db.ts` | Відкриває `server/data/olx.db`, вмикає WAL + foreign_keys, застосовує `schema.sql` при старті, далі `addColumnIfMissing` для дрібних додавань колонок і `migrateListingsTable()` (rebuild `listings` під `PRAGMA user_version=2`: новий CHECK статусів + `miss_count`). Бекфіл `searches.sort_order`. Експортує singleton `db`. |
+| `db/db.ts` | Створює клієнт `@libsql/client` (`createClient`): локально `file:server/data/olx.db` (дефолт), у проді `TURSO_DATABASE_URL` (`libsql://…`) + `TURSO_AUTH_TOKEN`. Експортує `db` + тонкі async-обгортки `dbGet`/`dbAll`/`dbRun` (НЕ ORM — лише прибирають boilerplate `{sql,args}` і локалізують каст `Row`→тип) + `initDb()` (`executeMultiple(schema.sql)` — викликати на старті кожної точки входу). Схема libSQL-сумісна (`CREATE TABLE IF NOT EXISTS`); історичний міграц-скаффолд (`addColumnIfMissing`/`migrateListingsTable`/backfill/PRAGMA/WAL) прибрано — `schema.sql` містить усі колонки. Інтерактивні транзакції (`db.transaction('write')`) для read→умова→write (upsert/statusEngine/commit); `db.batch([...], 'write')` для чистих наборів записів (cascade/swap/recompute). Env вантажиться `env.ts` (імпортований першим рядком `db.ts`). |
 | `db/schema.sql` | Канонічна схема (5 таблиць: `projects`, `searches`, `listings`, `price_history`, `scan_runs`). Єдине джерело визначень — не дублювати в коді. |
 | `types.ts` | Доменні типи (`SearchConfig`, `RawListing`, `ScanResult`, `ListingRow`, `ListingStatus`/`LISTING_STATUSES`, `ListingPatch`, `LocalFilters`, `ParamKeyInfo`, `LastScanInfo`, `SearchStats`, `FetchOptions`, `ScanStatus`, інтерфейс `OlxFetcher`, `PriceBucketSummary`/`ScanPlanQuery`/`ScanPlan` — DTO двофазного deep-скану, `docs/plans/two-phase-deep-scan.md`). Без `any`. |
 | `scraper/graphql/` | `GraphqlOlxFetcher implements OlxFetcher` (основний). Модуль розбитий на: `constants.ts` (URL, ліміти, GraphQL query, split-пороги), `types.ts` (типи відповіді GraphQL API, `PriceBucket`, `SplitPlan`), `client.ts` (HTTP запити/парсинг параметрів), `mapper.ts` (конвертація сирих даних у RawListing), `split.ts` (алгоритм розбиття діапазонів і допагінації бакетів), `fetcher.ts` (Facade, який оркеструє client та split), `index.ts` (реекспорт). `fetchPage` — один POST → `{ items, visibleTotalCount, listingError }` (спільна цеглина, тепер у `client.ts`). `fetchSearch` — звичайний/глибокий прохід одного діапазону. Двофазний split (`docs/plans/two-phase-deep-scan.md`): `analyzeSplit(search, options?) → SplitPlan` — лише root-probe + `resolveUpperPriceBound` + `bisectPriceRange`, **без** допагінації (малий пошук/невдалий probe → `SplitPlan.noSplit=true`); `scanFromPlan(search, plan, options?)` — допагінація вже зібраних бакетів (`scanBuckets`) без повторного зондування; `fetchSearchSplit` лишається тонкою композицією `analyzeSplit` + `scanFromPlan` (поведінка швидкого deep-скану незмінна). `probeMaxPrice` — зондування верхньої межі. Запобіжники `MAX_BUCKETS=60`/`MAX_TOTAL_REQUESTS=400` (на варіант; підняті для повного покриття великих пошуків, `docs/plans/deep-scan-stop-and-history.md`); повертає `bucketsUsed`. Деталі — `olx-api.md` §2.9. |
@@ -190,7 +234,8 @@ flowchart LR
 | `routes/analysis/*` | Ендпойнти LLM-аналізу (нижче §6), розбиті по файлах: `index.ts` (реєстрація + `GET /api/analysis/status`), `criteria.ts` (генерація/імпорт критеріїв), `matching.ts` (`analyze`/`package.zip`/`import`/`export`), `commit.ts` (запис у БД). Критерії читаються/пишуться у `searches.analysis_criteria`; commit пише `pros`/`cons` + `analysis_at/source/model`, `analysis_stale=0`. |
 | `analysis/aiPicks.ts` + `routes/aiPicks.ts` | **AI Вибір** (план `plans/AI-auto-top.md`) — окрема від matching фіча ранжування: кандидати без мінусів/не відфільтровані/активні/релевантні (`ai_relevant IS NOT 0` — як вкладка «Найкращі кандидати»), сортовані за ціною, до `PICK_CANDIDATES_LIMIT=500` (`repo.ts: loadPickCandidates`) йдуть у промпт; LLM обирає й сортує фінальний ТОП-`PICK_TOP_N=30`. `buildPickPrompt`/`parsePickResponse`/`runAiPicks` — спільні для авто (OpenRouter) й ручного режиму. Ручний режим: один промпт (`GET /ai-picks/prompt`) для пулів ≤`MANUAL_PICKS_ZIP_CHUNK_SIZE=50`; для більших — ZIP-пакет (`GET /ai-picks/package.zip`, `prompt.txt` + `candidates/chunk-NNN.json` по 50). На відміну від matching тут немає детермінованого скрипта (ранжування вимагає LLM-судження, не літерального матчингу) — `buildPickManualZipInstructions` замість цього кладе в `prompt.txt` 2-етапні map-reduce інструкції: етап 1 — LLM номінує до `PICKS_NOMINEES_PER_CHUNK=10` кращих із кожного чанку; етап 2 — фінальний ТОП-30 серед усіх номінантів; усе виконується всередині одної агент/чат-сесії, у застосунок вставляється рівно ОДНА фінальна JSON-відповідь (без нової UI-логіки накопичення). `POST /ai-picks/commit` пише `ai_rank`/`ai_pick_reason`/`ai_ranked_at`, скидаючи попередні результати пошуку. |
 | `analysis/relevance.ts` + `routes/relevance.ts` | **Семантичний фільтр релевантності** (план `plans/semantic-relevance-filter.md`) — окрема від matching/AI Вибору фіча: для кожного оголошення класифікує «чи цей лот ПРОДАЄ цільовий товар» (а не аксесуар/запчастину/згадку сумісності). Цільовий товар — на рівні пошуку (`searches.relevance_target`, порожній → `query`, `repo.ts: getRelevanceTarget`/`setRelevanceTarget`). `buildRelevancePrompt`/`buildRelevanceZipInstructions`/`parseRelevanceResponse`/`runRelevance` — спільні для авто (OpenRouter, чанки по `AUTO_CHUNK_SIZE=12`) й ручного режиму (ZIP `prompt.txt` + `descriptions/chunk-NNN.json` по `MANUAL_ZIP_CHUNK_SIZE=50`, без `analyze.py` — класифікація семантична, не літеральний матчинг). **Евристичний пре-фільтр перед ШІ** (`prefilterCandidates`): для цілей формату «бренд + номер моделі» відсіює оголошення, де бренд і номер моделі НЕ стоять поруч (`RELEVANCE_PROXIMITY_WINDOW=4` слів) — напр. «iPhone 1**5**», «батарея **5**%» для цілі «iphone 5»; до ШІ йдуть лише кандидати, відсіяні одразу `relevant=false` (reason «Авто-відсіяно…»). Обережний: ціль без номера моделі/бренду або «відкинуло б усе» → пропускає всіх до ШІ. Застосовується в `runRelevance` (авто), `package.zip` (у ZIP лише кандидати) і `relevance/import` (інжектує відсіяних за scope `ids`). `POST /relevance/preview` віддає розбивку (total/candidates/autoRejected) для UI. **Ручний ZIP** для агентного CLI (Antigravity, слабкі моделі типу Gemini Flash): крім `prompt.txt` + чанків кладе готові `relevance_merge.py`/`relevance_verify.py` (у ZIP — `merge.py`/`verify.py`); інструкція — жорстка покрокова процедура (класифікуй чанк → `classifications/result-NNN.json` → `merge.py` → `verify.py`), що обходить ліміт довжини відповіді й забороняє вигадувати власні скрипти. `POST /relevance/import` мерж відповіді в накопичене за `id`. `POST /relevance/commit` пише `ai_relevant`/`ai_relevant_reason`/`ai_relevant_at`/`ai_relevant_source`; рядки з `ai_relevant_source='manual'` НЕ перетираються (умова в `UPDATE`). PII продавця в промпт не йде. |
-| `index.ts` | Fastify bootstrap, CORS для `:5173`, `/health`, реєстрація `searchesRoutes`/`projectsRoutes`/`listingsRoutes`/`analysisRoutes`/`aiPicksRoutes`/`relevanceRoutes`, слухає `:3001`. |
+| `auth/*` | **Google OAuth «ворота»** single-user (план `plans/google-oauth-gate.md`) — замок доступу, НЕ мультиюзер (жодної таблиці `users`/`user_id`). `config.ts` — env `GOOGLE_CLIENT_ID`/`ALLOWED_EMAILS`/`SESSION_SECRET`/`AUTH_COOKIE_SECURE`/`AUTH_DISABLED`, кукі-флаги (прод cross-site: `Secure`+`SameSite=None`; локал http: `Lax`), `assertAuthConfigured()` (fail-fast, якщо auth on без ключів). `plugin.ts` — `fastify-plugin` (non-encapsulated, щоб глобальний хук бачив усі роути): реєструє `@fastify/cookie`+`@fastify/jwt` (сесійний JWT у httpOnly-кукі `olx_session`), декоратор `verifyGoogleIdToken` (`google-auth-library` `OAuth2Client.verifyIdToken` → перевірка `aud`+`email_verified`+allowlist), глобальний `onRequest`-замок на `/api/*` (пропускає `/health`, `/api/auth/*`, CORS-preflight). `routes.ts` — `POST /api/auth/google` (обмін Google ID-token на сесійну кукі), `GET /api/auth/me`, `POST /api/auth/logout`. `AUTH_DISABLED=true` (лише dev) вимикає замок повністю. |
+| `index.ts` | Fastify bootstrap, `assertAuthConfigured()` (fail-fast), CORS для `WEB_ORIGIN` з `credentials:true`, реєстрація `authPlugin`+`authRoutes` ДО доменних роутів (`searchesRoutes`/`projectsRoutes`/`listingsRoutes`/`analysisRoutes`/`aiPicksRoutes`/`relevanceRoutes`), `/health`, слухає `:3001`. |
 | `scan.ts` | CLI-обгортка над `runScan` (`npm run scan -- --search <id>`). |
 | `migratePostedAt.ts` | Одноразова CLI-міграція (`npm run migrate:posted-at`): конвертує наявні текстові `posted_at` (старий HTML-fallback) через `dateParser.parseOlxDate` в ISO; нерозпізнане → `NULL`. Виводить кількість конвертованих/занулених. |
 
@@ -200,17 +245,24 @@ flowchart LR
 [`olx-monitor-spec.md` §5](./olx-monitor-spec.md)). Таблиці: `projects`, `searches`, `listings`,
 `price_history`, `scan_runs`.
 
-Ключові інваріанти (повний перелік — у [`../CLAUDE.md`](../CLAUDE.md)):
+Ключові інваріанти (повний перелік — у [`../AGENTS.md`](../AGENTS.md)):
 - `listings.olx_id` UNIQUE — ключ дедуплікації (upsert).
 - `status` ∈ `new|interested|contacted|rejected|disabled`; `status_source` ∈ `auto|manual`;
   `miss_count` — лічильник сканів поспіль без оголошення у вікні покриття.
 - `params` зберігається сирим JSON.
 - `filtered_out` — прапорець локальних фільтрів (`local_filters`), рядок не видаляється.
+- Індекси `listings`: `idx_listings_search_status` (список/фільтр), `idx_listings_search_refresh`
+  (`search_id, last_refresh_at` — кандидати вікна покриття у `statusEngine`). `olx_id` UNIQUE
+  уже проіндексований (bulk-upsert лукапи). Індекс по `last_seen_at` **навмисно прибрано**
+  (`plans/turso-write-optimization.md`): він перезаписувався на кожному скані (бо `last_seen_at`
+  оновлюється завжди) і множив Turso "rows written"; verify-прохід P1 обходиться scan+sort.
+  DROP наявного — у `initDb` (`db.ts`).
 - `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/projects.md`).
-- `searches.sort_order` — ручний порядок у списку (менше → вище); бекфіл існуючих рядків
-  (`0..N-1` за `created_at DESC`) виконує `db.ts` при старті, нові пошуки отримують
-  `MIN(sort_order) - 1` (з'являються згори).
+- `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
+  `MIN(sort_order) - 1` (з'являються згори). Історичний одноразовий бекфіл у `db.ts` прибрано
+  при міграції на libSQL (порожня Turso/нова БД не має чого бекфілити; наявна локальна БД уже
+  заповнена).
 
 > `price_history` створена у схемі, але кодом ще не наповнюється (Етап 3).
 
@@ -226,6 +278,9 @@ flowchart LR
 
 | Метод | Шлях | Стан |
 | --- | --- | --- |
+| `POST` | `/api/auth/google` | ✅ Auth (`plans/google-oauth-gate.md`) — body `{credential}` (Google ID-token); verify + allowlist → ставить httpOnly-кукі сесії, повертає `{email}`; не в allowlist → 403, невалідний токен → 401 |
+| `GET` | `/api/auth/me` | ✅ — поточна сесія `{email}` з кукі (для гейта на фронті); немає/прострочена → 401 |
+| `POST` | `/api/auth/logout` | ✅ — чистить сесійну кукі |
 | `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1/2 — `GET` сортує за `sort_order ASC, created_at DESC, id DESC`; `DELETE` каскадний (`price_history` → `scan_runs` → `listings` → `searches`, у транзакції); `PATCH` з `local_filters` (Етап 2) → зберігає + синхронно перераховує `filtered_out` для всіх рядків пошуку, повертає `filtered_out_count` |
 | `POST` | `/api/searches/:id/move` | ✅ — `{direction: 'up'\|'down'}`, міняє `sort_order` із сусідом (серед `archived=0` ТА того ж `project_id`, для кнопок ↑/↓ у sidebar) |
 | `GET/POST/PATCH/DELETE` | `/api/projects[/:id]` | ✅ Проекти (`docs/plans/projects.md`) — групування пошуків в акордеони; `GET` сорт `sort_order ASC, created_at DESC, id DESC`; `POST {name}` (нова згори); `PATCH {name}` (перейменування); `DELETE` відв'язує пошуки (`project_id=NULL`), пошуки НЕ видаляє |
@@ -239,8 +294,8 @@ flowchart LR
 | `GET` | `/api/searches/:id/last-analysis` | ✅ — останній збережений `ScanPlan` (`kind='analyze'`): `{plan, analyzedAt, planValid}`; `planValid=false` → план протермінований (лише перегляд); 404, якщо аналізів не було |
 | `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 |
 | `GET` | `/api/searches/:id/param-keys` | ✅ Етап 2 — `{key, samples}[]` для конструктора діапазонів локальних фільтрів (UI закомментовано, заплановано на майбутнє) |
-| `GET` | `/api/searches/:id/filter-options` | ✅ Етап 2 — `{cities, sellers, pros, cons, categories}` для Drawer'а локальних фільтрів; `categories` — кешований facet OLX (`searches.category_facet`: назви+ієрархія+OLX-лічильники, без мережі в запиті); локальні лічильники накладає фронт у пам'яті |
-| `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку (`verify_candidates` = P1+P2, лічильник кнопки «Перевірити неактивні») |
+| `GET` | `/api/searches/:id/filter-options` | ✅ Етап 2 — `{cities, sellers, pros, cons, categories}` для Drawer'а локальних фільтрів; `cities/sellers/pros/cons` — **один прохід** по listings із дедупом у JS (раніше 4 окремі скани; економія читань Turso); `categories` — кешований facet OLX (`searches.category_facet`, без мережі/окремого скану); локальні лічильники накладає фронт у пам'яті |
+| `GET` | `/api/searches/:id/stats` | ✅ Етап 2 — `{in_db, stale_count, verify_candidates, last_scan}` для панелі дій пошуку; `in_db/stale_count/verify_candidates` рахуються **одним агрегатом** `SUM(CASE…)` (раніше 4 окремі COUNT-скани listings — на Turso вчетверо менше читань), `verify_candidates` = P1+P2 (`P1_CONDITION`/`P2_CONDITION` реюзаться з `verifyScan.ts`); `last_scan` — окремий `scan_runs … LIMIT 1` |
 | `PATCH` | `/api/listings/:id` | ✅ Етап 2 — `{status?, note?, pros?, cons?, ai_relevant?, olx_status?}`; зміна `status` → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'` (ручний override семантичного фільтра); `olx_status` (`active`/`inactive`/`removed`/`null`) — ручна «Активність» (разова підказка, без source-захисту) |
 | `GET` | `/api/analysis/status` | ✅ LLM-аналіз — `{apiAvailable, defaultModel}` (наявність `OPENROUTER_API_KEY`) |
 | `GET/PUT` | `/api/searches/:id/criteria` | ✅ — читання/збереження `searches.analysis_criteria` (`{cons[], pros[]}`) |
@@ -252,15 +307,15 @@ flowchart LR
 | `POST` | `/api/searches/:id/analyze/import` | ✅ — парс однієї вставленої відповіді + верифікація + мерж у накопичене |
 | `POST` | `/api/searches/:id/analyze/export` | ✅ — експорт превʼю (`xlsx` через ExcelJS \| `json`) |
 | `POST` | `/api/listings/analyze/commit` | ✅ — запис `pros`/`cons` + `analysis_*` (chunked з боку клієнта); `merge='append'` (дефолт UI — додати до наявних без дублів) \| `'replace'` (перезаписати) |
-| `GET` | `/api/searches/:id/ai-picks/prompt` | ✅ — готовий промпт ручного режиму (один файл, пули ≤50 кандидатів) |
-| `GET` | `/api/searches/:id/ai-picks/package.zip` | ✅ — ZIP-пакет ручного режиму для пулів >50: `prompt.txt` (2-етапні map-reduce інструкції) + `candidates/chunk-NNN.json` (по 50) |
-| `POST` | `/api/searches/:id/ai-picks/rank` | ✅ — авто-режим (OpenRouter) → `PickResult {picks, summary}`, НЕ пише в БД; 409 без `OPENROUTER_API_KEY` |
-| `POST` | `/api/searches/:id/ai-picks/import` | ✅ — парс вставленої відповіді ручного режиму → `PickResult`, НЕ пише в БД |
+| `POST` | `/api/searches/:id/ai-picks/prompt` | ✅ — готовий промпт ручного режиму (один файл, пули ≤50 кандидатів); body `{ids?}` обсягу (порожній → дефолтний пул кандидатів) |
+| `POST` | `/api/searches/:id/ai-picks/package.zip` | ✅ — ZIP-пакет ручного режиму для пулів >50: `prompt.txt` (map-reduce НА ФАЙЛАХ без скриптів, уніфіковано з кроками 1–2 через `manualZip.ts`) + `candidates/chunk-NNN.json` (по 50) + ПОРОЖНІ заготовки `nominations/nominees-NNN.json` (`[]`, по одній на чанк — агент заповнює, тоді сам пише `output.json`); body `{ids?}` обсягу |
+| `POST` | `/api/searches/:id/ai-picks/rank` | ✅ — авто-режим (OpenRouter) → `PickResult {picks, summary}`, НЕ пише в БД; 409 без `OPENROUTER_API_KEY`; body `{model?, ids?}` обсягу |
+| `POST` | `/api/searches/:id/ai-picks/import` | ✅ — парс вставленої відповіді ручного режиму → `PickResult`, НЕ пише в БД; body `{raw, ids?}` обсягу |
 | `POST` | `/api/searches/:id/ai-picks/commit` | ✅ — запис `ai_rank`/`ai_pick_reason`/`ai_ranked_at`; скидає попередні результати пошуку перед записом нових |
 | `GET/PUT` | `/api/searches/:id/relevance/target` | ✅ Семантичний фільтр — читання/збереження `searches.relevance_target` (порожній → `query` як передзаповнення) |
 | `POST` | `/api/searches/:id/relevance/preview` | ✅ — розбивка пре-фільтра для UI: `{total, candidates, autoRejected}` (скільки піде в ШІ vs авто-відсіється), НЕ пише в БД |
 | `POST` | `/api/searches/:id/relevance/analyze` | ✅ — авто-класифікація «лот продає <товар>?» (пре-фільтр + чанки по 12), `{results, errors}`, НЕ пише в БД; без ключа → 409 |
-| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + готові `merge.py`/`verify.py` + `descriptions/chunk-NNN.json` (лише кандидати по 50). Покрокова процедура для агентного CLI (Antigravity): класифікуй чанк → `classifications/result-NNN.json` → `merge.py` → `verify.py` |
+| `POST` | `/api/searches/:id/relevance/package.zip` | ✅ — ZIP ручного режиму: `prompt.txt` + готові `merge.py`/`verify.py` + `descriptions/chunk-NNN.json` (лише кандидати по 50) + ПОРОЖНІ заготовки `classifications/result-NNN.json` (`[]`, по одній на чанк — агент заповнює). Покрокова процедура для агентного CLI (Antigravity): заповни result-NNN.json → `merge.py` → `verify.py` |
 | `POST` | `/api/searches/:id/relevance/import` | ✅ — парс вставленої відповіді + інжект авто-відсіяних (пре-фільтр за scope `ids`) + мерж у накопичене за `id` |
 | `POST` | `/api/searches/:id/relevance/commit` | ✅ — запис `ai_relevant`/`ai_relevant_*`; рядки з `ai_relevant_source='manual'` НЕ перетираються |
 | `GET` | `/health` | ✅ |
@@ -270,6 +325,10 @@ flowchart LR
 
 ## 7. Frontend
 
+- `main.tsx` — `QueryClient` з дефолтами `staleTime: 60_000` + `refetchOnWindowFocus: false`
+  (щоб не перезавантажувати весь список оголошень при кожному фокусі вікна; дані оновлюються
+  явно через скан/мутації з точковою інвалідацією). Локальні `staleTime` (`useSession` —
+  `Infinity`, `useAnalysisStatus` — 5 хв) перекривають ці дефолти.
 - `api/client.ts` — fetch-обгортка + TanStack Query хуки: `useSearches`, `useCreateSearch`,
   `useDeleteSearch`, `useReorderSearches`, `useScan`, `useVerify`, `useScanStatus`,
   `useSearchStats`, `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`.
@@ -505,15 +564,24 @@ flowchart LR
 
 - Ланцюжок стратегій: **GraphQL → HTML (автоматично в scanner) → `__NEXT_DATA__` →
   headed Playwright** (останні два не реалізовані — рішення людини).
-- GraphQL-помилки (HTTP ≠ 200, `errors[]`, `ListingError`) → виняток → scanner пробує
-  `HtmlOlxFetcher`; при успіху fallback скан вважається успішним, а в `scan_runs.warning`
-  пишеться позначка `graphql failed: ...; fallback html OK`.
+- **Ретрай транзієнтних збоїв (`client.fetchPage`, 2026-06-30):** мережа / HTTP `429`/`5xx` /
+  `200` з не-JSON тілом (анти-бот) повторюються до 3 спроб із бекофом ПЕРШ ніж кидати виняток —
+  один блип серед десятків запитів deep-скану не валить прохід. Детерміновані помилки
+  (`400`/`404`, `errors[]`, `ListingError`) кидаються одразу.
+- GraphQL-помилки (HTTP ≠ 200, `errors[]`, `ListingError` після вичерпання ретраю) → виняток →
+  scanner пробує `HtmlOlxFetcher`; при успіху fallback скан вважається успішним, а в
+  `scan_runs.warning` пишеться позначка `graphql failed: ...; fallback html OK`.
 - Падіння обох стратегій не валить процес: повна помилка у `scan_runs.error` (поле `warning`
-  лишається `NULL`), скан failed, попередні дані лишаються.
-- Частковий успіх GraphQL (вікно пагінації `offset≤1000` вичерпано посеред скану,
-  `docs/plans/graphql-offset-window.md`) — скан вважається успішним, зібрані дані
-  зберігаються, `warning` (`graphql window cap hit at offset=<N>`) пишеться у
-  `scan_runs.warning`.
+  лишається `NULL`), скан failed, попередні дані лишаються. **`runDeepScanFromPlan` (запуск з
+  плану) тепер теж формує об'єднану помилку** `graphql failed: ...; html fallback failed: ...`
+  — раніше inline-fallback ковтав причину GraphQL і спливала лише оманлива HTML-помилка
+  (інцидент 2026-06-30, `olx-api.md` §6).
+- Частковий успіх GraphQL — скан вважається успішним, зібрані дані зберігаються, `warning`
+  пишеться у `scan_runs.warning`. Два випадки: (1) вікно пагінації `offset≤1000` вичерпано
+  посеред скану (`graphql window cap hit at offset=<N>`, `docs/plans/graphql-offset-window.md`);
+  (2) **транзієнтний виняток посеред пагінації** (вичерпані ретраї) за наявності зібраних даних
+  — `fetchSearch` → `graphql transient fail at offset=<N>: <причина>`, `scanSingleBucket` →
+  `capHit`; throw лишається лише коли даних ще нема (`offset=0`), щоб HTML-fallback дістав шанс.
 - **Розрізнення `error` vs `warning`:** `scan_runs.error` — ТІЛЬКИ реальний збій (обидві
   стратегії впали); частковий успіх (multi-query синоніми, price-split, HTML-fallback, window
   cap) → `scan_runs.warning`. UI показує перше червоним («Помилка»), друге — amber

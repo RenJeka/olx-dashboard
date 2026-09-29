@@ -1,4 +1,4 @@
-import { db } from '../db/db.js';
+import { dbGet } from '../db/db.js';
 import type { SearchConfig, ApiFilters } from '../types.js';
 
 export interface SearchRow {
@@ -10,10 +10,11 @@ export interface SearchRow {
   query_synonyms: string;
 }
 
-export function loadSearch(id: number): SearchConfig | null {
-  const row = db
-    .prepare('SELECT id, name, query, category_id, api_filters, query_synonyms FROM searches WHERE id = ?')
-    .get(id) as SearchRow | undefined;
+export async function loadSearch(id: number): Promise<SearchConfig | null> {
+  const row = await dbGet<SearchRow>(
+    'SELECT id, name, query, category_id, api_filters, query_synonyms FROM searches WHERE id = ?',
+    [id],
+  );
 
   if (!row) return null;
 

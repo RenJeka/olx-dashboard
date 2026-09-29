@@ -1,34 +1,4 @@
-import type { Listing, RelevanceItem } from '../types';
-
-export type Scope = 'selected' | 'tab' | 'all';
-
-/**
- * Визначає список ID оголошень, які підлягають класифікації, залежно від обраного Scope.
- */
-export function getEffectiveRelevanceIds(
-  scope: Scope,
-  selectedIds: number[],
-  statusFilter: string,
-  listings: Listing[] | undefined
-): number[] {
-  const all = listings ?? [];
-  if (scope === 'selected') {
-    return selectedIds;
-  }
-  if (scope === 'tab') {
-    return all.filter((l) => l.status === statusFilter).map((l) => l.id);
-  }
-  return all.map((l) => l.id);
-}
-
-/**
- * Визначає дефолтний Scope залежно від вибраних ID та поточного фільтра.
- */
-export function getDefaultScope(selectedIds: number[], statusFilter: string): Scope {
-  if (selectedIds.length > 0) return 'selected';
-  if (statusFilter !== 'all' && statusFilter !== 'ai_picks') return 'tab';
-  return 'all';
-}
+import type { RelevanceItem } from '../types';
 
 /**
  * Встановлює, чи є елемент релевантним, враховуючи ручні виправлення.

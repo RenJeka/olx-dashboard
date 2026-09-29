@@ -8,6 +8,14 @@ import { chat } from './openrouter.js';
 import { buildChunkListings, type PromptListing } from './prompts.js';
 import { chunk } from './promptData.js';
 import { normalizeForMatch, stripHtml } from './text.js';
+import {
+  FORBID_RESEARCH,
+  fallbackBlock,
+  forbidden,
+  mechanicalIntro,
+  packageContents,
+  resultLine,
+} from './manualZip.js';
 
 /** Знімає ```json … ``` обгортку й вирізає перший JSON-обʼєкт/масив (для ручних вставок). */
 function extractJson(text: string): string {
@@ -81,40 +89,45 @@ export function buildRelevanceZipInstructions(target: string, aliases: string[] 
   return [
     relevanceRules(target, aliases),
     '',
-    'Це МЕХАНІЧНА процедура на файлах — НЕ дослідницька задача. Дані вже поділені на чанки.',
-    'Твоє ЄДИНЕ змістове завдання — класифікувати кожне оголошення за правилами вище.',
+    mechanicalIntro('класифікувати кожне оголошення за правилами вище.', { chunked: true }),
     '',
-    'Вміст пакета:',
-    '- `descriptions/chunk-NNN.json` — вхідні оголошення ({id, title, characteristics, description}).',
-    '- `merge.py`, `verify.py` — ГОТОВІ скрипти (Python, лише стандартна бібліотека).',
-    '  НЕ редагувати, НЕ переписувати, НЕ копіювати їхню логіку.',
+    packageContents([
+      '`descriptions/chunk-NNN.json` — вхідні оголошення ({id, title, characteristics, description}).',
+      '`classifications/result-NNN.json` — ПОРОЖНІ заготовки (`[]`, по одній на чанк); ти їх заповнюєш.',
+      '`merge.py`, `verify.py` — ГОТОВІ скрипти (Python, лише стандартна бібліотека). НЕ редагувати, ' +
+        'НЕ переписувати, НЕ копіювати їхню логіку.',
+    ]),
     '',
-    'КРОК 1 — Класифікація. Для КОЖНОГО файлу `descriptions/chunk-NNN.json` ОКРЕМО:',
-    '   1. Прочитай один chunk-NNN.json.',
+    'КРОК 1 — Класифікація (map). У теці `classifications/` уже лежить ПОРОЖНІЙ `result-NNN.json` (`[]`)',
+    'на КОЖЕН чанк — це ЗАГОТОВКИ, які ти заповнюєш (не створюй нових). Для КОЖНОГО чанку ОКРЕМО:',
+    '   1. Прочитай `descriptions/chunk-NNN.json`.',
     '   2. Класифікуй КОЖНЕ оголошення (relevant true/false + коротка причина).',
-    '   3. Створи теку `classifications/` і запиши `classifications/result-NNN.json` (ТОЙ САМИЙ',
-    '      номер NNN) — РІВНО валідний JSON-масив [{"id","relevant","reason"}], без markdown',
-    '      і тексту навколо. Кожен id із чанку МАЄ бути у файлі.',
+    '   3. ЗАПОВНИ парний `classifications/result-NNN.json` (ТОЙ САМИЙ номер NNN) — заміни `[]` на',
+    '      РІВНО валідний JSON-масив [{"id","relevant","reason"}], без markdown і тексту навколо.',
+    '      Кожен id із чанку МАЄ бути у файлі.',
     '   4. Перейди до наступного чанку. Обробляй по одному — так не впираєшся в ліміт довжини',
     '      відповіді й не тримаєш усе в памʼяті.',
     '',
-    'КРОК 2 — Обʼєднання: запусти РІВНО ОДИН раз `python merge.py` (або `python3`). Створить output.json.',
+    'КРОК 2 — Обʼєднання (reduce): запусти РІВНО ОДИН раз `python merge.py` (або `python3`). Створить output.json.',
     '',
     'КРОК 3 — Перевірка: запусти `python verify.py`. Якщо звіт каже, що БРАКУЄ id — повернись до',
     '   КРОКУ 1 ЛИШЕ для відповідних чанків (онови їхні result-NNN.json), тоді знову `python merge.py`',
     '   і `python verify.py`. Коли verify.py пише «ПРОЙДЕНО» — ти ЗАКІНЧИВ.',
     '',
-    'СУВОРО ЗАБОРОНЕНО (інакше завдання вважається проваленим):',
-    '- створювати будь-які інші файли/скрипти, крім `classifications/result-NNN.json`',
-    '  (жодних scan/check/draft/proximity/helper-скриптів, проміжних .txt-дампів, «brain»-нотаток);',
-    '- редагувати/переписувати `merge.py` чи `verify.py`;',
-    '- «досліджувати» датасет, рахувати статистику, вичищати/оптимізувати точність, класифікувати',
-    '  чанк двічі; пропускати оголошення.',
+    forbidden([
+      'створювати НОВІ файли/теки/скрипти — ти ЛИШЕ заповнюєш наявні `classifications/result-NNN.json` ' +
+        '(жодних scan/check/draft/proximity/helper-скриптів, проміжних .txt-дампів, «brain»-нотаток);',
+      'редагувати/переписувати `merge.py` чи `verify.py`;',
+      `${FORBID_RESEARCH}, класифікувати чанк двічі; пропускати оголошення.`,
+    ]),
     '',
-    'РЕЗУЛЬТАТ: коли verify.py пройдено — встав ВМІСТ `output.json` у поле застосунку.',
+    resultLine('коли verify.py пройдено'),
     '',
-    '── Fallback (ТІЛЬКИ якщо ти НЕ можеш запускати код): класифікуй усі чанки й поверни ОДИН',
-    '   обʼєднаний JSON за схемою нижче. Помічних скриптів/файлів не створюй.',
+    fallbackBlock(
+      'якщо ти НЕ можеш запускати код',
+      'класифікуй усі чанки й поверни ОДИН обʼєднаний JSON за схемою нижче. Помічних ' +
+        'скриптів/файлів не створюй.',
+    ),
     '',
     relevanceFormat(),
   ].join('\n');

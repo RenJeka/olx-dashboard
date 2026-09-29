@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { toaster } from '../components/ui/toaster';
 import {
   useAnalysisStatus,
-  useListings,
   useRelevanceTarget,
   useRelevancePreview,
   useSaveRelevanceTarget,
@@ -14,11 +13,11 @@ import {
 import { useListingsUiStore } from '../stores/listingsUiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { showErrorToast } from '../utils/toast';
-import { useListingsMap } from './useListingsMap';
+import { useAiScope } from './analysis/useAiScope';
 import { chunk } from '../utils/array';
 import { ANALYZE_CHUNK } from '../constants';
 import type { RelevanceItem, Search } from '../types';
-import { getDefaultScope, getEffectiveRelevanceIds, Scope } from '../utils/relevance';
+import { getDefaultScope, type AiScope } from '../utils/aiScope';
 
 export type RelevanceStep = 'idle' | 'running' | 'done';
 
@@ -33,14 +32,13 @@ export interface UseRelevanceFlowProps {
  * Хук для управління станом і логікою діалогу фільтрації релевантності.
  */
 export function useRelevanceFlow({ search, selectedIds, open, onClose }: UseRelevanceFlowProps) {
-  const { data: listings } = useListings(search.id);
   const { data: status } = useAnalysisStatus();
   const { data: targetData } = useRelevanceTarget(search.id);
   const statusFilter = useListingsUiStore((s) => s.statusFilter);
 
   const [step, setStep] = useState<RelevanceStep>('idle');
   const [target, setTarget] = useState('');
-  const [scope, setScope] = useState<Scope>('all');
+  const [scope, setScope] = useState<AiScope>('all');
   const [results, setResults] = useState<RelevanceItem[]>([]);
   const [overrides, setOverrides] = useState<Map<number, boolean>>(new Map());
   const [source, setSource] = useState<'api' | 'import'>('api');
@@ -68,8 +66,7 @@ export function useRelevanceFlow({ search, selectedIds, open, onClose }: UseRele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const effectiveIds = getEffectiveRelevanceIds(scope, selectedIds, statusFilter, listings);
-  const listingsMap = useListingsMap(listings);
+  const { listings, listingById, counts, effectiveIds } = useAiScope(search.id, selectedIds, open, scope);
 
   const { data: preview } = useRelevancePreview(search.id, target, effectiveIds, open && step === 'idle');
 
@@ -173,9 +170,11 @@ export function useRelevanceFlow({ search, selectedIds, open, onClose }: UseRele
       progress,
       apiAvailable,
       effectiveIds,
+      counts,
+      statusFilter,
       preview,
       listings,
-      listingsMap,
+      listingsMap: listingById,
       selectedIds,
       search,
     },

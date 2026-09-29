@@ -76,6 +76,13 @@ CREATE TABLE IF NOT EXISTS listings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);
+-- Вікно покриття (statusEngine): кандидати за search_id + last_refresh_at >= windowFloor.
+CREATE INDEX IF NOT EXISTS idx_listings_search_refresh ON listings(search_id, last_refresh_at);
+-- Індекс по last_seen_at НАВМИСНО прибрано (docs/plans/turso-write-optimization.md):
+-- last_seen_at оновлюється на кожному скані → індекс перезаписувався на КОЖНОМУ записі
+-- рядка, множачи Turso "rows written" ×N. Verify-прохід P1 (search_id + last_seen_at,
+-- ≤ кілька тисяч рядків на пошук) обходиться scan+sort без помітних втрат. DROP наявного
+-- індексу на вже задеплоєних БД — у initDb (db.ts).
 
 CREATE TABLE IF NOT EXISTS price_history (
   id INTEGER PRIMARY KEY,
@@ -83,6 +90,23 @@ CREATE TABLE IF NOT EXISTS price_history (
   price REAL NOT NULL,
   observed_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Технічний журнал застосунку (docs/plans/logging-system.md): warn+error з усіх модулів.
+-- НЕ плутати зі scan_runs.error/warning (доменний підсумок скану) — сюди пишуть
+-- logError/logWarn із server/src/logger.ts, зокрема проміжні/best-effort збої, які
+-- раніше були невидимі. info/debug у БД НЕ пишуться (лише stdout) — бережемо Turso writes.
+CREATE TABLE IF NOT EXISTS app_logs (
+  id INTEGER PRIMARY KEY,
+  ts TEXT NOT NULL,                  -- ISO-час (з мілісекундами, пишеться з JS)
+  level TEXT NOT NULL,               -- warn | error
+  scope TEXT NOT NULL,               -- модуль: scanner | graphql-client | analysis | verify | http | process
+  stage TEXT,                        -- крок data flow: "bisect ₴0–5000", "variant «x» 2/4", "POST /api/…"
+  message TEXT NOT NULL,
+  details TEXT                       -- JSON: stack, searchId, runId, довільний контекст
+);
+
+-- Перегляд журналу — завжди ORDER BY ts DESC; retention видаляє за ts.
+CREATE INDEX IF NOT EXISTS idx_app_logs_ts ON app_logs(ts);
 
 CREATE TABLE IF NOT EXISTS scan_runs (
   id INTEGER PRIMARY KEY,

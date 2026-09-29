@@ -1,8 +1,10 @@
-import { db } from '../db/db.js';
+import { dbRun } from '../db/db.js';
+import { logWarn } from '../logger.js';
 import { fetchCategoryOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
 import { applyScanStatuses } from '../scraper/statusEngine.js';
 import type { SearchConfig, ScanResult, RawListing } from '../types.js';
+import type { ScanPersister } from './scanPersister.js';
 
 /**
  * Best-effort оновлення дерева категорій OLX (facet) для пошуку після успішного скану.
@@ -14,13 +16,16 @@ export async function refreshCategoryFacet(searchId: number, query: string): Pro
   try {
     const categories = await fetchCategoryOptions(query);
     if (categories) {
-      db.prepare('UPDATE searches SET category_facet = ? WHERE id = ?').run(
+      await dbRun('UPDATE searches SET category_facet = ? WHERE id = ?', [
         JSON.stringify(categories),
         searchId,
-      );
+      ]);
     }
-  } catch {
-    // best-effort — дерево категорій не критичне для скану
+  } catch (err) {
+    // best-effort — дерево категорій не критичне для скану; але збій має бути видимим у журналі
+    logWarn('scanner', 'category-facet', err instanceof Error ? err.message : String(err), {
+      searchId,
+    });
   }
 }
 
@@ -46,16 +51,18 @@ export interface FinalizeInput {
   missThreshold: number;
   /** Пропустити оновлення category_facet (напр. якщо був HTML-fallback без GraphQL). */
   skipCategoryRefresh?: boolean;
+  /**
+   * Інкрементальний persister цього скану (docs/plans/scan-failure-recovery.md): фінальний
+   * flush дозаписує ще не збережене, лічильники found/new_count беруться накопиченими за
+   * весь скан (проміжні флаші вже записали частину). Без нього — одноразовий upsert як раніше.
+   */
+  persister?: ScanPersister;
 }
 
-const updateVisibleTotalStmt = db.prepare(
-  'UPDATE searches SET visible_total_count = ? WHERE id = ?',
-);
+const UPDATE_VISIBLE_TOTAL_SQL = 'UPDATE searches SET visible_total_count = ? WHERE id = ?';
 
-const finalizeSuccessStmt = db.prepare(
-  `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, raw_found = ?, disabled_count = ?, warning = ?, error = NULL,
-     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`,
-);
+const FINALIZE_SUCCESS_SQL = `UPDATE scan_runs SET finished_at = ?, found = ?, new_count = ?, raw_found = ?, disabled_count = ?, warning = ?, error = NULL,
+     stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
 /**
  * Спільний хвіст фіналізації скану для `runScan` і `runDeepScanFromPlan`:
@@ -65,10 +72,16 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   const {
     searchId, runId, search, raw, rawTotal, requestsUsed,
     usedGraphql, exhausted, partial, bucketsUsed, aborted,
-    notes, missThreshold, skipCategoryRefresh,
+    notes, missThreshold, skipCategoryRefresh, persister,
   } = input;
 
-  const upsertResult = upsertListings(searchId, raw);
+  let upsertResult: Pick<ScanResult, 'found' | 'new_count'>;
+  if (persister) {
+    await persister.flush(raw);
+    upsertResult = persister.totals;
+  } else {
+    upsertResult = await upsertListings(searchId, raw);
+  }
 
   const stopped = aborted;
   const effectivePartial = partial || stopped;
@@ -76,7 +89,7 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів — не fallback,
   // не часткових, не split. Поріг disable пропорційний надійності скану.
   const { disabled_count } = usedGraphql && !effectivePartial
-    ? applyScanStatuses(searchId, raw, exhausted, missThreshold)
+    ? await applyScanStatuses(searchId, raw, exhausted, missThreshold)
     : { disabled_count: 0 };
 
   const result: ScanResult = {
@@ -90,7 +103,7 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
 
   // visible_total_count — оновлюємо лише якщо є (single-query non-split скан).
   if (input.visibleTotalCount != null) {
-    updateVisibleTotalStmt.run(input.visibleTotalCount, searchId);
+    await dbRun(UPDATE_VISIBLE_TOTAL_SQL, [input.visibleTotalCount, searchId]);
   }
 
   // Дерево категорій OLX (facet).
@@ -103,15 +116,15 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
     notes.unshift(`Зупинено користувачем — збережено ${result.found} оголошень`);
   }
 
-  finalizeSuccessStmt.run(
+  await dbRun(FINALIZE_SUCCESS_SQL, [
     new Date().toISOString(),
     result.found,
     result.new_count,
-    result.rawFound,
+    result.rawFound ?? null,
     result.disabled_count,
     notes.length > 0 ? notes.join('; ') : null,
     runId,
-  );
+  ]);
 
   return result;
 }
