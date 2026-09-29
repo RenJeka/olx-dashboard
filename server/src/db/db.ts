@@ -58,17 +58,108 @@ export async function dbRun(sql: string, args: InArgs = []): Promise<ResultSet> 
   return db.execute({ sql, args });
 }
 
+// ── Автоміграція колонок (docs/plans/db-auto-migrate.md) ─────────────────────
+
+/** Розбити тіло CREATE TABLE на визначення верхнього рівня (коми поза дужками й лапками). */
+function splitTopLevel(body: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let current = '';
+  for (const ch of body) {
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+    } else if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+    } else if (ch === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+/** Визначення колонки з CREATE TABLE (з REFERENCES/CHECK/DEFAULT), без `--`-коментарів. */
+function columnDefinition(createSql: string, column: string): string | undefined {
+  const withoutComments = createSql.replace(/--[^\n]*/g, '');
+  const body = withoutComments.slice(withoutComments.indexOf('(') + 1, withoutComments.lastIndexOf(')'));
+  return splitTopLevel(body).find((def) => def.split(/\s+/)[0]?.replace(/["`[\]]/g, '') === column);
+}
+
+/** Чому SQLite не зможе виконати ADD COLUMN з таким визначенням (або undefined, якщо зможе). */
+function addColumnBlocker(definition: string): string | undefined {
+  const upper = definition.toUpperCase();
+  if (/\bPRIMARY\s+KEY\b/.test(upper)) return 'PRIMARY KEY';
+  if (/\bUNIQUE\b/.test(upper)) return 'UNIQUE';
+  if (/\bDEFAULT\s*\(/.test(upper)) return 'неконстантний DEFAULT (вираз)';
+  if (/\bNOT\s+NULL\b/.test(upper) && !/\bDEFAULT\b/.test(upper)) return 'NOT NULL без DEFAULT';
+  return undefined;
+}
+
 /**
- * Застосовує канонічну схему (server/src/db/schema.sql, CREATE TABLE IF NOT EXISTS).
- * Викликати на старті КОЖНОЇ точки входу (index.ts, scan.ts, migratePostedAt.ts) ДО
- * першого доступу до БД — на порожній Turso/новій локальній БД це створює всі таблиці.
+ * Для таблиць, що вже є в робочій БД, знайти колонки зі schema.sql, яких у них немає, і
+ * повернути відповідні `ALTER TABLE … ADD COLUMN`. Еталон — схема, застосована до БД у пам'яті.
+ * Колонки, яких немає в схемі, не видаляються. Кидає помилку, якщо хоч одну колонку не можна
+ * додати через ADD COLUMN (до будь-яких змін у робочій БД).
  */
-export async function initDb(): Promise<void> {
+async function planColumnMigrations(schema: string): Promise<string[]> {
+  const reference = createClient({ url: ':memory:' });
+  try {
+    await reference.executeMultiple(schema);
+    const { rows: tables } = await reference.execute(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    );
+    const statements: string[] = [];
+    const blocked: string[] = [];
+    for (const { name, sql } of tables as unknown as { name: string; sql: string }[]) {
+      const { rows: existing } = await db.execute(`PRAGMA table_info(${name})`);
+      if (existing.length === 0) continue; // таблиці ще немає — її створить schema.sql
+      const have = new Set(existing.map((r) => String(r.name)));
+      const { rows: wanted } = await reference.execute(`PRAGMA table_info(${name})`);
+      for (const col of wanted.map((r) => String(r.name)).filter((c) => !have.has(c))) {
+        const definition = columnDefinition(sql, col);
+        const blocker = definition ? addColumnBlocker(definition) : 'визначення не знайдено';
+        if (blocker) blocked.push(`${name}.${col} (${blocker})`);
+        else statements.push(`ALTER TABLE ${name} ADD COLUMN ${definition}`);
+      }
+    }
+    if (blocked.length > 0) {
+      throw new Error(
+        `Автоміграція схеми неможлива для: ${blocked.join(', ')}. ` +
+          'Потрібна ручна міграція (rebuild таблиці) — див. docs/development.md §4.',
+      );
+    }
+    return statements;
+  } finally {
+    reference.close();
+  }
+}
+
+/**
+ * Застосовує канонічну схему (server/src/db/schema.sql) і додає в наявні таблиці колонки,
+ * яких бракує (ідемпотентно). Викликати на старті КОЖНОЇ точки входу (index.ts, scan.ts,
+ * migratePostedAt.ts) ДО першого доступу до БД. Повертає застосовані `ALTER TABLE` —
+ * логує викликач (logger.ts імпортує db.ts, тож тут логера немає).
+ */
+export async function initDb(): Promise<string[]> {
   const schema = readFileSync(SCHEMA_PATH, 'utf-8');
+
+  // Колонки — ДО schema.sql: її CREATE INDEX можуть посилатися на нові колонки.
+  const migrations = await planColumnMigrations(schema);
+  if (migrations.length > 0) await db.batch(migrations, 'write');
+
   await db.executeMultiple(schema);
 
   // Міграція: прибрати індекс по last_seen_at на вже задеплоєних БД. Цей індекс
   // перезаписувався на кожному upsert (last_seen_at = now), множачи Turso "rows written";
-  // verify-прохід P1 обходиться без нього (docs/plans/turso-write-optimization.md).
+  // verify-прохід P1 обходиться без нього (docs/plans/old/turso-write-optimization.md).
   await db.execute('DROP INDEX IF EXISTS idx_listings_search_lastseen');
+  return migrations;
 }

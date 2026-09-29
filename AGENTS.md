@@ -80,9 +80,11 @@ npm run skills:sync             # перегенерувати обгортки 
 `AUTH_DISABLED=true`, `AUTH_COOKIE_SECURE=false`; порожній `TURSO_DATABASE_URL` → локальний файл) →
 `npm run dev` → http://localhost:5173. Деплой — `docs/deploy-render-turso.md`.
 
-**Міграції схеми:** `initDb()` лише виконує `schema.sql` (`CREATE TABLE IF NOT EXISTS`) — нові
-колонки в наявну БД (локальну/Turso) **не додаються**; потрібен явний ідемпотентний
-`ALTER TABLE … ADD COLUMN`. Симптом пропуску — `SQLITE_ERROR: no such column`.
+**Міграції схеми:** `schema.sql` — єдине джерело. На старті `initDb()` сам додає в наявні таблиці
+(локально й у Turso) колонки, яких бракує (`ADD COLUMN` з визначенням зі схеми), і створює нові
+таблиці/індекси. Вручну (rebuild таблиці) — лише те, що `ADD COLUMN` не вміє: `PRIMARY KEY`,
+`UNIQUE`, `NOT NULL` без дефолту, `DEFAULT (вираз)`, зміна/видалення колонок чи `CHECK` — старт
+тоді падає з назвою `таблиця.колонка`. Деталі — `docs/plans/old/db-auto-migrate.md`.
 
 **Перевірка:** автоматичних тестів поки немає; мінімум — `npm run check`, далі smoke API / UI за
 `docs/development.md` (драбина перевірок, Definition of Done). UI/E2E — сабагент

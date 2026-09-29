@@ -67,7 +67,8 @@ await app.register(logsRoutes);
 app.get('/health', async () => ({ ok: true }));
 
 try {
-  await initDb(); // застосувати схему ДО прийому запитів (Turso/нова локальна БД — порожні)
+  // застосувати схему ДО прийому запитів (Turso/нова локальна БД — порожні) + автоміграція колонок
+  for (const sql of await initDb()) app.log.info(`Міграція схеми: ${sql}`);
   await cleanupOldLogs(); // retention журналу app_logs (старші за 14 днів)
   await app.listen({ port: PORT, host: '0.0.0.0' });
 } catch (err) {

@@ -8,7 +8,7 @@ interface Row {
   posted_at: string;
 }
 
-await initDb();
+for (const sql of await initDb()) console.log(`Міграція схеми: ${sql}`);
 
 const rows = await dbAll<Row>(
   `SELECT id, posted_at FROM listings

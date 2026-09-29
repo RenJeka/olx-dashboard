@@ -25,7 +25,8 @@ if (deep && verify) {
 }
 
 try {
-  await initDb(); // схема застосовується тут (не як side-effect імпорту db.ts)
+  // схема застосовується тут (не як side-effect імпорту db.ts) + автоміграція колонок
+  for (const sql of await initDb()) console.log(`Міграція схеми: ${sql}`);
   if (verify) {
     const result = await runVerify(searchId);
     console.log(
