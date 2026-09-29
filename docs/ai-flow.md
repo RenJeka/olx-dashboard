@@ -16,7 +16,7 @@ High-level огляд усіх AI-кроків OLX Dashboard: як влашто�
 - **Ніколи не авто** — лише за кнопкою; жоден скан / автооновлення / cron їх не тригерять.
 - **PII продавця в промпт не йде** (тільки `id/title/params/description`, для кроку 3 ще `price/city/pros`).
 - **Обсяг** — єдиний `ScopeSelector` (весь пошук / у таблиці / вибрані / найкращі кандидати),
-  `docs/plans/ai-scope-selector.md`.
+  `docs/plans/old/ai-scope-selector.md`.
 - **Два рівноправні рушії** (нижче): авто (OpenRouter) і ручний (ZIP-пакет для агента).
 - **Ключ OpenRouter** — лише в `server/.env` (`OPENROUTER_API_KEY`), опціональний.
 - **Промпти — єдине джерело** у `server/src/analysis/` (спільне для авто й ручного).

@@ -111,7 +111,7 @@ flowchart LR
    amber «Попередження».
 7. Web інвалідовує кеш `listings`/`search-stats` і перемальовує таблицю/панель дій.
 
-> **Стійкість великих сканів (`docs/plans/scan-failure-recovery.md`):** зібране пишеться в БД
+> **Стійкість великих сканів (`docs/plans/old/scan-failure-recovery.md`):** зібране пишеться в БД
 > НЕ лише наприкінці — `scanner/scanPersister.ts` (`ScanPersister`) flush-ить оголошення
 > ітераціями по ходу скану через `FetchOptions.onListings`: після кожної сторінки deep-скану
 > (`GraphqlOlxFetcher.fetchSearch`, лише deep — звичайний скан пише один раз, без зайвих
@@ -126,7 +126,7 @@ flowchart LR
 > пропускається), а все зібране лишається в БД. `upsertListings` додатково чанкує
 > `db.batch` (≤500 statements), щоб гігантський фінальний батч не падав через розмір payload.
 
-> **Логування (`docs/plans/logging-system.md`):** єдиний сервіс `server/src/logger.ts` на базі
+> **Логування (`docs/plans/old/logging-system.md`):** єдиний сервіс `server/src/logger.ts` на базі
 > **pino** (той самий інстанс передається у Fastify через `loggerInstance` — HTTP-логи й наші
 > в одному потоці; у dev консоль читабельна через `pino-pretty`, вмикається лише якщо пакет
 > резолвиться). `logError(scope, stage, err, details?)` / `logWarn(...)` пишуть у stdout **і**

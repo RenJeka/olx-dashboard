@@ -10,10 +10,10 @@
 - **Backend:** Node.js 20+, TypeScript, **Fastify**, **`@libsql/client`** (асинхронний; локально —
   файл `server/data/olx.db`, у проді — Turso через `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN`;
   хелпери `dbAll`/`dbRun` у `server/src/db/db.ts`), **cheerio** (парсинг), **node-cron** (опц., ще не підключений).
-  better-sqlite3 більше НЕ використовується (міграція — `docs/plans/render-turso-phase0.md`).
+  better-sqlite3 більше НЕ використовується (міграція — `docs/plans/old/render-turso-phase0.md`).
 - **Turso-економія:** кожен зайвий рядок читання/запису коштує квоти — батчити запити, не
-  додавати індекси на часто оновлювані колонки (`docs/plans/turso-write-optimization.md`,
-  `docs/plans/inventar-db-calls.md`, скіл `turso-reads-playbook`).
+  додавати індекси на часто оновлювані колонки (`docs/plans/old/turso-write-optimization.md`,
+  `docs/plans/old/inventar-db-calls.md`, скіл `turso-reads-playbook`).
 - **Auth:** Google OAuth single-user gate — `@fastify/jwt` + `@fastify/cookie` + `jose` (сервер,
   `server/src/auth/*`), `@react-oauth/google` (фронт, `web/src/auth/*`). Allowlist email, без
   таблиці users. Локально — `AUTH_DISABLED=true`. Деталі — `docs/google-oauth-setup.md`.
@@ -32,7 +32,7 @@
   `server/src/logger.ts`: `logError`/`logWarn(scope, stage, …)` → stdout + таблиця `app_logs`
   (лише warn+error; info/debug у БД не пишуться — Turso). Кожен запис журналу несе `scope`
   (модуль) і `stage` (крок data flow). Перегляд — діалог «Журнал» у хедері (`GET /api/logs`).
-  Деталі — `docs/plans/logging-system.md`.
+  Деталі — `docs/plans/old/logging-system.md`.
 - НЕ використовувати: Express, Prisma/ORM, PostgreSQL, Redux, Playwright у MVP.
 
 ## Метод збору даних (КРИТИЧНО — підтверджено живими запитами 2026-06-10)
@@ -169,7 +169,7 @@
     списку результатів і виправні кліком. Застосовується в `runRelevance`/`package.zip`/`import`.
   - `ai_relevant=0` ховається в таблиці за замовчуванням (як `filtered_out`); перемикач «Показати
     нерелевантні» повертає з бейджем. Два рівноправні рушії (авто OpenRouter + ручний ZIP).
-  - **Консистентність обсягу (єдиний селектор «Обсяг», `docs/plans/ai-scope-selector.md`):** усі три
+  - **Консистентність обсягу (єдиний селектор «Обсяг», `docs/plans/old/ai-scope-selector.md`):** усі три
     етапи AI (фільтр релевантності, майстер «Плюси/Мінуси», AI Picks) використовують ОДИН спільний
     селектор `web/src/components/analysis/ScopeSelector.tsx` із 4 завжди-видимими обсягами (`AiScope`
     у `web/src/utils/aiScope.ts`): **all** = геть усі рядки пошуку (вкл. відфільтровані/нерелевантні);
@@ -260,15 +260,19 @@ Render (Web Service для API + Static Site для `web/`) + Turso — покр
 - `docs/ai-flow.md` — короткий огляд AI-аналізу мінусів/плюсів (майстер, авто/ручний рушії, append/replace).
 - `docs/olx-monitor-spec.md` — канонічна специфікація (вимоги, схема БД §5, етапи, ризики).
 - `docs/deploy-render-turso.md` — деплой Render + Turso; `docs/google-oauth-setup.md` — налаштування Google OAuth.
-- `docs/plans/logging-system.md`, `docs/plans/scan-failure-recovery.md` — журнал помилок і відновлення часткових сканів.
+- `docs/plans/old/logging-system.md`, `docs/plans/old/scan-failure-recovery.md` — журнал помилок і відновлення часткових сканів.
 - `docs/plans/old/initial-mvp.md` — план Етапу 1 із прогресом.
 - `docs/plans/old/graphql-migration.md` — план міграції збору на GraphQL (інструкція для виконавця).
 - `docs/plans/old/stage-2-statuses-and-filters.md` — план Етапу 2 (статуси/нотатки/локальні фільтри/панель дій) із прогресом.
 - `docs/plans/old/llm-analysis.md` — план LLM-аналізу (майстер «Плюси/Мінуси», OpenRouter + ручний режим) із прогресом.
 - `docs/plans/old/search-synonyms.md` — план синонімів пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) із прогресом.
 - `docs/plans/old/honest-olx-status.md` — чесна колонка «Активність» (`olx_status`): поріг disable deep=1/normal=2, перезапис `olx_status` death-детекторами (coverage→`inactive`, verify→`removed`), бейдж+свіжість у UI.
-- `docs/plans/ai-scope-selector.md` — єдиний селектор «Обсяг» (`AiScope`/`ScopeSelector`/`useAiScope`) для всіх 3 етапів AI: all/tab/selected/candidates; «Весь пошук» = геть усі рядки; AI Picks приймає `ids` обсягу.
+- `docs/plans/old/ai-scope-selector.md` — єдиний селектор «Обсяг» (`AiScope`/`ScopeSelector`/`useAiScope`) для всіх 3 етапів AI: all/tab/selected/candidates; «Весь пошук» = геть усі рядки; AI Picks приймає `ids` обсягу.
 - Плани нових фіч/задач — завжди створювати/оновлювати в `docs/plans/<назва>.md` за форматом наявних файлів (контекст → файли → кроки з чекбоксами → test-cases). Створювати файл плану ПЕРШИМ кроком, до початку правок коду.
+- **Статус плану** — рядок одразу під заголовком: `> **Статус:** 🟢 активний | ✅ виконано (YYYY-MM-DD) | ⏸ відкладено`
+  (+ короткі примітки через ` · `). Чекбокси відмічати по ходу; невиконані ручні test-cases не
+  відмічати «наосліп» — назвати в примітці статусу. У `docs/plans/` лежать лише активні плани й
+  `TODO` (бекло); після завершення — статус ✅ і `git mv` у `docs/plans/old/` + `npm run docs:check`.
 - Після зміни коду, що додає файли/пакети/скрипти/ендпойнти — оновлювати `docs/architecture.md` і `docs/structure.md`.
 - Після переміщення/перейменування файлів коду чи документів — `npm run docs:check` і виправити биті посилання
   (виконані плани переносити в `docs/plans/old/`; шляхи до коду в них не переписуються — це історичний знімок).

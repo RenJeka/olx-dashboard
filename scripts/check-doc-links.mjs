@@ -1,5 +1,6 @@
 // Перевірка посилань у документації (npm run docs:check).
 // - markdown-лінки [текст](шлях) — відносно файлу, де вони стоять;
+// - «голі» шляхи `docs/…md` без бектиків — відносно кореня;
 // - бектик-шляхи `docs/…`, `server/…`, `web/…`, `.claude/…`, `.agents/…` — відносно кореня репо
 //   (або відносно файлу, якщо починаються з ./ чи ../).
 // Історичні плани (docs/plans/old/) — знімок на момент виконання: у них перевіряються лише
@@ -12,6 +13,9 @@ const HISTORICAL_DIR = 'docs/plans/old/';
 const MD_LINK = /\]\(([^)\s#]+)(?:#[^)]*)?\)/g;
 const CODE_PATH =
   /`((?:\.\.?\/)*(?:docs|server|web|scripts|\.claude|\.agents)\/[^`\s*<>{}|]+?\.(?:md|ts|tsx|sql|py|json|mjs))`/g;
+
+// «голі» шляхи до документів без бектиків (напр. у коментарях дерева structure.md)
+const BARE_DOC = /(?<![\w/.`-])(docs\/[\w./-]+?\.md)(?![\w`])/g;
 
 const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 process.chdir(root);
@@ -35,6 +39,9 @@ for (const file of files) {
       for (const [, p] of line.matchAll(CODE_PATH)) {
         if (historical && !p.endsWith('.md')) continue;
         if (!existsSync(resolve(file, p))) broken.push(`${file}:${i + 1}  ${p}`);
+      }
+      for (const [, p] of line.matchAll(BARE_DOC)) {
+        if (!existsSync(p)) broken.push(`${file}:${i + 1}  ${p}`);
       }
     });
 }

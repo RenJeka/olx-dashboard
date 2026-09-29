@@ -1,3 +1,7 @@
+# Промпт: Phase 0 — підготовка до Render + Turso
+
+> **Статус:** ✅ виконано (2026-06-23) · історичний промпт-завдання для агента; виконано в `render-turso-phase0.md`.
+
 Ти працюєш над моїм проєктом olx-dashboard (monorepo npm workspaces: server/ + web/).
 Обовʼязково прочитай AGENTS.md і docs/architecture.md перед початком — дотримуйся всіх
 інваріантів і конвенцій звідти.
@@ -9,7 +13,7 @@ libSQL — SQLite-сумісний, тож заборона PostgreSQL з AGENTS
 схема БД і метод збору з OLX НЕ змінюються — міняється ТІЛЬКИ механізм доступу до БД.
 
 ## Спочатку — ПЛАН, без коду
-Згідно з конвенцією репо: ПЕРШИМ кроком створи docs/plans/render-turso-phase0.md
+Згідно з конвенцією репо: ПЕРШИМ кроком створи docs/plans/old/render-turso-phase0.md
 у форматі наявних планів (Контекст → Файли → Кроки з чекбоксами → Test-cases → Ризики).
 Перелічи В НЬОМУ кожен файл і кожне місце правки. Зупинись і дай мені план на рев'ю
 ПЕРЕД будь-якими змінами коду.
@@ -104,4 +108,4 @@ OUT (НЕ робити в Phase 0): render.yaml, Static Site, rewrite-прави
 6. CLI: npm run scan -w server -- --search <id> і --verify працюють (теж async).
 7. (Якщо є акаунт Turso) ті самі сценарії проти реального Turso URL + authToken.
 
-Почни з плану в docs/plans/render-turso-phase0.md і дай його мені на підтвердження.
+Почни з плану в docs/plans/old/render-turso-phase0.md і дай його мені на підтвердження.

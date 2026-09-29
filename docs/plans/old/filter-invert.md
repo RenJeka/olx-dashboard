@@ -1,5 +1,7 @@
 # Інвертований режим локальних фільтрів
 
+> **Статус:** ✅ виконано (2026-06-17) · кроки відмічено 2026-09-29 за фактом коду (`invert` у `localFilters.ts` і local-filters UI).
+
 ## Контекст
 
 Локальні фільтри (ціна, міста, продавці, плюси, мінуси) працюють як білий список.
@@ -23,11 +25,11 @@
 ## Кроки
 
 - [x] Створити цей файл плану
-- [ ] `server/src/types.ts` — додати `invert?` до `LocalFilters`
-- [ ] `server/src/scraper/localFilters.ts` — `evaluateFilteredOut` з `match` → invert
-- [ ] `web/src/types/index.ts` — дзеркало `invert`
-- [ ] `web/src/components/SearchFiltersDrawer.tsx` — Switch + стани + динамічні тексти
-- [ ] `npm run build` — перевірка типів
+- [x] `server/src/types.ts` — додати `invert?` до `LocalFilters`
+- [x] `server/src/scraper/localFilters.ts` — `evaluateFilteredOut` з `match` → invert
+- [x] `web/src/types/index.ts` — дзеркало `invert`
+- [x] `web/src/components/SearchFiltersDrawer.tsx` — Switch + стани + динамічні тексти
+- [x] `npm run build` — перевірка типів
 
 ## Test-cases
 
