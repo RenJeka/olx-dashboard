@@ -39,8 +39,10 @@ olx-dashboard/
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
-│   ├── package.json          # deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver
-│   ├── tsconfig.json         # module/moduleResolution: NodeNext, emit у dist/
+│   ├── package.json          # test: vitest (тести — src/**/*.test.ts, хелпери — src/test/); deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver
+│   ├── tsconfig.json         # module/moduleResolution: NodeNext (typecheck, включно з тестами)
+│   ├── tsconfig.build.json   # production-збірка в dist/ без *.test.ts і src/test/
+│   ├── vitest.config.ts      # Vitest: тимчасова БД libSQL (TURSO_DATABASE_URL), послідовні файли, прибирання
 │   ├── scripts/
 │   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/

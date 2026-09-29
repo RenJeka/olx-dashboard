@@ -24,6 +24,7 @@
 - **Логування:** pino (той самий, що у Fastify) + `pino-pretty` (dev); єдиний сервіс
   `server/src/logger.ts` → stdout + таблиця `app_logs` (лише warn/error), діалог «Журнал» в UI.
 - **Notion:** `@notionhq/client` (етап 4).
+- **Тести:** **Vitest** (`server/`, dev), БД-тести — на тимчасовому файлі libSQL (не `server/data/olx.db`).
 - **НЕ використовувати:** Express, Prisma/ORM, PostgreSQL, Redux, Playwright/браузер для збору.
 - **Turso-економія:** кожен рядок читання/запису коштує квоти — батчити запити, не додавати
   індекси на часто оновлювані колонки, заміряти скілом `turso-reads-playbook`.
@@ -72,7 +73,8 @@ npm run build                   # tsc server + tsc/vite web (перевірка 
 npm run scan -- --search <id>   # CLI-скан без UI (--deep, --verify)
 npm run docs:check              # биті посилання в документації (має бути 0)
 npm run typecheck               # tsc --noEmit для server і web
-npm run check                   # typecheck + docs:check + skills:check — перед комітом
+npm test                        # Vitest (server): доменне ядро на тимчасовій БД
+npm run check                   # typecheck + test + docs:check + skills:check — перед комітом
 npm run skills:sync             # перегенерувати обгортки скілів після зміни skills/
 ```
 
@@ -86,8 +88,9 @@ npm run skills:sync             # перегенерувати обгортки 
 `UNIQUE`, `NOT NULL` без дефолту, `DEFAULT (вираз)`, зміна/видалення колонок чи `CHECK` — старт
 тоді падає з назвою `таблиця.колонка`. Деталі — `docs/plans/old/db-auto-migrate.md`.
 
-**Перевірка:** автоматичних тестів поки немає; мінімум — `npm run check`, далі smoke API / UI за
-`docs/development.md` (драбина перевірок, Definition of Done). UI/E2E — сабагент
+**Перевірка:** мінімум — `npm run check` (включно з Vitest-тестами `server/src/**/*.test.ts`), далі
+smoke API / UI за `docs/development.md` (драбина перевірок, Definition of Done). Зміна доменної
+логіки (статуси, upsert, фільтри, AI-парсинг) — разом із тестом. UI/E2E — сабагент
 `playwright-tester`, лише за явним запитом.
 
 ## Конвенції

@@ -20,13 +20,14 @@
 
 ## 2. Драбина перевірок
 
-Автоматичних тестів у репозиторії **поки немає** (див. §6). Перевірка — від дешевого до дорогого:
+Перевірка — від дешевого до дорогого:
 
 | # | Що | Команда / як | Коли |
 |---|---|---|---|
 | 1 | Типи (strict) | `npm run typecheck` (server `tsc --noEmit` + web `tsc -b --noEmit`) | завжди |
+| 1a | Автотести (Vitest, server) | `npm test` (`npm -w server run test:watch` — у режимі спостереження) | завжди; зміна доменної логіки — разом із тестом |
 | 2 | Посилання в документації | `npm run docs:check` | завжди (0 битих) |
-| 1+2 | Разом (+ `skills:check`) | `npm run check` | перед комітом |
+| 1–2 | Разом (typecheck + test + docs + skills) | `npm run check` | перед комітом |
 | 3 | Збірка | `npm run build` | зміни в конфігах TS/Vite, залежностях, `server/scripts/` |
 | 4 | Smoke API | `npm run dev` + запити нижче | зміни на сервері |
 | 5 | UI / E2E | сабагент `playwright-tester` із конкретними test-cases з плану | зміни в UI — **лише за явним запитом людини** |
@@ -100,18 +101,18 @@ claude -p "Invoke the project skill refactor-plan via the Skill tool. Do NOT cha
 Якщо Antigravity скіла не бачить — перевірити, з якої теки він читає скіли (очікується
 `.agents/skills/`), і за потреби додати ціль у `scripts/sync-skills.mjs` (`TARGET_DIRS`).
 
-## 7. Автотести — майбутнє
+## 7. Автотести
 
-Тестового фреймворку ще немає; додавання (напр. **Vitest** — природний вибір для Vite +
-TypeScript) — нова залежність, тож лише після підтвердження людиною. Пріоритети покриття, від
-найризиковішого:
+**Vitest** у `server/` (`npm test`). Тести — поруч із кодом (`*.test.ts`), хелпери — `server/src/test/`
+(`resetDb`, `createSearch`, `insertListing`, `gqlListing`). БД-тести йдуть на тимчасовому файлі
+libSQL з тією самою схемою (`initDb()`), послідовно, з очищенням у `beforeEach`; реальна
+`server/data/olx.db` не чіпається. З production-збірки тести виключені (`tsconfig.build.json`).
 
-1. `server/src/scraper/statusEngine.ts` — вікно покриття, пороги 1/2, `rejected → disabled`,
-   manual-override, auto-reactivate (історія: інцидент 395 хибних disable).
-2. `server/src/scraper/normalizer.ts` — upsert/дедуп за `olx_id`, `analysis_stale`, майбутня
-   `price_history` (Етап 3).
-3. `server/src/scraper/localFilters.ts` — групи фільтрів, `invert`, AND між групами.
-4. `server/src/analysis/parse*`/`relevance.ts` — парсинг відповідей LLM, перевірка `evidence`,
-   евристичний пре-фільтр.
-5. `server/src/scraper/graphql/mapper.ts` і `selectors.ts` — маппінг на збережених фікстурах
-   відповідей OLX (без живих запитів).
+Покрито: `statusEngine` (вікно покриття), `normalizer` (upsert, статуси, фільтри, `analysis_stale`),
+`localFilters`, AI-парсинг і пре-фільтр релевантності. Тести фіксують поточну поведінку:
+розбіжність із документацією — питання до людини, а не мовчазна правка тесту
+(приклад — `docs/plans/vitest-setup.md` → «Відкриті питання»).
+
+Далі за пріоритетом: `scraper/graphql/mapper.ts` і `selectors.ts` на збережених фікстурах
+відповідей OLX (без живих запитів); маршрути API (Fastify `inject`); фронтенд (Vitest + jsdom) —
+окремим рішенням.
