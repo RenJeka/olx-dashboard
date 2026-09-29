@@ -66,6 +66,8 @@ npm run scan -- --search <id>
 
 - [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) — канонічна специфікація (вимоги, схема БД, етапи, ризики)
 - [`docs/architecture.md`](docs/architecture.md) — технічна архітектура та потік даних
+- [`docs/business-rules.md`](docs/business-rules.md) — доменна механіка: скани, вікно покриття, verify, ручний override, синоніми
+- [`docs/ai-flow.md`](docs/ai-flow.md) — AI-кроки: фільтр релевантності, мінуси/плюси, AI Вибір
 - [`docs/olx-api.md`](docs/olx-api.md) — API OLX: GraphQL (основний метод) + HTML fallback (параметри, заголовки, приклади, dataflow фронтенду OLX)
 - [`docs/olx-graphql-fields-reference.md`](docs/olx-graphql-fields-reference.md) — довідник усіх полів GraphQL-відповіді OLX
 - [`docs/structure.md`](docs/structure.md) — структура файлів і папок

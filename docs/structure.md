@@ -20,11 +20,16 @@ olx-dashboard/
 │   ├── olx-monitor-spec.md           # канонічна специфікація (вимоги, схема, етапи)
 │   ├── architecture.md               # технічна архітектура (цей рівень опису)
 │   ├── olx-api.md                    # API OLX: GraphQL (основний) + HTML fallback
+│   ├── business-rules.md             # доменна механіка: скани, вікно покриття, verify, override, синоніми
+│   ├── ai-flow.md                    # AI-кроки (фільтр, мінуси/плюси, AI Вибір) + детальні AI-інваріанти
+│   ├── styles.md                     # семантичні токени Chakra UI v3
+│   ├── deploy-render-turso.md        # покроковий деплой Render + Turso
+│   ├── google-oauth-setup.md         # налаштування Google OAuth
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
 │   └── plans/                        # активні плани (зі статусом у шапці) + TODO; old/ — архів виконаних
-│       ├── old/                      # старі плани
+│       ├── old/                      # архів виконаних планів (історичний знімок, README.md)
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
