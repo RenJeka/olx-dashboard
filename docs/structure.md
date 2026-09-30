@@ -36,6 +36,7 @@ olx-dashboard/
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
+│   ├── handoffs/                     # handoff-знімки сесій (стан, рішення, наступний крок), YYYY-MM-DD-<тема>.md
 │   └── plans/                        # активні плани (зі статусом у шапці) + TODO; old/ — архів виконаних
 │       ├── old/                      # архів виконаних планів (історичний знімок, README.md)
 │       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами

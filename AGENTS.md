@@ -125,6 +125,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 | Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
 | Деплой / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
 | Що зараз у роботі / бекло? | [`docs/plans/`](docs/plans/) (активні плани), [`docs/plans/TODO`](docs/plans/TODO) |
+| Де зупинилась попередня сесія (стан, рішення, наступний крок)? | [`docs/handoffs/`](docs/handoffs/) — найсвіжіший файл |
 | Чому щось зроблено саме так (історія рішень)? | [`docs/plans/old/`](docs/plans/old/README.md) |
 | Скіли й сабагенти проєкту | [`skills/`](skills/README.md) — єдине джерело; `.claude/skills/` і `.agents/skills/` — згенеровані обгортки (не редагувати); сабагент `.claude/agents/playwright-tester.md` |
 
