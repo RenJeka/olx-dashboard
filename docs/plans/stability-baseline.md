@@ -11,11 +11,12 @@
 
 | # | Що | Стан | Вага |
 |---|---|---|---|
-| S1 | **Фронт на Render** `olx-dashboard-web.onrender.com` | ❌ `404`, `x-render-routing: no-server` — сервісу з такою адресою немає (видалено/призупинено/інша назва) | критично |
-| S2 | **API на Render** `olx-dashboard-api.onrender.com` | ✅ `/health` 200 (холодний старт ~33 с), OAuth-ворота працюють (401). ⚠️ Невідомо, з якої гілки задеплоєно (гайд — з feature-гілки, не `main`) | високо |
+| S1 | **Фронт на Render** — Static Site `olx-dashboard` → `olx-dashboard.onrender.com` | ✅ 200. Адреса `…-web.onrender.com` з гайду — хибна (сервіс названо `olx-dashboard`) → виправити `deploy-render-turso.md` | низько |
+| S2 | **API на Render** `olx-dashboard-api` (free, Node) | ✅ `/health` 200, OAuth-ворота (401). ❌ **Обидва сервіси деплояться з гілки `claude/turso-write-optimization-x920p8`** (autoDeploy), live — `ec44940` (2026-09-26, «Save local VS Code workspace»). Прод **не має 13 комітів `main`**: журнал помилок, інкрементальне збереження сканів, автоміграція схеми, документація. Ця ж гілка — PR #30: закриття/видалення гілки зламає автодеплой | високо |
+| S12 | Rewrite `/api/*` на Static Site | ❌ ціль `https://olx-dashboard-api.onrender.com.onrender.com/api/*` (подвоєний домен) → таймаут. Не впливає: фронт ходить в API напряму (`VITE_API_BASE`). Виправити або прибрати | низько |
 | S3 | **Збір: GraphQL OLX** | ✅ 52 оголошення за запит, `visible_total_count`, усі поля на місці (0,9 с) | — |
 | S4 | **Збір: HTML-fallback** | ❌ OLX віддає **HTTP 403** на сторінку пошуку — запасного каналу фактично немає | високо |
-| S5 | **Node на проді** | ⚠️ гайд ставить `NODE_VERSION=20` — Node 20 **EOL з 2026-04-30**; локально 22 | середньо |
+| S5 | **Node на проді** | ⚠️ підтверджено: `NODE_VERSION=20` — Node 20 **EOL з 2026-04-30**; локально 22 | середньо |
 | S6 | **Вразливості (prod-залежності)** | ⚠️ 7: high — `undici`, `find-my-way`, `fast-uri`, `brace-expansion`; moderate — `fastify`, `uuid` (через `exceljs`). Усі, крім `uuid`, лікуються `npm audit fix` без major | середньо |
 | S7 | Збірка / типи / тести / посилання | ✅ `npm run check` зелений, `npm run build` ок | — |
 | S8 | Бандл фронту | ⚠️ один чанк 1 МБ (280 КБ gzip) — не стабільність, а швидкість першого завантаження | низько |
@@ -28,8 +29,11 @@
 ## Кроки
 
 - [x] Аудит (таблиця вище).
-- [ ] **S1/S2** (людина, Render dashboard): чи існує Static Site і з якою назвою; з якої гілки
-      деплояться обидва сервіси; остання дата деплою. → далі — у `dev-deploy-harness.md`.
+- [x] **S1/S2** аудит Render через API (2026-09-30, read-only): сервіси, гілка, деплої, назви env.
+- [ ] **S2** Перевести обидва сервіси на `main` (перший деплой застосує автоміграцію до Turso — перед
+      цим гілка/бекап Turso) → `dev-deploy-harness.md` H3. **До того — не закривати PR #30 і не
+      видаляти гілку `claude/turso-write-optimization-x920p8`.**
+- [ ] **S12** Виправити або прибрати rewrite `/api/*`; виправити назви сервісів у гайді.
 - [ ] **S4** Діагностика HTML-fallback за чеклістом `olx-api.md` §5: заголовки/UA, `/d/uk/list/` vs
       інші URL, чи 403 стабільний (з різних IP — локально й з Render). Показати людині зразок
       відповіді. Playwright — ні (рішення людини). Якщо fallback не відновити — задокументувати
