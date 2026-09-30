@@ -10,7 +10,7 @@
 
 ## Стек (не відхилятися без явного запиту)
 
-- **Monorepo:** npm workspaces — `server/` + `web/`. Node.js 20+, TypeScript strict.
+- **Monorepo:** npm workspaces — `server/` + `web/`. Node.js **22 LTS** (`.nvmrc`, `engines`), TypeScript strict.
 - **Backend:** **Fastify**, **`@libsql/client`** (асинхронний; локально — файл
   `server/data/olx.db`, у проді — Turso; хелпери `dbAll`/`dbRun` у `server/src/db/db.ts`),
   **cheerio** (HTML-парсинг), **node-cron** (етап 4, ще не підключений). better-sqlite3 — більше НЕ використовується.
@@ -88,7 +88,8 @@ npm run skills:sync             # перегенерувати обгортки 
 `UNIQUE`, `NOT NULL` без дефолту, `DEFAULT (вираз)`, зміна/видалення колонок чи `CHECK` — старт
 тоді падає з назвою `таблиця.колонка`. Деталі — `docs/plans/old/db-auto-migrate.md`.
 
-**Перевірка:** мінімум — `npm run check` (включно з Vitest-тестами `server/src/**/*.test.ts`), далі
+**Перевірка:** CI (GitHub Actions, `.github/workflows/ci.yml`) на кожен push: `npm ci` →
+`npm run check` → `npm run build`; червоний CI = не зливати. Локально мінімум — `npm run check` (включно з Vitest-тестами `server/src/**/*.test.ts`), далі
 smoke API / UI за `docs/development.md` (драбина перевірок, Definition of Done). Зміна доменної
 логіки (статуси, upsert, фільтри, AI-парсинг) — разом із тестом. UI/E2E — сабагент
 `playwright-tester`, лише за явним запитом.

@@ -23,7 +23,7 @@
 | Шар | Технологія |
 | --- | --- |
 | Monorepo | npm workspaces (`server/` + `web/`) |
-| Backend | Node.js 20+, TypeScript (strict), Fastify 5, @libsql/client (Turso/libSQL, async; локально `file:`), cheerio |
+| Backend | Node.js 22 LTS, TypeScript (strict), Fastify 5, @libsql/client (Turso/libSQL, async; локально `file:`), cheerio |
 | Frontend | React 18, Vite 6, TanStack Query v5, TanStack Table v8, Chakra UI v3 (+ next-themes) |
 | Збір даних | GraphQL `POST /apigateway/graphql` (основний); `fetch` + cheerio HTML-парсинг (fallback). БЕЗ браузера/Playwright |
 

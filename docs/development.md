@@ -28,6 +28,7 @@
 | 1a | Автотести (Vitest, server) | `npm test` (`npm -w server run test:watch` — у режимі спостереження) | завжди; зміна доменної логіки — разом із тестом |
 | 2 | Посилання в документації | `npm run docs:check` | завжди (0 битих) |
 | 1–2 | Разом (typecheck + test + docs + skills) | `npm run check` | перед комітом |
+| CI | `npm ci` → `npm run check` → `npm run build` на Node з `.nvmrc` | GitHub Actions, `.github/workflows/ci.yml` | автоматично на кожен push; червоний — не зливати |
 | 3 | Збірка | `npm run build` | зміни в конфігах TS/Vite, залежностях, `server/scripts/` |
 | 4 | Smoke API | `npm run dev` + запити нижче | зміни на сервері |
 | 5 | UI / E2E | сабагент `playwright-tester` із конкретними test-cases з плану | зміни в UI — **лише за явним запитом людини** |
