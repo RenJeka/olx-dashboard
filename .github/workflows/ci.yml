@@ -1,0 +1,34 @@
+# CI: кожен push у будь-яку гілку (і PR з неї) — повна перевірка + production-збірка.
+# Локальний еквівалент: npm ci && npm run check && npm run build (docs/development.md §2).
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # typecheck (server + web) → Vitest (тимчасова БД, без мережі) → docs:check → skills:check
+      - run: npm run check
+
+      - run: npm run build

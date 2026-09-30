@@ -7,7 +7,7 @@
 ## Стек
 
 - **Monorepo:** npm workspaces — `server/` + `web/`
-- **Backend:** Node.js 20+, TypeScript, Fastify 5, @libsql/client (Turso/SQLite), cheerio
+- **Backend:** Node.js 22 LTS, TypeScript, Fastify 5, @libsql/client (Turso/SQLite), cheerio
 - **Frontend:** React 18, Vite 6, TanStack Query/Table, Chakra UI v3 (+ next-themes, react-icons/lu)
 - **Збір даних:** GraphQL `POST /apigateway/graphql` (основний) + `fetch`/cheerio HTML-fallback (без браузера/Playwright)
 

@@ -120,7 +120,7 @@
    | --- | --- |
    | `TURSO_DATABASE_URL` | `libsql://…` (з Частини 1, крок 3) |
    | `TURSO_AUTH_TOKEN` | токен (з Частини 1, крок 4) |
-   | `NODE_VERSION` | `20` |
+   | `NODE_VERSION` | `22` (або прибрати змінну — Render візьме версію з `.nvmrc`) |
    | `OPENROUTER_API_KEY` | *(опційно — лише якщо хочеш авто-режим AI; без нього працює ручний)* |
 
    > `PORT` додавати **не треба** — Render підставляє його сам, а наш код читає `process.env.PORT`.
@@ -263,7 +263,7 @@ TURSO
 RENDER — Web Service (бекенд)
   Build:  npm install --include=dev && npm run build -w server
   Start:  npm run start -w server
-  Env:    TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, NODE_VERSION=20
+  Env:    TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, NODE_VERSION=22
   Health: /health  → {"ok":true}
 
 RENDER — Static Site (фронт)
