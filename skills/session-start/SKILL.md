@@ -19,8 +19,8 @@ description: "Почати сесію в olx-dashboard: прочитати curre
 
 - **Git:** `git branch --show-current`, `git status --short`, `git log --oneline -3`,
   `git fetch --quiet && git log --oneline -1 origin/main`.
-- **CI `main`:** `https://api.github.com/repos/RenJeka/olx-dashboard/actions/runs?branch=main&per_page=1`
-  (публічно, без токена) — `conclusion` і `head_sha`.
+- **CI `main` і відкриті PR:** `gh run list --branch main --limit 1`, `gh pr list` (без `gh` — запасний
+  шлях з [github-cli](../../docs/instructions/github-cli.md)).
 - **Render** (якщо MCP доступний): `list_services` → сервіси `olx-dashboard-api` і `olx-dashboard` —
   гілка; `list_deploys` (limit 1) — статус і коміт live-деплою; збігається з `origin/main`?
 - **Turso:** не чіпати без потреби (`AGENTS.md` → «Turso-економія»). Лише якщо `current.md` чи хендоф прямо чекають перевірки БД —

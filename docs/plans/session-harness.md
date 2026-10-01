@@ -47,6 +47,8 @@
       `rules.md`, `current.md`, `development.md`, `structure.md`, інструкціях і скілах замінено
       посиланнями на джерело (плани, сесії, секрети, Turso, git, хендофи, прод). Хендофи й `plans/old/`
       не чіпали (знімки). Дубль у пам'яті агента (абсолютні шляхи) видалено — джерело `absolute-paths-for-user`.
+- [x] `gh` встановлено й залогінено (2026-10-01): інструкцію `github-pr-links` замінено на `github-cli`,
+      `session-start` дивиться CI/PR через `gh`; нова пастка `docs-check-untracked-files` (CI PR #34).
 
 ## Test-cases
 

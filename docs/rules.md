@@ -90,4 +90,4 @@
 - Коміт — лише за словом людини; повідомлення коміту й PR — англійською. Після змін — запропонувати
   текст коміту.
 - У PR — без помітки про Claude Code. Merge — «Create a merge commit». Гілки не видаляти без прямого
-  запиту. PR без `gh` — [github-pr-links](instructions/github-pr-links.md). Коли зливати — `AGENTS.md` → «Перевірка».
+  запиту. PR і CI — [github-cli](instructions/github-cli.md). Коли зливати — `AGENTS.md` → «Перевірка».

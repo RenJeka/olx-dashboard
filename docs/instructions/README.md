@@ -15,4 +15,5 @@ AI) сюди не дублюється — вона в документах із
 | [render-env-change-redeploys](render-env-change-redeploys.md) | Змінюєш env сервісу на Render |
 | [turso-create-branch-timeout](turso-create-branch-timeout.md) | Turso MCP `create_branch` повернув таймаут |
 | [absolute-paths-for-user](absolute-paths-for-user.md) | Даєш людині шлях до файлу в інструкції |
-| [github-pr-links](github-pr-links.md) | Треба відкрити PR або глянути CI без `gh` |
+| [github-cli](github-cli.md) | Треба відкрити PR, подивитись CI чи логи впалого прогону; перелогінити `gh` |
+| [docs-check-untracked-files](docs-check-untracked-files.md) | Пишеш у доках шлях до незакоміченого файлу; `docs:check` зелений локально, червоний у CI |

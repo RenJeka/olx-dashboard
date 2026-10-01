@@ -16,9 +16,9 @@
 - Бекап прод-БД від 2026-09-30: гілка Turso `olx-dashboard-bak-20260930` (захищена від видалення) + SQL-дамп
   у теці ключів агента ([secrets-in-sources](instructions/secrets-in-sources.md)).
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
-  «Прод». `gh` не встановлено ([github-pr-links](instructions/github-pr-links.md)).
+  «Прод». GitHub — через `gh` ([github-cli](instructions/github-cli.md)).
 - Харнес розробки (CI, тести, перевірки) — `AGENTS.md` → «Перевірка»; харнес сесій — `AGENTS.md` → «Сесія».
-- Робоча гілка `handoff-2026-09-30`: закомічено доки сесії 2026-09-30 і харнес сесій, у `main` ще не злито. Локальний untracked-файл налаштувань Claude Code (`.claude/` → settings) — не з цих сесій, рішення за людиною.
+- Гілка `handoff-2026-09-30` (доки сесії 2026-09-30, харнес сесій, `gh`) — [PR #34](https://github.com/RenJeka/olx-dashboard/pull/34) у `main`, ще не злито. Локальний untracked-файл налаштувань Claude Code (`.claude/` → settings) — не з цих сесій, рішення за людиною.
 
 ## Активні плани
 
@@ -42,5 +42,4 @@
 
 ## Наступний крок
 
-Запушити `handoff-2026-09-30` і відкрити PR у `main`
-([github-pr-links](instructions/github-pr-links.md)). Далі — S9 у stability-baseline: повторний глибокий скан на проді.
+Злити [PR #34](https://github.com/RenJeka/olx-dashboard/pull/34) (рішення людини — [rules](rules.md) → «Прод»). Далі — S9 у stability-baseline: повторний глибокий скан на проді.
