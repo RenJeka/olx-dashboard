@@ -20,7 +20,7 @@
   які обірваний липневий deep-скан 24 так і не зібрав); «вічні» скани 18, 19, 20, 23, 24 закрито з `error`.
 - Робоча гілка `handoff-2026-09-30` — **незакомічені** зміни: `.gitignore` (`*.env`), доки (`deploy-render-turso.md`,
   `dev-deploy-harness.md`, `stability-baseline.md`), `docs/plans/old/render-to-main.md` (новий), цей
-  handoff; `.claude/settings.json` — untracked, не з цієї сесії (не чіпав).
+  handoff; .claude/settings.json — untracked, не з цієї сесії (не чіпав).
 
 ## Decisions (і чому)
 
