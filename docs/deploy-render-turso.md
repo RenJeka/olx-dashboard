@@ -35,11 +35,19 @@
 > запити як **same-origin** (той самий домен) — не треба налаштовувати CORS, а відносні `/api/...`
 > у коді працюють без змін.
 
+> ⚠️ **Фактичний прод (з 2026-09-30) відрізняється від цієї схеми:**
+> - обидва сервіси деплояться з гілки **`main`** (autoDeploy), Node 22 (`NODE_VERSION=22`);
+> - Static Site названо **`olx-dashboard`** → `https://olx-dashboard.onrender.com` (не `…-web`);
+> - фронт ходить в API **напряму** через `VITE_API_BASE=https://olx-dashboard-api.onrender.com`
+>   (`web/src/api/base.ts`), бекенд дозволяє CORS для `WEB_ORIGIN=https://olx-dashboard.onrender.com`;
+> - rewrite `/api/*` **прибрано** (був битий), лишається лише SPA-fallback `/*` → `/index.html`.
+> Історія переведення — `docs/plans/old/render-to-main.md`.
+
 ---
 
 ## ✅ Передумови (5 хв)
 
-1. Код запушено в GitHub (гілка `claude/render-turso-migration-ikp6t5` або `main` після merge).
+1. Код запушено в GitHub, гілка `main` (прод деплоїться лише з неї; CI має бути зеленим).
 2. Акаунт **GitHub** (вже є).
 3. Зареєструватись (безкоштовно, через GitHub):
    - **Turso** — https://turso.tech
@@ -104,7 +112,7 @@
    | --- | --- |
    | **Name** | `olx-dashboard-api` |
    | **Region** | `Frankfurt (EU Central)` (найближче до України) |
-   | **Branch** | твоя гілка (напр. `claude/render-turso-migration-ikp6t5`) |
+   | **Branch** | `main` |
    | **Root Directory** | *(залишити порожнім — це монорепо з npm workspaces)* |
    | **Runtime / Language** | `Node` |
    | **Build Command** | `npm install --include=dev && npm run build -w server` |
@@ -225,7 +233,8 @@ Postman із браузера) — додай у **бекенд** (Render Web Se
 
 ## 🔄 Частина 7. Як оновлювати (CI/CD)
 
-Render слухає твою гілку: **кожен `git push` у неї → автоматичний редеплой** відповідного сервісу.
+Render слухає гілку **`main`**: **кожен merge/push у неї → автоматичний редеплой** обох сервісів.
+Тому зміни йдуть через PR із зеленим CI (`.github/workflows/ci.yml`), а не прямим push у `main`.
 Тобто далі цикл такий:
 
 ```bash
@@ -269,8 +278,10 @@ RENDER — Web Service (бекенд)
 RENDER — Static Site (фронт)
   Build:    npm install --include=dev && npm run build -w web
   Publish:  web/dist
-  Rewrite1: /api/*  →  https://<бекенд>.onrender.com/api/*   (Rewrite)
-  Rewrite2: /*      →  /index.html                            (Rewrite)
+  Env:      VITE_API_BASE=https://<бекенд>.onrender.com, VITE_GOOGLE_CLIENT_ID
+  Rewrite:  /*      →  /index.html                            (Rewrite, SPA-fallback)
+  (фактичний прод — API напряму + CORS WEB_ORIGIN; rewrite /api/* не використовується)
+  Branch:   main (обидва сервіси)
 ```
 
 Готово. Насолоджуйся тим, як твій локальний застосунок ожив у хмарі ✨

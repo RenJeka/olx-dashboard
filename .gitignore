@@ -69,6 +69,8 @@ web_modules/
 .env
 .env.*
 !.env.example
+# секрети у файлах *.env (render.env, turso.env…) — ніде в репо; тримати поза репо: ~/.config/olx-dashboard/
+*.env
 
 # SQLite database (локальні дані OLX)
 server/data/*.db

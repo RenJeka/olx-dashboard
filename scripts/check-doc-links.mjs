@@ -20,7 +20,7 @@ const BARE_DOC = /(?<![\w/.`-])(docs\/[\w./-]+?\.md)(?![\w`])/g;
 const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 process.chdir(root);
 // Відстежувані + нові (ще не додані), без ігнорованих.
-const files = execSync('git ls-files --cached --others --exclude-standard "*.md" "docs/plans/TODO"', {
+const files = execSync('git ls-files --cached --others --exclude-standard "*.md"', {
   encoding: 'utf8',
 })
   .split('\n')
