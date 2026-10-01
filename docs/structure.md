@@ -36,10 +36,14 @@ olx-dashboard/
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
 │   ├── structure.md                  # цей файл
 │   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
-│   ├── handoffs/                     # handoff-знімки сесій (стан, рішення, наступний крок), YYYY-MM-DD-<тема>.md
-│   └── plans/                        # активні плани (зі статусом у шапці) + TODO; old/ — архів виконаних
-│       ├── old/                      # архів виконаних планів (історичний знімок, README.md)
-│       └── TODO                      # робочий список дрібних UI/UX-задач із чекбоксами
+│   ├── current.md                    # поточний стан «на зараз» (перезаписує скіл session-close)
+│   ├── rules.md                      # стабільні правила: документація, секрети, прод, хендофи, парковка, git (імпорт в AGENTS.md)
+│   ├── parking.md                    # відкладені бажані зміни й бекло (P-NNN, скіл parking-add)
+│   ├── instructions/                 # по файлу на пастку/глухий кут + README.md (скіл instruction-add)
+│   ├── templates/                    # шаблони: handoff.md, instruction.md, parking-entry.md
+│   ├── handoffs/                     # handoff-знімки сесій (стан, рішення, наступний крок); ім'я — docs/rules.md → «Хендофи»
+│   └── plans/                        # активні плани (зі статусом у шапці); old/ — архів виконаних
+│       └── old/                      # архів виконаних планів (історичний знімок, README.md)
 │
 ├── server/                   # workspace "server" (Node + Fastify), type: module
 │   ├── package.json          # test: vitest (тести — src/**/*.test.ts, хелпери — src/test/); deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver

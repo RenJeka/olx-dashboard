@@ -1,12 +1,23 @@
 # AGENTS.md — olx-monitor
 
 > Єдина точка входу для AI-агентів (Claude Code, Codex, Antigravity тощо); окремого CLAUDE.md
-> немає. Тут — стек, інваріанти, які не можна порушувати, команди, конвенції й **карта
+> немає ([чому](docs/instructions/agents-md-loading.md)). Тут — стек, інваріанти, які не можна порушувати, команди, конвенції й **карта
 > документації**. Детальна механіка — у документах із розділу «Карта документації».
 
 Персональна система моніторингу оголошень OLX.ua: збір → SQLite/libSQL → React-таблиця зі
 статусами/нотатками/історією цін, AI-аналіз описів, експорт у Notion (етап 4). Single-user:
 локальний запуск або деплой Render + Turso за Google-OAuth «воротами».
+
+## Сесія
+
+- **Старт:** скіл `session-start` (кроки — [`skills/session-start/SKILL.md`](skills/session-start/SKILL.md);
+  без підтримки скілів — виконати їх вручну).
+- **Кінець:** завжди скіл `session-close` (кроки — [`skills/session-close/SKILL.md`](skills/session-close/SKILL.md)).
+- **Посеред сесії:** пастка → `instruction-add`; відкладене → `parking-add`; процедура → `skill-from-instruction`.
+- **Стабільні правила роботи** (документація, прод, хендофи, парковка, git, стиль) — у
+  [`docs/rules.md`](docs/rules.md); прочитати обов'язково (Claude Code підтягує імпортом нижче):
+
+@docs/rules.md
 
 ## Стек (не відхилятися без явного запиту)
 
@@ -99,7 +110,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 - Без `any` у доменних типах (scraper/db/logic). Доменні типи — `server/src/types/` (реекспорт — `types.ts`),
   фронтенду — `web/src/types/`; DTO між беком і фронтом дублюються (без build-зчеплень).
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
-- Після змін пропонувати текст git commit англійською (тільки текст).
+- Git, коміти й PR — `docs/rules.md` → «Git».
 - **Плани:** перед правками коду нової фічі/задачі — ПЕРШИМ кроком файл `docs/plans/<назва>.md`
   (контекст → файли → кроки з чекбоксами → test-cases). Під заголовком — рядок
   `> **Статус:** 🟢 активний | ✅ виконано (YYYY-MM-DD) | ⏸ відкладено` (+ примітки через ` · `).
@@ -124,10 +135,13 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 | Кольори/токени UI (світла/темна тема)? | [`docs/styles.md`](docs/styles.md) |
 | Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
 | Деплой / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
-| Що зараз у роботі / бекло? | [`docs/plans/`](docs/plans/) (активні плани), [`docs/plans/TODO`](docs/plans/TODO) |
-| Де зупинилась попередня сесія (стан, рішення, наступний крок)? | [`docs/handoffs/`](docs/handoffs/) — найсвіжіший файл |
+| Що зараз: мета, стан, відкриті питання, наступний крок? | [`docs/current.md`](docs/current.md) |
+| Що в роботі / бекло? | [`docs/plans/`](docs/plans/) (активні плани), [`docs/parking.md`](docs/parking.md) (відкладене, `P-NNN`) |
+| Де зупинилась попередня сесія (рішення, глухі кути, деталі)? | [`docs/handoffs/`](docs/handoffs/) — найсвіжіший за датою в імені |
+| Відома пастка / глухий кут (git, Windows, Render, Turso, секрети)? | [`docs/instructions/`](docs/instructions/README.md) |
+| Правила документації, сесій, git, роботи з продом? Шаблони хендофа/інструкції/парковки? | [`docs/rules.md`](docs/rules.md), [`docs/templates/`](docs/templates/) |
 | Чому щось зроблено саме так (історія рішень)? | [`docs/plans/old/`](docs/plans/old/README.md) |
-| Скіли й сабагенти проєкту | [`skills/`](skills/README.md) — єдине джерело; `.claude/skills/` і `.agents/skills/` — згенеровані обгортки (не редагувати); сабагент `.claude/agents/playwright-tester.md` |
+| Скіли й сабагенти проєкту | [`skills/`](skills/README.md) — єдине джерело; `.claude/skills/` і `.agents/skills/` — згенеровані обгортки (не редагувати); харнес сесій — розділ «Сесія» вище; сабагент `.claude/agents/playwright-tester.md` |
 
 ## Етапи (рухатись по черзі, не забігати вперед)
 

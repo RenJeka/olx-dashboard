@@ -8,6 +8,11 @@
     "refactor": ["claude", "agents"],
     "refactor-plan": ["claude", "agents"],
     "refactor-method-complexity-reduce": ["claude", "agents"],
-    "simplify": ["agents"]
+    "simplify": ["agents"],
+    "session-start": ["claude", "agents"],
+    "session-close": ["claude", "agents"],
+    "instruction-add": ["claude", "agents"],
+    "parking-add": ["claude", "agents"],
+    "skill-from-instruction": ["claude", "agents"]
   }
 }
