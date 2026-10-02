@@ -18,7 +18,9 @@
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
   «Прод». GitHub — через `gh` ([github-cli](instructions/github-cli.md)).
 - Харнес розробки (CI, тести, перевірки) — `AGENTS.md` → «Перевірка»; харнес сесій — `AGENTS.md` → «Сесія».
-- Гілка `handoff-2026-09-30` (доки сесії 2026-09-30, харнес сесій, `gh`) — [PR #34](https://github.com/RenJeka/olx-dashboard/pull/34) у `main`, ще не злито. Локальний untracked-файл налаштувань Claude Code (`.claude/` → settings) — не з цих сесій, рішення за людиною.
+- Харнес сесій і `gh` злито в `main` ([PR #34](https://github.com/RenJeka/olx-dashboard/pull/34), 2026-10-01),
+  автодеплой обох сервісів — live, smoke OK. Гілку `handoff-2026-09-30` не видаляли.
+- Локальний untracked-файл налаштувань Claude Code (`.claude/` → settings) — не з цих сесій, рішення за людиною.
 
 ## Активні плани
 
@@ -42,4 +44,5 @@
 
 ## Наступний крок
 
-Злити [PR #34](https://github.com/RenJeka/olx-dashboard/pull/34) (рішення людини — [rules](rules.md) → «Прод»). Далі — S9 у stability-baseline: повторний глибокий скан на проді.
+S9 у [stability-baseline](plans/stability-baseline.md): повторний глибокий скан на проді — чи доживає
+процес на free-тарифі Render і чи зберігається зібране. Запуск — лише з «так» людини ([rules](rules.md) → «Прод»).
