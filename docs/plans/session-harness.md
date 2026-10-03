@@ -1,6 +1,6 @@
 # План: харнес сесій і перманентної пам'яті (перенос із youtrack)
 
-> **Статус:** 🟢 активний (з 2026-10-01) · усе перенесено, `npm run check` і headless-виклик `session-start` зелені; лишились ручні test-cases (нова сесія: `/session-start`, `/session-close`; Antigravity).
+> **Статус:** 🟢 активний (з 2026-10-01) · усе перенесено, `npm run check` і headless-виклик `session-start` зелені; `session-close` відпрацював у реальній сесії 2026-10-03 (план-таблиця → запис після «так»); лишились ручні test-cases: `/session-start` у новій сесії, Antigravity.
 
 ## Контекст
 
