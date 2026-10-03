@@ -4,7 +4,7 @@ import { createSearch, resetDb } from '../test/db.js';
 import { INTERRUPTED_SCAN_ERROR, closeInterruptedScanRuns } from './scanRunLifecycle.js';
 
 // Обірвані скани (процес зупинився посеред скану — засинання/рестарт Render) закриваються
-// на старті сервера, щоб не лишались «вічними» (docs/plans/scan-keepalive.md, S9).
+// на старті сервера, щоб не лишались «вічними» (docs/plans/old/scan-keepalive.md, S9).
 
 interface RunRow {
   id: number;

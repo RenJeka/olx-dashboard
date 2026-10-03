@@ -18,8 +18,10 @@
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
   «Прод». GitHub — через `gh` ([github-cli](instructions/github-cli.md)).
 - Харнес розробки (CI, тести, перевірки) — `AGENTS.md` → «Перевірка»; харнес сесій — `AGENTS.md` → «Сесія».
-- Харнес сесій і `gh` злито в `main` ([PR #34](https://github.com/RenJeka/olx-dashboard/pull/34), 2026-10-01),
-  автодеплой обох сервісів — live, smoke OK. Гілку `handoff-2026-09-30` не видаляли.
+- **S9 закрито** (2026-10-03): довгі скани більше не гинуть від засинання free-тарифу Render (самопінг під час
+  скану + закриття обірваних на старті) — [план](plans/old/scan-keepalive.md), перевірено на проді.
+- Пошук `iphone` на проді після глибоких сканів має на порядок більше оголошень, ніж до них; як UI і
+  `/listings` поводяться на такому обсязі (швидкість, пам'ять сервера, читання Turso) — ще не перевірено.
 - Локальний untracked-файл налаштувань Claude Code (`.claude/` → settings) — не з цих сесій, рішення за людиною.
 
 ## Активні плани
@@ -44,5 +46,6 @@
 
 ## Наступний крок
 
-S9 у [stability-baseline](plans/stability-baseline.md): повторний глибокий скан на проді — чи доживає
-процес на free-тарифі Render і чи зберігається зібране. Запуск — лише з «так» людини ([rules](rules.md) → «Прод»).
+Вибір людини серед решти стабільності ([stability-baseline](plans/stability-baseline.md)): S6 `npm audit fix`,
+S4 HTML-fallback (`403`), S10 (рішення про NULL `last_refresh_at`), перевірка UI на великому пошуку `iphone`;
+далі — харнес деплою H3–H6 ([dev-deploy-harness](plans/dev-deploy-harness.md)).
