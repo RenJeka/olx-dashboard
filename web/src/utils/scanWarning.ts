@@ -64,7 +64,8 @@ export function parseScanWarning(raw: string, context: ScanWarningContext = {}):
     lower.includes('coverage window skipped') || lower.includes('вікно покриття пропущено');
   const capHit = lower.includes('pagination/request cap');
   const windowCap = lower.includes('window cap hit');
-  const htmlFallback = lower.includes('fallback html') || lower.includes('graphql failed');
+  // Лише успішний HTML-fallback; «graphql failed» без нього (S4: fallback вимкнено) — це збій варіанта.
+  const htmlFallback = lower.includes('fallback html ok');
   const noPriceBound = lower.includes('no upper price bound');
 
   const stats: ScanWarningStat[] = [];

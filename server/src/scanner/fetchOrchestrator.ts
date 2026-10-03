@@ -5,6 +5,7 @@ import { interruptibleSleep, randomDelayMs } from '../scraper/utils.js';
 import {
   BATCH_PAUSE_MIN_MS,
   BATCH_PAUSE_MAX_MS,
+  HTML_FALLBACK_ENABLED,
 } from '../scraper/constants.js';
 import type {
   SearchConfig,
@@ -27,8 +28,14 @@ export function variantFailureNote(variant: string, message: string): string {
   return `«${variant}»: збій (${message}) — скан завершено достроково, зібране попередніми варіантами збережено`;
 }
 
+/** Текст помилки скану, коли GraphQL упав, а HTML-fallback вимкнено (HTML_FALLBACK_ENABLED). */
+export function htmlFallbackDisabledMessage(graphqlMessage: string): string {
+  return `graphql failed: ${graphqlMessage}; html fallback вимкнено (OLX відповідає 403)`;
+}
+
 /**
- * Викликає GraphqlOlxFetcher; якщо він кидає помилку — fallback на HtmlOlxFetcher.
+ * Викликає GraphqlOlxFetcher; якщо він кидає помилку — fallback на HtmlOlxFetcher
+ * (лише коли HTML_FALLBACK_ENABLED; інакше — помилка з причиною GraphQL).
  * Якщо впав і fallback — кидає об'єднану помилку (обидва методи недоступні).
  */
 export async function fetchWithFallback(
@@ -74,6 +81,7 @@ export async function fetchWithFallback(
   } catch (graphqlErr) {
     const graphqlMessage =
       graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
+    if (!HTML_FALLBACK_ENABLED) throw new Error(htmlFallbackDisabledMessage(graphqlMessage));
 
     try {
       const result = await htmlFetcher.fetchSearch(search, {

@@ -18,7 +18,7 @@
 | № | Метод | Статус | Код |
 | --- | --- | --- | --- |
 | 1 | **GraphQL** `POST /apigateway/graphql` | ✅ основний | `server/src/scraper/graphql/fetcher.ts` |
-| 2 | HTML-сторінка пошуку + cheerio | ✅ fallback №1 (автоматичний у scanner) | `server/src/scraper/olxFetcher.ts` |
+| 2 | HTML-сторінка пошуку + cheerio | ⛔ вимкнено з 2026-10-03 (`HTML_FALLBACK_ENABLED`, 403 від CloudFront — §3) | `server/src/scraper/olxFetcher.ts` |
 | 3 | `__NEXT_DATA__` JSON зі сторінки | концепт (не реалізовано) | — |
 | 4 | Playwright з видимим Chromium | крайній випадок, рішення людини | — |
 
@@ -471,8 +471,10 @@ GET https://www.olx.ua/api/v1/offers/metadata/search/?query=<q>&facets=[{"field"
 
 ## 3. HTML-сторінка пошуку (fallback №1)
 
-> Працює, верифіковано; до 2026-06 був основним методом. Scanner вмикає його автоматично,
-> якщо GraphQL-запит упав.
+> ⛔ **Вимкнено з 2026-10-03** (`HTML_FALLBACK_ENABLED = false` у `scraper/constants.ts`): OLX за
+> CloudFront відповідає `403` на будь-яку HTML-сторінку з Node (пошук, головна, оголошення) — заголовки
+> й адреса не допомагають. Скан при збої GraphQL падає з `graphql failed: …; html fallback вимкнено`.
+> Опис нижче — для повернення (ідея обходу — [P-005](parking.md)). До 2026-06 був основним методом.
 
 ### 3.1 Запит
 
@@ -530,6 +532,8 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 ```
 GET <listing.url>
 ```
+
+> ⚠️ З 2026-10-03 сторінка оголошення теж віддає `403` (CloudFront, як §3) → проба завжди `unknown`.
 
 Заголовки — `REQUEST_HEADERS` з `selectors.ts` (ті самі, що для HTML-fallback пошуку),
 `redirect: 'manual'` (НЕ йдемо за 3xx-редіректами — opaque-redirect трактуємо як `unknown`).
@@ -600,11 +604,12 @@ DOM-селектори простіші й достатні).
      більше не ковтає її, 2026-06-30). Дивись саме частину `graphql failed:`, а не оманливу
      HTML-помилку «рендериться через JS» (картки в HTML зазвичай Є — `__NEXT_DATA__` OLX прибрав,
      але `[data-cy="l-card"]` лишилися).
+   - `graphql failed: ...; html fallback вимкнено` — HTML-fallback вимкнено (§3); причина — у частині GraphQL.
    - `... транзієнт ... після 3 спроб` / `graphql transient fail at offset=<N>` — тимчасовий
      збій (429/5xx/не-JSON) пережив ретрай (§2.8). Якщо часто — OLX тротлить: збільш паузи
      (`BATCH_PAUSE_*`) або зменш частоту сканів; це НЕ «зміна розмітки».
 2. GraphQL віддає 200, але поля `null` — схему розширили/перейменували; онови query.
-3. HTML-fallback: картки є, поля порожні → звір селектори §3.2, онови `selectors.ts`.
+3. HTML-fallback (якщо увімкнено): картки є, поля порожні → звір селектори §3.2, онови `selectors.ts`.
 4. Карток в HTML нема взагалі → перевір `__NEXT_DATA__` (§4.1).
 5. Після фіксу — онови ЦЕЙ файл (журнал §6) і `AGENTS.md`, якщо змінився канон.
 
@@ -627,4 +632,5 @@ DOM-селектори простіші й достатні).
 | 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/old/verify-pass.md` |
 | 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/old/coverage-window-fix.md` |
 | 2026-06-30 | Глибокий скан після «Аналізу перед скануванням» падав із оманливою HTML-помилкою «Карток не знайдено… рендериться через JS». Наживо підтверджено: GraphQL і HTML працюють (200, 50 карток; `__NEXT_DATA__` зник, але `[data-cy="l-card"]` є). Реальна причина — ОДИН транзієнтний GraphQL-збій (429/5xx/не-JSON) посеред пагінації валив увесь скан (`fetchPage` без ретраю), а `runDeepScanFromPlan` ковтав причину GraphQL (inline HTML-fallback без try/catch) | ретрай транзієнтних збоїв у `client.fetchPage` (3 спроби, бекоф; детерміновані 4xx/схема/ListingError — без ретраю); об'єднана помилка `graphql failed:…; html fallback failed:…` у `runDeepScanFromPlan`; частковий успіх при транзієнтному винятку посеред пагінації (`fetchSearch`/`scanSingleBucket`) замість обвалу — §2.8/§2.9 |
+| 2026-10-03 | OLX (CloudFront) відповідає `403` на будь-яку HTML-сторінку з Node: пошук (`/d/uk/list/`, `/uk/list/`, `/list/`), головна, сторінка оголошення; заголовки Firefox 91 і сучасного Chrome — без різниці. GraphQL з того ж IP працює. Гіпотеза (середня впевненість): блок за TLS-відбитком Node | HTML-fallback вимкнено (`HTML_FALLBACK_ENABLED`), скан падає з причиною GraphQL; ідея обходу — [P-005](parking.md); verify-проба §3.4 теж дає `unknown` |
 | 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/old/price-range-split.md`, §2.9 |
