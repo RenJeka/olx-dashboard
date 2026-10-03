@@ -74,7 +74,8 @@ olx-dashboard/
 │       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan
 │       │   ├── searchLoader.ts # loadSearch (SQLite → SearchConfig), dedupeQueries
 │       │   ├── fetchOrchestrator.ts # fetchWithFallback (GraphQL→HTML), fetchAllQueries (синоніми + злиття по olxId)
-│       │   ├── scanRunLifecycle.ts  # withScanRun — спільний lifecycle scan_runs (insert/progress/error/abort)
+│       │   ├── scanRunLifecycle.ts  # withScanRun — спільний lifecycle scan_runs (insert/progress/error/abort/keep-alive) + closeInterruptedScanRuns
+│       │   ├── keepAlive.ts         # самопінг публічного /health під час скану (free-тариф Render не засинає)
 │       │   ├── scanPersister.ts    # ScanPersister — інкрементальне збереження по ходу скану (flushSafe/flush, дедуп olx_id)
 │       │   ├── scanFinalize.ts     # finalizeScanResult (upsert→statuses→facet→update), refreshCategoryFacet
 │       │   ├── runScan.ts    # runScan (normal/deep): fetchAllQueries → finalizeScanResult

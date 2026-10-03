@@ -2,6 +2,7 @@ import { dbRun } from '../db/db.js';
 import { logError } from '../logger.js';
 import type { ScanProgress } from '../types.js';
 import { abortFlags } from './abortControl.js';
+import { acquireKeepAlive } from './keepAlive.js';
 
 /**
  * Контекст, доступний бізнес-логіці всередині `withScanRun`.
@@ -31,6 +32,23 @@ const PROGRESS_WRITE_THROTTLE_MS = 1000;
 
 const FINALIZE_ERROR_SQL = `UPDATE scan_runs SET finished_at = ?, error = ?,
      stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
+
+/** Текст помилки скану, який обірвався разом із процесом сервера (засинання/рестарт Render). */
+export const INTERRUPTED_SCAN_ERROR =
+  'Скан перервано: процес сервера зупинився (засинання або рестарт). Зібране до обриву збережено.';
+
+const CLOSE_INTERRUPTED_SQL = `UPDATE scan_runs SET finished_at = ?, error = ?,
+     stage = NULL, sub_done = NULL, sub_total = NULL WHERE finished_at IS NULL`;
+
+/**
+ * Закрити скани, що лишились без finished_at після зупинки процесу (docs/plans/scan-keepalive.md).
+ * Викликається на старті сервера (не CLI): у цей момент жоден скан цього процесу ще не йде.
+ * Повертає кількість закритих.
+ */
+export async function closeInterruptedScanRuns(): Promise<number> {
+  const res = await dbRun(CLOSE_INTERRUPTED_SQL, [new Date().toISOString(), INTERRUPTED_SCAN_ERROR]);
+  return res.rowsAffected;
+}
 
 /**
  * Обгортка lifecycle для scan_runs: створює запис, налаштовує abort/progress,
@@ -71,6 +89,9 @@ export async function withScanRun<T>(
     ]).catch(() => {});
   };
 
+  // Не дати free-інстансу Render заснути посеред довгого скану.
+  const releaseKeepAlive = acquireKeepAlive();
+
   try {
     return await body({ runId, shouldAbort, onProgress });
   } catch (err) {
@@ -81,6 +102,7 @@ export async function withScanRun<T>(
     await dbRun(FINALIZE_ERROR_SQL, [new Date().toISOString(), message, runId]);
     throw err;
   } finally {
+    releaseKeepAlive();
     abortFlags.delete(searchId);
   }
 }
