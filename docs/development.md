@@ -92,13 +92,6 @@ claude -p "Invoke the project skill refactor-plan via the Skill tool. Do NOT cha
 # очікується: CANONICAL_PATH=skills/refactor-plan/SKILL.md; FIRST_HEADING=# Refactor Plan
 ```
 
-**Antigravity** (вручну, у чаті агента в цьому репозиторії):
-> Use the refactor-plan skill. Do not change any code. Tell me the path of the file with its full
-> instructions and quote the first heading of that file.
-
-Очікується: скіл знайдено, шлях `skills/refactor-plan/SKILL.md`, заголовок `# Refactor Plan`.
-Якщо Antigravity скіла не бачить — перевірити, з якої теки він читає скіли (очікується
-`.agents/skills/`), і за потреби додати ціль у `scripts/sync-skills.mjs` (`TARGET_DIRS`).
 
 ## 7. Автотести
 
@@ -107,11 +100,10 @@ claude -p "Invoke the project skill refactor-plan via the Skill tool. Do NOT cha
 libSQL з тією самою схемою (`initDb()`), послідовно, з очищенням у `beforeEach`; реальна
 `server/data/olx.db` не чіпається. З production-збірки тести виключені (`tsconfig.build.json`).
 
-Покрито: `statusEngine` (вікно покриття), `normalizer` (upsert, статуси, фільтри, `analysis_stale`),
-`localFilters`, AI-парсинг і пре-фільтр релевантності. Тести фіксують поточну поведінку:
-розбіжність із документацією — питання до людини, а не мовчазна правка тесту
-(приклад — `docs/plans/vitest-setup.md` → «Відкриті питання»).
+Що покрито — файли `*.test.ts` поруч із кодом. Тести фіксують поточну поведінку: розбіжність із
+документацією — питання до людини, а не мовчазна правка тесту (приклад — S10 у
+`docs/plans/stability-baseline.md`). На Windows тимчасова БД буває ще зайнята при прибиранні (`EBUSY`, особливо при прогоні одного файлу
+`npm test -w server -- <файл>`) — це лише попередження; старі (понад годину) залишки прибирає старт наступного прогону
+(`server/src/test/globalSetup.ts`).
 
-Далі за пріоритетом: `scraper/graphql/mapper.ts` і `selectors.ts` на збережених фікстурах
-відповідей OLX (без живих запитів); маршрути API (Fastify `inject`); фронтенд (Vitest + jsdom) —
-окремим рішенням.
+Наступні тести (бекло) — [P-006](parking.md).

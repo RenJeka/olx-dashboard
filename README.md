@@ -1,7 +1,7 @@
 # OLX Dashboard
 
 Персональна single-user система моніторингу оголошень **OLX.ua**: збір через GraphQL API OLX
-(fallback — HTML) → SQLite → React-таблиця зі статусами/нотатками/історією цін (за етапами)
+→ SQLite → React-таблиця зі статусами/нотатками/історією цін (за етапами)
 та експортом у Notion. Локальний запуск або деплой Render + Turso (див. нижче).
 
 ## Стек
@@ -9,7 +9,7 @@
 - **Monorepo:** npm workspaces — `server/` + `web/`
 - **Backend:** Node.js 22 LTS, TypeScript, Fastify 5, @libsql/client (Turso/SQLite), cheerio
 - **Frontend:** React 18, Vite 6, TanStack Query/Table, Chakra UI v3 (+ next-themes, react-icons/lu)
-- **Збір даних:** GraphQL `POST /apigateway/graphql` (основний) + `fetch`/cheerio HTML-fallback (без браузера/Playwright)
+- **Збір даних:** GraphQL `POST /apigateway/graphql` (без браузера/Playwright); HTML-fallback вимкнено — OLX відповідає `403` (`docs/olx-api.md` §3)
 
 ## Швидкий старт
 
@@ -51,28 +51,8 @@ npm run scan -- --search <id>
      AI-аналіз» (дефолт `google/gemini-2.5-flash-lite`).
 
 `server/.env` ігнорується git (закомічено лише `.env.example`). Аналіз запускається **тільки
-вручну** (ніколи зі сканів/автооновлення). Деталі — `docs/plans/old/llm-analysis.md`.
+вручну** (ніколи зі сканів/автооновлення). Деталі — [`docs/ai-flow.md`](docs/ai-flow.md).
 
-## Стан
+## Стан і документація
 
-- ✅ **Етап 1 (MVP):** GraphQL-збір (HTML — fallback), upsert, REST, React-таблиця на Chakra UI v3.
-- ✅ **Етап 2:** статуси (ручні + auto-disable/reactivate), нотатки, інлайн-едіт, локальні фільтри, verify-прохід.
-- ✅ **Поза етапами:** глибокий скан з авто-розбиттям по ціні й двофазним аналізом, синоніми пошуку,
-  проєкти, дерево категорій OLX, AI (плюси/мінуси, фільтр релевантності, AI Picks), Turso + Render,
-  Google OAuth, журнал помилок, відновлення часткових сканів.
-- ⏳ **Етап 3:** спарклайни `price_history` + MD-експорт. **Етап 4:** Notion-експорт + node-cron.
-
-## Документація
-
-- [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) — канонічна специфікація (вимоги, схема БД, етапи, ризики)
-- [`docs/architecture.md`](docs/architecture.md) — технічна архітектура та потік даних
-- [`docs/development.md`](docs/development.md) — процес розробки, драбина перевірок, Definition of Done
-- [`docs/business-rules.md`](docs/business-rules.md) — доменна механіка: скани, вікно покриття, verify, ручний override, синоніми
-- [`docs/ai-flow.md`](docs/ai-flow.md) — AI-кроки: фільтр релевантності, мінуси/плюси, AI Вибір
-- [`docs/olx-api.md`](docs/olx-api.md) — API OLX: GraphQL (основний метод) + HTML fallback (параметри, заголовки, приклади, dataflow фронтенду OLX)
-- [`docs/olx-graphql-fields-reference.md`](docs/olx-graphql-fields-reference.md) — довідник усіх полів GraphQL-відповіді OLX
-- [`docs/structure.md`](docs/structure.md) — структура файлів і папок
-- [`docs/plans/old/initial-mvp.md`](docs/plans/old/initial-mvp.md) — план Етапу 1 із прогресом
-- [`docs/plans/old/graphql-migration.md`](docs/plans/old/graphql-migration.md) — план міграції збору на GraphQL
-- [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) — покрокове налаштування Google OAuth (Google Console, env-змінні, локал, Render)
-- [`AGENTS.md`](AGENTS.md) — інваріанти й конвенції (обовʼязкові при змінах)
+Етапи, інваріанти й карта документації — [`AGENTS.md`](AGENTS.md); поточний стан — [`docs/current.md`](docs/current.md).

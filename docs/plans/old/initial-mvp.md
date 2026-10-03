@@ -7,7 +7,7 @@
 ## Context
 
 Репозиторій порожній (початковий коміт + `AGENTS.md` + `docs/`). Завдання — за промптом
-`docs/claude-code-scaffold-prompt.md` збудувати **тільки Етап 1 (MVP)** згідно канону
+`claude-code-scaffold-prompt.md` (видалено 2026-10-03) збудувати **тільки Етап 1 (MVP)** згідно канону
 (`AGENTS.md` + `docs/olx-monitor-spec.md`): monorepo, scraper (fetch+cheerio), SQLite-схема
 з 4 таблиць, upsert-нормалізація, REST (CRUD searches + scan + listings), CLI-скан і сира
 React-таблиця.

@@ -13,6 +13,7 @@
     "session-close": ["claude", "agents"],
     "instruction-add": ["claude", "agents"],
     "parking-add": ["claude", "agents"],
-    "skill-from-instruction": ["claude", "agents"]
+    "skill-from-instruction": ["claude", "agents"],
+    "docs-audit": ["claude", "agents"]
   }
 }
