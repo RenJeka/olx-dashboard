@@ -89,5 +89,5 @@
 
 - Коміт — лише за словом людини; повідомлення коміту й PR — англійською. Після змін — запропонувати
   текст коміту.
-- У PR — без помітки про Claude Code. Merge — «Create a merge commit». Гілки не видаляти без прямого
+- У PR і комітах — без помітки про Claude Code (`Co-Authored-By`, `Claude-Session`, «Generated with»). Merge — «Create a merge commit». Гілки не видаляти без прямого
   запиту. PR і CI — [github-cli](instructions/github-cli.md). Коли зливати — `AGENTS.md` → «Перевірка».

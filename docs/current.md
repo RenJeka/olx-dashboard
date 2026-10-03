@@ -9,7 +9,7 @@
 розробки й деплою**, **(3) нова фіча «модель JEV»** (що це — ще не з'ясовано). Історія цін (Етап 3) —
 не пріоритет ([P-001](parking.md)).
 
-Порядок роботи (рішення людини, 2026-10-03): **S6 → S4 → S14 → S10** зі
+Порядок роботи (рішення людини, 2026-10-03): **S6 ✅ → S4 → S14 → S10** зі
 [stability-baseline](plans/stability-baseline.md), потім харнес **H3–H6** з
 [dev-deploy-harness](plans/dev-deploy-harness.md).
 
@@ -52,5 +52,5 @@
 
 ## Наступний крок
 
-S6 у [stability-baseline](plans/stability-baseline.md): `npm audit fix` (без `--force`) → `npm run check` +
-smoke → PR.
+S4 у [stability-baseline](plans/stability-baseline.md): діагностика HTML-fallback (`403`) за [olx-api](olx-api.md) §5,
+без Playwright; перед запитами з проду — погодження людини.
