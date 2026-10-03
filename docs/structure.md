@@ -16,7 +16,7 @@ olx-dashboard/
 ├── AGENTS.md                 # канон інваріантів/конвенцій для агентів (читають Claude Code, Codex тощо)
 ├── README.md                 # огляд + швидкий старт
 ├── scripts/
-│   ├── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (docs/plans/old — лише лінки на доки)
+│   ├── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (plans/old і handoffs — лише лінки на доки, заархівований план валідний)
 │   └── sync-skills.mjs       # `npm run skills:sync|skills:check`: обгортки скілів з skills/ у .claude/ і .agents/
 ├── skills/                   # ЄДИНЕ джерело скілів (<name>/SKILL.md + references/), skills.json — цілі, README.md
 ├── .claude/skills/           # згенеровані обгортки для Claude Code (не редагувати)
@@ -36,7 +36,6 @@ olx-dashboard/
 │   ├── google-oauth-setup.md         # налаштування Google OAuth
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
 │   ├── structure.md                  # цей файл
-│   ├── claude-code-scaffold-prompt.md# промпт-скаффолд Етапу 1
 │   ├── current.md                    # поточний стан «на зараз» (перезаписує скіл session-close)
 │   ├── rules.md                      # стабільні правила: документація, секрети, прод, хендофи, парковка, git (імпорт в AGENTS.md)
 │   ├── parking.md                    # відкладені бажані зміни й бекло (P-NNN, скіл parking-add)
@@ -85,7 +84,7 @@ olx-dashboard/
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
-│       │   ├── schema.sql    # КАНОН схеми БД (5 таблиць) — джерело істини
+│       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
 │       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard

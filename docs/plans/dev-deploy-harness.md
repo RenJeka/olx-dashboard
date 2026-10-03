@@ -39,7 +39,7 @@
 
 ## Кроки
 
-- [ ] Людина: стан сервісів у Render (див. `stability-baseline.md` S1/S2), доступ до Turso CLI.
+- [x] Людина: стан сервісів у Render (S1/S2 `stability-baseline.md`), доступ агента до Render і Turso (MCP) — 2026-09-30.
 - [x] H2 Node 22 у репо: `.nvmrc`, `engines`, документація. ✅ `NODE_VERSION=22` на Render (2026-09-30,
       разом із переведенням обох сервісів на `main` — `render-to-main.md`; прод на Node 22.23.3).
 - [x] H1 CI: `.github/workflows/ci.yml` (push у будь-яку гілку + ручний запуск).

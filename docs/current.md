@@ -10,7 +10,7 @@
 не пріоритет ([P-001](parking.md)).
 
 Порядок роботи (рішення людини, 2026-10-03): **S6 ✅ → S4 ✅ →
-[аудит документації](plans/docs-audit.md) → S14 → S10** зі [stability-baseline](plans/stability-baseline.md), потім
+аудит документації ✅ → S14 → S10** зі [stability-baseline](plans/stability-baseline.md), потім
 харнес **H3–H6** з [dev-deploy-harness](plans/dev-deploy-harness.md).
 
 ## Де ми зараз
@@ -29,9 +29,8 @@
 ## Активні плани
 
 Що лишилось — рядок `> **Статус:**` і невідмічені кроки кожного плану:
-[stability-baseline](plans/stability-baseline.md) (стабільність, S…), [docs-audit](plans/docs-audit.md) (аудит доків + скіл), [dev-deploy-harness](plans/dev-deploy-harness.md)
-(харнес деплою, H…), [vitest-setup](plans/vitest-setup.md), [docs-harness](plans/docs-harness.md),
-[session-harness](plans/session-harness.md).
+[stability-baseline](plans/stability-baseline.md) (стабільність, S…), [dev-deploy-harness](plans/dev-deploy-harness.md)
+(харнес деплою, H…).
 
 ## Що враховувати
 
@@ -45,11 +44,12 @@
 
 - «Модель JEV» — що це, для чого, як доступна (API / OpenRouter / локально).
 - S10: NULL `last_refresh_at` при вичерпаній видачі — пояснення простими словами в
-  [vitest-setup](plans/vitest-setup.md) → «Відкриті питання»; перед рішенням — пояснити людині.
+  [stability-baseline](plans/stability-baseline.md) → «S10»; перед рішенням — пояснити людині.
 - Чи копіювати `OPENROUTER_API_KEY` в `server/.env` з іншого проєкту.
 - Коли видаляти бекап-гілку Turso `olx-dashboard-bak-20260930`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03).
 
 ## Наступний крок
 
-[docs-audit](plans/docs-audit.md): інструкція + скіл аудиту → звіт-таблиця людині → правки після «так».
+S14 у [stability-baseline](plans/stability-baseline.md): разом із людиною відкрити великий пошук `iphone` на
+проді; перед замірами (Render MCP, Turso) — сказати людині, що саме запускаємо, і чекати «так».

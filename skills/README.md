@@ -27,4 +27,4 @@
   вміст у `skills/chakra-ui-builder/` і запустити `npm run skills:sync` (`skills:check` покаже
   «зайва тека, не згенерована», якщо копія лишилась).
 - Перевірено 2026-09-29: Claude Code (`claude -p`) через обгортку доходить до канонічного
-  `SKILL.md` і до `references/`. Antigravity — див. ручну перевірку в `docs/development.md`.
+  `SKILL.md` і до `references/`.
