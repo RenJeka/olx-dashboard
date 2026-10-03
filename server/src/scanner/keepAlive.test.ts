@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KEEPALIVE_INTERVAL_MS, acquireKeepAlive } from './keepAlive.js';
 
 // Самопінг під час скану: free-інстанс Render засинає після 15 хв без вхідних запитів
-// (docs/plans/scan-keepalive.md, S9).
+// (docs/plans/old/scan-keepalive.md, S9).
 const URL = 'https://olx-dashboard-api.onrender.com';
 
 const fetchMock = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));

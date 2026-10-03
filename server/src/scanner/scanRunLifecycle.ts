@@ -41,7 +41,7 @@ const CLOSE_INTERRUPTED_SQL = `UPDATE scan_runs SET finished_at = ?, error = ?,
      stage = NULL, sub_done = NULL, sub_total = NULL WHERE finished_at IS NULL`;
 
 /**
- * Закрити скани, що лишились без finished_at після зупинки процесу (docs/plans/scan-keepalive.md).
+ * Закрити скани, що лишились без finished_at після зупинки процесу (docs/plans/old/scan-keepalive.md).
  * Викликається на старті сервера (не CLI): у цей момент жоден скан цього процесу ще не йде.
  * Повертає кількість закритих.
  */
