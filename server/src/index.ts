@@ -2,7 +2,8 @@ import './env.js'; // завантажити server/.env у process.env ДО ч�
 import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import { initDb } from './db/db.js';
-import { rootLogger, logError, cleanupOldLogs } from './logger.js';
+import { rootLogger, logError, logWarn, cleanupOldLogs } from './logger.js';
+import { closeInterruptedScanRuns } from './scanner/scanRunLifecycle.js';
 import { authPlugin } from './auth/plugin.js';
 import { authRoutes } from './auth/routes.js';
 import { assertAuthConfigured } from './auth/config.js';
@@ -70,6 +71,11 @@ try {
   // застосувати схему ДО прийому запитів (Turso/нова локальна БД — порожні) + автоміграція колонок
   for (const sql of await initDb()) app.log.info(`Міграція схеми: ${sql}`);
   await cleanupOldLogs(); // retention журналу app_logs (старші за 14 днів)
+  // скани, обірвані разом із попереднім процесом (засинання/рестарт), — закрити, а не лишати «вічними»
+  const interrupted = await closeInterruptedScanRuns();
+  if (interrupted > 0) {
+    logWarn('scanner', 'startup', `Закрито обірваних сканів: ${interrupted} (процес зупинявся посеред скану)`);
+  }
   await app.listen({ port: PORT, host: '0.0.0.0' });
 } catch (err) {
   app.log.error(err);
