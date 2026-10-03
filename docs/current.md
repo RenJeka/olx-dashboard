@@ -9,9 +9,9 @@
 розробки й деплою**, **(3) нова фіча «модель JEV»** (що це — ще не з'ясовано). Історія цін (Етап 3) —
 не пріоритет ([P-001](parking.md)).
 
-Порядок роботи (рішення людини, 2026-10-03): **S6 ✅ → S4 → S14 → S10** зі
-[stability-baseline](plans/stability-baseline.md), потім харнес **H3–H6** з
-[dev-deploy-harness](plans/dev-deploy-harness.md).
+Порядок роботи (рішення людини, 2026-10-03): **S6 ✅ → S4 ✅ →
+[аудит документації](plans/docs-audit.md) → S14 → S10** зі [stability-baseline](plans/stability-baseline.md), потім
+харнес **H3–H6** з [dev-deploy-harness](plans/dev-deploy-harness.md).
 
 ## Де ми зараз
 
@@ -29,20 +29,21 @@
 ## Активні плани
 
 Що лишилось — рядок `> **Статус:**` і невідмічені кроки кожного плану:
-[stability-baseline](plans/stability-baseline.md) (стабільність, S…), [dev-deploy-harness](plans/dev-deploy-harness.md)
+[stability-baseline](plans/stability-baseline.md) (стабільність, S…), [docs-audit](plans/docs-audit.md) (аудит доків + скіл), [dev-deploy-harness](plans/dev-deploy-harness.md)
 (харнес деплою, H…), [vitest-setup](plans/vitest-setup.md), [docs-harness](plans/docs-harness.md),
 [session-harness](plans/session-harness.md).
 
 ## Що враховувати
 
-- Запасного каналу збору фактично немає: HTML-fallback OLX отримує `403` — stability-baseline, S4.
+- Запасного каналу збору немає: HTML-fallback вимкнено (OLX відповідає `403`), ідея обходу — [P-005](parking.md).
+- Verify-проба («Перевірити неактивні») теж отримує `403` → нічого не вимикає (S15, рішення людини).
 - Пошук `iphone` на проді після глибоких сканів став великим — поведінка UI/`/listings` не перевірена (S14);
-  багато «зниклих/старих» там — потрібне ручне «Перевірити неактивні» (чому — [business-rules](business-rules.md),
-  авто-disable лише після повного скану).
+  багато «зниклих/старих» там; ручне «Перевірити неактивні» зараз не допоможе (S15).
 - Моніторинг скану на проді — [prod-scan-monitoring](instructions/prod-scan-monitoring.md).
 
 ## Відкриті питання (чекають людину)
 
+- S15: що робити з verify-пробою під `403` (stability-baseline).
 - «Модель JEV» — що це, для чого, як доступна (API / OpenRouter / локально).
 - S10: NULL `last_refresh_at` при вичерпаній видачі — пояснення простими словами в
   [vitest-setup](plans/vitest-setup.md) → «Відкриті питання»; перед рішенням — пояснити людині.
@@ -52,5 +53,4 @@
 
 ## Наступний крок
 
-S4 у [stability-baseline](plans/stability-baseline.md): діагностика HTML-fallback (`403`) за [olx-api](olx-api.md) §5,
-без Playwright; перед запитами з проду — погодження людини.
+[docs-audit](plans/docs-audit.md): інструкція + скіл аудиту → звіт-таблиця людині → правки після «так».

@@ -28,6 +28,13 @@ export const BATCH_PAUSE_MAX_MS = 6000;
  */
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
 
+/**
+ * HTML-fallback збору (S4, 2026-10-03): OLX за CloudFront відповідає 403 на будь-яку HTML-сторінку
+ * з Node, незалежно від заголовків і адреси — fallback вимкнено, скан падає з причиною GraphQL.
+ * Код HtmlOlxFetcher і селектори лишаються; ідея обходу — docs/parking.md (P-005).
+ */
+export const HTML_FALLBACK_ENABLED = false;
+
 // ── HTTP ─────────────────────────────────────────────────────────────────────
 
 export const USER_AGENT =

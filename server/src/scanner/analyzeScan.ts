@@ -21,7 +21,13 @@ import type {
   RawListing,
 } from '../types.js';
 import { loadSearch, dedupeQueries } from './searchLoader.js';
-import { graphqlFetcher, htmlFetcher, variantFailureNote } from './fetchOrchestrator.js';
+import {
+  graphqlFetcher,
+  htmlFetcher,
+  htmlFallbackDisabledMessage,
+  variantFailureNote,
+} from './fetchOrchestrator.js';
+import { HTML_FALLBACK_ENABLED } from '../scraper/constants.js';
 import { withScanRun } from './scanRunLifecycle.js';
 import { finalizeScanResult } from './scanFinalize.js';
 import { ScanPersister } from './scanPersister.js';
@@ -452,6 +458,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       } catch (graphqlErr) {
         const graphqlMessage = graphqlErr instanceof Error ? graphqlErr.message : String(graphqlErr);
         try {
+          if (!HTML_FALLBACK_ENABLED) throw graphqlErr; // S4: fallback вимкнено — одразу в обробку збою
           const htmlResult = await htmlFetcher.fetchSearch(variantSearch, {
             onProgress: (p) => onVariantProgress({ ...p, method: 'HTML' }),
             shouldAbort: ctx.shouldAbort,
@@ -463,7 +470,9 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
           // Обидва методи впали — НЕ ковтаємо причину GraphQL (інакше спливає лише оманлива
           // HTML-помилка «рендериться через JS»). Дзеркалить контракт fetchWithFallback.
           const htmlMessage = htmlErr instanceof Error ? htmlErr.message : String(htmlErr);
-          const combined = `graphql failed: ${graphqlMessage}; html fallback failed: ${htmlMessage}`;
+          const combined = HTML_FALLBACK_ENABLED
+            ? `graphql failed: ${graphqlMessage}; html fallback failed: ${htmlMessage}`
+            : htmlFallbackDisabledMessage(graphqlMessage);
           // Збій пізнього варіанта НЕ валить скан: усе зібране (і вже flush-нуте) лишається,
           // скан завершується достроково з warning (docs/plans/scan-failure-recovery.md).
           if (merged.size > 0) {

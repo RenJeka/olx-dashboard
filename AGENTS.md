@@ -44,8 +44,8 @@
 
 **Збір з OLX** (деталі — `docs/olx-api.md`):
 - Основний метод — **GraphQL** `POST https://www.olx.ua/apigateway/graphql` (без кукі/auth/токенів),
-  `sort_by=created_at:desc`. **Fallback — HTML + cheerio**, вмикається автоматично; усі селектори —
-  лише в `server/src/scraper/selectors.ts`. Усі стратегії — за інтерфейсом `OlxFetcher`.
+  `sort_by=created_at:desc`. **Fallback — HTML + cheerio — вимкнено** (`HTML_FALLBACK_ENABLED`: OLX відповідає 403,
+  [P-005](docs/parking.md)); код і селектори лишаються, селектори — лише в `server/src/scraper/selectors.ts`. Усі стратегії — за інтерфейсом `OlxFetcher`.
 - **Ввічливість:** звичайний скан ≤3 запити з паузою 1–2 с; глибокий — батчі по 3 з паузою 3–6 с
   і жорсткими запобіжниками (вікно пагінації OLX `offset ≤ 1000`).
 - Наступні fallback (`__NEXT_DATA__` → headed Playwright) — **лише за рішенням людини**.
@@ -156,7 +156,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 
 ## Що питати перед дією
 
-- GraphQL почав падати → діагностика за чеклістом `docs/olx-api.md` §5 (HTML-fallback вмикається
-  автоматично); НЕ переходити одразу на Playwright; спершу перевірити `__NEXT_DATA__` і показати
+- GraphQL почав падати → діагностика за чеклістом `docs/olx-api.md` §5 (HTML-fallback вимкнено — скан
+  падає з причиною GraphQL); НЕ переходити одразу на Playwright; спершу перевірити `__NEXT_DATA__` і показати
   людині зразок HTML.
 - Зміни стеку, схеми БД чи інваріантів вище — лише після підтвердження.
