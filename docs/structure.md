@@ -21,6 +21,7 @@ olx-dashboard/
 ├── skills/                   # ЄДИНЕ джерело скілів (<name>/SKILL.md + references/), skills.json — цілі, README.md
 ├── .claude/skills/           # згенеровані обгортки для Claude Code (не редагувати)
 ├── .claude/agents/           # сабагент playwright-tester (UI/E2E за запитом)
+├── .claude/settings.json     # проєктні налаштування Claude Code (увімкнений плагін turso)
 ├── .agents/skills/           # згенеровані обгортки для Antigravity (не редагувати)
 │
 ├── docs/
