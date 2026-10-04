@@ -1,6 +1,6 @@
 # План: мінімальний харнес для розробки й деплою
 
-> **Статус:** 🟢 активний (з 2026-09-29) · H1 CI і H2 Node 22 (репо + Render, 2026-09-30) зроблено; прод на `main` (`render-to-main.md`); далі H3–H6 — після S6, S4, S14, S10 зі `stability-baseline.md` (порядок людини, 2026-10-03).
+> **Статус:** 🟢 активний (з 2026-09-29) · H1, H2 (2026-09-30), H4, H5, H6 + P-004 (2026-10-04) ✅; лишився H3 (`render.yaml`, потрібні дії людини в Render) — наступна сесія.
 
 ## Контекст
 
@@ -22,7 +22,7 @@
 |---|---|---|
 | H1 | **GitHub Actions CI**: на PR і push у `main` — `npm ci` → `npm run check` → `npm run build` (Node 22) | Зламаний код не потрапляє в `main` |
 | H2 | **Node 22 LTS**: `engines` у `package.json`, `.nvmrc`, `NODE_VERSION=22` на Render | Однакова версія скрізь, не EOL |
-| H3 | **`render.yaml` (Blueprint)**: обидва сервіси (API + Static Site), build/start, `healthCheckPath: /health`, rewrite `/api/*`, env-ключі (значення — у dashboard), гілка `main`, auto-deploy **після зеленого CI** | Конфіг деплою в git, відтворюваний; відновлення S1 одним кліком |
+| H3 | **`render.yaml` (Blueprint)**: обидва сервіси (API + Static Site), build/start, `healthCheckPath: /health`, SPA-fallback `/*` → `/index.html` (rewrite `/api/*` прибрано в S12), env-ключі (значення — у dashboard), гілка `main`, auto-deploy **після зеленого CI** | Конфіг деплою в git, відтворюваний; відновлення S1 одним кліком |
 | H4 | **`npm run smoke -- <api-url> [web-url]`**: `/health` 200, `/api/*` без сесії → 401, фронт `index.html` 200 | Перевірка деплою за хвилину, з будь-якого ПК |
 | H5 | **Runbook** у `docs/deploy-render-turso.md` → розділ «Реліз»: чекліст (CI зелений → merge → деплой → smoke → лог «Міграція схеми»), відкат (Render «Rollback» + обмеження: міграції схеми лише додають колонки — відкат коду безпечний), бекап Turso перед ризиковими змінами | Передбачуваний реліз і відкат |
 | H6 | **Dependabot** (npm + GitHub Actions, ≈ раз на 2 тижні, групування minor/patch) | Вразливості не накопичуються місяцями (S6) |
@@ -48,7 +48,7 @@
       деплой з `main` → smoke.
 - [x] H5 runbook (2026-10-04): `docs/deploy-render-turso.md` → «Реліз, відкат, бекап».
 - [x] H6 Dependabot (2026-10-04, [h6-dependabot](old/h6-dependabot.md)) + P-004 (дії CI `v7`).
-- [ ] Документація.
+- [ ] Документація H3 (`deploy-render-turso.md`, `structure.md`); для H4–H6 — оновлено в їхніх PR.
 
 ## Оцінка
 
