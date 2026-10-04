@@ -1,6 +1,7 @@
 # Dependabot (H6, docs/plans/h6-dependabot.md): PR з оновленнями залежностей приблизно раз на 2 тижні
 # (1-го і 15-го числа о 07:00 за Києвом — рішення людини 2026-10-04; «кожні 2 тижні» Dependabot не вміє).
-# minor/patch — одним груповим PR на екосистему; major — окремими PR (рішення людини).
+# npm: лише minor/patch, одним груповим PR; major не пропонуються (рішення людини 2026-10-04 — великі
+# оновлення вирішуються вручну, P-012 у docs/parking.md). Дії CI — і major (як P-004: рантайм Node у GitHub).
 # Кожен PR проходить CI; злиття в main = деплой на Render — лише з «так» людини (docs/rules.md → «Прод»).
 version: 2
 updates:
@@ -12,6 +13,9 @@ updates:
       cronjob: "0 7 1,15 * *"
       timezone: Europe/Kyiv
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]

@@ -29,7 +29,7 @@
 | 2 | Посилання в документації | `npm run docs:check` | завжди (0 битих) |
 | 1–2 | Разом (typecheck + test + docs + skills) | `npm run check` | перед комітом |
 | CI | `npm ci` → `npm run check` → `npm run build` на Node з `.nvmrc` | GitHub Actions, `.github/workflows/ci.yml` | автоматично на кожен push; червоний — не зливати |
-| Deps | PR оновлень залежностей і дій CI (minor/patch — групою) | Dependabot, `.github/dependabot.yml` | 1-го і 15-го числа (≈ раз на 2 тижні); злиття = деплой — лише з «так» людини |
+| Deps | PR оновлень залежностей (npm — лише minor/patch, групою; major — вручну, [P-012](parking.md)) і дій CI | Dependabot, `.github/dependabot.yml` | 1-го і 15-го числа (≈ раз на 2 тижні); злиття = деплой — лише з «так» людини |
 | Прод | `npm run smoke` (API, гейт `401`, CORS, фронт) | `scripts/smoke.mjs` | після кожного деплою |
 | 3 | Збірка | `npm run build` | зміни в конфігах TS/Vite, залежностях, `server/scripts/` |
 | 4 | Smoke API | `npm run dev` + запити нижче | зміни на сервері |
