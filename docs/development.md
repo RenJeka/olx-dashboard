@@ -30,7 +30,7 @@
 | 1–2 | Разом (typecheck + test + docs + skills) | `npm run check` | перед комітом |
 | CI | `npm ci` → `npm run check` → `npm run build` на Node з `.nvmrc` | GitHub Actions, `.github/workflows/ci.yml` | автоматично на кожен push; червоний — не зливати |
 | Deps | PR оновлень залежностей (npm — лише minor/patch, групою; major — вручну, [P-012](parking.md)) і дій CI | Dependabot, `.github/dependabot.yml` | 1-го і 15-го числа (≈ раз на 2 тижні); злиття = деплой — лише з «так» людини |
-| Прод | `npm run smoke` (API, гейт `401`, CORS, фронт) | `scripts/smoke.mjs` | після кожного деплою |
+| Прод | `npm run smoke` (API, гейт `401`, CORS, фронт) | `scripts/smoke.mjs` | після кожного деплою; повний чекліст релізу й відкат — [deploy-render-turso](deploy-render-turso.md) → «Реліз, відкат, бекап» |
 | 3 | Збірка | `npm run build` | зміни в конфігах TS/Vite, залежностях, `server/scripts/` |
 | 4 | Smoke API | `npm run dev` + запити нижче | зміни на сервері |
 | 5 | UI / E2E | сабагент `playwright-tester` із конкретними test-cases з плану | зміни в UI — **лише за явним запитом людини** |

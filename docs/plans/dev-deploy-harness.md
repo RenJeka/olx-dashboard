@@ -46,7 +46,7 @@
 - [x] H4 smoke-скрипт (2026-10-04, [h4-smoke](old/h4-smoke.md)): `npm run smoke`.
 - [ ] H3 `render.yaml` → людина підключає Blueprint у Render (або звіряє з наявними сервісами) →
       деплой з `main` → smoke.
-- [ ] H5 runbook.
+- [x] H5 runbook (2026-10-04): `docs/deploy-render-turso.md` → «Реліз, відкат, бекап».
 - [x] H6 Dependabot (2026-10-04, [h6-dependabot](old/h6-dependabot.md)) + P-004 (дії CI `v7`).
 - [ ] Документація.
 

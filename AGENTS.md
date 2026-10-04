@@ -135,7 +135,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 | Як вести задачу, чим перевіряти, коли «готово», як безпечно з OLX і БД? | [`docs/development.md`](docs/development.md) |
 | Кольори/токени UI (світла/темна тема)? | [`docs/styles.md`](docs/styles.md) |
 | Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
-| Деплой / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
+| Деплой, реліз, відкат, бекап Turso / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
 | Що зараз: мета, стан, відкриті питання, наступний крок? | [`docs/current.md`](docs/current.md) |
 | Що в роботі / бекло? | [`docs/plans/`](docs/plans/) (активні плани), [`docs/parking.md`](docs/parking.md) (відкладене, `P-NNN`) |
 | Де зупинилась попередня сесія (рішення, глухі кути, деталі)? | [`docs/handoffs/`](docs/handoffs/) — найсвіжіший за датою в імені |
