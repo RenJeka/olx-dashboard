@@ -47,9 +47,8 @@ describe('applyScanStatuses — вікно покриття', () => {
   });
 
   it('вичерпана видача (exhausted) — вікно на всю видачу, включно з NULL-refresh', async () => {
-    // ⚠️ Фіксує ПОТОЧНУ поведінку коду: при exhausted NULL-refresh рядки теж кандидати.
-    // Документація (AGENTS.md / business-rules.md) каже «NULL-refresh — не кандидати ніколи»;
-    // розбіжність винесено на рішення людини (docs/plans/vitest-setup.md → «Відкриті питання»).
+    // Задумано (S10, рішення людини 2026-10-04): повна видача — сама доказ, тож NULL-refresh
+    // рядки теж кандидати (docs/business-rules.md → «Auto-disable»).
     await insertListing(searchId, 2, { last_refresh_at: BELOW_WINDOW });
     await insertListing(searchId, 3, { last_refresh_at: null });
     await applyScanStatuses(searchId, [gqlListing(1)], true, 1);
