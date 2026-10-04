@@ -335,9 +335,14 @@ flowchart LR
   (щоб не перезавантажувати весь список оголошень при кожному фокусі вікна; дані оновлюються
   явно через скан/мутації з точковою інвалідацією). Локальні `staleTime` (`useSession` —
   `Infinity`, `useAnalysisStatus` — 5 хв) перекривають ці дефолти.
-- `api/client.ts` — fetch-обгортка + TanStack Query хуки: `useSearches`, `useCreateSearch`,
+- `api/*.ts` (реекспорт — `api/index.ts`; fetch-обгортка — `api/base.ts`) — TanStack Query хуки: `useSearches`, `useCreateSearch`,
   `useDeleteSearch`, `useReorderSearches`, `useScan`, `useVerify`, `useScanStatus`,
   `useSearchStats`, `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`.
+  Легка таблиця (`api/listings.ts`, `docs/plans/listings-light-payload.md`): `useListingDetails(id)` —
+  повний опис і галерея на вимогу (підказка, діалог опису, `PhotoCell`), `useListingsDetails(searchId, ids)` —
+  пакетом порціями по 500 (крок перегляду AI-майстра), `useListingSearch(searchId, query, scope)` — id збігів
+  серверного пошуку в описі (запит — з паузою через `hooks/useDebouncedValue.ts`; збіги застосовуються у
+  `visibleRows` `ListingsTable`).
   LLM-аналіз: `useAnalysisStatus`, `useSavedCriteria`, `useGenerateCriteria`,
   `useImportCriteria`, `useSaveCriteria`, `useAnalyze` (клієнтське чанкування по 200),
   `useImportAnalysis`, `useCommitAnalysis` (chunked) + плоскі хелпери `fetchCriteriaPrompt`/
