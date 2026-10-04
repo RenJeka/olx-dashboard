@@ -39,7 +39,7 @@
 > - обидва сервіси деплояться з гілки **`main`** — Auto-Deploy **«After CI Checks Pass»** (лише після зеленого CI),
 >   Node 22 (`NODE_VERSION=22`);
 > - налаштування обох сервісів зафіксовано в [`render.yaml`](../render.yaml) — еталон, **не** підключений як
->   Blueprint (новий Blueprint створив би дублікати; рішення — `docs/plans/h3-render-yaml.md`);
+>   Blueprint (новий Blueprint створив би дублікати; рішення — `docs/plans/old/h3-render-yaml.md`);
 > - Static Site названо **`olx-dashboard`** → `https://olx-dashboard.onrender.com` (не `…-web`);
 > - фронт ходить в API **напряму** через `VITE_API_BASE=https://olx-dashboard-api.onrender.com`
 >   (`web/src/api/base.ts`), бекенд дозволяє CORS для `WEB_ORIGIN=https://olx-dashboard.onrender.com`;

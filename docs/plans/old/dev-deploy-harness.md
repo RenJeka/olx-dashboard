@@ -1,6 +1,6 @@
 # План: мінімальний харнес для розробки й деплою
 
-> **Статус:** 🟢 активний (з 2026-09-29) · H1, H2 (2026-09-30), H4, H5, H6 + P-004 (2026-10-04) ✅; лишився H3 (`render.yaml`, потрібні дії людини в Render) — наступна сесія.
+> **Статус:** ✅ виконано (2026-10-04) · H1, H2 (2026-09-30), H3–H6 + P-004 (2026-10-04); H3 — варіант А (`render.yaml` без Blueprint) · ручні test-cases «Render Rollback → smoke» і «нова колонка → лог міграції» не проганялись
 
 ## Контекст
 
@@ -43,12 +43,12 @@
 - [x] H2 Node 22 у репо: `.nvmrc`, `engines`, документація. ✅ `NODE_VERSION=22` на Render (2026-09-30,
       разом із переведенням обох сервісів на `main` — `render-to-main.md`; прод на Node 22.23.3).
 - [x] H1 CI: `.github/workflows/ci.yml` (push у будь-яку гілку + ручний запуск).
-- [x] H4 smoke-скрипт (2026-10-04, [h4-smoke](old/h4-smoke.md)): `npm run smoke`.
-- [ ] H3 `render.yaml` — варіант А (еталон без Blueprint) + Auto-Deploy «After CI Checks Pass»:
+- [x] H4 smoke-скрипт (2026-10-04, [h4-smoke](h4-smoke.md)): `npm run smoke`.
+- [x] H3 `render.yaml` — варіант А (еталон без Blueprint) + Auto-Deploy «After CI Checks Pass»:
       [h3-render-yaml](h3-render-yaml.md).
 - [x] H5 runbook (2026-10-04): `docs/deploy-render-turso.md` → «Реліз, відкат, бекап».
-- [x] H6 Dependabot (2026-10-04, [h6-dependabot](old/h6-dependabot.md)) + P-004 (дії CI `v7`).
-- [ ] Документація H3 — у [h3-render-yaml](h3-render-yaml.md); для H4–H6 — оновлено в їхніх PR.
+- [x] H6 Dependabot (2026-10-04, [h6-dependabot](h6-dependabot.md)) + P-004 (дії CI `v7`).
+- [x] Документація H3 — у [h3-render-yaml](h3-render-yaml.md); для H4–H6 — оновлено в їхніх PR.
 
 ## Оцінка
 

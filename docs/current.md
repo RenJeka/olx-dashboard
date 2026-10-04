@@ -10,14 +10,16 @@
 не пріоритет ([P-001](parking.md)).
 
 Стабільність закрито ([stability-baseline](plans/old/stability-baseline.md) ✅, 2026-10-04; S15 ⏸ → P-005,
-лагодження швидкості S17 → P-010). Харнес: H1, H2, H4–H6 ✅, лишився **H3** з
-[dev-deploy-harness](plans/dev-deploy-harness.md); далі — «модель JEV».
+лагодження швидкості S17 → P-010). Харнес закрито ([dev-deploy-harness](plans/old/dev-deploy-harness.md) ✅,
+2026-10-04). Зараз — **«модель JEV»**.
 
 ## Де ми зараз
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-04](handoffs/2026-10-04-s17-s10-harness.md): замір S17, рішення S10, харнес H4–H6, Dependabot.
+- Останній хендоф — [2026-10-04](handoffs/2026-10-04-h3-render-yaml.md): H3 — `render.yaml` як еталон, деплой лише після зеленого CI.
+- Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
+  [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекап прод-БД від 2026-09-30: гілка Turso `olx-dashboard-bak-20260930` (захищена від видалення) + SQL-дамп
   у теці ключів агента ([secrets-in-sources](instructions/secrets-in-sources.md)).
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
@@ -31,8 +33,7 @@
 
 ## Активні плани
 
-Що лишилось — рядок `> **Статус:**` і невідмічені кроки кожного плану:
-[dev-deploy-harness](plans/dev-deploy-harness.md) (харнес деплою, H3).
+Немає. Наступний план з'явиться, коли людина пояснить «модель JEV».
 
 ## Що враховувати
 
@@ -53,6 +54,5 @@
 
 ## Наступний крок
 
-H3 у [dev-deploy-harness](plans/dev-deploy-harness.md): `render.yaml` (Blueprint) для обох сервісів — спершу
-пояснити людині простими словами, що дасть і чим ризикує підключення до наявних сервісів (дублікати), дати
-варіанти й чекати «так»; застосування в Render — людина.
+«Модель JEV»: спершу розпитати людину — що це, для чого, як доступна (API / OpenRouter / локально); лише потім
+план у `docs/plans/`.
