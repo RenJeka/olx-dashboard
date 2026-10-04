@@ -1,5 +1,5 @@
 import type { InStatement } from '@libsql/client';
-import { db, dbAll, dbGet } from '../db/db.js';
+import { dbAll, dbBatchChunked, dbGet } from '../db/db.js';
 import { evaluateFilteredOut } from './localFilters.js';
 import { parseOlxDate } from './dateParser.js';
 import type { RawListing, NormalizedPrice, ScanResult, LocalFilters } from '../types.js';
@@ -58,15 +58,6 @@ const SELECT_EXISTING_FIELDS =
 
 /** Розмір чанка для IN-списку (ліміт змінних SQLite — 999). */
 const IN_CHUNK = 500;
-
-/**
- * Максимум statements на один db.batch. Великий deep-скан може принести тисячі UPSERT-ів —
- * один гігантський batch до Turso (мережевий payload у мегабайти) ризикує впасти цілком
- * уже ПІСЛЯ успішного збору (docs/plans/scan-failure-recovery.md). Чанки жертвують
- * атомарністю всього набору (кожен чанк — окрема транзакція), що безпечно: upsert по
- * olx_id ідемпотентний, а частково записаний скан кращий за втрачений.
- */
-const BATCH_CHUNK = 500;
 
 // district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
@@ -277,7 +268,7 @@ async function loadExistingByOlxId(olxIds: number[]): Promise<Map<number, Existi
  * Потік (мінімум мережевих round-trip для Turso):
  *   1) один bulk-SELECT наявних рядків по olx_id (чанками);
  *   2) у пам'яті: new_count + злиття COALESCE-полів + filtered_out;
- *   3) один db.batch('write') усіх UPSERT-ів (атомарно, як транзакція).
+ *   3) UPSERT-и batch-ами (dbBatchChunked; кожен чанк — транзакція).
  * Повертає кількість знайдених і нових.
  */
 export async function upsertListings(
@@ -447,11 +438,9 @@ export async function upsertListings(
     statements.push({ sql: `${TOUCH_PREFIX}${placeholders}${TOUCH_SUFFIX}`, args: chunk });
   }
 
-  // UPSERT-и + touch — batch-ами (libSQL batch = транзакція) чанками ≤BATCH_CHUNK:
-  // типовий скан вміщається в один round-trip, дуже великий не впирається в ліміт payload.
-  for (let i = 0; i < statements.length; i += BATCH_CHUNK) {
-    await db.batch(statements.slice(i, i + BATCH_CHUNK), 'write');
-  }
+  // UPSERT-и + touch — чанками (dbBatchChunked): upsert по olx_id ідемпотентний, тож частково
+  // записаний скан безпечний і кращий за втрачений.
+  await dbBatchChunked(statements);
 
   return { found: raw.length, new_count: newCount };
 }

@@ -1,5 +1,5 @@
 import '../env.js'; // ПЕРШИМ: гарантує .env у process.env до читання TURSO_* нижче.
-import { createClient, type InArgs, type ResultSet } from '@libsql/client';
+import { createClient, type InArgs, type InStatement, type ResultSet } from '@libsql/client';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -56,6 +56,25 @@ export async function dbAll<T>(sql: string, args: InArgs = []): Promise<T[]> {
 /** INSERT/UPDATE/DELETE → ResultSet (lastInsertRowid: bigint, rowsAffected: number). */
 export async function dbRun(sql: string, args: InArgs = []): Promise<ResultSet> {
   return db.execute({ sql, args });
+}
+
+/**
+ * Максимум statements на один db.batch. Тисячі UPSERT/UPDATE одним batch-ем — мережевий payload у
+ * мегабайти: Turso рве з'єднання (`fetch failed`; S16 — збереження фільтра на великому пошуку,
+ * docs/plans/scan-failure-recovery.md — великий deep-скан). Чанки жертвують атомарністю всього
+ * набору (кожен чанк — окрема транзакція): частково записане краще за втрачене цілком.
+ */
+export const BATCH_CHUNK = 500;
+
+/**
+ * Записати statements batch-ами по ≤BATCH_CHUNK (типовий набір — один round-trip). Лише для
+ * повторюваних наборів (upsert, перерахунок filtered_out): після часткового збою повтор дає той
+ * самий результат. Неідемпотентне (statusEngine: miss_count + 1) — одним атомарним db.batch.
+ */
+export async function dbBatchChunked(statements: InStatement[]): Promise<void> {
+  for (let i = 0; i < statements.length; i += BATCH_CHUNK) {
+    await db.batch(statements.slice(i, i + BATCH_CHUNK), 'write');
+  }
 }
 
 // ── Автоміграція колонок (docs/plans/db-auto-migrate.md) ─────────────────────
