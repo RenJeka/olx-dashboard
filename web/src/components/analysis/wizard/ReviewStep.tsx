@@ -118,7 +118,7 @@ export function ReviewStep({ w }: Props) {
     setStep,
   } = w;
 
-  // Повні описи в списку не приходять — пакетом для видимих рядків (docs/plans/listings-light-payload.md).
+  // Повні описи в списку не приходять — пакетом для видимих рядків (docs/plans/old/listings-light-payload.md).
   const visibleIds = useMemo(() => visibleRows.map((r) => r.id), [visibleRows]);
   const { data: detailsById } = useListingsDetails(searchId, visibleIds);
 

@@ -14,7 +14,7 @@ const SORTABLE = new Set([
   'last_seen_at',
 ]);
 
-// Легкий рядок таблиці (docs/plans/listings-light-payload.md): без повного опису й галереї — вони
+// Легкий рядок таблиці (docs/plans/old/listings-light-payload.md): без повного опису й галереї — вони
 // найважчі у відповіді великого пошуку (пам'ять API, S14). Опис — лише початок (`description_head`),
 // з якого сервер робить фрагмент для колонки; повний опис і `photo_urls` — `/details` на вимогу.
 const DESCRIPTION_HEAD_CHARS = 600;

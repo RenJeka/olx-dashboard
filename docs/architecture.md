@@ -295,7 +295,7 @@ flowchart LR
 | `POST` | `/api/searches/:id/verify` | ✅ Етап 2 (A3) — verify-прохід (кандидати P1+P2, ≤50 сторінок); повертає `VerifyResult {checked, alive, dead, unknown, reactivated, disabled_count, backfilled}` |
 | `GET` | `/api/searches/:id/scan-status` | ✅ Етап 1/2 — останній рядок `scan_runs` (для поллінгу прогресу глибокого скану/verify) |
 | `GET` | `/api/searches/:id/last-analysis` | ✅ — останній збережений `ScanPlan` (`kind='analyze'`): `{plan, analyzedAt, planValid}`; `planValid=false` → план протермінований (лише перегляд); 404, якщо аналізів не було |
-| `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 — легкі рядки: без `description`/`photo_urls`, натомість `description_preview` (початок опису чистим текстом) + `has_description` (`docs/plans/listings-light-payload.md`) |
+| `GET` | `/api/searches/:id/listings?sort=&order=` | ✅ Етап 1 — легкі рядки: без `description`/`photo_urls`, натомість `description_preview` (початок опису чистим текстом) + `has_description` (`docs/plans/old/listings-light-payload.md`) |
 | `GET` | `/api/listings/:id/details` | ✅ — `{id, description, photo_urls}` на вимогу (підказка/діалог опису, галерея) |
 | `POST` | `/api/searches/:id/listings/details` | ✅ — те саме пакетом за `{ids}` (≤500, лише рядки пошуку; крок перегляду AI-майстра) |
 | `GET` | `/api/searches/:id/listings/search?q=&title=&description=` | ✅ — `{ids}` збігів булевого запиту (оператори як у пошуку таблиці) у назві/описі; рядки читаються порціями за `id` |
@@ -338,7 +338,7 @@ flowchart LR
 - `api/*.ts` (реекспорт — `api/index.ts`; fetch-обгортка — `api/base.ts`) — TanStack Query хуки: `useSearches`, `useCreateSearch`,
   `useDeleteSearch`, `useReorderSearches`, `useScan`, `useVerify`, `useScanStatus`,
   `useSearchStats`, `useListings`, `useUpdateListing`, `useParamKeys`, `useUpdateSearchFilters`.
-  Легка таблиця (`api/listings.ts`, `docs/plans/listings-light-payload.md`): `useListingDetails(id)` —
+  Легка таблиця (`api/listings.ts`, `docs/plans/old/listings-light-payload.md`): `useListingDetails(id)` —
   повний опис і галерея на вимогу (підказка, діалог опису, `PhotoCell`), `useListingsDetails(searchId, ids)` —
   пакетом порціями по 500 (крок перегляду AI-майстра), `useListingSearch(searchId, query, scope)` — id збігів
   серверного пошуку в описі (запит — з паузою через `hooks/useDebouncedValue.ts`; збіги застосовуються у

@@ -22,7 +22,7 @@ function parsePhotoUrls(raw: string | null): string[] {
  *   у сітці прев'ю стають інтерактивними — наведення робить фото головним великим,
  *   у куті — кнопка ✕; клік поза модалкою / Esc закриває.
  * Дані — `photo_urls` (galery з GraphQL photos[]) — завантажуються при відкритті попапа (у списку
- * їх немає, docs/plans/listings-light-payload.md); до того й для старої БД (NULL) — `photo_url`.
+ * їх немає, docs/plans/old/listings-light-payload.md); до того й для старої БД (NULL) — `photo_url`.
  */
 export function PhotoCell({ listing }: { listing: Listing }) {
   const thumb = listing.photo_url;
