@@ -85,6 +85,7 @@ olx-dashboard/
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
 │       │   └── verifyScan.ts # runVerify (P1+P2 кандидати, probeListingPage), countVerifyCandidates
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
+│       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/jev-model.md)
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
@@ -97,7 +98,8 @@ olx-dashboard/
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
-│       │   ├── openrouter.ts # chat() — POST /chat/completions (json_object, ретрай, зняття code-fence)
+│       │   ├── openrouter.ts # chat()/chatWithUsage() — POST /chat/completions (json_object, ретрай, зняття code-fence; usage.cost для замірів)
+│       │   ├── jev.ts        # Jev через OpenRouter Decisions API (docs/jev.md): decide (ретраї, спільна пауза на 429), runPool, listingState, relevanceQuestion/criteriaQuestions/criteriaAbove
 │       │   ├── parse.ts      # парс відповідей LLM (критерії/matching/синоніми) + верифікація evidence (substring) + мерж результатів
 │       │   ├── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/old/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (map-reduce НА ФАЙЛАХ без скриптів: агент заповнює ПОРОЖНІ nominations/nominees-NNN.json заготовки в ZIP→сам пише output.json; уніфіковано з кроками 1–2 через manualZip.ts, docs/ai-flow.md)

@@ -18,6 +18,20 @@ export const OPENROUTER_RESPONSE_FORMAT = { type: 'json_object' } as const;
 /** Імʼя файлу .env (у корені server/). */
 export const ENV_FILENAME = '.env';
 
+// ── Jev (decision-модель TypeSafe через OpenRouter, docs/jev.md) ─────────────────
+/** Пін версії: пороги підбираються під конкретну версію (аліас ~typesafe/jev-latest рухається). */
+export const JEV_MODEL = 'typesafe/jev-1.13';
+export const JEV_DECISIONS_URL = 'https://openrouter.ai/api/alpha/decisions';
+/** Паралельних запитів (один state = один запит; ліміти TypeSafe динамічні → retry). */
+export const JEV_CONCURRENCY = 8;
+/** Спроб на запит при тимчасових помилках (429 / 5xx / 402 in-flight / мережа). */
+export const JEV_MAX_ATTEMPTS = 5;
+export const JEV_TIMEOUT_MS = 60_000;
+/** Стеля backoff без Retry-After. */
+export const JEV_BACKOFF_CAP_MS = 30_000;
+/** Короткий state для фільтра релевантності: перші N символів опису. */
+export const JEV_SHORT_DESC_SLICE = 300;
+
 // ── Чанкування / ліміти ──────────────────────────────────────────────────────
 /** Авто-режим: дрібні батчі (модель деградує на довгому контексті). */
 export const AUTO_CHUNK_SIZE = 12;

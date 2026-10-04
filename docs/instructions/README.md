@@ -24,4 +24,7 @@ AI) сюди не дублюється — вона в документах із
 | [scripted-edit-assert](scripted-edit-assert.md) | Правиш файли скриптом (Python `replace`, `sed` за номерами рядків) |
 | [local-dev-port-busy](local-dev-port-busy.md) | Локальний сервер не стартує (`EADDRINUSE :3001`) або логів smoke-запитів не видно |
 | [npm-lockfile-peer-flags](npm-lockfile-peer-flags.md) | Після `npm install` змінився `package-lock.json`, хоча залежності не чіпали |
+| [jev-agent-setup](jev-agent-setup.md) | Треба підключити чи перевірити Jev MCP і скіли jevai.org для агента |
+| [jev-pilot](jev-pilot.md) | Треба порівняти Jev з LLM на пошуку (вартість, якість, ручна розмітка спірних) |
+| [prod-data-via-turso-mcp](prod-data-via-turso-mcp.md) | Агенту потрібні рядки з прод-БД у файл; читання ключів заблоковано |
 | [render-mcp-no-env](render-mcp-no-env.md) | Треба знати env чи rewrite сервісів Render або звірити `render.yaml` з продом |
