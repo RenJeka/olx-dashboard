@@ -1,0 +1,32 @@
+# Dependabot (H6, docs/plans/h6-dependabot.md): PR з оновленнями залежностей приблизно раз на 2 тижні
+# (1-го і 15-го числа о 07:00 за Києвом — рішення людини 2026-10-04; «кожні 2 тижні» Dependabot не вміє).
+# minor/patch — одним груповим PR на екосистему; major — окремими PR (рішення людини).
+# Кожен PR проходить CI; злиття в main = деплой на Render — лише з «так» людини (docs/rules.md → «Прод»).
+version: 2
+updates:
+  # npm workspaces (server/ + web/) — один lock-файл у корені.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 7 1,15 * *"
+      timezone: Europe/Kyiv
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Версії дій у .github/workflows/ (P-004: щоб не відставати від Node-рантайму GitHub Actions).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 7 1,15 * *"
+      timezone: Europe/Kyiv
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "ci(deps)"

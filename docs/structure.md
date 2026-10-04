@@ -12,6 +12,7 @@ olx-dashboard/
 ├── tsconfig.base.json        # спільні strict-опції TS (без module/moduleResolution)
 ├── .nvmrc                    # Node 22 LTS (локально, CI, Render); package.json engines: >=22
 ├── .github/workflows/ci.yml  # CI: npm ci → npm run check → npm run build на кожен push
+├── .github/dependabot.yml    # Dependabot: PR оновлень ≈ раз на 2 тижні (npm + GitHub Actions)
 ├── .gitignore                # + server/data/*.db, *.db-shm, *.db-wal
 ├── AGENTS.md                 # канон інваріантів/конвенцій для агентів (читають Claude Code, Codex тощо)
 ├── README.md                 # огляд + швидкий старт
