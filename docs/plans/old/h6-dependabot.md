@@ -4,7 +4,7 @@
 
 ## Контекст
 
-H6 з [dev-deploy-harness](../dev-deploy-harness.md): вразливості й застарілі залежності не мають накопичуватись
+H6 з [dev-deploy-harness](dev-deploy-harness.md): вразливості й застарілі залежності не мають накопичуватись
 місяцями (S6). Разом — P-004: CI попереджав, що `actions/checkout@v4` і `actions/setup-node@v4` працюють на
 Node 20; актуальні `v7` (рантайм `node24`). Злам для нас у `v5`–`v7` не знайдено: кеш npm задано явно
 (`cache: npm`), раннер — GitHub-hosted.
