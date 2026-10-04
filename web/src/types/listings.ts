@@ -46,7 +46,7 @@ export interface Listing {
   photo_url: string | null;
   /**
    * Фрагмент опису (чистий текст, обрізаний сервером) для колонки таблиці. Повний опис і галерея
-   * (`photo_urls`) у список не входять — `ListingDetails` на вимогу (docs/plans/listings-light-payload.md).
+   * (`photo_urls`) у список не входять — `ListingDetails` на вимогу (docs/plans/old/listings-light-payload.md).
    */
   description_preview: string | null;
   has_description: boolean;

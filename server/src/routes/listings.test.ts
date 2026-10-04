@@ -4,7 +4,7 @@ import { db } from '../db/db.js';
 import { createSearch, resetDb } from '../test/db.js';
 import { listingsRoutes } from './listings.js';
 
-// Легка відповідь /listings (docs/plans/listings-light-payload.md): без повного опису й галереї.
+// Легка відповідь /listings (docs/plans/old/listings-light-payload.md): без повного опису й галереї.
 let app: FastifyInstance;
 let searchId: number;
 

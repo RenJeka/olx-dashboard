@@ -19,3 +19,5 @@ AI) сюди не дублюється — вона в документах із
 | [github-cli](github-cli.md) | Треба відкрити PR, подивитись CI чи логи впалого прогону; перелогінити `gh` |
 | [docs-check-untracked-files](docs-check-untracked-files.md) | Пишеш у доках шлях до незакоміченого файлу; `docs:check` зелений локально, червоний у CI |
 | [docs-audit](docs-audit.md) | Треба перевірити документацію чи парковку на актуальність і прибрати застаріле (скіл `docs-audit`) |
+| [node-e-escaping](node-e-escaping.md) | Правиш файл однорядковим node -e, а в новому коді є бектики чи перенос рядка в літералах |
+| [curl-cyrillic-body](curl-cyrillic-body.md) | Smoke API через curl у Git Bash із кирилицею в тілі дає 400 Content-Length |

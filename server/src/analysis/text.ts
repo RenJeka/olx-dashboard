@@ -45,7 +45,7 @@ export function parseBullets(text: string | null): string[] {
 
 /**
  * Короткий фрагмент опису для колонки таблиці (`/listings` не віддає повний опис —
- * docs/plans/listings-light-payload.md). `html` — уже обрізаний SQL-ем початок опису: прибираємо
+ * docs/plans/old/listings-light-payload.md). `html` — уже обрізаний SQL-ем початок опису: прибираємо
  * обірваний на межі тег і обрізаємо чистий текст до `maxChars` (з «…», якщо щось відкинуто).
  */
 export function descriptionPreview(html: string | null | undefined, maxChars: number): string | null {
