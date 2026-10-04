@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Badge,
   Box,
@@ -15,6 +16,7 @@ import { HighlightText } from '../../table/HighlightText';
 import { Tooltip } from '../../ui/tooltip';
 import { stripDescriptionHtml } from '../../../utils/format';
 import { useIsMobile } from '../../../hooks/useIsMobile';
+import { useListingsDetails } from '../../../api';
 import type { useWizard } from '../../../hooks/analysis/useWizard';
 import type { AnalyzedListing, Listing } from '../../../types';
 
@@ -42,9 +44,11 @@ function PhotoTitle({ listing, fallbackId }: { listing: Listing | undefined; fal
 }
 
 function DescriptionBlock({
-  listing, desc, evidence, isMobile, onClickDescription,
+  listing, html, desc, evidence, isMobile, onClickDescription,
 }: {
   listing: Listing | undefined;
+  /** Повний HTML-опис (пакетом із сервера) — для підказки. */
+  html: string | null;
   desc: string;
   evidence: string[];
   isMobile: boolean;
@@ -52,7 +56,7 @@ function DescriptionBlock({
 }) {
   return (
     <DescriptionTooltip
-      description={listing?.description ?? null}
+      description={html}
       query={evidence}
       onClick={() => listing && onClickDescription(listing)}
     >
@@ -106,7 +110,7 @@ function CriteriaTags({
 export function ReviewStep({ w }: Props) {
   const isMobile = useIsMobile();
   const {
-    mode, modeLabel, listingById,
+    searchId, mode, modeLabel, listingById,
     visibleRows, hiddenCount, accumulated,
     isIncluded, toggleIncluded,
     setOpenDescriptionListing,
@@ -114,14 +118,19 @@ export function ReviewStep({ w }: Props) {
     setStep,
   } = w;
 
+  // Повні описи в списку не приходять — пакетом для видимих рядків (docs/plans/listings-light-payload.md).
+  const visibleIds = useMemo(() => visibleRows.map((r) => r.id), [visibleRows]);
+  const { data: detailsById } = useListingsDetails(searchId, visibleIds);
+
   function renderRow(r: AnalyzedListing) {
     const l = listingById.get(r.id);
-    const desc = stripDescriptionHtml(l?.description ?? null);
+    const html = detailsById?.get(r.id)?.description ?? null;
+    const desc = stripDescriptionHtml(html);
     const includedEvidence = r.items
       .filter((it) => isIncluded(r.id, it))
       .map((it) => it.evidence);
 
-    return { l, desc, includedEvidence };
+    return { l, html, desc, includedEvidence };
   }
 
   return (
@@ -149,13 +158,14 @@ export function ReviewStep({ w }: Props) {
       {isMobile ? (
         <Stack gap={3} maxH="60vh" overflowY="auto">
           {visibleRows.map((r) => {
-            const { l, desc, includedEvidence } = renderRow(r);
+            const { l, html, desc, includedEvidence } = renderRow(r);
             return (
               <Box key={r.id} p={3} borderWidth="1px" borderColor="border.subtle" rounded="md">
                 <Stack gap={2}>
                   <PhotoTitle listing={l} fallbackId={r.id} />
                   <DescriptionBlock
                     listing={l}
+                    html={html}
                     desc={desc}
                     evidence={includedEvidence}
                     isMobile={isMobile}
@@ -185,7 +195,7 @@ export function ReviewStep({ w }: Props) {
             </Table.Header>
             <Table.Body>
               {visibleRows.map((r) => {
-                const { l, desc, includedEvidence } = renderRow(r);
+                const { l, html, desc, includedEvidence } = renderRow(r);
                 return (
                   <Table.Row key={r.id}>
                     <Table.Cell verticalAlign="top">
@@ -194,6 +204,7 @@ export function ReviewStep({ w }: Props) {
                     <Table.Cell verticalAlign="top" whiteSpace="normal">
                       <DescriptionBlock
                         listing={l}
+                        html={html}
                         desc={desc}
                         evidence={includedEvidence}
                         isMobile={isMobile}

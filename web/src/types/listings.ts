@@ -21,6 +21,15 @@ export interface ListingPatch {
   olx_status?: string | null;
 }
 
+/** Важкі поля оголошення — `GET /api/listings/:id/details` (на вимогу). */
+export interface ListingDetails {
+  id: number;
+  /** HTML-опис OLX. */
+  description: string | null;
+  /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
+  photo_urls: string | null;
+}
+
 export interface Listing {
   id: number;
   olx_id: number;
@@ -35,9 +44,12 @@ export interface Listing {
   /** OLX category.type (слаг верхнього рівня). NULL до re-scan. */
   category_type: string | null;
   photo_url: string | null;
-  /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
-  photo_urls: string | null;
-  description: string | null;
+  /**
+   * Фрагмент опису (чистий текст, обрізаний сервером) для колонки таблиці. Повний опис і галерея
+   * (`photo_urls`) у список не входять — `ListingDetails` на вимогу (docs/plans/listings-light-payload.md).
+   */
+  description_preview: string | null;
+  has_description: boolean;
   seller_name: string | null;
   contact_name: string | null;
   olx_status: string | null;

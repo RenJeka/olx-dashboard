@@ -1,38 +1,44 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Spinner } from '@chakra-ui/react';
 import { useState, type ReactNode } from 'react';
 import { Tooltip } from '../ui/tooltip';
 import { stripDescriptionHtml } from '../../utils/format';
+import { useListingDetails } from '../../api';
 import { HighlightText } from './HighlightText';
 
-interface DescriptionTooltipProps {
-  description: string | null;
+type DescriptionSource =
+  /** Опис уже є (AI-майстер отримує описи пакетом). */
+  | { description: string | null; listingId?: never; hasDescription?: never }
+  /** Таблиця: повного опису в списку немає — завантажується при першому наведенні. */
+  | { listingId: number; hasDescription: boolean; description?: never };
+
+type DescriptionTooltipProps = DescriptionSource & {
   /** Рядок-запит (фільтр таблиці) або масив фрагментів (evidence у превʼю аналізу). */
   query: string | string[];
   children: ReactNode;
   onClick: () => void;
-}
+};
 
-export function DescriptionTooltip({ description, query, children, onClick }: DescriptionTooltipProps) {
-  // `mounted` — лінивий монтаж: zag-машина Tooltip з'являється лише після першого
-  // наведення. До того — статичний обрізаний текст з cursor=pointer (клік відкриває
-  // діалог опису). Прибирає до 50 завжди-змонтованих тултіпів на сторінку.
+export function DescriptionTooltip(props: DescriptionTooltipProps) {
+  const { query, children, onClick } = props;
+  // `mounted` — лінивий монтаж: zag-машина Tooltip (і запит опису) з'являється лише після першого
+  // наведення. До того — статичний обрізаний текст з cursor=pointer (клік відкриває діалог опису).
   const [mounted, setMounted] = useState(false);
-  const fullText = stripDescriptionHtml(description);
-  if (!fullText) return <>{children}</>;
+  const hasText =
+    props.listingId != null ? props.hasDescription : stripDescriptionHtml(props.description) !== '';
+  if (!hasText) return <>{children}</>;
 
-  if (!mounted) {
-    return (
-      <Box
-        cursor="pointer"
-        rounded="sm"
-        _hover={{ bg: 'bg.muted' }}
-        onClick={onClick}
-        onMouseEnter={() => setMounted(true)}
-      >
-        {children}
-      </Box>
-    );
-  }
+  const trigger = (
+    <Box
+      cursor="pointer"
+      rounded="sm"
+      _hover={{ bg: 'bg.muted' }}
+      onClick={onClick}
+      onMouseEnter={mounted ? undefined : () => setMounted(true)}
+    >
+      {children}
+    </Box>
+  );
+  if (!mounted) return trigger;
 
   return (
     <Tooltip
@@ -42,19 +48,22 @@ export function DescriptionTooltip({ description, query, children, onClick }: De
       closeOnScroll={false}
       content={
         <Box maxH="240px" overflowY="auto" whiteSpace="pre-line" fontSize="sm">
-          <HighlightText text={fullText} query={query} />
+          {props.listingId != null ? (
+            <LazyDescription listingId={props.listingId} query={query} />
+          ) : (
+            <HighlightText text={stripDescriptionHtml(props.description)} query={query} />
+          )}
         </Box>
       }
       contentProps={{ maxW: { base: '85vw', md: '380px' } }}
     >
-      <Box
-        cursor="pointer"
-        rounded="sm"
-        _hover={{ bg: 'bg.muted' }}
-        onClick={onClick}
-      >
-        {children}
-      </Box>
+      {trigger}
     </Tooltip>
   );
+}
+
+function LazyDescription({ listingId, query }: { listingId: number; query: string | string[] }) {
+  const { data, isLoading } = useListingDetails(listingId);
+  if (isLoading) return <Spinner size="xs" />;
+  return <HighlightText text={stripDescriptionHtml(data?.description ?? null)} query={query} />;
 }

@@ -9,7 +9,8 @@ import {
   type RowSelectionState,
 } from '@tanstack/react-table';
 import { Box, Flex, Spinner, Table, Text } from '@chakra-ui/react';
-import { useListings } from '../api';
+import { useListings, useListingSearch } from '../api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useListingsTableState } from '../hooks/useListingsTableState';
 import { useListingsUiStore } from '../stores/listingsUiStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -21,7 +22,6 @@ import {
   TablePagination,
 } from '../components/table';
 import { DescriptionDialog } from '../components/DescriptionDialog';
-import { stripDescriptionHtml } from '../utils/format';
 import { matchesQuery } from '../utils/search';
 import { isListingVisible } from '../utils/listingVisibility';
 import type { SearchScope } from '../components/table';
@@ -29,6 +29,9 @@ import type { Listing } from '../types';
 import { CONTENT_PAD_X, CONTENT_PAD_Y, EMPTY_STATE_PAD } from '../theme';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table';
+
+/** Пауза після набору перед серверним пошуком в описі (мс). */
+const SEARCH_DEBOUNCE_MS = 400;
 
 export function ListingsTable() {
   const searchId = useSettingsStore((s) => s.selectedSearchId);
@@ -47,6 +50,9 @@ export function ListingsTable() {
   const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
   const [searchText, setSearchText] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>({ inTitle: true, inDescription: true });
+  // Пошук в описі — на сервері (повного опису в списку немає): id збігів після паузи в наборі.
+  const debouncedSearch = useDebouncedValue(searchText, SEARCH_DEBOUNCE_MS);
+  const { data: serverMatches } = useListingSearch(searchId, debouncedSearch, searchScope);
 
   // Стабільне посилання (залежить лише від searchScope), щоб не інвалідувати
   // внутрішні мемо TanStack на кожен рендер.
@@ -54,13 +60,11 @@ export function ListingsTable() {
     (row: Row<Listing>, _columnId: string, filterValue: unknown) => {
       const query = String(filterValue).trim();
       if (!query) return true;
-      // Поле(я) для пошуку зливаємо в один haystack — терми (&&/||/!) працюють крізь
-      // назву й опис разом.
-      const parts: string[] = [];
-      if (searchScope.inTitle) parts.push((row.original.title ?? '').toLowerCase());
-      if (searchScope.inDescription) parts.push(stripDescriptionHtml(row.original.description).toLowerCase());
-      if (parts.length === 0) return false;
-      return matchesQuery(parts.join('\n'), query);
+      // З описом — збіги рахує сервер і вони застосовуються у visibleRows (TanStack не перефільтровує,
+      // коли змінюється лише функція). Лише назва — тут, на клієнті, миттєво.
+      if (searchScope.inDescription) return true;
+      if (!searchScope.inTitle) return false;
+      return matchesQuery((row.original.title ?? '').toLowerCase(), query);
     },
     [searchScope],
   );
@@ -78,8 +82,15 @@ export function ListingsTable() {
   }, [statusFilter]);
 
   const visibleRows = useMemo(
-    () => rows.filter((l) => isListingVisible(l, statusFilter, showFilteredOut, showIrrelevant)),
-    [rows, showFilteredOut, showIrrelevant, statusFilter],
+    () =>
+      rows.filter(
+        (l) =>
+          isListingVisible(l, statusFilter, showFilteredOut, showIrrelevant) &&
+          // Серверний пошук в описі (назва й опис разом, терми &&/||/! крізь обидва); до першої
+          // відповіді — нічого не ховаємо.
+          (!searchScope.inDescription || !searchText.trim() || !serverMatches || serverMatches.has(l.id)),
+      ),
+    [rows, showFilteredOut, showIrrelevant, statusFilter, searchScope.inDescription, searchText, serverMatches],
   );
 
   const table = useReactTable({

@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Image, Link, Stack, Text } from '@chakra-ui/react';
+import { Box, Button, HStack, Image, Link, Spinner, Stack, Text } from '@chakra-ui/react';
 import { LuExternalLink } from 'react-icons/lu';
 import {
   DialogBackdrop,
@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import type { Listing } from '../types';
+import { useListingDetails } from '../api';
 import { formatPrice, stripDescriptionHtml } from '../utils/format';
 import { DIALOG_SIZE } from '../theme';
 
@@ -20,7 +21,9 @@ interface Props {
 }
 
 export function DescriptionDialog({ listing, onClose }: Props) {
-  const text = stripDescriptionHtml(listing?.description ?? null);
+  // Повний опис у списку не приходить — завантажується при відкритті (кешується).
+  const { data: details, isLoading } = useListingDetails(listing?.id ?? null);
+  const text = stripDescriptionHtml(details?.description ?? null);
 
   return (
     <DialogRoot
@@ -63,7 +66,7 @@ export function DescriptionDialog({ listing, onClose }: Props) {
               </HStack>
             </DialogHeader>
             <DialogBody>
-              <Text whiteSpace="pre-line">{text || '—'}</Text>
+              {isLoading ? <Spinner /> : <Text whiteSpace="pre-line">{text || '—'}</Text>}
             </DialogBody>
             <DialogFooter>
               {listing.url && (

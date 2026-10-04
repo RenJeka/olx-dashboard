@@ -45,7 +45,7 @@ export function computeListingStats(listings: Listing[] | undefined): ListingSta
     // P1: url != null AND давно не бачене AND (auto OR rejected).
     const p1 = l.url != null && isOld && (l.status_source === 'auto' || l.status === 'rejected');
     // P2: url != null AND без опису AND не disabled AND NOT P1 (взаємовиключні).
-    const p2 = l.url != null && l.description == null && l.status !== 'disabled' && !p1;
+    const p2 = l.url != null && !l.has_description && l.status !== 'disabled' && !p1;
     if (p1 || p2) verify_candidates++;
   }
 
