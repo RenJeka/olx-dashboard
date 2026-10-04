@@ -3,9 +3,11 @@ import { parseBullets } from '../analysis/text.js';
 
 /** Поля оголошення, потрібні для оцінки локальних фільтрів. */
 export interface FilterableListing {
-  title: string | null;
-  description: string | null;
-  params: string | null;
+  // Лише для запланованих правил (стоп-слова, діапазони params — закоментовано нижче). Не читати їх
+  // з БД без потреби: описи великого пошуку — десятки МБ (S16, refilter.ts).
+  title?: string | null;
+  description?: string | null;
+  params?: string | null;
   price: number | null;
   city: string | null;
   seller_name: string | null;
