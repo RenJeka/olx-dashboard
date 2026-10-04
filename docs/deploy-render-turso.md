@@ -36,7 +36,10 @@
 > у коді працюють без змін.
 
 > ⚠️ **Фактичний прод (з 2026-09-30) відрізняється від цієї схеми:**
-> - обидва сервіси деплояться з гілки **`main`** (autoDeploy), Node 22 (`NODE_VERSION=22`);
+> - обидва сервіси деплояться з гілки **`main`** — Auto-Deploy **«After CI Checks Pass»** (лише після зеленого CI),
+>   Node 22 (`NODE_VERSION=22`);
+> - налаштування обох сервісів зафіксовано в [`render.yaml`](../render.yaml) — еталон, **не** підключений як
+>   Blueprint (новий Blueprint створив би дублікати; рішення — `docs/plans/h3-render-yaml.md`);
 > - Static Site названо **`olx-dashboard`** → `https://olx-dashboard.onrender.com` (не `…-web`);
 > - фронт ходить в API **напряму** через `VITE_API_BASE=https://olx-dashboard-api.onrender.com`
 >   (`web/src/api/base.ts`), бекенд дозволяє CORS для `WEB_ORIGIN=https://olx-dashboard.onrender.com`;
@@ -265,7 +268,7 @@ git push
 1. PR → CI зелений. Червоний — не зливати.
 2. Ризикова зміна (схема БД, масовий запис/перерахунок, зміна auto-логіки статусів) → спершу **бекап Turso** (нижче).
 3. Злиття (`Create a merge commit`) — лише з «так» людини на конкретний PR.
-4. Дочекатися деплою: Render → сервіс → **Events** (або Render MCP `list_deploys`) — статус `live`, коміт =
+4. Дочекатися деплою (стартує лише після зеленого CI на merge-коміті): Render → сервіс → **Events** (або Render MCP `list_deploys`) — статус `live`, коміт =
    merge-коміт. Обидва сервіси: `olx-dashboard-api` і `olx-dashboard`.
 5. `npm run smoke` — усе ✅ (див. «Частина 7»).
 6. Зміна `schema.sql` → у лозі API рядок `Міграція схеми: ALTER TABLE …`. Старт упав з назвою
@@ -278,11 +281,17 @@ git push
 - **Швидко — Render Rollback:** сервіс → **Events** → попередній вдалий деплой → **Rollback**. Окремо для API і
   фронту, якщо зламано обидва. Потім `npm run smoke`.
   - ⚠️ Rollback з дашборду **вимикає Auto-Deploy** сервісу (захист від повторного деплою зламаного). Після
-    виправлення увімкнути: сервіс → **Settings** → **Auto-Deploy**. Rollback через Render API автодеплой не вимикає.
+    виправлення увімкнути: сервіс → **Settings** → **Auto-Deploy** → «After CI Checks Pass». Rollback через Render API автодеплой не вимикає.
 - **Охайно — revert:** `git revert -m 1 <merge-коміт>` окремим PR → CI → злиття. Автодеплой лишається як є.
 - **Схема:** відкат коду безпечний — `initDb()` лише додає таблиці й колонки, старий код нові колонки ігнорує.
 - **Дані:** відкат коду **не повертає** вже змінені дані (масовий `UPDATE`, хибні auto-disable). Тоді —
   відновлення з бекапу Turso, лише з рішення людини.
+
+### Зміна налаштувань у Render
+
+Змінили в dashboard build/start-команду, тариф, rewrite, Auto-Deploy чи **набір** змінних середовища → у тому ж
+PR чи сесії оновити [`render.yaml`](../render.yaml). Звірка: dashboard → виділити обидва сервіси → **Generate
+Blueprint** → порівняти з файлом (згенерований YAML не містить значень змінних).
 
 ### Бекап Turso
 

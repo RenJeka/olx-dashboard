@@ -1,0 +1,65 @@
+# Еталон конфігурації проду на Render (H3, варіант А — docs/plans/h3-render-yaml.md).
+#
+# ⚠️ Цей файл НЕ підключений як Blueprint. Render його не читає — сервіси налаштовані в dashboard.
+# Він фіксує в git, як налаштовано прод, і дає відтворити сервіси, якщо їх втрачено.
+# Новий Blueprint з цього файлу при наявних сервісах з тими самими назвами створить ДУБЛІКАТИ
+# (Render додає суфікс до назв) — не підключати без окремого рішення людини.
+# Змінили налаштування в dashboard — оновіть і цей файл (звірка — docs/deploy-render-turso.md → «Реліз, відкат, бекап»).
+#
+# Секрети — лише в dashboard: `sync: false` = значення в git немає.
+# Звірено з Render «Generate Blueprint» 2026-10-04; там сервіси лежать у проєкті «📊 OLX dashboard project»,
+# середовище Production (у цьому файлі структуру проєкту опущено).
+
+services:
+  # Бекенд: Fastify + Turso
+  - type: web
+    name: olx-dashboard-api
+    runtime: node
+    plan: free # без цього Blueprint поставив би платний тариф
+    region: frankfurt
+    branch: main
+    autoDeployTrigger: checksPass # деплой з main лише після зеленого CI
+    buildCommand: npm install --include=dev && npm run build -w server
+    startCommand: npm run start -w server
+    healthCheckPath: /health
+    previews:
+      generation: off
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: WEB_ORIGIN # CORS: адреса фронту
+        value: https://olx-dashboard.onrender.com
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: ALLOWED_EMAILS
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: AUTH_COOKIE_SECURE
+        sync: false
+      - key: AUTH_DISABLED # заданий, але не `true` (smoke: API без сесії → 401); на проді не потрібен
+        sync: false
+
+  # Фронтенд: зібраний React (Static Site), ходить в API напряму (VITE_API_BASE)
+  - type: web
+    name: olx-dashboard
+    runtime: static
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: npm install --include=dev && npm run build -w web
+    staticPublishPath: web/dist
+    previews:
+      generation: off
+    routes:
+      - type: rewrite # SPA-fallback; rewrite /api/* прибрано (S12)
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE
+        value: https://olx-dashboard-api.onrender.com
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
