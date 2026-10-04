@@ -43,8 +43,6 @@
 ## Відкриті питання (чекають людину)
 
 - «Модель JEV» — що це, для чого, як доступна (API / OpenRouter / локально).
-- S10: NULL `last_refresh_at` при вичерпаній видачі — пояснення простими словами в
-  [stability-baseline](plans/stability-baseline.md) → «S10»; перед рішенням — пояснити людині.
 - Чи копіювати `OPENROUTER_API_KEY` в `server/.env` з іншого проєкту.
 - Коли видаляти бекап-гілку Turso `olx-dashboard-bak-20260930`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03).

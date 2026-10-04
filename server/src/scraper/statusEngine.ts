@@ -49,8 +49,9 @@ function appendCoverageNote(note: string | null, threshold: number): string {
  * без exhausted, не-GraphQL дані) → прохід пропускається.
  *
  * Кандидати: рядки цього search зі status != 'disabled', відсутні у `fetched`,
- * і (windowFloor IS NULL OR last_refresh_at >= windowFloor; NULL-refresh — старі рядки
- * і «хвіст» за вікном пагінації — у кандидати не потрапляють, їх перевіряє verify).
+ * і (windowFloor IS NULL OR last_refresh_at >= windowFloor). NULL-refresh — старі рядки
+ * і «хвіст» за вікном пагінації — при невичерпаній видачі в кандидати не потрапляють (їх
+ * перевіряє verify); при exhausted кандидати й вони: повна видача — сама доказ (S10, 2026-10-04).
  * Їм miss_count += 1; при miss_count >= `threshold` і (status_source='auto' OR
  * status='rejected') → status='disabled', olx_status='inactive' + маркер у note
  * (прозорість причини). `threshold` залежить від глибини скану: глибокий скан бачить усю
