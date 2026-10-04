@@ -42,18 +42,33 @@ function toLightRow({ description_head, ...row }: LightRowRaw) {
   return { ...row, description_preview, has_description: description_preview != null };
 }
 
+// ТИМЧАСОВО (S17, docs/plans/s17-timing.md): заміри етапів великого пошуку — прибрати після висновку.
+// CPU-час — на весь процес (паралельні запити додаються), але порівняння з загальним часом показує,
+// сервер рахує чи чекає.
+const ms = (since: number): number => Math.round(performance.now() - since);
+function perfTotals(): () => { totalMs: number; cpuMs: number } {
+  const t0 = performance.now();
+  const cpu0 = process.cpuUsage();
+  return () => {
+    const cpu = process.cpuUsage(cpu0);
+    return { totalMs: ms(t0), cpuMs: Math.round((cpu.user + cpu.system) / 1000) };
+  };
+}
+
 export async function listingsRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Params: { id: string };
     Querystring: { sort?: string; order?: string };
-  }>('/api/searches/:id/listings', async (req) => {
+  }>('/api/searches/:id/listings', async (req, reply) => {
     const searchId = Number(req.params.id);
+    const totals = perfTotals();
 
     const sort = SORTABLE.has(req.query.sort ?? '')
       ? (req.query.sort as string)
       : 'first_seen_at';
     const order = req.query.order?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
+    let t = performance.now();
     const rows = await dbAll<LightRowRaw>(
       `SELECT ${LISTING_COLUMNS}
          FROM listings
@@ -61,7 +76,28 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
          ORDER BY ${sort} ${order}`,
       [searchId],
     );
-    return rows.map(toLightRow);
+    const tursoMs = ms(t);
+    t = performance.now();
+    const light = rows.map(toLightRow);
+    const mapMs = ms(t);
+    t = performance.now();
+    const body = JSON.stringify(light);
+    const jsonMs = ms(t);
+    req.log.info(
+      {
+        scope: 'perf',
+        route: 'listings',
+        searchId,
+        rows: rows.length,
+        tursoMs,
+        mapMs,
+        jsonMs,
+        bytes: Buffer.byteLength(body),
+        ...totals(),
+      },
+      'S17 timing',
+    );
+    return reply.type('application/json; charset=utf-8').send(body);
   });
 
   // Повний опис і галерея одного оголошення — на вимогу (підказка, діалог, галерея).
@@ -104,24 +140,50 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
     const inDescription = req.query.description !== '0';
     if (!query || (!inTitle && !inDescription)) return { ids: [] };
 
+    const totals = perfTotals();
+    let tursoMs = 0;
+    let matchMs = 0;
+    let chunks = 0;
+    let rowsRead = 0;
     const ids: number[] = [];
     let lastId = 0;
     for (;;) {
+      let t = performance.now();
       const chunk = await dbAll<{ id: number; title: string | null; description: string | null }>(
         `SELECT id, title, description FROM listings
            WHERE search_id = ? AND id > ? ORDER BY id LIMIT ${SEARCH_CHUNK}`,
         [searchId, lastId],
       );
+      tursoMs += performance.now() - t;
+      t = performance.now();
+      chunks += 1;
+      rowsRead += chunk.length;
       for (const row of chunk) {
         const parts: string[] = [];
         if (inTitle) parts.push((row.title ?? '').toLowerCase());
         if (inDescription) parts.push(stripHtml(row.description).toLowerCase());
         if (matchesQuery(parts.join('\n'), query)) ids.push(row.id);
       }
+      matchMs += performance.now() - t;
       const last = chunk.at(-1);
       if (!last || chunk.length < SEARCH_CHUNK) break;
       lastId = last.id;
     }
+    req.log.info(
+      {
+        scope: 'perf',
+        route: 'listings/search',
+        searchId,
+        inDescription,
+        chunks,
+        rows: rowsRead,
+        matches: ids.length,
+        tursoMs: Math.round(tursoMs),
+        matchMs: Math.round(matchMs),
+        ...totals(),
+      },
+      'S17 timing',
+    );
     return { ids };
   });
 
