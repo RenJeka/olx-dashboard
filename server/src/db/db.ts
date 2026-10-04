@@ -66,7 +66,11 @@ export async function dbRun(sql: string, args: InArgs = []): Promise<ResultSet> 
  */
 export const BATCH_CHUNK = 500;
 
-/** Записати statements batch-ами по ≤BATCH_CHUNK (типовий набір — один round-trip). */
+/**
+ * Записати statements batch-ами по ≤BATCH_CHUNK (типовий набір — один round-trip). Лише для
+ * повторюваних наборів (upsert, перерахунок filtered_out): після часткового збою повтор дає той
+ * самий результат. Неідемпотентне (statusEngine: miss_count + 1) — одним атомарним db.batch.
+ */
 export async function dbBatchChunked(statements: InStatement[]): Promise<void> {
   for (let i = 0; i < statements.length; i += BATCH_CHUNK) {
     await db.batch(statements.slice(i, i + BATCH_CHUNK), 'write');
