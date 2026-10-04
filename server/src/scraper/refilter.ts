@@ -26,7 +26,8 @@ export async function recomputeFilteredOut(
   }
 
   const rows = await dbAll<RefilterRow>(
-    'SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id, filtered_out FROM listings WHERE search_id = ?',
+    // Лише поля активних правил: опис/назва/params великого пошуку — десятки МБ із Turso (S16).
+    'SELECT id, price, city, seller_name, pros, cons, category_id, filtered_out FROM listings WHERE search_id = ?',
     [searchId],
   );
 
