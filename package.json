@@ -15,6 +15,7 @@
     "scan": "npm -w server run scan --",
     "migrate:posted-at": "npm -w server run migrate:posted-at",
     "docs:check": "node scripts/check-doc-links.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "typecheck": "npm -w server exec -- tsc -p tsconfig.json --noEmit && npm -w web exec -- tsc -b --noEmit",
     "check": "npm run typecheck && npm run test && npm run docs:check && npm run skills:check",
     "skills:sync": "node scripts/sync-skills.mjs",

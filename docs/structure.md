@@ -17,6 +17,7 @@ olx-dashboard/
 ├── README.md                 # огляд + швидкий старт
 ├── scripts/
 │   ├── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (plans/old і handoffs — лише лінки на доки, заархівований план валідний)
+│   ├── smoke.mjs             # `npm run smoke -- [api-url] [web-url]`: smoke-перевірка деплою (за замовчуванням — прод)
 │   └── sync-skills.mjs       # `npm run skills:sync|skills:check`: обгортки скілів з skills/ у .claude/ і .agents/
 ├── skills/                   # ЄДИНЕ джерело скілів (<name>/SKILL.md + references/), skills.json — цілі, README.md
 ├── .claude/skills/           # згенеровані обгортки для Claude Code (не редагувати)

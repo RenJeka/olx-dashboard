@@ -83,6 +83,7 @@ npm run dev:server | dev:web
 npm run build                   # tsc server + tsc/vite web (перевірка типів)
 npm run scan -- --search <id>   # CLI-скан без UI (--deep, --verify)
 npm run docs:check              # биті посилання в документації (має бути 0)
+npm run smoke                   # smoke-перевірка проду після деплою (-- <api-url> [web-url])
 npm run typecheck               # tsc --noEmit для server і web
 npm test                        # Vitest (server): доменне ядро на тимчасовій БД
 npm run check                   # typecheck + test + docs:check + skills:check — перед комітом
