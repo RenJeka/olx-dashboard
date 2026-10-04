@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, Image, Popover, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { CloseButton } from '../ui/close-button';
 import type { Listing } from '../../types';
+import { useListingDetails } from '../../api';
 
 /** Парсить JSON-масив прев'ю-лінків (photo_urls); повертає [] при NULL/помилці. */
 function parsePhotoUrls(raw: string | null): string[] {
@@ -20,19 +21,21 @@ function parsePhotoUrls(raw: string | null): string[] {
  * - Клік по мініатюрі → «фіксує» модалку (pinned): вона лишається після відведення миші,
  *   у сітці прев'ю стають інтерактивними — наведення робить фото головним великим,
  *   у куті — кнопка ✕; клік поза модалкою / Esc закриває.
- * Дані — `photo_urls` (galery з GraphQL photos[]); для старої БД (NULL) fallback на `photo_url`.
+ * Дані — `photo_urls` (galery з GraphQL photos[]) — завантажуються при відкритті попапа (у списку
+ * їх немає, docs/plans/listings-light-payload.md); до того й для старої БД (NULL) — `photo_url`.
  */
 export function PhotoCell({ listing }: { listing: Listing }) {
   const thumb = listing.photo_url;
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const { data: details } = useListingDetails(open ? listing.id : null);
 
   if (!thumb) {
     return <Box boxSize={12} rounded="md" bg="bg.muted" />;
   }
 
-  const gallery = parsePhotoUrls(listing.photo_urls);
+  const gallery = parsePhotoUrls(details?.photo_urls ?? null);
   // Усі фото для перегляду: galery (600x450) або fallback на мініатюру.
   const allPhotos = gallery.length > 0 ? gallery : [thumb];
   // У pinned-режимі активне фото керується наведенням; у hover-режимі завжди перше.

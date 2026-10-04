@@ -44,7 +44,8 @@ function ListingsTableRowImpl({
         if (cell.column.id === 'description' && descriptionExpandEnabled) {
           content = (
             <DescriptionTooltip
-              description={row.original.description}
+              listingId={row.original.id}
+              hasDescription={row.original.has_description}
               query={searchQuery}
               onClick={() => onOpenDescription(row.original)}
             >

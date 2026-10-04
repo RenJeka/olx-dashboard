@@ -18,7 +18,7 @@ import { TbBrandDaysCounter } from 'react-icons/tb';
 import { Tooltip } from '../ui/tooltip';
 import type { Listing } from '../../types';
 import { HeaderLabel } from './HeaderLabel';
-import { formatPrice, formatDate, stripDescriptionHtml, countProsConsItems } from '../../utils/format';
+import { formatPrice, formatDate, countProsConsItems } from '../../utils/format';
 import { StatusCell } from './StatusCell';
 import { ActivityCell } from './ActivityCell';
 import { NoteCell } from './NoteCell';
@@ -116,14 +116,16 @@ export const columns = [
       );
     },
   }),
-  columnHelper.accessor('description', {
+  // Фрагмент від сервера (чистий текст); повний опис — підказка/діалог на вимогу.
+  columnHelper.accessor('description_preview', {
+    id: 'description',
     header: () => <HeaderLabel icon={<LuFileText />}>Опис</HeaderLabel>,
     size: 320,
     minSize: 160,
     maxSize: 600,
     enableSorting: false,
     cell: (info) => {
-      const text = stripDescriptionHtml(info.getValue());
+      const text = info.getValue();
       if (!text) return '—';
       const query = toHighlightQuery(String(info.table.getState().globalFilter ?? ''));
       return (

@@ -42,3 +42,38 @@ export function parseBullets(text: string | null): string[] {
     .map((line) => line.replace(/^•\s*/, '').trim())
     .filter(Boolean);
 }
+
+/**
+ * Короткий фрагмент опису для колонки таблиці (`/listings` не віддає повний опис —
+ * docs/plans/listings-light-payload.md). `html` — уже обрізаний SQL-ем початок опису: прибираємо
+ * обірваний на межі тег і обрізаємо чистий текст до `maxChars` (з «…», якщо щось відкинуто).
+ */
+export function descriptionPreview(html: string | null | undefined, maxChars: number): string | null {
+  if (!html) return null;
+  const text = stripHtml(html.replace(/<[^>]*$/, ''));
+  if (!text) return null;
+  return text.length > maxChars ? `${text.slice(0, maxChars).trimEnd()}…` : text;
+}
+
+/**
+ * Булевий пошук по тексту (вже у нижньому регістрі): `||` — АБО, `&&` — І, `!терм` — НЕ.
+ * Дзеркалить web/src/utils/search.ts (matchesQuery) — пошук в описі тепер на сервері.
+ */
+export function matchesQuery(haystack: string, rawQuery: string): boolean {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+  return query.split('||').some((group) => {
+    const andTerms = group
+      .split('&&')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (andTerms.length === 0) return false;
+    return andTerms.every((term) => {
+      if (term.startsWith('!')) {
+        const negated = term.slice(1).trim();
+        return negated ? !haystack.includes(negated) : true;
+      }
+      return haystack.includes(term);
+    });
+  });
+}
