@@ -9,7 +9,7 @@ import {
   requestStopScan,
   isAnalysisFresh,
 } from '../scanner/index.js';
-import { evaluateFilteredOut } from '../scraper/localFilters.js';
+import { recomputeFilteredOut } from '../scraper/refilter.js';
 import { parseBullets } from '../analysis/text.js';
 import type {
   CategoryOption,
@@ -146,48 +146,8 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       // Зміна local_filters → ретроактивний перерахунок filtered_out для всіх рядків пошуку.
       if (req.body.local_filters === undefined) return search;
 
-      const filtersRow = await dbGet<{ local_filters: string }>(
-        'SELECT local_filters FROM searches WHERE id = ?',
-        [id],
-      );
-      let localFilters: LocalFilters = {};
-      try {
-        localFilters = JSON.parse(filtersRow?.local_filters || '{}') as LocalFilters;
-      } catch {
-        localFilters = {};
-      }
-
-      const listingRows = await dbAll<{
-        id: number;
-        title: string | null;
-        description: string | null;
-        params: string | null;
-        price: number | null;
-        city: string | null;
-        seller_name: string | null;
-        pros: string | null;
-        cons: string | null;
-        category_id: number | null;
-      }>(
-        'SELECT id, title, description, params, price, city, seller_name, pros, cons, category_id FROM listings WHERE search_id = ?',
-        [id],
-      );
-
-      // Рішення filtered_out рахуються в JS наперед → чистий набір UPDATE-ів у batch (без проміжних читань).
-      let filteredOutCount = 0;
-      const statements = listingRows.map((row) => {
-        const filteredOut = evaluateFilteredOut(localFilters, row);
-        if (filteredOut) filteredOutCount++;
-        return {
-          sql: 'UPDATE listings SET filtered_out = ? WHERE id = ?',
-          args: [filteredOut ? 1 : 0, row.id] as InValue[],
-        };
-      });
-      if (statements.length > 0) {
-        await db.batch(statements, 'write');
-      }
-
-      return { ...(search as object), filtered_out_count: filteredOutCount };
+      const { filtered_out_count } = await recomputeFilteredOut(id);
+      return { ...(search as object), filtered_out_count };
     },
   );
 

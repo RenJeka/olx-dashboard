@@ -85,7 +85,7 @@ olx-dashboard/
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
-│       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, initDb (executeMultiple schema.sql)
+│       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, dbBatchChunked (batch порціями), initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
@@ -119,6 +119,7 @@ olx-dashboard/
 │       │   ├── dateParser.ts   # parseOlxDate(): текстові дати HTML-fallback → ISO ("Сьогодні/Вчора о HH:MM", "D <місяць> YYYY р.")
 │       │   ├── normalizer.ts   # upsert по olx_id; olx_status auto-disable; filtered_out; postedAt HTML-fallback через parseOlxDate; selectKnownOlxIds (для оцінки ~нових у двофазному deep-скані)
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
+│       │   ├── refilter.ts     # recomputeFilteredOut(): перерахунок filtered_out після зміни local_filters (лише змінені рядки, порціями)
 │       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
 │       │   ├── olxCategories.ts # fetchCategoryOptions(query): дерево категорій OLX (facet метаданих пошуку, olx-api.md §2.11) → CategoryOption[]; тягнеться scanner-ом, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)

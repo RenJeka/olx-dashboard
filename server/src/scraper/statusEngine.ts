@@ -1,5 +1,5 @@
 import type { InValue } from '@libsql/client';
-import { db, dbAll } from '../db/db.js';
+import { dbAll, dbBatchChunked } from '../db/db.js';
 import type { RawListing } from '../types.js';
 
 interface CandidateRow {
@@ -97,8 +97,9 @@ export async function applyScanStatuses(
       windowFloor === null ? [searchId, ...fetchedIds] : [searchId, ...fetchedIds, windowFloor];
   }
 
-  // Кандидати читаються одним SELECT; усі UPDATE-и збираються в JS і пишуться ОДНИМ
-  // db.batch (атомарно, як транзакція) — без N мережевих round-trip на кожен рядок (Turso).
+  // Кандидати читаються одним SELECT; усі UPDATE-и збираються в JS і пишуться batch-ами
+  // (dbBatchChunked) — без N мережевих round-trip на кожен рядок (Turso) і без гігантського
+  // payload на вичерпаній видачі великого пошуку (S16).
   const candidates = await dbAll<CandidateRow>(candidatesSql, candidatesArgs);
 
   let disabledCount = 0;
@@ -120,6 +121,6 @@ export async function applyScanStatuses(
     }
   }
 
-  if (statements.length > 0) await db.batch(statements, 'write');
+  await dbBatchChunked(statements);
   return { disabled_count: disabledCount };
 }
