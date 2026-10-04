@@ -25,7 +25,7 @@
 | H3 | **`render.yaml` (Blueprint)**: обидва сервіси (API + Static Site), build/start, `healthCheckPath: /health`, rewrite `/api/*`, env-ключі (значення — у dashboard), гілка `main`, auto-deploy **після зеленого CI** | Конфіг деплою в git, відтворюваний; відновлення S1 одним кліком |
 | H4 | **`npm run smoke -- <api-url> [web-url]`**: `/health` 200, `/api/*` без сесії → 401, фронт `index.html` 200 | Перевірка деплою за хвилину, з будь-якого ПК |
 | H5 | **Runbook** у `docs/deploy-render-turso.md` → розділ «Реліз»: чекліст (CI зелений → merge → деплой → smoke → лог «Міграція схеми»), відкат (Render «Rollback» + обмеження: міграції схеми лише додають колонки — відкат коду безпечний), бекап Turso перед ризиковими змінами | Передбачуваний реліз і відкат |
-| H6 | **Dependabot** (npm, щотижня, групування minor/patch) | Вразливості не накопичуються місяцями (S6) |
+| H6 | **Dependabot** (npm + GitHub Actions, ≈ раз на 2 тижні, групування minor/patch) | Вразливості не накопичуються місяцями (S6) |
 
 Поза мінімумом (пізніше): pre-commit hook, staging-середовище, e2e у CI (Playwright),
 моніторинг/алерти, пінг проти засинання free-тарифу.
@@ -47,7 +47,7 @@
 - [ ] H3 `render.yaml` → людина підключає Blueprint у Render (або звіряє з наявними сервісами) →
       деплой з `main` → smoke.
 - [ ] H5 runbook.
-- [ ] H6 Dependabot.
+- [x] H6 Dependabot (2026-10-04, [h6-dependabot](old/h6-dependabot.md)) + P-004 (дії CI `v7`).
 - [ ] Документація.
 
 ## Оцінка
