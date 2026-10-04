@@ -164,6 +164,7 @@ export async function listingsRoutes(app: FastifyInstance): Promise<void> {
         if (inDescription) parts.push(stripHtml(row.description).toLowerCase());
         if (matchesQuery(parts.join('\n'), query)) ids.push(row.id);
       }
+      matchMs += performance.now() - t;
       const last = chunk.at(-1);
       if (!last || chunk.length < SEARCH_CHUNK) break;
       lastId = last.id;
