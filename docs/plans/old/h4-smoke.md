@@ -1,16 +1,16 @@
 # План: H4 — smoke-перевірка деплою
 
-> **Статус:** 🟢 активний (з 2026-10-04)
+> **Статус:** ✅ виконано (2026-10-04) · PR #50; прод — усі перевірки ✅
 
 ## Контекст
 
-H4 з [dev-deploy-harness](dev-deploy-harness.md): одна команда за хвилину перевіряє, що задеплоєний прод живий.
+H4 з [dev-deploy-harness](../dev-deploy-harness.md): одна команда за хвилину перевіряє, що задеплоєний прод живий.
 Лише GET-запити без сесії: ні в OLX, ні в Turso нічого не пишеться, дані не читаються (гейт `401`).
 
 ## Файли
 
 - `scripts/smoke.mjs` — перевірки; без аргументів — адреси проду з
-  [deploy-render-turso](../deploy-render-turso.md) → «Фактичний прод».
+  [deploy-render-turso](../../deploy-render-turso.md) → «Фактичний прод».
 - `package.json` — скрипт `smoke`.
 - Документація: `AGENTS.md` → «Команди», `docs/deploy-render-turso.md`, `docs/structure.md`.
 
@@ -31,7 +31,7 @@ H4 з [dev-deploy-harness](dev-deploy-harness.md): одна команда за 
 - [x] `scripts/smoke.mjs` + `npm run smoke`.
 - [x] Прогін проти проду — усе ✅; проти хибної адреси фронту — ❌ і код `1`.
 - [x] Документація (`architecture.md` не описує службові скрипти — не чіпали).
-- [ ] PR → CI → «так» людини.
+- [x] PR #50 → CI → «так» людини.
 
 ## Test-cases
 

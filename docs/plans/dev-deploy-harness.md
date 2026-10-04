@@ -43,7 +43,7 @@
 - [x] H2 Node 22 у репо: `.nvmrc`, `engines`, документація. ✅ `NODE_VERSION=22` на Render (2026-09-30,
       разом із переведенням обох сервісів на `main` — `render-to-main.md`; прод на Node 22.23.3).
 - [x] H1 CI: `.github/workflows/ci.yml` (push у будь-яку гілку + ручний запуск).
-- [x] H4 smoke-скрипт (2026-10-04, [h4-smoke](h4-smoke.md)): `npm run smoke`.
+- [x] H4 smoke-скрипт (2026-10-04, [h4-smoke](old/h4-smoke.md)): `npm run smoke`.
 - [ ] H3 `render.yaml` → людина підключає Blueprint у Render (або звіряє з наявними сервісами) →
       деплой з `main` → smoke.
 - [ ] H5 runbook.
