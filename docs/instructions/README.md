@@ -22,7 +22,7 @@ AI) сюди не дублюється — вона в документах із
 | [node-e-escaping](node-e-escaping.md) | Правиш файл однорядковим node -e, а в новому коді є бектики чи перенос рядка в літералах |
 | [curl-cyrillic-body](curl-cyrillic-body.md) | Smoke API через curl у Git Bash із кирилицею в тілі дає 400 Content-Length |
 | [scripted-edit-assert](scripted-edit-assert.md) | Правиш файли скриптом (Python `replace`, `sed` за номерами рядків) |
-| [local-dev-port-busy](local-dev-port-busy.md) | Локальний сервер не стартує (`EADDRINUSE :3001`) або логів smoke-запитів не видно |
+| [local-dev-port-busy](local-dev-port-busy.md) | Локальний сервер не стартує (`EADDRINUSE :3001` чи `SQLITE_BUSY`) або логів smoke-запитів не видно |
 | [npm-lockfile-peer-flags](npm-lockfile-peer-flags.md) | Після `npm install` змінився `package-lock.json`, хоча залежності не чіпали |
 | [jev-agent-setup](jev-agent-setup.md) | Треба підключити чи перевірити Jev MCP і скіли jevai.org для агента |
 | [jev-pilot](jev-pilot.md) | Треба порівняти Jev з LLM на пошуку (вартість, якість, ручна розмітка спірних) |
