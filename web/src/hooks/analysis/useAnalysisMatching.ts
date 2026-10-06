@@ -33,6 +33,8 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
       toaster.create({ type: 'error', title: 'Немає оголошень для аналізу' });
       return;
     }
+    // Модель попереднього прогону не має «прилипнути» до результатів цього (упалого) прогону.
+    setRunModel(null);
     const chunks = chunk(effectiveIds, ANALYZE_CHUNK);
     setAnalyzeProgress({ done: 0, total: effectiveIds.length });
     let acc: AnalyzedListing[] = [];
@@ -88,6 +90,8 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
   }
 
   function handleImportMatching(raw: string) {
+    // Імпорт ручного ZIP — не результат авто-рушія: commit візьме модель із налаштувань, не Jev.
+    setRunModel(null);
     importAnalysis.mutate(
       { searchId, mode, raw, accumulated },
       {
