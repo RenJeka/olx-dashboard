@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json && node scripts/copyAssets.mjs",
     "start": "node dist/index.js",
     "scan": "tsx src/scan.ts",
+    "jev:pilot": "tsx src/jevPilot.ts",
     "migrate:posted-at": "tsx src/migratePostedAt.ts",
     "test": "vitest run",
     "test:watch": "vitest"

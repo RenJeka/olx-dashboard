@@ -19,7 +19,7 @@ export function useAnalysisCommit(
   overwriteCount: number,
   apiAvailable: boolean
 ) {
-  const { mode, reset } = useAnalysisWizardStore();
+  const { mode, reset, runModel } = useAnalysisWizardStore();
 
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [commitProgress, setCommitProgress] = useState<{ done: number; total: number } | null>(null);
@@ -37,7 +37,7 @@ export function useAnalysisCommit(
           searchId,
           mode,
           items: batch,
-          model: apiAvailable ? model : MANUAL_MODEL,
+          model: apiAvailable ? (runModel ?? model) : MANUAL_MODEL,
           source: apiAvailable ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT,
           merge: mergeMode,
         });

@@ -28,11 +28,27 @@ function stripCodeFence(text: string): string {
   return fenced ? (fenced[1] as string).trim() : trimmed;
 }
 
+/** Облік вартості виклику (OpenRouter usage accounting). */
+export interface ChatUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  /** USD; 0, якщо OpenRouter не повернув cost. */
+  cost: number;
+}
+
 /**
  * Один виклик chat-completions. Повертає сирий текст відповіді (без code-fence).
  * 1 ретрай на мережевій/HTTP-помилці. Кидає, якщо ключа немає або відповідь порожня.
  */
 export async function chat(messages: ChatMessage[], options: ChatOptions): Promise<string> {
+  return (await chatWithUsage(messages, options)).content;
+}
+
+/** Як chat(), але ще й з usage (токени + вартість) — для замірів вартості (jev-пілот). */
+export async function chatWithUsage(
+  messages: ChatMessage[],
+  options: ChatOptions,
+): Promise<{ content: string; usage: ChatUsage }> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY не налаштовано (авто-режим недоступний)');
@@ -72,11 +88,19 @@ export async function chat(messages: ChatMessage[], options: ChatOptions): Promi
 
       const json = (await res.json()) as {
         choices?: { message?: { content?: string } }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
       };
       const content = json.choices?.[0]?.message?.content;
       if (!content) throw new Error('OpenRouter повернув порожню відповідь');
 
-      return stripCodeFence(content);
+      return {
+        content: stripCodeFence(content),
+        usage: {
+          prompt_tokens: json.usage?.prompt_tokens ?? 0,
+          completion_tokens: json.usage?.completion_tokens ?? 0,
+          cost: json.usage?.cost ?? 0,
+        },
+      };
     } catch (err) {
       lastErr = err;
       logWarn(

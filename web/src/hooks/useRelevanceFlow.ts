@@ -13,6 +13,7 @@ import {
 import { useListingsUiStore } from '../stores/listingsUiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { showErrorToast } from '../utils/toast';
+import { formatAiUsage } from '../utils/format';
 import { useAiScope } from './analysis/useAiScope';
 import { chunk } from '../utils/array';
 import { ANALYZE_CHUNK } from '../constants';
@@ -85,20 +86,36 @@ export function useRelevanceFlow({ search, selectedIds, open, onClose }: UseRele
     setStep('running');
     setProgress({ done: 0, total: effectiveIds.length });
     const acc: RelevanceItem[] = [];
+    const errors: string[] = [];
+    const usage = { requests: 0, cost: 0 };
+    const { analysisModel, analysisEngine } = useSettingsStore.getState();
     try {
       for (const batch of chunk(effectiveIds, ANALYZE_CHUNK)) {
         const res = await runRelevance.mutateAsync({
           searchId: search.id,
           target: target.trim(),
           ids: batch,
-          model: useSettingsStore.getState().analysisModel,
+          model: analysisModel,
+          engine: analysisEngine,
         });
         acc.push(...res.results);
+        errors.push(...res.errors);
+        if (res.usage) {
+          usage.requests += res.usage.requests;
+          usage.cost += res.usage.cost;
+        }
         setProgress((p) => (p ? { ...p, done: p.done + batch.length } : p));
       }
       setSource('api');
       setResults(acc);
       setStep('done');
+      if (analysisEngine === 'jev') {
+        toaster.create({
+          type: errors.length > 0 ? 'warning' : 'info',
+          title: formatAiUsage(usage),
+          description: errors[0],
+        });
+      }
     } catch (err) {
       setStep('idle');
       setProgress(null);

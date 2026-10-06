@@ -76,6 +76,7 @@ web_modules/
 server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
+server/data/jev-pilot/
 
 # Архіви локальних даних/бекапів (напр. server/data.zip)
 *.zip

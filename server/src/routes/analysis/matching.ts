@@ -17,6 +17,7 @@ import {
   PREVIEW_XLSX_WIDTHS,
   isMode,
 } from '../../analysis/constants.js';
+import { runJevMatching } from '../../analysis/jevEngine.js';
 import { chat } from '../../analysis/openrouter.js';
 import { mergeResults, parseMatchingResponse } from '../../analysis/parse.js';
 import {
@@ -29,13 +30,14 @@ import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../a
 import { getSearch, getSavedCriteria, loadListings } from '../../analysis/repo.js';
 import { stripHtml } from '../../analysis/text.js';
 import { buildXlsxBuffer } from '../../export/xlsx.js';
+import { getLogger } from '../../logger.js';
 import type { AnalysisMode, AnalyzeResponse, AnalyzedListing } from '../../types.js';
 
 export async function matchingRoutes(app: FastifyInstance): Promise<void> {
-  // Авто matching (чанки по AUTO_CHUNK_SIZE). НЕ пише в БД.
+  // Авто matching (LLM — чанки по AUTO_CHUNK_SIZE; Jev — пул по оголошенню). НЕ пише в БД.
   app.post<{
     Params: { id: string };
-    Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean };
+    Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
     if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
@@ -55,6 +57,11 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const listings = await loadListings(id, ids);
+    if (req.body.engine === 'jev') {
+      const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing));
+      getLogger('analysis').info({ searchId: id, mode: req.body.mode, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
+      return response;
+    }
     const descriptions = descriptionMap(listings);
     const model = req.body.model ?? DEFAULT_MODEL;
 

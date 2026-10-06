@@ -4,6 +4,7 @@ import { downloadBlob } from '../utils/download';
 import type {
   AnalysisStatus,
   AnalysisCriteria,
+  AnalysisEngine,
   AnalysisMode,
   AnalyzeResponse,
   AnalyzedListing,
@@ -94,16 +95,18 @@ export function useAnalyze() {
       ids,
       model,
       reasoning,
+      engine,
     }: {
       searchId: number;
       mode: AnalysisMode;
       ids: number[];
       model?: string;
       reasoning?: boolean;
+      engine?: AnalysisEngine;
     }) =>
       api<AnalyzeResponse>(`/api/searches/${searchId}/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ mode, ids, model, reasoning }),
+        body: JSON.stringify({ mode, ids, model, reasoning, engine }),
       }),
   });
 }

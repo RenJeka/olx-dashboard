@@ -68,7 +68,8 @@
 **AI** (деталі — `docs/ai-flow.md`):
 - **Ніколи не авто** — лише за кнопкою (жодних викликів зі сканів/автооновлення/cron).
 - **PII продавця в промпт не йде**; промпти — єдине джерело в `server/src/analysis/`.
-- `evidence` верифікується як підрядок опису і **в БД не зберігається**.
+- `evidence` верифікується як підрядок опису і **в БД не зберігається**; для рушія **Jev** (без тексту) замість
+  evidence — ймовірність ≥ поріг (`JEV_*_THRESHOLD`), LLM-рушій лишається з evidence.
 - Критерії — на рівні пошуку, мінуси/плюси та вердикти — на рівні оголошення.
 
 **Безпека:** секрети (`TURSO_AUTH_TOKEN`, `SESSION_SECRET`, `OPENROUTER_API_KEY`, `GOOGLE_CLIENT_ID`,
@@ -132,6 +133,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 | Як ми ходимо в OLX (GraphQL, HTML, пагінація, селектори), що робити, якщо OLX щось змінив? | [`docs/olx-api.md`](docs/olx-api.md) (§5 — чекліст) |
 | Які поля повертає GraphQL OLX? | [`docs/olx-graphql-fields-reference.md`](docs/olx-graphql-fields-reference.md) |
 | Як працюють AI-кроки (фільтр, мінуси/плюси, AI Вибір), рушії, обсяг, ZIP? | [`docs/ai-flow.md`](docs/ai-flow.md) |
+| Що таке Jev (decision-модель), ціна, обмеження, як писати питання? | [`docs/jev.md`](docs/jev.md) |
 | Як вести задачу, чим перевіряти, коли «готово», як безпечно з OLX і БД? | [`docs/development.md`](docs/development.md) |
 | Кольори/токени UI (світла/темна тема)? | [`docs/styles.md`](docs/styles.md) |
 | Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |

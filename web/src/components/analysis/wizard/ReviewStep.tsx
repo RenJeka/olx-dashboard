@@ -80,7 +80,11 @@ function CriteriaTags({
       {row.items.map((it, i) => {
         const included = isIncluded(row.id, it);
         return (
-          <Tooltip key={i} content={it.evidence} disabled={!it.evidence}>
+          <Tooltip
+            key={i}
+            content={it.probability !== undefined ? `Jev: ймовірність ${it.probability.toFixed(2)}` : it.evidence}
+            disabled={!it.evidence && it.probability === undefined}
+          >
             <Badge
               colorPalette={included ? (mode === 'cons' ? 'danger' : 'success') : 'gray'}
               variant={included ? 'subtle' : 'outline'}
@@ -127,7 +131,7 @@ export function ReviewStep({ w }: Props) {
     const html = detailsById?.get(r.id)?.description ?? null;
     const desc = stripDescriptionHtml(html);
     const includedEvidence = r.items
-      .filter((it) => isIncluded(r.id, it))
+      .filter((it) => isIncluded(r.id, it) && it.evidence)
       .map((it) => it.evidence);
 
     return { l, html, desc, includedEvidence };

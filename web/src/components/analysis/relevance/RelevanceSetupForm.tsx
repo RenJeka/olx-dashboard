@@ -10,6 +10,8 @@ import { LuSparkles, LuDownload } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
 import { ScopeSelector } from '../ScopeSelector';
 import type { useRelevanceFlow } from '../../../hooks/useRelevanceFlow';
+import { useSettingsStore } from '../../../stores/settingsStore';
+import { ANALYSIS_ENGINE_LABELS } from '../../../constants';
 
 interface Props {
   flow: ReturnType<typeof useRelevanceFlow>;
@@ -21,6 +23,7 @@ interface Props {
 export function RelevanceSetupForm({ flow }: Props) {
   const { state, actions, mutations } = flow;
   const candidatesCount = state.preview?.candidates ?? null;
+  const engine = useSettingsStore((s) => s.analysisEngine);
 
   return (
     <Stack gap={4}>
@@ -74,7 +77,7 @@ export function RelevanceSetupForm({ flow }: Props) {
           disabled={state.effectiveIds.length === 0 || !state.target.trim()}
           onClick={actions.handleRun}
         >
-          <LuSparkles /> Запустити (авто)
+          <LuSparkles /> Запустити (авто · {ANALYSIS_ENGINE_LABELS[engine]})
         </Button>
       )}
 
