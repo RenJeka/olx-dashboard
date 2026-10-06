@@ -11,15 +11,15 @@
 
 Стабільність закрито ([stability-baseline](plans/old/stability-baseline.md) ✅, 2026-10-04; S15 ⏸ → P-005,
 лагодження швидкості S17 → P-010). Харнес закрито ([dev-deploy-harness](plans/old/dev-deploy-harness.md) ✅,
-2026-10-04). Зараз — **«модель JEV»**: пілоти показали, що Jev дешевший і в розбіжностях частіше правий за LLM;
-наступне — інтеграція рушія «Jev» (етап 2 плану [jev-model](plans/jev-model.md)).
+2026-10-04). Зараз — **«модель JEV»**: рушій «Jev» для кроків 1–2 на проді (етап 2, PR #63, 2026-10-06), але на
+кроці 2 він пропускає багато мінусів → діагностика (етап 3 плану [jev-model](plans/jev-model.md)).
 
 ## Де ми зараз
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-04 jev-pilot](handoffs/2026-10-04-jev-pilot.md): доки й пілоти Jev, гілка `feat/jev-model`
-  (запушена, не злита; прод не змінювався).
+- Останній хендоф — [2026-10-06 jev-engine](handoffs/2026-10-06-jev-engine.md): рушій «Jev» злито й задеплоєно
+  (за замовчуванням лишається LLM; Jev — перемикач у налаштуваннях AI).
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекап прод-БД від 2026-09-30: гілка Turso `olx-dashboard-bak-20260930` (захищена від видалення) + SQL-дамп
@@ -35,7 +35,7 @@
 
 ## Активні плани
 
-- [jev-model](plans/jev-model.md) — етапи 0–1 ✅, етап 2 (інтеграція рушія «Jev» у кроки 1–2) чекає «так» людини.
+- [jev-model](plans/jev-model.md) — етапи 0–2 ✅, етап 3 — діагностика пропусків мінусів у Jev.
 
 ## Що враховувати
 
@@ -47,17 +47,19 @@
 - Моніторинг скану на проді — [prod-scan-monitoring](instructions/prod-scan-monitoring.md).
 - Рядки з прод-БД агенту — лише через Turso MCP або команду людини; читання ключів блокує auto-mode
   ([prod-data-via-turso-mcp](instructions/prod-data-via-turso-mcp.md)).
-- Jev MCP/skills jevai.org для агента встановлено глобально, але виклики падають на їхньому боці
+- Jev MCP/skills jevai.org для агента встановлено глобально, але MCP зараз відповідає `401` — ключ перевипустити
   ([jev-agent-setup](instructions/jev-agent-setup.md)).
+- Локально `SQLITE_BUSY` / зайнятий 3001 — старі `tsx watch` ([local-dev-port-busy](instructions/local-dev-port-busy.md)).
 
 ## Відкриті питання (чекають людину)
 
-- «Так» на етап 2 плану [jev-model](plans/jev-model.md); чи робити скіл з інструкції [jev-pilot](instructions/jev-pilot.md).
+- Етап 3 [jev-model](plans/jev-model.md): на якому пошуку й середовищі робити тестовий прогін; чи робити скіл з інструкції
+  [jev-pilot](instructions/jev-pilot.md).
 - Коли видаляти бекап-гілку Turso `olx-dashboard-bak-20260930`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).
 
 ## Наступний крок
 
-Етап 2 [jev-model](plans/jev-model.md) після «так» людини: спершу міні-пілот `JEV_MAX_ALIASES` (0 / 3) на вибірці
-«навісна полиця», далі рушій «Jev» у кроках 1–2 за планом.
+Етап 3 [jev-model](plans/jev-model.md): тестовий прогін кроку 2 рушієм Jev на 5 оголошеннях — сирий вхід (state +
+питання) і вихід (ймовірність по кожному критерію) у live artifact з підсвіткою; без запису в БД.

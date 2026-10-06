@@ -41,6 +41,8 @@ OpenRouter ([jev](../jev.md)).
 - `Connected` і `tools/list` ключ не перевіряють. Справжня перевірка — `tools/call`. Невірний ключ → REST `401`;
   `502` / «The request credentials or model access were rejected» при валідному ключі — збій на боці jevai.org
   (спостерігалось 2026-10-04), не наша конфігурація: повторити пізніше.
+- 2026-10-05/06 MCP `jev` при старті сесії вже не підключається: `401 Invalid or missing Jev API key`. Ймовірно,
+  ключ протух або відкликаний → людина перевипускає ключ (крок 1) і перезапускає wmux/Claude Code.
 
 ## Пов'язане
 [jev](../jev.md), [plans/jev-model](../plans/jev-model.md), [secrets-in-sources](secrets-in-sources.md).
