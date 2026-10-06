@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "scan": "tsx src/scan.ts",
     "jev:pilot": "tsx src/jevPilot.ts",
+    "jev:probe": "tsx src/jevProbe.ts",
     "migrate:posted-at": "tsx src/migratePostedAt.ts",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -276,7 +276,22 @@ export function criterionKey(mode: AnalysisMode, index: number): string {
   return `${mode}_${index}`;
 }
 
-/** По одному noul на кожен критерій мінусів/плюсів пошуку. */
+/**
+ * Межа «так/ні» для критеріїв. Без неї Jev читає «state» буквально й занижує ймовірності — пропускає
+ * перефразовані мінуси/плюси (експеримент «формулювання × поріг», docs/plans/jev-model.md → етап 3).
+ */
+const CRITERION_BOUNDARY: Record<JevLang, { true: string; false: string }> = {
+  en: { true: 'Stated or clearly implied.', false: 'Not mentioned, or the opposite.' },
+  uk: { true: 'Прямо сказано або явно випливає.', false: 'Не згадано або сказано протилежне.' },
+};
+
+/** Текст noul-питання критерію (без межі `criteria`). */
+function criterionInstructions(mode: AnalysisMode, criterion: string, lang: JevLang): string {
+  if (lang === 'uk') return `Чи має товар ${mode === 'cons' ? 'такий недолік' : 'таку перевагу'}: «${criterion}»?`;
+  return `Does this item have the following ${mode === 'cons' ? 'drawback' : 'advantage'}: "${criterion}"?`;
+}
+
+/** По одному noul на кожен критерій мінусів/плюсів пошуку (з межею «так/ні»). */
 export function criteriaQuestions(
   criteria: Record<AnalysisMode, string[]>,
   lang: JevLang,
@@ -284,11 +299,10 @@ export function criteriaQuestions(
   const out: Record<string, JevNoulQuestion> = {};
   for (const mode of ['cons', 'pros'] as const) {
     criteria[mode].forEach((c, i) => {
-      const what =
-        lang === 'en' ? (mode === 'cons' ? 'drawback' : 'advantage') : mode === 'cons' ? 'недолік' : 'перевагу';
       out[criterionKey(mode, i)] = {
         type: 'noul',
-        instructions: lang === 'en' ? `Does the listing state this ${what}: "${c}"?` : `Чи оголошення вказує ${what}: «${c}»?`,
+        instructions: criterionInstructions(mode, c, lang),
+        criteria: CRITERION_BOUNDARY[lang],
       };
     });
   }

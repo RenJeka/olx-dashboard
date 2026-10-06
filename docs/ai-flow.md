@@ -34,8 +34,9 @@ High-level огляд усіх AI-кроків OLX Dashboard: як влашто�
 `relevance/analyze` і `analyze`. Jev не генерує текст → генерація критеріїв і AI Вибір — завжди LLM.
 - **Крок 1:** код-префільтр → Jev на короткому state (назва + характеристики + опис ≤ `JEV_SHORT_DESC_SLICE`),
   EN-питання з ціллю й усіма синонімами пошуку → `relevant` при p ≥ `JEV_RELEVANCE_THRESHOLD`, `reason` «Jev 0.xx».
-- **Крок 2:** повний state (опис ≤ `MATCHING_DESC_SLICE`), noul на кожен критерій режиму → критерій знайдено при
-  p ≥ `JEV_CRITERIA_THRESHOLD`; `evidence` порожній, `ok: true`, ймовірність — у `probability` (підказка тегу
+- **Крок 2:** повний state (опис ≤ `MATCHING_DESC_SLICE`), noul на кожен критерій режиму — EN-питання «чи має товар
+  такий мінус/плюс» з межею `criteria` («прямо сказано або явно випливає» / «не згадано або протилежне»,
+  `criteriaQuestions` у `jev.ts`) → критерій знайдено при p ≥ `JEV_CRITERIA_THRESHOLD`; `evidence` порожній, `ok: true`, ймовірність — у `probability` (підказка тегу
   в «Перевірці»). Commit пише в `analysis_model` версію Jev з відповіді.
 - Відповідь несе `usage {requests, cost}` і `model`; UI показує вартість прогону тостом, сервер — у stdout-лог.
 - Числові критерії («батарея 70%») Jev пропускає → кодом, [P-013](parking.md). Пілоти й пороги — план

@@ -2,13 +2,21 @@
 // на вибірці. Нічого не пише в БД — лише читає JSON-вибірку й пише звіт поруч.
 //   npm run jev:pilot -- --export <searchId> [--limit N]   # вибірка з БД з server/.env (лише SELECT)
 //   npm run jev:pilot -- [--sample <path>] [--limit N] [--variants L,A1s,A1f,A2,B,UK]
-//                        [--model <llm>] [--concurrency N] [--rel-threshold 0.5] [--uk-limit N]
+//                        [--model <llm>] [--concurrency N] [--rel-threshold <JEV_RELEVANCE_THRESHOLD>] [--uk-limit N]
 //                        [--max-aliases N] [--out <dir>]   # синонімів у питанні Jev; тека звіту
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hasApiKey } from './analysis/config.js';
-import { AUTO_CHUNK_SIZE, DEFAULT_MODEL, JEV_CONCURRENCY, JEV_SHORT_DESC_SLICE, MATCHING_DESC_SLICE } from './analysis/constants.js';
+import {
+  AUTO_CHUNK_SIZE,
+  DEFAULT_MODEL,
+  JEV_CONCURRENCY,
+  JEV_CRITERIA_THRESHOLD,
+  JEV_RELEVANCE_THRESHOLD,
+  JEV_SHORT_DESC_SLICE,
+  MATCHING_DESC_SLICE,
+} from './analysis/constants.js';
 import {
   RELEVANT_KEY,
   criteriaAbove,
@@ -181,15 +189,18 @@ const per1000 = (cost: number, listings: number) => (listings === 0 ? '—' : `$
 
 // ── Спірні випадки для ручної розмітки ─────────────────────────────────────────
 
-const DISPUTE_THRESHOLD = 0.7;
+/** Ключ «LLM дав результат для оголошення в цьому режимі». */
+const llmDoneKey = (id: number, mode: AnalysisMode) => `${id}|${mode}`;
+
 const DISPUTE_DESC_CHARS = 400;
 
 /** Рядок-посилання на оголошення (порожньо, якщо url у вибірці немає). */
 const olxLink = (r: SampleListing): string[] => (r.url ? [`[Відкрити на OLX](${r.url})`] : []);
 
 /**
- * disputes.md: оголошення, де Jev (поріг 0.7) і свіжий LLM розходяться. Людина ставить відповідь
- * у квадратних дужках — це еталон якості замість «збігу з LLM».
+ * disputes.md: оголошення, де Jev (продові пороги кроків 1 і 2) і свіжий LLM розходяться. Людина ставить
+ * відповідь у квадратних дужках — це еталон якості замість «збігу з LLM». Режим, для якого LLM не дав
+ * результату (збій запиту), не вважається відповіддю «ні» — такі пари пропускаються.
  */
 function buildDisputes(
   rows: SampleListing[],
@@ -197,6 +208,7 @@ function buildDisputes(
   llmRel: Map<number, boolean>,
   jevCrit: Map<number, JevResult> | undefined,
   llmCrit: Map<number, Record<AnalysisMode, string[]>>,
+  llmCritDone: Set<string>,
   criteria: Record<AnalysisMode, string[]>,
 ): string {
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -207,17 +219,18 @@ function buildDisputes(
   for (const [id, p] of jevRel ?? []) {
     const llm = llmRel.get(id);
     const r = byId.get(id);
-    if (llm === undefined || !r || p >= DISPUTE_THRESHOLD === llm) continue;
+    if (llm === undefined || !r || p >= JEV_RELEVANCE_THRESHOLD === llm) continue;
     md.push(`### R${id} [ ]  ${r.title ?? ''}`, ...olxLink(r), `Jev ${p.toFixed(2)} · LLM ${llm ? 'так' : 'ні'}`, '', `> ${text(r)}`, '');
   }
   md.push('## Крок 2 — чи є в оголошенні цей мінус/плюс?', '');
   for (const [id, res] of jevCrit ?? []) {
     const r = byId.get(id);
     if (!r) continue;
-    const jev = criteriaAbove(res, criteria, DISPUTE_THRESHOLD);
+    const jev = criteriaAbove(res, criteria, JEV_CRITERIA_THRESHOLD);
     const llm = llmCrit.get(id) ?? { cons: [], pros: [] };
     const lines: string[] = [];
     for (const mode of ['cons', 'pros'] as const) {
+      if (!llmCritDone.has(llmDoneKey(id, mode))) continue;
       const j = new Set(jev[mode]);
       const l = new Set(llm[mode]);
       for (const c of new Set([...j, ...l])) {
@@ -275,7 +288,7 @@ async function main(): Promise<void> {
   const limit = Number(arg('limit') ?? Infinity);
   const model = arg('model') ?? DEFAULT_MODEL;
   const concurrency = Number(arg('concurrency') ?? JEV_CONCURRENCY);
-  const relThreshold = Number(arg('rel-threshold') ?? 0.5);
+  const relThreshold = Number(arg('rel-threshold') ?? JEV_RELEVANCE_THRESHOLD);
   const ukLimit = Number(arg('uk-limit') ?? 60);
   const variants = new Set<Variant>(
     (arg('variants')?.split(',') ?? [...ALL_VARIANTS]).filter((v): v is Variant => (ALL_VARIANTS as readonly string[]).includes(v)),
@@ -326,6 +339,7 @@ async function main(): Promise<void> {
   const crit = new Map<string, Map<number, JevResult>>(); // варіант → id → відповіді критеріїв
   const llmRel = new Map<number, boolean>();
   const llmCrit = new Map<number, Record<AnalysisMode, string[]>>();
+  const llmCritDone = new Set<string>();
   const relQ = { [RELEVANT_KEY]: relevanceQuestion(target, jevAliases, lang) };
   const critQ = criteriaQuestions(criteria, lang);
   const hasCriteria = Object.keys(critQ).length > 0;
@@ -366,6 +380,7 @@ async function main(): Promise<void> {
               const rec = llmCrit.get(a.id) ?? { cons: [], pros: [] };
               rec[mode] = a.items.filter((i) => i.ok).map((i) => i.criterion);
               llmCrit.set(a.id, rec);
+              llmCritDone.add(llmDoneKey(a.id, mode));
             }
           } catch (err) {
             line2.errors++;
@@ -428,12 +443,14 @@ async function main(): Promise<void> {
   md.push('', `Шляхи на ${cands.length} оголошень (після префільтра): L = ${usd(sum(['L1', 'L2']))}, A = A1-short + A2 = ${usd(sum(['A1-short', 'A2']))}, B = ${usd(sum(['B ']))}.`);
   md.push('Увага: вартість LLM (L) залежить від `usage.cost` OpenRouter; 0 означає, що провайдер не віддав cost.', '');
 
-  md.push('## Крок 1 — релевантність', '', 'Колонки: n | precision | recall | accuracy | tp/fp/fn/tn.', '');
+  // Відсіяні код-префільтром — вердикт «ні» для будь-якого рушія (як у проді), а не «немає даних».
+  const withRejected = (pred: Map<number, boolean>) => new Map([...rejected.map((r): [number, boolean] => [r.id, false]), ...pred]);
+  md.push('## Крок 1 — релевантність', '', 'Колонки: n | precision | recall | accuracy | tp/fp/fn/tn. Відсіяні префільтром рахуються як «ні».', '');
   for (const [refName, ref] of [['manual (золото)', gold], ['збережений LLM', llmStored]] as const) {
     if (ref.size === 0) continue;
     md.push(`### Проти: ${refName}`, '', '| Варіант | Поріг | n | P | R | Acc | tp/fp/fn/tn |', '|---|---|---|---|---|---|---|');
-    if (llmRel.size) md.push(`| L1 свіжий LLM | — | ${confusionCells(confusion(llmRel, ref))} |`);
-    for (const [name, probs] of rel) for (const t of THRESHOLDS) md.push(`| ${name} | ${t} | ${confusionCells(confusion(atThreshold(probs, t), ref))} |`);
+    if (llmRel.size) md.push(`| L1 свіжий LLM | — | ${confusionCells(confusion(withRejected(llmRel), ref))} |`);
+    for (const [name, probs] of rel) for (const t of THRESHOLDS) md.push(`| ${name} | ${t} | ${confusionCells(confusion(withRejected(atThreshold(probs, t)), ref))} |`);
     md.push('');
   }
 
@@ -470,7 +487,7 @@ async function main(): Promise<void> {
   };
   writeFileSync(join(outDir, 'raw.json'), JSON.stringify(raw, null, 2));
   writeFileSync(join(outDir, 'report.md'), md.join('\n'));
-  writeFileSync(join(outDir, 'disputes.md'), buildDisputes(rows, rel.get('A1s'), llmRel, crit.get('A2'), llmCrit, criteria));
+  writeFileSync(join(outDir, 'disputes.md'), buildDisputes(rows, rel.get('A1s'), llmRel, crit.get('A2'), llmCrit, llmCritDone, criteria));
   console.log(md.join('\n'));
   console.log(`\nЗвіт: ${join(outDir, 'report.md')}`);
 }

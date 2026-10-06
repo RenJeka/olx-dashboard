@@ -75,6 +75,12 @@ describe('state і питання', () => {
     const criteria = { cons: ['без торгу', 'подряпини'], pros: ['можливий торг'] };
     const q = criteriaQuestions(criteria, 'en');
     expect(Object.keys(q)).toEqual(['cons_0', 'cons_1', 'pros_0']);
+    expect(q.cons_0).toEqual({
+      type: 'noul',
+      instructions: 'Does this item have the following drawback: "без торгу"?',
+      criteria: { true: 'Stated or clearly implied.', false: 'Not mentioned, or the opposite.' },
+    });
+    expect(q.pros_0?.instructions).toContain('advantage: "можливий торг"');
     const result = parseDecisionsResponse(
       {
         model: 'm',
