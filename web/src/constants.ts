@@ -20,6 +20,8 @@ export const MODE_LABELS: Record<'cons' | 'pros', string> = { cons: 'Мінус�
 export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
 /** Позначка моделі для ручного імпорту. */
 export const MANUAL_MODEL = 'manual';
+/** Підписи рушіїв авто-режиму кроків 1–2. */
+export const ANALYSIS_ENGINE_LABELS = { llm: 'LLM', jev: 'Jev' } as const;
 
 // ── AI Вибір (ранжування) ──────────────────────────────────────────────────────
 /** Підпис псевдо-вкладки/scope «Найкращі кандидати» (ai_picks) — спільний для таблиці й майстра. */

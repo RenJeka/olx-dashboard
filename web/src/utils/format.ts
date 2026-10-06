@@ -126,3 +126,8 @@ export function stripDescriptionHtml(html: string | null): string {
     .replace(/&#39;/g, "'")
     .trim();
 }
+
+/** Опис вартості прогону Jev для тосту: «Jev: 120 запитів · $0.0042». */
+export function formatAiUsage(usage: { requests: number; cost: number }): string {
+  return `Jev: ${usage.requests} запитів · $${usage.cost.toFixed(4)}`;
+}

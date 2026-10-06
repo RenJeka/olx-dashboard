@@ -31,6 +31,10 @@ export const JEV_TIMEOUT_MS = 60_000;
 export const JEV_BACKOFF_CAP_MS = 30_000;
 /** Короткий state для фільтра релевантності: перші N символів опису. */
 export const JEV_SHORT_DESC_SLICE = 300;
+/** Крок 1: noul «продає цільовий товар» ≥ порогу → relevant (пілот «навісна полиця»: 0.5 точніше за 0.7). */
+export const JEV_RELEVANCE_THRESHOLD = 0.5;
+/** Крок 2: noul критерію ≥ порогу → критерій знайдено (замість evidence для рушія Jev). */
+export const JEV_CRITERIA_THRESHOLD = 0.7;
 
 // ── Чанкування / ліміти ──────────────────────────────────────────────────────
 /** Авто-режим: дрібні батчі (модель деградує на довгому контексті). */

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiBlob } from './base';
 import { downloadBlob } from '../utils/download';
-import type { RelevanceItem, RelevanceResponse } from '../types';
+import type { AnalysisEngine, RelevanceItem, RelevanceResponse } from '../types';
 
 /** Цільовий товар фільтра (передзаповнюється query, якщо ще не збережений). */
 export function useRelevanceTarget(searchId: number | null) {
@@ -45,7 +45,7 @@ export function useRelevancePreview(
   });
 }
 
-/** Авто-класифікація релевантності через OpenRouter. НЕ пише в БД — повертає results для перегляду. */
+/** Авто-класифікація релевантності через OpenRouter (рушій LLM або Jev). НЕ пише в БД — повертає results для перегляду. */
 export function useRunRelevance() {
   return useMutation({
     mutationFn: ({
@@ -53,15 +53,17 @@ export function useRunRelevance() {
       target,
       ids,
       model,
+      engine,
     }: {
       searchId: number;
       target: string;
       ids: number[];
       model?: string;
+      engine?: AnalysisEngine;
     }) =>
       api<RelevanceResponse>(`/api/searches/${searchId}/relevance/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ target, ids, model }),
+        body: JSON.stringify({ target, ids, model, engine }),
       }),
   });
 }

@@ -6,9 +6,20 @@ export interface RelevanceItem {
   reason: string;
 }
 
+/** Рушій авто-режиму кроків 1–2 (docs/ai-flow.md → «Рушій Jev»). */
+export type AnalysisEngine = 'llm' | 'jev';
+
+/** Облік прогону рушія Jev. */
+export interface AiUsage {
+  requests: number;
+  cost: number;
+}
+
 export interface RelevanceResponse {
   results: RelevanceItem[];
   errors: string[];
+  usage?: AiUsage;
+  model?: string;
 }
 
 // ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────
@@ -31,6 +42,8 @@ export type AnalysisMode = 'cons' | 'pros';
 export interface AnalysisStatus {
   apiAvailable: boolean;
   defaultModel: string;
+  jevAvailable?: boolean;
+  jevModel?: string;
 }
 
 export interface AnalysisCriteria {
@@ -42,6 +55,8 @@ export interface MatchedItem {
   criterion: string;
   evidence: string;
   ok: boolean;
+  /** Рушій Jev: ймовірність критерію (evidence порожній). */
+  probability?: number;
 }
 
 export interface AnalyzedListing {
@@ -52,6 +67,8 @@ export interface AnalyzedListing {
 export interface AnalyzeResponse {
   results: AnalyzedListing[];
   errors: string[];
+  usage?: AiUsage;
+  model?: string;
 }
 
 export interface PackagePart {

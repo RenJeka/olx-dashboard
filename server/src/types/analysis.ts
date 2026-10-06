@@ -9,10 +9,23 @@ export interface RelevanceItem {
   reason: string;
 }
 
+/** Рушій авто-режиму кроків 1–2: LLM (OpenRouter chat) або Jev (decision-модель, docs/jev.md). */
+export type AnalysisEngine = 'llm' | 'jev';
+
+/** Облік прогону рушія (поки — лише для Jev, у якого `usage.cost` на кожен запит). */
+export interface AiUsage {
+  requests: number;
+  /** Сума `usage.cost`, $. */
+  cost: number;
+}
+
 /** Відповідь relevance-ендпойнтів (auto + manual import). */
 export interface RelevanceResponse {
   results: RelevanceItem[];
   errors: string[];
+  /** Рушій Jev: облік і версія моделі прогону. */
+  usage?: AiUsage;
+  model?: string;
 }
 
 // ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────
@@ -58,8 +71,10 @@ export interface MatchedItem {
   criterion: string;
   /** Дослівний фрагмент опису (для верифікації/підсвітки); у БД НЕ зберігається. */
   evidence: string;
-  /** evidence підтверджено як підрядок опису (анти-галюцинація). */
+  /** evidence підтверджено як підрядок опису (анти-галюцинація); для рушія Jev — ймовірність ≥ порогу. */
   ok: boolean;
+  /** Рушій Jev: ймовірність критерію (evidence тоді порожній). */
+  probability?: number;
 }
 
 /** Результат аналізу одного оголошення (для кроку «Перевірка»). */
@@ -72,6 +87,9 @@ export interface AnalyzedListing {
 export interface AnalyzeResponse {
   results: AnalyzedListing[];
   errors: string[];
+  /** Рушій Jev: облік і версія моделі прогону (commit пише її в analysis_model). */
+  usage?: AiUsage;
+  model?: string;
 }
 
 /** Один елемент запису в БД (commit). */

@@ -3,6 +3,7 @@
 //   npm run jev:pilot -- --export <searchId> [--limit N]   # вибірка з БД з server/.env (лише SELECT)
 //   npm run jev:pilot -- [--sample <path>] [--limit N] [--variants L,A1s,A1f,A2,B,UK]
 //                        [--model <llm>] [--concurrency N] [--rel-threshold 0.5] [--uk-limit N]
+//                        [--max-aliases N] [--out <dir>]   # синонімів у питанні Jev; тека звіту
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -270,6 +271,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const samplePath = arg('sample') ?? join(PILOT_DIR, 'sample.json');
+  const outDir = arg('out') ?? PILOT_DIR;
   const limit = Number(arg('limit') ?? Infinity);
   const model = arg('model') ?? DEFAULT_MODEL;
   const concurrency = Number(arg('concurrency') ?? JEV_CONCURRENCY);
@@ -290,6 +292,9 @@ async function main(): Promise<void> {
   const rows = sample.listings.slice(0, limit);
   const target = (sample.search.relevance_target ?? '').trim() || sample.search.query;
   const aliases = jsonArray(sample.search.query_synonyms);
+  // Синоніми в питанні Jev оплачуються в кожному запиті → обрізаються (префільтр бачить усі).
+  const maxAliases = arg('max-aliases');
+  const jevAliases = maxAliases === undefined ? aliases : aliases.slice(0, Number(maxAliases));
   const criteria = parseCriteria(sample.search.analysis_criteria);
   const lang: JevLang = 'en';
 
@@ -321,7 +326,7 @@ async function main(): Promise<void> {
   const crit = new Map<string, Map<number, JevResult>>(); // варіант → id → відповіді критеріїв
   const llmRel = new Map<number, boolean>();
   const llmCrit = new Map<number, Record<AnalysisMode, string[]>>();
-  const relQ = { [RELEVANT_KEY]: relevanceQuestion(target, aliases, lang) };
+  const relQ = { [RELEVANT_KEY]: relevanceQuestion(target, jevAliases, lang) };
   const critQ = criteriaQuestions(criteria, lang);
   const hasCriteria = Object.keys(critQ).length > 0;
 
@@ -401,7 +406,7 @@ async function main(): Promise<void> {
   }
   if (variants.has('UK')) {
     const line = newCost(`UK (Jev, релевантність українською, опис ≤${JEV_SHORT_DESC_SLICE}, перші ${ukLimit})`);
-    const ukQ = { [RELEVANT_KEY]: relevanceQuestion(target, aliases, 'uk') };
+    const ukQ = { [RELEVANT_KEY]: relevanceQuestion(target, jevAliases, 'uk') };
     rel.set('UK', relProbs(await runJev(line, cands.slice(0, ukLimit), JEV_SHORT_DESC_SLICE, ukQ, concurrency)));
     costs.push(line);
   }
@@ -410,7 +415,7 @@ async function main(): Promise<void> {
   const uniqueStates = new Set(cands.map((c) => JSON.stringify(listingState(c, MATCHING_DESC_SLICE)))).size;
   const md: string[] = [];
   md.push(`# Jev-пілот — звіт`, '');
-  md.push(`- Дата: ${new Date().toISOString()}; пошук #${sample.search.id} «${sample.search.query}», ціль «${target}»${aliases.length ? `, синоніми: ${aliases.join(', ')}` : ''}.`);
+  md.push(`- Дата: ${new Date().toISOString()}; пошук #${sample.search.id} «${sample.search.query}», ціль «${target}»${aliases.length ? `, синоніми: ${aliases.join(', ')}` : ''}; у питанні Jev синонімів ${jevAliases.length}.`);
   md.push(`- Вибірка ${rows.length}; у AI після префільтра ${cands.length}; унікальних state ${uniqueStates}.`);
   md.push(`- Еталон релевантності: manual ${gold.size}, збережений LLM ${llmStored.size}. Збережених аналізів мінусів/плюсів: ${storedCriteria.size}.`);
   md.push(`- Критеріїв: мінуси ${criteria.cons.length}, плюси ${criteria.pros.length}. Поріг релевантності для A2/B: ${relThreshold}.`, '');
@@ -455,7 +460,7 @@ async function main(): Promise<void> {
     md.push('');
   }
 
-  mkdirSync(PILOT_DIR, { recursive: true });
+  mkdirSync(outDir, { recursive: true });
   const raw = {
     relevance: Object.fromEntries([...rel].map(([k, m]) => [k, Object.fromEntries(m)])),
     criteria: Object.fromEntries([...crit].map(([k, m]) => [k, Object.fromEntries([...m].map(([id, r]) => [id, r.answers]))])),
@@ -463,11 +468,11 @@ async function main(): Promise<void> {
     llmCriteria: Object.fromEntries(llmCrit),
     costs,
   };
-  writeFileSync(join(PILOT_DIR, 'raw.json'), JSON.stringify(raw, null, 2));
-  writeFileSync(join(PILOT_DIR, 'report.md'), md.join('\n'));
-  writeFileSync(join(PILOT_DIR, 'disputes.md'), buildDisputes(rows, rel.get('A1s'), llmRel, crit.get('A2'), llmCrit, criteria));
+  writeFileSync(join(outDir, 'raw.json'), JSON.stringify(raw, null, 2));
+  writeFileSync(join(outDir, 'report.md'), md.join('\n'));
+  writeFileSync(join(outDir, 'disputes.md'), buildDisputes(rows, rel.get('A1s'), llmRel, crit.get('A2'), llmCrit, criteria));
   console.log(md.join('\n'));
-  console.log(`\nЗвіт: ${join(PILOT_DIR, 'report.md')}`);
+  console.log(`\nЗвіт: ${join(outDir, 'report.md')}`);
 }
 
 await main();

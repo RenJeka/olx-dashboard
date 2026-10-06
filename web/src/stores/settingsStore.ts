@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { RowSelectionState, VisibilityState } from '@tanstack/react-table';
+import type { AnalysisEngine } from '../types';
 import { SETTINGS_STORAGE_KEY, DEFAULT_AUTO_REFRESH_INTERVAL_MIN, DEFAULT_ANALYSIS_MODEL } from '../constants';
 
 interface SettingsState {
@@ -41,6 +42,10 @@ interface SettingsState {
 
   analysisReasoning: boolean;
   setAnalysisReasoning: (reasoning: boolean) => void;
+
+  /** Рушій авто-режиму кроків 1–2 (генерація критеріїв і AI Вибір — завжди LLM). */
+  analysisEngine: AnalysisEngine;
+  setAnalysisEngine: (engine: AnalysisEngine) => void;
 
   analysisExtraCriteria: string;
   setAnalysisExtraCriteria: (criteria: string) => void;
@@ -94,6 +99,9 @@ export const useSettingsStore = create<SettingsState>()(
       analysisReasoning: false,
       setAnalysisReasoning: (analysisReasoning) => set({ analysisReasoning }),
 
+      analysisEngine: 'llm',
+      setAnalysisEngine: (analysisEngine) => set({ analysisEngine }),
+
       analysisExtraCriteria: '',
       setAnalysisExtraCriteria: (analysisExtraCriteria) => set({ analysisExtraCriteria }),
     }),
@@ -111,6 +119,7 @@ export const useSettingsStore = create<SettingsState>()(
         skipDeepScanConfirm: state.skipDeepScanConfirm,
         analysisModel: state.analysisModel,
         analysisReasoning: state.analysisReasoning,
+        analysisEngine: state.analysisEngine,
         analysisExtraCriteria: state.analysisExtraCriteria,
       }),
     }

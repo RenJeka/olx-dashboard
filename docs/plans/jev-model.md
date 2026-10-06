@@ -1,6 +1,6 @@
 # План: «модель JEV» — документація, встановлення, пілот для AI-кроків 1+2
 
-> **Статус:** 🟢 активний · етапи 0–1 ✅ (пілоти 2026-10-04) · етап 2 (інтеграція) розписано, чекає «так» людини
+> **Статус:** 🟢 активний · етапи 0–1 ✅ (пілоти 2026-10-04) · етап 2: код і доки ✅ (2026-10-05), ручна перевірка людиною ✅ (2026-10-06) · PR відкрито, злиття/деплой — після «так»
 
 ## Context
 
@@ -57,7 +57,7 @@ evidence** (поріг noul; LLM-рушій лишається з evidence); ш�
   3. Агент: `claude mcp add --scope user --transport http jev https://www.jevai.org/api/mcp --header "Authorization: Bearer ${JEV_API_KEY}"`.
      Розкриття `${JEV_API_KEY}` у user-scope — гіпотеза (середня впевненість); перевірка — `claude mcp list`
      + виклик `tools/list`. Не спрацює → запасний варіант зафіксувати в інструкції.
-- [ ] Закрити відкрите питання `current.md` «що таке модель JEV» (на session-close).
+- [x] Закрити відкрите питання `current.md` «що таке модель JEV» (питання з `current.md` уже прибрано).
 
 ### Етап 1 — пілот (без змін у БД і UI)
 
@@ -120,26 +120,32 @@ LLM (OpenRouter chat) і ручним ZIP; LLM-рушій лишається б�
 - Крок 2: лише для вибраних оголошень (як зараз), повний state, по noul на кожен критерій режиму, поріг **0.7**
   (`JEV_CRITERIA_THRESHOLD`) → `items` з `evidence: ''`, `ok: true`, нове поле `probability`.
 - Генерація критеріїв (крок 2а) і AI Вибір (крок 3) — лише LLM (Jev не генерує).
-- Синоніми в питанні Jev: ціль + не більше `JEV_MAX_ALIASES` (кожен синонім оплачується в кожному запиті).
+- Синоніми в питанні Jev: ціль + **усі** синоніми пошуку (≤ `MAX_SYNONYMS`); окремого `JEV_MAX_ALIASES` немає —
+  міні-пілот нижче.
 - `usage.cost` прогону — у відповіді API (`usage: {requests, cost}`) і в stdout-лог; UI показує суму в тості.
 
 **Кроки**
-- [ ] Перед кодом — міні-пілот: варіант A1-short з `JEV_MAX_ALIASES` = 0 / 3 на «навісній полиці» (є розмітка
-      `polka/disputes-marked.md`) → вибрати значення; оновити `jevPilot.ts` варіантом.
-- [ ] Новий модуль jevEngine.ts у `server/src/analysis/`: `runJevRelevance(target, listings, aliases)` → `RelevanceResponse` + usage;
+- [x] Міні-пілот (2026-10-05): A1-short з 0 / 3 / усіма синонімами на «навісній полиці»; `jevPilot.ts` → опції
+      `--max-aliases N`, `--out <dir>`. Еталон — ручна розмітка спірних + узгоджені Jev/LLM. Обрізання синонімів
+      дешевшає на копійки на тисячу оголошень, але точність помітно падає: випадають «книжкові полиці» (синонім
+      з кінця списку) → **усі синоніми**, `JEV_MAX_ALIASES` не вводимо. Цифри — у хендофі сесії.
+- [x] Новий модуль jevEngine.ts у `server/src/analysis/`: `runJevRelevance(target, listings, aliases)` → `RelevanceResponse` + usage;
       `runJevMatching(criteria, mode, listings)` → `AnalyzeResponse` + usage (через `decide`/`runPool` з `jev.ts`).
-- [ ] Типи: `MatchedItem.probability?` у `server/src/types/analysis.ts` і дубль у `web/src/types/`; `usage?` у відповідях.
-- [ ] Маршрути: `engine?: 'llm' | 'jev'` у тілі `POST /api/searches/:id/relevance/analyze` і `POST /api/searches/:id/analyze`
+- [x] Типи: `MatchedItem.probability?` у `server/src/types/analysis.ts` і дубль у `web/src/types/`; `usage?` у відповідях.
+- [x] Маршрути: `engine?: 'llm' | 'jev'` у тілі `POST /api/searches/:id/relevance/analyze` і `POST /api/searches/:id/analyze`
       (дефолт `llm`); `GET /api/analysis/status` → `jevAvailable` (той самий ключ OpenRouter).
-- [ ] Commit: `analysis_model` = версія Jev з відповіді (перевірити, звідки commit бере модель).
-- [ ] UI: вибір рушія «LLM / Jev» у налаштуваннях AI (`settingsStore` + `AnalysisSection.tsx`); у діалогах кроків 1–2
+- [x] Commit: `analysis_model` = версія Jev з відповіді — commit бере модель від клієнта; клієнт зберігає `model`
+      відповіді прогону (`analysisWizardStore.runModel`).
+- [x] UI: вибір рушія «LLM / Jev» у налаштуваннях AI (`settingsStore` + `AnalysisSection.tsx`); у діалогах кроків 1–2
       підпис рушія; у перегляді мінусів — ймовірність замість evidence; тост з вартістю прогону.
-- [ ] Тести (Vitest, `decide` замокано): поріг кроку 1, префільтр до Jev, `reason`; крок 2 — поріг і `probability`;
+- [x] Тести (Vitest, `decide` замокано, `jevEngine.test.ts`): поріг кроку 1, префільтр до Jev, `reason`; крок 2 — поріг і `probability`;
       маршрут з `engine: 'jev'` без ключа → 409.
-- [ ] Доки: `business-rules.md` + інваріант в `AGENTS.md` («для рушія Jev замість evidence — ймовірність ≥ поріг»);
+- [x] Доки (AI-правила живуть в `ai-flow.md`, не в `business-rules.md`): інваріант в `AGENTS.md` («для рушія Jev замість evidence — ймовірність ≥ поріг»);
       `ai-flow.md` (розділ «Рушій Jev»), `jev.md`, `architecture.md`, `structure.md`.
 - [x] Парковка: детермінований (regex) розбір числових критеріїв — [P-013](../parking.md).
-- [ ] `npm run check` + `npm run build`; деплой — лише після «так» людини (злиття в `main` = автодеплой).
+- [x] `npm run check` + `npm run build` — зелені (2026-10-05); живий виклик обох кроків на локальній БД («ipad 9»).
+- [x] Ручні test-cases (UI) — перевірила людина локально (2026-10-06: «все працює»); PR відкрито.
+- [ ] Злиття в `main` і деплой — лише після «так» людини (злиття = автодеплой); smoke проду.
 
 **Test-cases (ручні)**
 1. «навісна полиця», крок 1, рушій Jev, 50 оголошень → результати з «Jev 0.xx», тост з вартістю; commit не

@@ -9,6 +9,8 @@ import {
 import { LuSearch, LuDownload } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
 import type { useWizard } from '../../../hooks/analysis/useWizard';
+import { useSettingsStore } from '../../../stores/settingsStore';
+import { ANALYSIS_ENGINE_LABELS } from '../../../constants';
 
 type Actions = ReturnType<typeof useWizard>;
 
@@ -28,6 +30,7 @@ export function MatchingStep({ w }: Props) {
     handleImportMatching, importAnalysisIsPending,
     setStep,
   } = w;
+  const engine = useSettingsStore((s) => s.analysisEngine);
 
   return (
     <Stack gap={4}>
@@ -38,7 +41,7 @@ export function MatchingStep({ w }: Props) {
       {apiAvailable && (
         <Box>
           <Button colorPalette="purple" onClick={runAutoAnalyze} loading={analyzeProgress != null}>
-            <LuSearch /> Знайти (авто)
+            <LuSearch /> Знайти (авто · {ANALYSIS_ENGINE_LABELS[engine]})
           </Button>
           {analyzeProgress && (
             <Stack gap={1} mt={3}>

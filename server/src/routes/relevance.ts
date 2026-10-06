@@ -15,6 +15,7 @@ import {
   prefilterCandidates,
   runRelevance,
 } from '../analysis/relevance.js';
+import { runJevRelevance } from '../analysis/jevEngine.js';
 import { buildChunkListings } from '../analysis/prompts.js';
 import {
   RELEVANCE_MERGE_PY_PATH,
@@ -30,6 +31,7 @@ import {
   setRelevanceTarget,
 } from '../analysis/repo.js';
 import { db } from '../db/db.js';
+import { getLogger } from '../logger.js';
 import type { RelevanceItem, RelevanceResponse } from '../types.js';
 
 const SEARCH_NOT_FOUND = 'Пошук не знайдено';
@@ -76,10 +78,10 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Авто-класифікація (чанки на сервері). НЕ пише в БД.
+  // Авто-класифікація (чанки LLM або пул Jev на сервері). НЕ пише в БД.
   app.post<{
     Params: { id: string };
-    Body: { target?: string; ids?: number[]; model?: string };
+    Body: { target?: string; ids?: number[]; model?: string; engine?: string };
   }>('/api/searches/:id/relevance/analyze', async (req, reply) => {
     const id = Number(req.params.id);
     if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
@@ -96,6 +98,11 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
 
     const listings = await loadListings(id, ids);
     try {
+      if (req.body.engine === 'jev') {
+        const result = await runJevRelevance(target, listings.map(toPromptListing), aliases);
+        getLogger('relevance').info({ searchId: id, model: result.model, usage: result.usage }, 'Jev: прогін релевантності');
+        return result satisfies RelevanceResponse;
+      }
       const result = await runRelevance(
         target,
         listings.map(toPromptListing),

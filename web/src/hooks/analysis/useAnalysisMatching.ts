@@ -6,6 +6,7 @@ import { showErrorToast } from '../../utils/toast';
 import { toaster } from '../../components/ui/toaster';
 import { chunk } from '../../utils/array';
 import { ANALYZE_CHUNK } from '../../constants';
+import { formatAiUsage } from '../../utils/format';
 import type { AnalyzedListing } from '../../types';
 
 /**
@@ -14,7 +15,7 @@ import type { AnalyzedListing } from '../../types';
  * ручного виконання (напр., через Claude) з подальшим імпортом результатів.
  */
 export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
-  const { mode, accumulated, setAccumulated, setStep } = useAnalysisWizardStore();
+  const { mode, accumulated, setAccumulated, setStep, setRunModel } = useAnalysisWizardStore();
 
   const [showMatchAssistant, setShowMatchAssistant] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
@@ -25,6 +26,7 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
 
   const model = useSettingsStore.getState().analysisModel;
   const reasoning = useSettingsStore.getState().analysisReasoning;
+  const engine = useSettingsStore.getState().analysisEngine;
 
   async function runAutoAnalyze() {
     if (effectiveIds.length === 0) {
@@ -35,16 +37,25 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
     setAnalyzeProgress({ done: 0, total: effectiveIds.length });
     let acc: AnalyzedListing[] = [];
     const errors: string[] = [];
+    const usage = { requests: 0, cost: 0 };
+    let runModel: string | null = null;
     try {
       let done = 0;
       for (const ids of chunks) {
-        const res = await analyze.mutateAsync({ searchId, mode, ids, model, reasoning });
+        const res = await analyze.mutateAsync({ searchId, mode, ids, model, reasoning, engine });
         acc = [...acc, ...res.results];
         errors.push(...res.errors);
+        if (res.usage) {
+          usage.requests += res.usage.requests;
+          usage.cost += res.usage.cost;
+        }
+        runModel = res.model ?? runModel;
         done += ids.length;
         setAnalyzeProgress({ done, total: effectiveIds.length });
       }
       setAccumulated(acc);
+      setRunModel(runModel);
+      if (engine === 'jev') toaster.create({ type: 'info', title: formatAiUsage(usage) });
       if (errors.length > 0) {
         toaster.create({
           type: 'warning',

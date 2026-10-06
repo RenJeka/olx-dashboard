@@ -100,6 +100,7 @@ olx-dashboard/
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat()/chatWithUsage() — POST /chat/completions (json_object, ретрай, зняття code-fence; usage.cost для замірів)
 │       │   ├── jev.ts        # Jev через OpenRouter Decisions API (docs/jev.md): decide (ретраї, спільна пауза на 429), runPool, listingState, relevanceQuestion/criteriaQuestions/criteriaAbove
+│       │   ├── jevEngine.ts  # рушій «Jev» кроків 1–2: runJevRelevance / runJevMatching (пороги JEV_*_THRESHOLD, usage + model у відповіді)
 │       │   ├── parse.ts      # парс відповідей LLM (критерії/matching/синоніми) + верифікація evidence (substring) + мерж результатів
 │       │   ├── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/old/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (map-reduce НА ФАЙЛАХ без скриптів: агент заповнює ПОРОЖНІ nominations/nominees-NNN.json заготовки в ZIP→сам пише output.json; уніфіковано з кроками 1–2 через manualZip.ts, docs/ai-flow.md)
