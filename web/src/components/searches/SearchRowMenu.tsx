@@ -73,7 +73,7 @@ export function SearchRowMenu({
             </Menu.Item>
             <Menu.Item value="criteria" onSelect={onCriteria}>
               <HStack gap={2}>
-                <LuListChecks /> <Text>Критерії AI</Text>
+                <LuListChecks /> <Text>Плюси та мінуси</Text>
               </HStack>
             </Menu.Item>
 

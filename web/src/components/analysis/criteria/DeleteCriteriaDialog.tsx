@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { Button, Stack, Text } from '@chakra-ui/react';
 import {
   DialogBackdrop,
@@ -13,6 +13,8 @@ import {
 import { Checkbox } from '../../ui/checkbox';
 
 interface Props {
+  /** Контент вікна «Плюси та мінуси» — рендер усередині нього, інакше його фокус-пастка блокує поля. */
+  portalRef: RefObject<HTMLElement | null>;
   open: boolean;
   onClose: () => void;
   names: string[];
@@ -23,7 +25,7 @@ interface Props {
 }
 
 /** Підтвердження видалення критеріїв: зі списку пошуку і (за галочкою) з оголошень та локальних фільтрів. */
-export function DeleteCriteriaDialog({ open, onClose, names, affected, pending, onConfirm }: Props) {
+export function DeleteCriteriaDialog({ portalRef, open, onClose, names, affected, pending, onConfirm }: Props) {
   const [withListings, setWithListings] = useState(true);
 
   useEffect(() => {
@@ -37,11 +39,12 @@ export function DeleteCriteriaDialog({ open, onClose, names, affected, pending, 
       onOpenChange={(d) => !d.open && onClose()}
       size="sm"
       placement="center"
-      // Поверх вікна «Критерії пошуку» — див. ConfirmActionDialog (modal=false).
+      // Поверх вікна «Плюси та мінуси»: modal=false (див. ConfirmActionDialog) + рендер у його DOM (portalRef).
       modal={false}
+      closeOnInteractOutside={false}
     >
       <DialogBackdrop />
-      <DialogContent>
+      <DialogContent portalRef={portalRef}>
         <DialogCloseTrigger />
         <DialogHeader>
           <DialogTitle>Видалити критерії ({names.length})?</DialogTitle>

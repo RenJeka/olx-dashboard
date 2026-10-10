@@ -78,7 +78,7 @@ export function AiHubDialog({ search, open, onClose, onSelect }: Props) {
                   onRun={() => onSelect(step.mode)}
                   secondary={
                     step.mode === 'analysis'
-                      ? { label: 'Критерії', icon: LuListChecks, onClick: () => onSelect('criteria') }
+                      ? { label: 'Плюси та мінуси', icon: LuListChecks, onClick: () => onSelect('criteria') }
                       : undefined
                   }
                 />

@@ -8,8 +8,8 @@ import type { CriteriaConfig, CriterionGroup } from '../../types';
 
 /**
  * Логіка кроку 1 (Критерії): чипи = категорії пошуку (docs/plans/criteria-categories.md); обраний чип =
- * категорія «в аналізі». Генерація/імпорт — спільний хук; згенероване, що збігається з назвою чи синонімом,
- * поглинається наявною категорією. «Далі» зберігає позначки й нові категорії, нічого не видаляючи.
+ * категорія «в аналізі». Генерація/імпорт — спільний хук: нові формулювання спершу показуються в
+ * `NewCriteriaDialog`, збіги з назвою чи синонімом поглинаються наявною категорією. «Далі» зберігає позначки й нові категорії, нічого не видаляючи.
  */
 export function useAnalysisCriteria(searchId: number, savedCriteria: CriteriaConfig | undefined) {
   const {
@@ -42,7 +42,10 @@ export function useAnalysisCriteria(searchId: number, savedCriteria: CriteriaCon
     return added.length;
   }
 
-  const generation = useCriteriaGeneration(searchId, mode, mergeCriteria);
+  const generation = useCriteriaGeneration(searchId, mode, {
+    freshOf: (criteria) => absorbIncoming(currentGroups(), criteria).added,
+    onAdd: mergeCriteria,
+  });
 
   function toggleCriterion(c: string) {
     setSelected((prev) => {
@@ -94,6 +97,10 @@ export function useAnalysisCriteria(searchId: number, savedCriteria: CriteriaCon
     openCriteriaAssistant: generation.openAssistant,
     handleImportCriteria: generation.handleImport,
     importCriteriaIsPending: generation.importPending,
+    newCriteria: generation.candidates,
+    addNewCriteria: generation.addCandidates,
+    addNewCriteriaPending: generation.addPending,
+    dismissNewCriteria: generation.dismissCandidates,
     goToMatching,
     saveCriteriaIsPending: saveCriteria.isPending,
     chosenCount,

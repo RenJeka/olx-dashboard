@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { Button, Field, Input, Stack, Text, Wrap, Badge } from '@chakra-ui/react';
 import {
   DialogBackdrop,
@@ -12,6 +12,8 @@ import {
 } from '../../ui/dialog';
 
 interface Props {
+  /** Контент вікна «Плюси та мінуси» — рендер усередині нього, інакше його фокус-пастка блокує поля. */
+  portalRef: RefObject<HTMLElement | null>;
   open: boolean;
   onClose: () => void;
   /** «Об'єднати в категорію» (кілька) чи «Перейменувати» (одна). */
@@ -35,7 +37,7 @@ function suggestName(names: string[]): string {
  * Діалог об'єднання/перейменування: назва категорії (можна взяти будь-яку з обраних або ввести нову),
  * решта формулювань стає синонімами; у зачеплених оголошеннях пункти перейменовуються.
  */
-export function MergeCriteriaDialog({ open, onClose, title, names, aliases, affected, pending, onConfirm }: Props) {
+export function MergeCriteriaDialog({ portalRef, open, onClose, title, names, aliases, affected, pending, onConfirm }: Props) {
   const [name, setName] = useState('');
 
   useEffect(() => {
@@ -51,11 +53,12 @@ export function MergeCriteriaDialog({ open, onClose, title, names, aliases, affe
       onOpenChange={(d) => !d.open && onClose()}
       size="sm"
       placement="center"
-      // Відкривається поверх вікна «Критерії пошуку» — див. ConfirmActionDialog (modal=false).
+      // Поверх вікна «Плюси та мінуси»: modal=false (див. ConfirmActionDialog) + рендер у його DOM (portalRef).
       modal={false}
+      closeOnInteractOutside={false}
     >
       <DialogBackdrop />
-      <DialogContent>
+      <DialogContent portalRef={portalRef}>
         <DialogCloseTrigger />
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

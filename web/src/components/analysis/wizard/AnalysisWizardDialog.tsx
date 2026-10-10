@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAnalysisWizardStore } from '../../../stores/analysisWizardStore';
 import { Stack } from '@chakra-ui/react';
 import {
@@ -20,6 +20,7 @@ import { MatchingStep } from './MatchingStep';
 import { ReviewStep } from './ReviewStep';
 import { CommitStep } from './CommitStep';
 import { CriteriaManagerDialog } from '../criteria/CriteriaManagerDialog';
+import { NewCriteriaDialog } from '../criteria/NewCriteriaDialog';
 import type { Search } from '../../../types';
 
 interface Props {
@@ -34,8 +35,9 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
   const isMobile = useIsMobile();
   const w = useWizard(search, selectedIds, open);
   const [criteriaManagerOpen, setCriteriaManagerOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  // Завантажуємо категорії при першому відкритті, зміні режиму на кроці 1 або після вікна «Критерії пошуку»:
+  // Завантажуємо категорії при першому відкритті, зміні режиму на кроці 1 або після вікна «Плюси та мінуси»:
   // чипи — усі категорії режиму, обрані — з позначкою «в аналізі».
   useEffect(() => {
     if (!open || !w.savedCriteria) return;
@@ -70,7 +72,7 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
       closeOnInteractOutside={false}
     >
       <DialogBackdrop />
-      <DialogContent>
+      <DialogContent ref={contentRef}>
         <DialogCloseTrigger />
         <DialogHeader>
           <Stack gap={3} w="full">
@@ -101,17 +103,29 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
         onConfirm={() => void w.doCommit(onClose)}
       />
       <DescriptionDialog listing={w.openDescriptionListing} onClose={() => w.setOpenDescriptionListing(null)} />
-      <CriteriaManagerDialog
-        search={search}
-        initialMode={w.mode}
-        nested
-        open={criteriaManagerOpen}
-        onClose={() => {
-          setCriteriaManagerOpen(false);
-          // Перечитати чипи з оновлених категорій (незбережений вибір кроку 1 скидається).
-          w.setCriteriaLoadedMode(null);
-        }}
-      />
+      {w.newCriteria && (
+        <NewCriteriaDialog
+          portalRef={contentRef}
+          candidates={w.newCriteria}
+          pending={w.addNewCriteriaPending}
+          onAdd={(phrases) => void w.addNewCriteria(phrases)}
+          onClose={w.dismissNewCriteria}
+        />
+      )}
+      {/* Монтується лише на час показу: Ark Portal читає portalRef один раз при монтуванні. */}
+      {criteriaManagerOpen && (
+        <CriteriaManagerDialog
+          search={search}
+          initialMode={w.mode}
+          portalRef={contentRef}
+          open
+          onClose={() => {
+            setCriteriaManagerOpen(false);
+            // Перечитати чипи з оновлених категорій (незбережений вибір кроку 1 скидається).
+            w.setCriteriaLoadedMode(null);
+          }}
+        />
+      )}
     </DialogRoot>
   );
 }

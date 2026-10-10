@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Box, Button, HStack, IconButton, Input, Spinner, Stack, Text } from '@chakra-ui/react';
-import { LuCombine, LuPlus, LuRefreshCw, LuSearch, LuTrash2, LuWandSparkles } from 'react-icons/lu';
+import { LuCombine, LuPlus, LuSearch, LuTrash2, LuWandSparkles } from 'react-icons/lu';
 import {
   DialogBackdrop,
   DialogBody,
@@ -16,10 +16,12 @@ import { ManualAssistant } from '../ManualAssistant';
 import { CriterionRow } from './CriterionRow';
 import { MergeCriteriaDialog } from './MergeCriteriaDialog';
 import { DeleteCriteriaDialog } from './DeleteCriteriaDialog';
+import { NewCriteriaDialog } from './NewCriteriaDialog';
 import { useAnalysisStatus } from '../../../api';
 import { useCriteriaManager } from '../../../hooks/analysis/useCriteriaManager';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { MODE_LABELS } from '../../../constants';
+import type { CriterionRowData } from '../../../hooks/analysis/useCriteriaManager';
 import type { AnalysisMode, Search } from '../../../types';
 
 interface Props {
@@ -27,8 +29,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initialMode?: AnalysisMode;
-  /** Відкрито поверх іншої модалки (майстра) — modal=false, див. ConfirmActionDialog. */
-  nested?: boolean;
+  /**
+   * Відкрито поверх іншої модалки (майстра): її контент. Вікно рендериться всередині її DOM і з modal=false —
+   * інакше фокус-пастка нижньої модалки не пускає фокус у поля вікна.
+   */
+  portalRef?: RefObject<HTMLElement | null>;
 }
 
 const MODE_PALETTE: Record<AnalysisMode, string> = { cons: 'danger', pros: 'success' };
@@ -37,17 +42,18 @@ const MODE_PALETTE: Record<AnalysisMode, string> = { cons: 'danger', pros: 'succ
 type SubDialog = { kind: 'merge' | 'rename' | 'delete'; names: string[] } | null;
 
 /**
- * Вікно «Критерії пошуку» (docs/plans/criteria-categories.md): перегляд усіх мінусів/плюсів пошуку,
+ * Вікно «Плюси та мінуси» (docs/plans/criteria-categories.md): перегляд усіх мінусів/плюсів пошуку,
  * додавання й генерація, позначка «в аналізі», перейменування, видалення та об'єднання синонімічних
  * формулювань у категорію — без майстра AI-аналізу. Входи: меню пошуку, хаб AI, крок 1 майстра.
  */
-export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'cons', nested = false }: Props) {
+export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'cons', portalRef }: Props) {
   const isMobile = useIsMobile();
   const m = useCriteriaManager(search.id, open, initialMode);
   const { data: status } = useAnalysisStatus();
   const apiAvailable = status?.apiAvailable ?? false;
   const [customInput, setCustomInput] = useState('');
   const [sub, setSub] = useState<SubDialog>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Відкриття з майстра — на режимі майстра.
   const { setMode } = m;
@@ -78,6 +84,22 @@ export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'co
     if (await m.runRemap(sub.names, to, withListings)) setSub(null);
   }
 
+  const listedRow = (row: CriterionRowData) => (
+    <CriterionRow
+      key={row.name}
+      row={row}
+      colorPalette={palette}
+      checked={m.selected.has(row.name)}
+      onCheck={() => m.toggleSelected(row.name)}
+      busy={busy}
+      onToggleEnabled={() => m.toggleEnabled(row.name)}
+      onRename={() => setSub({ kind: 'rename', names: [row.name] })}
+      onDelete={() => setSub({ kind: 'delete', names: [row.name] })}
+      onDetachAlias={(alias) => m.detachAlias(row.name, alias)}
+      onAdd={() => {}}
+    />
+  );
+
   return (
     <DialogRoot
       open={open}
@@ -85,14 +107,16 @@ export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'co
       size={isMobile ? 'full' : 'lg'}
       placement="center"
       scrollBehavior="inside"
-      modal={!nested}
+      modal={!portalRef}
+      // Закриття — лише хрестиком (або Escape), не кліком повз вікно.
+      closeOnInteractOutside={false}
     >
       <DialogBackdrop />
-      <DialogContent>
+      <DialogContent ref={contentRef} portalRef={portalRef}>
         <DialogCloseTrigger />
         <DialogHeader>
           <Stack gap={3} w="full">
-            <DialogTitle>Критерії пошуку — {search.name}</DialogTitle>
+            <DialogTitle>Плюси та мінуси — {search.name}</DialogTitle>
             <HStack gap={2} wrap="wrap">
               {(['cons', 'pros'] as const).map((mode) => (
                 <Button
@@ -129,24 +153,14 @@ export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'co
             </HStack>
             <HStack gap={2} wrap="wrap">
               {apiAvailable && (
-                <>
-                  <Button
-                    size="sm"
-                    colorPalette="purple"
-                    onClick={m.generation.handleGenerate}
-                    loading={m.generation.generatePending}
-                  >
-                    <LuWandSparkles /> Згенерувати
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={m.generation.handleGenerate}
-                    loading={m.generation.generatePending}
-                  >
-                    <LuRefreshCw /> Ще варіанти
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  colorPalette="purple"
+                  onClick={m.generation.handleGenerate}
+                  loading={m.generation.generatePending}
+                >
+                  <LuWandSparkles /> Згенерувати
+                </Button>
               )}
               <Button size="sm" variant="outline" onClick={m.generation.openAssistant}>
                 Згенерувати вручну
@@ -166,31 +180,20 @@ export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'co
               <Spinner size="sm" />
             ) : (
               <Box borderTopWidth="1px" borderColor="border.subtle">
-                {m.rows.listed.length === 0 && m.rows.orphans.length === 0 && (
+                {m.rows.categories.length + m.rows.singles.length + m.rows.orphans.length === 0 && (
                   <Text textStyle="sm" color="fg.muted" py={3}>
                     {m.filter ? 'Нічого не знайдено.' : 'Критеріїв ще немає — згенеруй або додай вручну.'}
                   </Text>
                 )}
-                {m.rows.listed.map((row) => (
-                  <CriterionRow
-                    key={row.name}
-                    row={row}
-                    colorPalette={palette}
-                    checked={m.selected.has(row.name)}
-                    onCheck={() => m.toggleSelected(row.name)}
-                    busy={busy}
-                    onToggleEnabled={() => m.toggleEnabled(row.name)}
-                    onRename={() => setSub({ kind: 'rename', names: [row.name] })}
-                    onDelete={() => setSub({ kind: 'delete', names: [row.name] })}
-                    onDetachAlias={(alias) => m.detachAlias(row.name, alias)}
-                    onAdd={() => {}}
-                  />
-                ))}
+                {m.rows.categories.length > 0 && <SectionLabel>Категорії (з синонімами)</SectionLabel>}
+                {m.rows.categories.map(listedRow)}
+                {m.rows.categories.length > 0 && m.rows.singles.length > 0 && (
+                  <SectionLabel>Окремі критерії</SectionLabel>
+                )}
+                {m.rows.singles.map(listedRow)}
                 {m.rows.orphans.length > 0 && (
                   <>
-                    <Text textStyle="xs" color="fg.muted" pt={3} pb={1}>
-                      Лише в оголошеннях (не в списку критеріїв): старі прогони або ручні правки
-                    </Text>
+                    <SectionLabel>Лише в оголошеннях (не в списку критеріїв): старі прогони або ручні правки</SectionLabel>
                     {m.rows.orphans.map((row) => (
                       <CriterionRow
                         key={`orphan:${row.name}`}
@@ -239,26 +242,48 @@ export function CriteriaManagerDialog({ search, open, onClose, initialMode = 'co
         </DialogFooter>
       </DialogContent>
 
-      <MergeCriteriaDialog
-        open={sub?.kind === 'merge' || sub?.kind === 'rename'}
-        onClose={() => setSub(null)}
-        title={sub?.kind === 'rename' ? 'Перейменувати категорію' : "Об'єднати в категорію"}
-        names={sub?.names ?? EMPTY}
-        aliases={subAliases}
-        affected={sub ? m.affectedCount(sub.names) : 0}
-        pending={m.remapPending}
-        onConfirm={(name) => void confirmRemap(name)}
-      />
-      <DeleteCriteriaDialog
-        open={sub?.kind === 'delete'}
-        onClose={() => setSub(null)}
-        names={sub?.names ?? EMPTY}
-        affected={sub ? m.affectedCount(sub.names) : 0}
-        pending={m.remapPending}
-        onConfirm={(withListings) => void confirmRemap(null, withListings)}
-      />
+      {/* Монтуються лише на час показу: Ark Portal читає portalRef один раз при монтуванні. */}
+      {(sub?.kind === 'merge' || sub?.kind === 'rename') && (
+        <MergeCriteriaDialog
+          portalRef={contentRef}
+          open
+          onClose={() => setSub(null)}
+          title={sub.kind === 'rename' ? 'Перейменувати категорію' : "Об'єднати в категорію"}
+          names={sub.names}
+          aliases={subAliases}
+          affected={m.affectedCount(sub.names)}
+          pending={m.remapPending}
+          onConfirm={(name) => void confirmRemap(name)}
+        />
+      )}
+      {m.generation.candidates && (
+        <NewCriteriaDialog
+          portalRef={contentRef}
+          candidates={m.generation.candidates}
+          pending={m.generation.addPending}
+          onAdd={(phrases) => void m.generation.addCandidates(phrases)}
+          onClose={m.generation.dismissCandidates}
+        />
+      )}
+      {sub?.kind === 'delete' && (
+        <DeleteCriteriaDialog
+          portalRef={contentRef}
+          open
+          onClose={() => setSub(null)}
+          names={sub.names}
+          affected={m.affectedCount(sub.names)}
+          pending={m.remapPending}
+          onConfirm={(withListings) => void confirmRemap(null, withListings)}
+        />
+      )}
     </DialogRoot>
   );
 }
 
-const EMPTY: string[] = [];
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <Text textStyle="xs" color="fg.muted" fontWeight="semibold" pt={3} pb={1}>
+      {children}
+    </Text>
+  );
+}

@@ -219,7 +219,7 @@ olx-dashboard/
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
-        │   │   ├── criteria/               # вікно «Критерії пошуку» (docs/plans/criteria-categories.md)
+        │   │   ├── criteria/               # вікно «Плюси та мінуси» + вибір згенерованого (docs/plans/criteria-categories.md)
         │   │   │   ├── CriteriaManagerDialog.tsx # категорії мінусів/плюсів: перегляд, генерація, «в аналізі», об'єднання/видалення
         │   │   │   ├── CriterionRow.tsx     # рядок: категорія з синонімами або пункт «лише в оголошеннях»
         │   │   │   ├── MergeCriteriaDialog.tsx  # об'єднати / перейменувати (назва + синоніми + «зачепить N»)
@@ -286,8 +286,8 @@ olx-dashboard/
         │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
         │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (чипи = категорії, позначка «в аналізі», поглинання синонімів)
-        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Критерії пошуку»
-        │   │   ├── useCriteriaManager.ts # логіка вікна «Критерії пошуку» (лічильники з кешу, PUT/remap)
+        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»
+        │   │   ├── useCriteriaManager.ts # логіка вікна «Плюси та мінуси» (лічильники з кешу, PUT/remap)
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)

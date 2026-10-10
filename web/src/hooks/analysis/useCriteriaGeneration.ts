@@ -5,30 +5,48 @@ import { showErrorToast } from '../../utils/toast';
 import { toaster } from '../../components/ui/toaster';
 import type { AnalysisMode, PackagePart } from '../../types';
 
+/** Згенеровані/розпізнані критерії, що чекають рішення людини (діалог `NewCriteriaDialog`). */
+export interface CriteriaCandidates {
+  title: string;
+  /** Справді нові — не збігаються з назвою чи синонімом наявної категорії. */
+  fresh: string[];
+  /** Скільки збіглися з наявними (не показуються). */
+  absorbed: number;
+}
+
+interface Handlers {
+  /** Які з формулювань справді нові (решту поглинають наявні категорії). */
+  freshOf: (criteria: string[]) => string[];
+  /** Додати обрані людиною. */
+  onAdd: (phrases: string[]) => unknown;
+}
+
 /**
  * Генерація критеріїв: авто (LLM), ручний помічник (промпт → вставка відповіді). Спільне для кроку 1
- * майстра й діалогу «Критерії пошуку». Що робити зі згенерованим — вирішує `onIncoming`
- * (повертає, скільки справді нових — для тосту).
+ * майстра й вікна «Плюси та мінуси». Згенероване не додається одразу: нові формулювання йдуть у
+ * `candidates` — людина обирає потрібні в `NewCriteriaDialog` (`addCandidates`) або закриває без змін.
  */
-export function useCriteriaGeneration(
-  searchId: number,
-  mode: AnalysisMode,
-  onIncoming: (criteria: string[]) => number | Promise<number>,
-) {
+export function useCriteriaGeneration(searchId: number, mode: AnalysisMode, { freshOf, onAdd }: Handlers) {
   const [showAssistant, setShowAssistant] = useState(false);
   const [parts, setParts] = useState<PackagePart[]>([]);
+  const [candidates, setCandidates] = useState<CriteriaCandidates | null>(null);
+  const [addPending, setAddPending] = useState(false);
 
   const generateCriteria = useGenerateCriteria();
   const importCriteria = useImportCriteria();
 
-  async function report(title: string, criteria: string[]) {
-    const added = await onIncoming(criteria);
-    const absorbed = criteria.length - added;
-    toaster.create({
-      type: 'success',
-      title: `${title}: ${criteria.length}`,
-      description: absorbed > 0 ? `Нових: ${added}; ${absorbed} збіглися з наявними категоріями` : undefined,
-    });
+  function offer(title: string, criteria: string[]) {
+    const fresh = freshOf(criteria);
+    const absorbed = criteria.length - fresh.length;
+    if (fresh.length === 0) {
+      toaster.create({
+        type: 'info',
+        title: `${title}: нових немає`,
+        description: absorbed > 0 ? `Усі ${absorbed} збіглися з наявними категоріями` : undefined,
+      });
+      return;
+    }
+    setCandidates({ title, fresh, absorbed });
   }
 
   async function handleGenerate() {
@@ -36,7 +54,7 @@ export function useCriteriaGeneration(
       useSettingsStore.getState();
     try {
       const { criteria } = await generateCriteria.mutateAsync({ searchId, mode, model, reasoning, extra });
-      await report('Згенеровано критеріїв', criteria);
+      offer('Згенеровано', criteria);
     } catch (err) {
       showErrorToast('Помилка генерації', err);
     }
@@ -56,10 +74,23 @@ export function useCriteriaGeneration(
     importCriteria.mutate(
       { searchId, mode, raw },
       {
-        onSuccess: ({ criteria }) => void report('Розпізнано критеріїв', criteria),
+        onSuccess: ({ criteria }) => offer('Розпізнано', criteria),
         onError: (err) => showErrorToast('Помилка розбору', err),
       },
     );
+  }
+
+  async function addCandidates(phrases: string[]) {
+    setAddPending(true);
+    try {
+      await onAdd(phrases);
+      setCandidates(null);
+      toaster.create({ type: 'success', title: `Додано критеріїв: ${phrases.length}` });
+    } catch {
+      // тост — у onAdd
+    } finally {
+      setAddPending(false);
+    }
   }
 
   return {
@@ -71,5 +102,9 @@ export function useCriteriaGeneration(
     assistantParts: parts,
     handleImport,
     importPending: importCriteria.isPending,
+    candidates,
+    addCandidates,
+    addPending,
+    dismissCandidates: () => setCandidates(null),
   };
 }

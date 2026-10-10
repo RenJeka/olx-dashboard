@@ -3,6 +3,7 @@ import { LuPencil, LuPlus, LuTrash2, LuX } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
+import { sortAlpha } from '../../../utils/sort';
 import type { CriterionRowData } from '../../../hooks/analysis/useCriteriaManager';
 
 interface Props {
@@ -19,7 +20,7 @@ interface Props {
   onAdd: () => void;
 }
 
-/** Рядок вікна «Критерії пошуку»: категорія з синонімами або пункт, що є лише в оголошеннях. */
+/** Рядок вікна «Плюси та мінуси»: категорія з синонімами або пункт, що є лише в оголошеннях. */
 export function CriterionRow({
   row,
   colorPalette,
@@ -82,7 +83,7 @@ export function CriterionRow({
       </HStack>
       {group && group.aliases.length > 0 && (
         <Wrap gap={1} pl={8}>
-          {group.aliases.map((a) => (
+          {sortAlpha(group.aliases).map((a) => (
             <Badge key={a} variant="outline" size="sm" gap={0.5}>
               {a}
               <Tooltip content="Вийняти з категорії" openDelay={300}>

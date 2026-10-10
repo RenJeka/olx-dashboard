@@ -17,7 +17,7 @@ export interface CriterionRowData {
 }
 
 /**
- * Вікно «Критерії пошуку» (docs/plans/criteria-categories.md): категорії режиму, лічильники з уже
+ * Вікно «Плюси та мінуси» (docs/plans/criteria-categories.md): категорії режиму, лічильники з уже
  * завантажених оголошень (без запитів у Turso), вибір для об'єднання/видалення, генерація й додавання.
  * Зміни списку зберігаються одразу (PUT), об'єднання/перейменування/видалення — через remap.
  */
@@ -49,10 +49,13 @@ export function useCriteriaManager(searchId: number, open: boolean, initialMode:
       return listingKeys.filter((lk) => [...lk].some((k) => set.has(k))).length;
     };
     const byName = new Map(groups.map((g) => [g.name, g]));
-    const listed: CriterionRowData[] = sortAlpha(groups.map((g) => g.name)).map((name) => {
+    const toRow = (name: string): CriterionRowData => {
       const group = byName.get(name) as CriterionGroup;
       return { name, group, count: countFor(groupKeys(group)) };
-    });
+    };
+    // Спершу категорії (є синоніми), далі окремі критерії — кожна частина за алфавітом.
+    const categories = sortAlpha(groups.filter((g) => g.aliases.length > 0).map((g) => g.name)).map(toRow);
+    const singles = sortAlpha(groups.filter((g) => g.aliases.length === 0).map((g) => g.name)).map(toRow);
     const orphans: CriterionRowData[] = sortAlpha(orphanPhrases(listings ?? [], mode, groups)).map((name) => ({
       name,
       group: null,
@@ -61,7 +64,11 @@ export function useCriteriaManager(searchId: number, open: boolean, initialMode:
     const q = phraseKey(filter);
     const matches = (r: CriterionRowData) =>
       !q || [r.name, ...(r.group?.aliases ?? [])].some((s) => phraseKey(s).includes(q));
-    return { listed: listed.filter(matches), orphans: orphans.filter(matches) };
+    return {
+      categories: categories.filter(matches),
+      singles: singles.filter(matches),
+      orphans: orphans.filter(matches),
+    };
   }, [groups, listings, listingKeys, mode, filter]);
 
   function setMode(next: AnalysisMode) {
@@ -95,7 +102,10 @@ export function useCriteriaManager(searchId: number, open: boolean, initialMode:
     return added.length;
   }
 
-  const generation = useCriteriaGeneration(searchId, mode, addPhrases);
+  const generation = useCriteriaGeneration(searchId, mode, {
+    freshOf: (criteria) => absorbIncoming(groups, criteria).added,
+    onAdd: addPhrases,
+  });
 
   function toggleEnabled(name: string) {
     void saveGroups(groups.map((g) => (g.name === name ? { ...g, enabled: !g.enabled } : g))).catch(() => {});

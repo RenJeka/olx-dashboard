@@ -10,7 +10,6 @@ import {
 } from '@chakra-ui/react';
 import {
   LuWandSparkles,
-  LuRefreshCw,
   LuPlus,
   LuListChecks,
 } from 'react-icons/lu';
@@ -24,7 +23,7 @@ type Actions = ReturnType<typeof useWizard>;
 
 interface Props {
   w: Actions;
-  /** Відкрити вікно «Критерії пошуку» (перегляд, об'єднання, видалення). */
+  /** Відкрити вікно «Плюси та мінуси» (перегляд, об'єднання, видалення). */
   onManageCriteria: () => void;
 }
 
@@ -48,6 +47,9 @@ export function CriteriaStep({ w, onManageCriteria }: Props) {
     savedGroups,
   } = w;
   const aliasesOf = new Map(savedGroups.map((g) => [g.name, g.aliases]));
+  // Як у вікні «Плюси та мінуси»: спершу категорії (є синоніми), далі окремі — кожна частина за алфавітом.
+  const isCategory = (c: string) => (aliasesOf.get(c)?.length ?? 0) > 0;
+  const chips = [...sortAlpha(available.filter(isCategory)), ...sortAlpha(available.filter((c) => !isCategory(c)))];
 
   return (
     <Stack gap={4}>
@@ -69,16 +71,16 @@ export function CriteriaStep({ w, onManageCriteria }: Props) {
           Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
         </Text>
         <Button size="xs" variant="ghost" onClick={onManageCriteria}>
-          <LuListChecks /> Керувати критеріями…
+          <LuListChecks /> Керувати плюсами та мінусами…
         </Button>
       </HStack>
       <Wrap gap={2}>
-        {sortAlpha(available).map((c) => {
+        {chips.map((c) => {
           const aliases = aliasesOf.get(c) ?? [];
           return (
             <Tooltip
               key={c}
-              content={aliases.length > 0 ? `${c} · сюди ж: ${aliases.join(', ')}` : c}
+              content={aliases.length > 0 ? `${c} · сюди ж: ${sortAlpha(aliases).join(', ')}` : c}
               openDelay={300}
             >
               <Button
@@ -122,14 +124,9 @@ export function CriteriaStep({ w, onManageCriteria }: Props) {
 
       <HStack gap={2} wrap="wrap">
         {apiAvailable && (
-          <>
-            <Button size="sm" colorPalette="purple" onClick={handleGenerateCriteria} loading={generateCriteriaIsPending}>
-              <LuWandSparkles /> Згенерувати критерії
-            </Button>
-            <Button size="sm" variant="ghost" onClick={handleGenerateCriteria} loading={generateCriteriaIsPending}>
-              <LuRefreshCw /> Ще варіанти
-            </Button>
-          </>
+          <Button size="sm" colorPalette="purple" onClick={handleGenerateCriteria} loading={generateCriteriaIsPending}>
+            <LuWandSparkles /> Згенерувати
+          </Button>
         )}
         <Button size="sm" variant="outline" onClick={openCriteriaAssistant}>
           Згенерувати вручну
