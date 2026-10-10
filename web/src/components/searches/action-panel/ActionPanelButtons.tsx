@@ -1,6 +1,6 @@
 import { Badge, Box, Button, HStack, Stack, Text } from '@chakra-ui/react';
 import { LuChartNoAxesCombined, LuLayers, LuRefreshCw, LuStethoscope } from 'react-icons/lu';
-import { DEEP_SCAN_MAX_PAGES } from '../../../constants';
+import { DEEP_SCAN_MAX_PAGES, VERIFY_PROBE_AVAILABLE } from '../../../constants';
 
 interface Props {
   isScanning: boolean;
@@ -30,6 +30,9 @@ export function ActionPanelButtons({
   onRunVerifyPass,
   onStartAnalysis,
 }: Props) {
+  // Verify вимкнено, поки OLX відповідає 403 на сторінки оголошень (P-005, docs/plans/verify-403-guard.md).
+  const canVerify = VERIFY_PROBE_AVAILABLE && verifyCandidates > 0;
+
   return (
     <Stack gap={3}>
       <Text textStyle="xs" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
@@ -168,8 +171,8 @@ export function ActionPanelButtons({
       {/* Перевірити неактивні */}
       <Button
         variant="ghost"
-        onClick={() => !isScanning && verifyCandidates > 0 && onRunVerifyPass()}
-        disabled={isScanning || verifyCandidates === 0}
+        onClick={() => !isScanning && canVerify && onRunVerifyPass()}
+        disabled={isScanning || !canVerify}
         p={4}
         rounded="xl"
         borderWidth="1px"
@@ -182,13 +185,13 @@ export function ActionPanelButtons({
         w="full"
         fontWeight="normal"
         _hover={
-          !isScanning && verifyCandidates > 0
+          !isScanning && canVerify
             ? { bg: 'bg.muted', borderColor: 'teal.muted', transform: 'translateY(-1px)' }
             : undefined
         }
-        _active={!isScanning && verifyCandidates > 0 ? { transform: 'translateY(0)' } : undefined}
-        cursor={isScanning || verifyCandidates === 0 ? 'not-allowed' : 'pointer'}
-        opacity={(isScanning && scanKind !== 'verify') || verifyCandidates === 0 ? 0.5 : 1}
+        _active={!isScanning && canVerify ? { transform: 'translateY(0)' } : undefined}
+        cursor={isScanning || !canVerify ? 'not-allowed' : 'pointer'}
+        opacity={(isScanning && scanKind !== 'verify') || !canVerify ? 0.5 : 1}
         transition="all 0.2s"
       >
         <HStack gap={4} align="start" w="full">
@@ -200,12 +203,14 @@ export function ActionPanelButtons({
               <Text textStyle="sm" fontWeight="bold" color="fg.default">
                 Перевірити неактивні
               </Text>
-              <Badge size="sm" colorPalette="teal" variant="subtle">
-                ~2–3 хв
+              <Badge size="sm" colorPalette={VERIFY_PROBE_AVAILABLE ? 'teal' : 'gray'} variant="subtle">
+                {VERIFY_PROBE_AVAILABLE ? '~2–3 хв' : 'недоступно'}
               </Badge>
             </HStack>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-              Перевіряє сторінки давно не бачених оголошень і дозаповнює опис/продавця ({verifyCandidates}, до 50 сторінок за прохід).
+              {VERIFY_PROBE_AVAILABLE
+                ? `Перевіряє сторінки давно не бачених оголошень і дозаповнює опис/продавця (${verifyCandidates}, до 50 сторінок за прохід).`
+                : `Тимчасово недоступно: OLX блокує відкриття сторінок оголошень (HTTP 403). Кандидатів на перевірку: ${verifyCandidates}. Обхід — P-005.`}
             </Text>
           </Stack>
         </HStack>

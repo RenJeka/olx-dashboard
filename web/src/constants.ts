@@ -76,6 +76,12 @@ export const SCAN_KIND_LABELS: Record<string, string> = {
 };
 
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+/**
+ * Verify-прохід («Перевірити неактивні») доступний. Вимкнено: OLX відповідає 403 на сторінки оголошень —
+ * дзеркало HTML_FALLBACK_ENABLED сервера (той самий HTML-канал); повернути true при закритті P-005
+ * (docs/plans/verify-403-guard.md).
+ */
+export const VERIFY_PROBE_AVAILABLE = false;
 /** Скільки хвилин живе закешований план аналізу скану (дзеркалить PLAN_TTL_MIN у server/src/scanner.ts). */
 export const SCAN_PLAN_TTL_MIN = 30;
 export const DEEP_SCAN_PAGE_LIMIT = 40;

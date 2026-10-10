@@ -36,7 +36,8 @@
      TLS-відбитком (напр. `curl-impersonate` або Node-обгортка над ним) — локально, потім з Render.
   2. Якщо проходить — винести HTTP-транспорт в одну функцію `httpGet(url, headers)`, яку використовують
      `HtmlOlxFetcher` (`scraper/olxFetcher.ts`) і `probeListingPage` (`scraper/verifier.ts`); увімкнути
-     `HTML_FALLBACK_ENABLED` у `scraper/constants.ts`; оновити `olx-api.md` §3 і журнал §6.
+     `HTML_FALLBACK_ENABLED` у `scraper/constants.ts` і `VERIFY_PROBE_AVAILABLE` у `web/src/constants.ts`
+     (кнопка «Перевірити неактивні»); оновити `olx-api.md` §3 і журнал §6.
   3. Не проходить — headed-браузер (крайній варіант, лише за рішенням людини, `AGENTS.md`).
   Для verify окремо варто перевірити GraphQL-запит оголошення за id — тоді HTML для verify не потрібен.
 - Чому відкладено: зараз немає часу; основний канал (GraphQL) працює.
