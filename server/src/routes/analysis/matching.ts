@@ -27,7 +27,8 @@ import {
   buildMatchingPrompt,
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
-import { getSearch, getSavedCriteria, loadListings } from '../../analysis/repo.js';
+import { getSearch, loadListings } from '../../analysis/repo.js';
+import { enabledGroups, parseCriteriaConfig } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';
 import { buildXlsxBuffer } from '../../export/xlsx.js';
 import { getLogger } from '../../logger.js';
@@ -40,7 +41,8 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    const search = await getSearch(id);
+    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!hasApiKey()) {
       return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
@@ -51,7 +53,8 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    const criteria = (await getSavedCriteria(id))[req.body.mode];
+    // Лише категорії з позначкою «в аналізі» (docs/plans/criteria-categories.md).
+    const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
     if (criteria.length === 0) {
       return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
     }
@@ -92,12 +95,13 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+      const search = await getSearch(id);
+      if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
       if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
 
-      const criteria = (await getSavedCriteria(id))[req.body.mode];
+      const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
       if (criteria.length === 0) {
         return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
@@ -130,11 +134,13 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; raw?: string; accumulated?: AnalyzedListing[] };
   }>('/api/searches/:id/analyze/import', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    const search = await getSearch(id);
+    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
 
-    const criteria = (await getSavedCriteria(id))[req.body.mode];
+    // Усі категорії режиму — для зведення синонімів до назви (вимкнені теж не шкодять).
+    const criteria = parseCriteriaConfig(search.analysis_criteria)[req.body.mode];
     const listings = await loadListings(id, []);
     const descriptions = descriptionMap(listings);
 

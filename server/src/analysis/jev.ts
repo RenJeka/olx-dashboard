@@ -1,7 +1,7 @@
 // Jev — decision-модель TypeSafe через OpenRouter Decisions API (docs/jev.md). Не LLM: на вхід
 // state + типізовані питання, на вихід лише ймовірності (без тексту/evidence). Один state на
 // запит → масовість паралельним пулом із спільною паузою на 429. Без PII продавця у state.
-import type { AnalysisMode } from '../types.js';
+import type { AnalysisMode, CriterionGroup } from '../types.js';
 import { getApiKey } from './config.js';
 import {
   JEV_BACKOFF_CAP_MS,
@@ -285,23 +285,35 @@ const CRITERION_BOUNDARY: Record<JevLang, { true: string; false: string }> = {
   uk: { true: 'Прямо сказано або явно випливає.', false: 'Не згадано або сказано протилежне.' },
 };
 
-/** Текст noul-питання критерію (без межі `criteria`). */
-function criterionInstructions(mode: AnalysisMode, criterion: string, lang: JevLang): string {
-  if (lang === 'uk') return `Чи має товар ${mode === 'cons' ? 'такий недолік' : 'таку перевагу'}: «${criterion}»?`;
-  return `Does this item have the following ${mode === 'cons' ? 'drawback' : 'advantage'}: "${criterion}"?`;
+/**
+ * Текст noul-питання категорії (без межі `criteria`). Синоніми категорії — приклади в дужках
+ * (docs/plans/criteria-categories.md): одне питання на категорію замість питання на кожне формулювання.
+ */
+function criterionInstructions(mode: AnalysisMode, group: CriterionGroup, lang: JevLang, withAliases: boolean): string {
+  const examples = withAliases && group.aliases.length > 0 ? group.aliases.map((a) => `"${a}"`).join(', ') : '';
+  if (lang === 'uk') {
+    const hint = examples ? ` (напр. ${examples})` : '';
+    return `Чи має товар ${mode === 'cons' ? 'такий недолік' : 'таку перевагу'}: «${group.name}»${hint}?`;
+  }
+  const hint = examples ? ` (e.g. ${examples})` : '';
+  return `Does this item have the following ${mode === 'cons' ? 'drawback' : 'advantage'}: "${group.name}"${hint}?`;
 }
 
-/** По одному noul на кожен критерій мінусів/плюсів пошуку (з межею «так/ні»). */
+/**
+ * По одному noul на кожну категорію мінусів/плюсів пошуку (з межею «так/ні»).
+ * `withAliases = false` — лише назва (порівняння в `jev:probe`).
+ */
 export function criteriaQuestions(
-  criteria: Record<AnalysisMode, string[]>,
+  criteria: Record<AnalysisMode, CriterionGroup[]>,
   lang: JevLang,
+  withAliases = true,
 ): Record<string, JevNoulQuestion> {
   const out: Record<string, JevNoulQuestion> = {};
   for (const mode of ['cons', 'pros'] as const) {
-    criteria[mode].forEach((c, i) => {
+    criteria[mode].forEach((g, i) => {
       out[criterionKey(mode, i)] = {
         type: 'noul',
-        instructions: criterionInstructions(mode, c, lang),
+        instructions: criterionInstructions(mode, g, lang, withAliases),
         criteria: CRITERION_BOUNDARY[lang],
       };
     });
@@ -309,17 +321,17 @@ export function criteriaQuestions(
   return out;
 }
 
-/** Критерії, чия ймовірність ≥ threshold (за режимом; канонічні рядки зі списку). */
+/** Категорії, чия ймовірність ≥ threshold (за режимом; назви категорій). */
 export function criteriaAbove(
   result: JevResult,
-  criteria: Record<AnalysisMode, string[]>,
+  criteria: Record<AnalysisMode, CriterionGroup[]>,
   threshold: number,
 ): Record<AnalysisMode, string[]> {
   const out: Record<AnalysisMode, string[]> = { cons: [], pros: [] };
   for (const mode of ['cons', 'pros'] as const) {
-    criteria[mode].forEach((c, i) => {
+    criteria[mode].forEach((g, i) => {
       const a = result.answers[criterionKey(mode, i)];
-      if (a?.type === 'noul' && a.noul >= threshold) out[mode].push(c);
+      if (a?.type === 'noul' && a.noul >= threshold) out[mode].push(g.name);
     });
   }
   return out;

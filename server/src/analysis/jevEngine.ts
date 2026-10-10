@@ -2,7 +2,15 @@
 // Поруч з LLM-рушієм (OpenRouter chat) і ручним ZIP: той самий контракт відповіді, але замість
 // evidence — ймовірність ≥ порогу. Один state = один запит Decisions API, паралельно пулом.
 // Нічого не пише в БД; генерація критеріїв і AI Вибір лишаються на LLM (Jev не генерує текст).
-import type { AiUsage, AnalysisMode, AnalyzeResponse, AnalyzedListing, RelevanceItem, RelevanceResponse } from '../types.js';
+import type {
+  AiUsage,
+  AnalysisMode,
+  AnalyzeResponse,
+  AnalyzedListing,
+  CriterionGroup,
+  RelevanceItem,
+  RelevanceResponse,
+} from '../types.js';
 import {
   JEV_CONCURRENCY,
   JEV_CRITERIA_THRESHOLD,
@@ -85,19 +93,21 @@ export async function runJevRelevance(
  * `ok: true` означає «ймовірність ≥ порогу», сама ймовірність — у `probability`.
  */
 export async function runJevMatching(
-  criteria: string[],
+  groups: CriterionGroup[],
   mode: AnalysisMode,
   listings: PromptListing[],
+  withAliases = true,
 ): Promise<AnalyzeResponse> {
-  const byMode: Record<AnalysisMode, string[]> = { cons: [], pros: [], [mode]: criteria };
-  const run = await runJev(buildChunkListings(listings), MATCHING_DESC_SLICE, criteriaQuestions(byMode, 'en'));
+  const byMode: Record<AnalysisMode, CriterionGroup[]> = { cons: [], pros: [], [mode]: groups };
+  const questions = criteriaQuestions(byMode, 'en', withAliases);
+  const run = await runJev(buildChunkListings(listings), MATCHING_DESC_SLICE, questions);
 
   const results: AnalyzedListing[] = [];
   for (const [id, r] of run.byId) {
-    const items = criteria.flatMap((criterion, i) => {
+    const items = groups.flatMap((g, i) => {
       const a = r.answers[criterionKey(mode, i)];
       return a?.type === 'noul' && a.noul >= JEV_CRITERIA_THRESHOLD
-        ? [{ criterion, evidence: '', ok: true, probability: a.noul }]
+        ? [{ criterion: g.name, evidence: '', ok: true, probability: a.noul }]
         : [];
     });
     results.push({ id, items });

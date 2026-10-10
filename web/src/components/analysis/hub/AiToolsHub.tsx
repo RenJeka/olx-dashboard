@@ -5,9 +5,10 @@ import { AiHubDialog } from './AiHubDialog';
 import { RelevanceFilterDialog } from '../relevance/RelevanceFilterDialog';
 import { AnalysisWizardDialog } from '../wizard/AnalysisWizardDialog';
 import { AiPicksDialog } from '../ai-picks/AiPicksDialog';
+import { CriteriaManagerDialog } from '../criteria/CriteriaManagerDialog';
 import type { Search } from '../../../types';
 
-export type AiHubMode = 'closed' | 'hub' | 'relevance' | 'analysis' | 'picks';
+export type AiHubMode = 'closed' | 'hub' | 'relevance' | 'analysis' | 'picks' | 'criteria';
 
 interface Props {
   search: Search;
@@ -48,6 +49,7 @@ export function AiToolsHub({ search, selectedIds }: Props) {
         open={mode === 'picks'}
         onClose={close}
       />
+      <CriteriaManagerDialog search={search} open={mode === 'criteria'} onClose={close} />
     </>
   );
 }

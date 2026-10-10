@@ -80,7 +80,11 @@ describe('runJevMatching (крок 2)', () => {
       'Полиця A': { cons_0: 0.95, cons_1: JEV_CRITERIA_THRESHOLD - 0.01 },
       'Полиця B': {},
     });
-    const res = await runJevMatching(['зламана', 'подряпини'], 'cons', [listing(1, 'Полиця A'), listing(2, 'Полиця B')]);
+    const groups = [
+      { name: 'зламана', aliases: [], enabled: true },
+      { name: 'подряпини', aliases: [], enabled: true },
+    ];
+    const res = await runJevMatching(groups, 'cons', [listing(1, 'Полиця A'), listing(2, 'Полиця B')]);
     const byId = new Map(res.results.map((r) => [r.id, r.items]));
 
     expect(byId.get(1)).toEqual([{ criterion: 'зламана', evidence: '', ok: true, probability: 0.95 }]);
@@ -115,7 +119,10 @@ describe('маршрути з engine=jev', () => {
     await db.batch(
       [
         { sql: 'UPDATE listings SET title = ? WHERE olx_id = 1', args: ['iPhone 13 128GB'] },
-        { sql: 'UPDATE searches SET analysis_criteria = ? WHERE id = ?', args: [JSON.stringify({ cons: ['подряпини'], pros: [] }), searchId] },
+        {
+          sql: 'UPDATE searches SET analysis_criteria = ? WHERE id = ?',
+          args: [JSON.stringify({ cons: ['подряпини', { name: 'вимкнена', aliases: [], enabled: false }], pros: [] }), searchId],
+        },
       ],
       'write',
     );
@@ -139,5 +146,7 @@ describe('маршрути з engine=jev', () => {
     const an = await app.inject({ method: 'POST', url: `/api/searches/${searchId}/analyze`, payload: { engine: 'jev', mode: 'cons' } });
     expect(an.statusCode).toBe(200);
     expect(an.json()).toMatchObject({ results: [{ items: [{ criterion: 'подряпини', probability: 0.75, evidence: '' }] }], usage: { requests: 1 } });
+    // Вимкнена категорія («в аналізі» = ні) у Jev не йде.
+    expect(Object.keys(decideMock.mock.calls.at(-1)![1])).toEqual(['cons_0']);
   });
 });

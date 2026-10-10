@@ -94,7 +94,8 @@ olx-dashboard/
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
-│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getSavedCriteria/loadListings
+│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getCriteriaConfig/loadListings
+│       │   ├── criteria.ts   # категорії критеріїв (docs/plans/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
@@ -140,7 +141,7 @@ olx-dashboard/
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/old/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
-│               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import, GET .../prompt
+│               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import/.../remap, GET .../prompt
 │               ├── matching.ts # A5: POST /analyze, GET /analyze/package.zip, POST /analyze/import+export
 │               └── commit.ts   # POST /api/listings/analyze/commit (запис cons/pros у БД)
 │
@@ -218,6 +219,11 @@ olx-dashboard/
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
+        │   │   ├── criteria/               # вікно «Критерії пошуку» (docs/plans/criteria-categories.md)
+        │   │   │   ├── CriteriaManagerDialog.tsx # категорії мінусів/плюсів: перегляд, генерація, «в аналізі», об'єднання/видалення
+        │   │   │   ├── CriterionRow.tsx     # рядок: категорія з синонімами або пункт «лише в оголошеннях»
+        │   │   │   ├── MergeCriteriaDialog.tsx  # об'єднати / перейменувати (назва + синоніми + «зачепить N»)
+        │   │   │   └── DeleteCriteriaDialog.tsx # видалити зі списку (і з оголошень за галочкою)
         │   │   └── wizard/                 # workflow «AI-аналіз» (4-етапний майстер мінуси/плюси)
         │   │       ├── AnalysisWizardDialog.tsx # оболонка діалогу (DialogRoot + степер + switch по кроках)
         │   │       ├── WizardStepper.tsx    # UI степеру (4 кроки: критерії→пошук→перевірка→вставка)
@@ -279,7 +285,9 @@ olx-dashboard/
         │   │   ├── useWizard.ts        # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
         │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
         │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
-        │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (генерація/імпорт/вибір критеріїв)
+        │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (чипи = категорії, позначка «в аналізі», поглинання синонімів)
+        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Критерії пошуку»
+        │   │   ├── useCriteriaManager.ts # логіка вікна «Критерії пошуку» (лічильники з кешу, PUT/remap)
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)

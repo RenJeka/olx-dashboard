@@ -11,7 +11,7 @@ import { criterionKey, listingState } from './analysis/jev.js';
 import { runJevMatching } from './analysis/jevEngine.js';
 import { toPromptListing } from './analysis/promptData.js';
 import { buildChunkListings } from './analysis/prompts.js';
-import { getSavedCriteria } from './analysis/repo.js';
+import { aliasMap, enabledGroups, parseCriteriaConfig, phraseKey } from './analysis/criteria.js';
 import { parseBullets, stripHtml } from './analysis/text.js';
 import { dbAll, dbGet } from './db/db.js';
 
@@ -60,20 +60,27 @@ async function main(): Promise<void> {
   const searchId = Number(arg('search'));
   const mode = arg('mode') ?? 'cons';
   if (!Number.isFinite(searchId) || !isMode(mode)) {
-    console.error('Використання: npm run jev:probe -- --search <id> [--top N | --ids a,b] [--mode cons|pros] [--out <file>]');
+    console.error('Використання: npm run jev:probe -- --search <id> [--top N | --ids a,b] [--mode cons|pros] [--no-aliases] [--out <file>]');
     process.exit(1);
   }
   if (!hasApiKey()) {
     console.error('Немає OPENROUTER_API_KEY у server/.env — Jev недоступний.');
     process.exit(1);
   }
-  const search = await dbGet<{ query: string }>('SELECT query FROM searches WHERE id = ?', [searchId]);
+  const search = await dbGet<{ query: string; analysis_criteria: string | null }>(
+    'SELECT query, analysis_criteria FROM searches WHERE id = ?',
+    [searchId],
+  );
   if (!search) {
     console.error(`Пошук #${searchId} не знайдено`);
     process.exit(1);
   }
-  const criteria = (await getSavedCriteria(searchId))[mode];
-  const allowed = new Set(criteria.map((c) => c.toLowerCase()));
+  // Категорії «в аналізі»; --no-aliases — питання лише з назвою (порівняння з «назва + приклади»).
+  const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), mode);
+  const withAliases = !process.argv.includes('--no-aliases');
+  // Пункт збереженого аналізу → назва категорії (старі прогони могли писати синонім).
+  const toCategory = aliasMap(criteria);
+  const categoryOf = (c: string) => toCategory.get(phraseKey(c));
 
   const all = await dbAll<ProbeRow>(
     'SELECT id, title, description, params, url, cons, pros, analysis_source, analysis_model FROM listings WHERE search_id = ?',
@@ -85,12 +92,12 @@ async function main(): Promise<void> {
     ? all.filter((r) => ids.includes(r.id))
     : all
         .filter((r) => r.analysis_source)
-        .sort((a, b) => llmOf(b).filter((c) => allowed.has(c.toLowerCase())).length - llmOf(a).filter((c) => allowed.has(c.toLowerCase())).length)
+        .sort((a, b) => llmOf(b).filter(categoryOf).length - llmOf(a).filter(categoryOf).length)
         .slice(0, Number(arg('top') ?? 5));
 
   const captured: Captured[] = [];
   captureDecisions(captured);
-  const response = await runJevMatching(criteria, mode, rows.map(toPromptListing));
+  const response = await runJevMatching(criteria, mode, rows.map(toPromptListing), withAliases);
 
   const chunks = new Map(buildChunkListings(rows.map(toPromptListing)).map((c) => [c.id, c]));
   const engineById = new Map(response.results.map((r) => [r.id, r.items]));
@@ -121,20 +128,20 @@ async function main(): Promise<void> {
       attempts: calls.map((c) => c.status),
       rawRequest: ok?.request ?? null,
       rawResponse: ok ? (JSON.parse(ok.response) as unknown) : (calls.at(-1)?.response ?? null),
-      criteria: criteria.map((criterion, i) => {
+      criteria: criteria.map((group, i) => {
         const key = criterionKey(mode, i);
         const p = answers[key]?.noul;
         return {
           key,
-          criterion,
+          criterion: group.name,
           question: questions[key]?.instructions ?? null,
           probability: typeof p === 'number' ? p : null,
           passed: typeof p === 'number' && p >= JEV_CRITERIA_THRESHOLD,
-          llmFound: llm.some((c) => c.toLowerCase() === criterion.toLowerCase()),
+          llmFound: llm.some((c) => categoryOf(c) === group.name),
         };
       }),
       engineItems: engineById.get(r.id) ?? [],
-      llmOutsideCriteria: llm.filter((c) => !allowed.has(c.toLowerCase())),
+      llmOutsideCriteria: llm.filter((c) => !categoryOf(c)),
       // Чим зроблено збережений аналіз-орієнтир (може бути й сам Jev — тоді «ймовірно пропущено» нічого не доводить).
       referenceModel: r.analysis_model,
     };
@@ -145,6 +152,7 @@ async function main(): Promise<void> {
     createdAt: new Date().toISOString(),
     search: { id: searchId, query: search.query },
     mode,
+    withAliases,
     threshold: JEV_CRITERIA_THRESHOLD,
     descSlice: MATCHING_DESC_SLICE,
     model: response.model,
@@ -156,7 +164,9 @@ async function main(): Promise<void> {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(report, null, 2));
 
-  console.log(`Пошук #${searchId} «${search.query}», режим ${mode}, критеріїв ${criteria.length}, поріг ${JEV_CRITERIA_THRESHOLD}`);
+  console.log(
+    `Пошук #${searchId} «${search.query}», режим ${mode}, категорій ${criteria.length}${withAliases ? '' : ' (без синонімів у питанні)'}, поріг ${JEV_CRITERIA_THRESHOLD}`,
+  );
   console.log(`Модель ${response.model}, запитів ${response.usage?.requests}, $${response.usage?.cost.toFixed(6)}`);
   if (response.errors.length > 0) console.log('Помилки:', response.errors.join('; '));
   for (const l of listings) {

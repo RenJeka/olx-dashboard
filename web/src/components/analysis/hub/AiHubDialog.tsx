@@ -1,5 +1,5 @@
 import { Box, Stack } from '@chakra-ui/react';
-import { LuScanSearch, LuSparkles, LuTrophy } from 'react-icons/lu';
+import { LuListChecks, LuScanSearch, LuSparkles, LuTrophy } from 'react-icons/lu';
 import {
   DialogBackdrop,
   DialogBody,
@@ -76,6 +76,11 @@ export function AiHubDialog({ search, open, onClose, onSelect }: Props) {
                   icon={step.icon}
                   colorPalette={step.colorPalette}
                   onRun={() => onSelect(step.mode)}
+                  secondary={
+                    step.mode === 'analysis'
+                      ? { label: 'Критерії', icon: LuListChecks, onClick: () => onSelect('criteria') }
+                      : undefined
+                  }
                 />
                 {i < STEPS.length - 1 && (
                   <Box w="1px" h={4} bg="border.subtle" ml={7.5} />

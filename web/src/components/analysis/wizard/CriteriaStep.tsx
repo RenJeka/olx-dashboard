@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   HStack,
   IconButton,
@@ -11,6 +12,7 @@ import {
   LuWandSparkles,
   LuRefreshCw,
   LuPlus,
+  LuListChecks,
 } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
 import { ScopeSelector } from '../ScopeSelector';
@@ -22,10 +24,12 @@ type Actions = ReturnType<typeof useWizard>;
 
 interface Props {
   w: Actions;
+  /** Відкрити вікно «Критерії пошуку» (перегляд, об'єднання, видалення). */
+  onManageCriteria: () => void;
 }
 
-/** Крок 1: вибір режиму, scope, критеріїв. */
-export function CriteriaStep({ w }: Props) {
+/** Крок 1: вибір режиму, scope, критеріїв (категорій пошуку). */
+export function CriteriaStep({ w, onManageCriteria }: Props) {
   const {
     mode, setMode,
     scope, setScope,
@@ -41,7 +45,9 @@ export function CriteriaStep({ w }: Props) {
     goToMatching, saveCriteriaIsPending,
     reset, bindSearch, computeDefaultScope,
     statusFilter,
+    savedGroups,
   } = w;
+  const aliasesOf = new Map(savedGroups.map((g) => [g.name, g.aliases]));
 
   return (
     <Stack gap={4}>
@@ -58,25 +64,42 @@ export function CriteriaStep({ w }: Props) {
       {/* Перемикач обсягу */}
       <ScopeSelector value={scope} onChange={setScope} counts={counts} statusFilter={statusFilter} />
 
-      <Text textStyle="sm" color="fg.muted">
-        Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
-      </Text>
+      <HStack justify="space-between" gap={2} wrap="wrap">
+        <Text textStyle="sm" color="fg.muted">
+          Обери критерії, за якими шукати {modeLabel.toLowerCase()}. Tap по чипу — обрати/зняти.
+        </Text>
+        <Button size="xs" variant="ghost" onClick={onManageCriteria}>
+          <LuListChecks /> Керувати критеріями…
+        </Button>
+      </HStack>
       <Wrap gap={2}>
-        {sortAlpha(available).map((c) => (
-          <Tooltip key={c} content={c} openDelay={300}>
-            <Button
-              size="xs"
-              variant={selected.has(c) ? 'solid' : 'outline'}
-              colorPalette={mode === 'cons' ? 'danger' : 'success'}
-              onClick={() => toggleCriterion(c)}
-              maxW="260px"
+        {sortAlpha(available).map((c) => {
+          const aliases = aliasesOf.get(c) ?? [];
+          return (
+            <Tooltip
+              key={c}
+              content={aliases.length > 0 ? `${c} · сюди ж: ${aliases.join(', ')}` : c}
+              openDelay={300}
             >
-              <Text as="span" lineClamp={1}>
-                {c}
-              </Text>
-            </Button>
-          </Tooltip>
-        ))}
+              <Button
+                size="xs"
+                variant={selected.has(c) ? 'solid' : 'outline'}
+                colorPalette={mode === 'cons' ? 'danger' : 'success'}
+                onClick={() => toggleCriterion(c)}
+                maxW="260px"
+              >
+                <Text as="span" lineClamp={1}>
+                  {c}
+                </Text>
+                {aliases.length > 0 && (
+                  <Badge size="xs" variant="subtle">
+                    +{aliases.length}
+                  </Badge>
+                )}
+              </Button>
+            </Tooltip>
+          );
+        })}
         {available.length === 0 && (
           <Text textStyle="sm" color="fg.muted">
             Критеріїв ще немає — згенеруй або додай вручну.

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS searches (
   cron_enabled INTEGER DEFAULT 0,
   visible_total_count INTEGER,       -- metadata.visible_total_count з останнього успішного скану (GraphQL)
   sort_order INTEGER,                -- ручний порядок у списку (менше — вище); NULL до бекфілу в db.ts
-  analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[], pros:[]}: обрані критерії LLM-аналізу (рівень пошуку)
+  analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[{name,aliases[],enabled}], pros:[…]}: категорії критеріїв аналізу (рівень пошуку; рядок — старий формат); server/src/analysis/criteria.ts
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
   category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/category-counts-and-filter.md

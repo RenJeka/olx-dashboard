@@ -10,7 +10,7 @@ export function parseLocalFilters(raw: string): LocalFilters {
 }
 
 /** Пункти з bullet-тексту «• a\n• b» → ['a','b'] (для оцінки фільтрів плюсів/мінусів). */
-function parseBullets(text: string | null): string[] {
+export function parseBullets(text: string | null): string[] {
   if (!text) return [];
   return text
     .split('\n')

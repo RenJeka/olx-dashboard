@@ -4,7 +4,10 @@ import { parseRelevanceResponse, prefilterCandidates } from './relevance.js';
 
 describe('parseMatchingResponse — анти-галюцинація evidence', () => {
   const descriptions = new Map([[1, 'Батарея 87%, є подряпини на корпусі. Face ID працює.']]);
-  const allowed = ['Подряпини', 'Не працює Face ID'];
+  const allowed = [
+    { name: 'Подряпини', aliases: ['потертості'], enabled: true },
+    { name: 'Не працює Face ID', aliases: [], enabled: true },
+  ];
 
   it('evidence-підрядок опису → ok=true; вигаданий → ok=false; criterion зводиться до канонічного', () => {
     const raw = JSON.stringify([
@@ -26,6 +29,23 @@ describe('parseMatchingResponse — анти-галюцинація evidence', (
   it('приймає JSON у markdown-огорожі та {results:[...]}', () => {
     const raw = '```json\n{"results":[{"id":1,"items":[{"criterion":"Подряпини","evidence":"подряпини"}]}]}\n```';
     expect(parseMatchingResponse(raw, descriptions, allowed)[0]?.items[0]?.ok).toBe(true);
+  });
+
+  it('синонім і скопійований рядок списку «(сюди ж: …)» зводяться до назви категорії', () => {
+    const raw = JSON.stringify([
+      {
+        id: 1,
+        items: [
+          { criterion: 'Потертості', evidence: 'подряпини на корпусі' },
+          { criterion: 'Подряпини (сюди ж: потертості)', evidence: 'подряпини' },
+          { criterion: 'Не працює Face ID', evidence: 'Face ID працює' },
+        ],
+      },
+    ]);
+    expect(parseMatchingResponse(raw, descriptions, allowed)[0]?.items.map((i) => i.criterion)).toEqual([
+      'Подряпини',
+      'Не працює Face ID',
+    ]);
   });
 
   it('невалідний JSON → зрозуміла помилка', () => {
