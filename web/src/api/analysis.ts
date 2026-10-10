@@ -3,12 +3,14 @@ import { api, apiBlob } from './base';
 import { downloadBlob } from '../utils/download';
 import type {
   AnalysisStatus,
-  AnalysisCriteria,
   AnalysisEngine,
   AnalysisMode,
   AnalyzeResponse,
   AnalyzedListing,
   CommitItem,
+  CriteriaConfig,
+  CriterionGroup,
+  RemapCriteriaResult,
 } from '../types';
 
 /** Статус авто-режиму (наявність ключа OpenRouter) + дефолтна модель. */
@@ -20,11 +22,11 @@ export function useAnalysisStatus() {
   });
 }
 
-/** Збережені критерії пошуку (cons/pros). */
+/** Категорії критеріїв пошуку (cons/pros; docs/plans/criteria-categories.md). */
 export function useSavedCriteria(searchId: number | null) {
   return useQuery({
     queryKey: ['criteria', searchId],
-    queryFn: () => api<AnalysisCriteria>(`/api/searches/${searchId}/criteria`),
+    queryFn: () => api<CriteriaConfig>(`/api/searches/${searchId}/criteria`),
     enabled: searchId != null,
   });
 }
@@ -72,17 +74,49 @@ export function useImportCriteria() {
   });
 }
 
-/** Зберегти обрані критерії пошуку. */
+/** Зберегти список категорій режиму цілком (вмик/вимк, додані, вийнятий синонім). Оголошень не чіпає. */
 export function useSaveCriteria() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ searchId, cons, pros }: { searchId: number; cons?: string[]; pros?: string[] }) =>
-      api<AnalysisCriteria>(`/api/searches/${searchId}/criteria`, {
+    mutationFn: ({ searchId, cons, pros }: { searchId: number; cons?: CriterionGroup[]; pros?: CriterionGroup[] }) =>
+      api<CriteriaConfig>(`/api/searches/${searchId}/criteria`, {
         method: 'PUT',
         body: JSON.stringify({ cons, pros }),
       }),
-    onSuccess: (_data, { searchId }) =>
-      qc.invalidateQueries({ queryKey: ['criteria', searchId] }),
+    onSuccess: (data, { searchId }) => qc.setQueryData(['criteria', searchId], data),
+  });
+}
+
+/**
+ * Об'єднати / перейменувати (`to` — назва) або видалити (`to = null`) формулювання: категорії + пункти в
+ * оголошеннях і локальних фільтрах (`listings: false` — видалити лише зі списку).
+ */
+export function useRemapCriteria() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      mode,
+      from,
+      to,
+      listings,
+    }: {
+      searchId: number;
+      mode: AnalysisMode;
+      from: string[];
+      to: string | null;
+      listings?: boolean;
+    }) =>
+      api<RemapCriteriaResult>(`/api/searches/${searchId}/criteria/remap`, {
+        method: 'POST',
+        body: JSON.stringify({ mode, from, to, listings }),
+      }),
+    onSuccess: (data, { searchId }) => {
+      qc.setQueryData(['criteria', searchId], data.criteria);
+      qc.invalidateQueries({ queryKey: ['listings', searchId] });
+      qc.invalidateQueries({ queryKey: ['filter-options', searchId] });
+      qc.invalidateQueries({ queryKey: ['searches'] });
+    },
   });
 }
 
@@ -96,6 +130,7 @@ export function useAnalyze() {
       model,
       reasoning,
       engine,
+      threshold,
     }: {
       searchId: number;
       mode: AnalysisMode;
@@ -103,10 +138,12 @@ export function useAnalyze() {
       model?: string;
       reasoning?: boolean;
       engine?: AnalysisEngine;
+      /** Поріг Jev (лише для engine='jev'). */
+      threshold?: number;
     }) =>
       api<AnalyzeResponse>(`/api/searches/${searchId}/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ mode, ids, model, reasoning, engine }),
+        body: JSON.stringify({ mode, ids, model, reasoning, engine, threshold }),
       }),
   });
 }

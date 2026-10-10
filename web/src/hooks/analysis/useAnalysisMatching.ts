@@ -27,6 +27,7 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
   const model = useSettingsStore.getState().analysisModel;
   const reasoning = useSettingsStore.getState().analysisReasoning;
   const engine = useSettingsStore.getState().analysisEngine;
+  const threshold = engine === 'jev' ? useSettingsStore.getState().jevCriteriaThreshold : undefined;
 
   async function runAutoAnalyze() {
     if (effectiveIds.length === 0) {
@@ -44,7 +45,7 @@ export function useAnalysisMatching(searchId: number, effectiveIds: number[]) {
     try {
       let done = 0;
       for (const ids of chunks) {
-        const res = await analyze.mutateAsync({ searchId, mode, ids, model, reasoning, engine });
+        const res = await analyze.mutateAsync({ searchId, mode, ids, model, reasoning, engine, threshold });
         acc = [...acc, ...res.results];
         errors.push(...res.errors);
         if (res.usage) {

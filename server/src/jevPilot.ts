@@ -36,7 +36,8 @@ import { descriptionMap, chunk } from './analysis/promptData.js';
 import { buildChunkListings, buildMatchingPrompt, type ChunkListing, type PromptListing } from './analysis/prompts.js';
 import { buildRelevancePrompt, parseRelevanceResponse, prefilterCandidates } from './analysis/relevance.js';
 import { parseBullets } from './analysis/text.js';
-import type { AnalysisMode } from './types.js';
+import type { AnalysisMode, CriterionGroup } from './types.js';
+import { enabledGroups, parseCriteriaConfig } from './analysis/criteria.js';
 
 // ── Вхід ───────────────────────────────────────────────────────────────────────
 
@@ -85,14 +86,10 @@ function jsonArray(text: string | null): string[] {
   }
 }
 
-function parseCriteria(text: string | null): Record<AnalysisMode, string[]> {
-  try {
-    const v = JSON.parse(text || '{}') as { cons?: unknown; pros?: unknown };
-    const list = (x: unknown) => (Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string') : []);
-    return { cons: list(v.cons), pros: list(v.pros) };
-  } catch {
-    return { cons: [], pros: [] };
-  }
+/** Категорії «в аналізі» за режимом (спільний парс — analysis/criteria.ts). */
+function parseCriteria(text: string | null): Record<AnalysisMode, CriterionGroup[]> {
+  const config = parseCriteriaConfig(text);
+  return { cons: enabledGroups(config, 'cons'), pros: enabledGroups(config, 'pros') };
 }
 
 // ── Облік вартості ─────────────────────────────────────────────────────────────
@@ -209,7 +206,7 @@ function buildDisputes(
   jevCrit: Map<number, JevResult> | undefined,
   llmCrit: Map<number, Record<AnalysisMode, string[]>>,
   llmCritDone: Set<string>,
-  criteria: Record<AnalysisMode, string[]>,
+  criteria: Record<AnalysisMode, CriterionGroup[]>,
 ): string {
   const byId = new Map(rows.map((r) => [r.id, r]));
   const text = (r: SampleListing) =>
@@ -325,7 +322,10 @@ async function main(): Promise<void> {
     (r.ai_relevant_source === 'manual' ? gold : llmStored).set(r.id, r.ai_relevant === 1);
   }
   const storedCriteria = new Map<number, Record<AnalysisMode, string[]>>();
-  const allowed = { cons: new Set(criteria.cons.map((c) => c.toLowerCase())), pros: new Set(criteria.pros.map((c) => c.toLowerCase())) };
+  const allowed = {
+    cons: new Set(criteria.cons.map((g) => g.name.toLowerCase())),
+    pros: new Set(criteria.pros.map((g) => g.name.toLowerCase())),
+  };
   for (const r of rows) {
     if (!r.analysis_source) continue;
     storedCriteria.set(r.id, {

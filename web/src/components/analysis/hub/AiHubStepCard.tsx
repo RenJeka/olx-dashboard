@@ -8,10 +8,12 @@ interface Props {
   icon: IconType;
   colorPalette: string;
   onRun: () => void;
+  /** Додаткова кнопка поруч із «Запустити» (напр. «Критерії» для кроку 2). */
+  secondary?: { label: string; icon: IconType; onClick: () => void };
 }
 
 /** Клікабельна картка кроку в хабі AI-інструментів (`AiHubDialog`). */
-export function AiHubStepCard({ number, title, description, icon, colorPalette, onRun }: Props) {
+export function AiHubStepCard({ number, title, description, icon, colorPalette, onRun, secondary }: Props) {
   return (
     <Box
       as="button"
@@ -63,6 +65,20 @@ export function AiHubStepCard({ number, title, description, icon, colorPalette, 
             {description}
           </Text>
         </Stack>
+        {secondary && (
+          <Button
+            size="sm"
+            colorPalette={colorPalette}
+            variant="outline"
+            flexShrink={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              secondary.onClick();
+            }}
+          >
+            <Icon as={secondary.icon} /> {secondary.label}
+          </Button>
+        )}
         <Button
           size="sm"
           colorPalette={colorPalette}

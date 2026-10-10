@@ -4,6 +4,7 @@ import { LuChevronDown, LuChevronUp } from 'react-icons/lu';
 import { SearchRowMenu } from './SearchRowMenu';
 import { SearchDeleteDialog } from './SearchDeleteDialog';
 import { SearchFiltersDrawer } from './SearchFiltersDrawer';
+import { CriteriaManagerDialog } from '../analysis/criteria/CriteriaManagerDialog';
 import { SearchVariantsDialog } from './SearchVariantsDialog';
 import { SearchEditDialog } from './SearchEditDialog';
 import { Tooltip } from '../ui/tooltip';
@@ -29,6 +30,7 @@ interface Props {
 export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDeleted }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [criteriaOpen, setCriteriaOpen] = useState(false);
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const updateSynonyms = useUpdateSearchSynonyms();
@@ -170,12 +172,15 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
           onEdit={() => setEditOpen(true)}
           onFilters={() => setFiltersOpen(true)}
           onVariants={() => setVariantsOpen(true)}
+          onCriteria={() => setCriteriaOpen(true)}
           onArchiveToggle={handleArchiveToggle}
           onDeleteRequest={() => setConfirmOpen(true)}
         />
       </HStack>
       <SearchEditDialog search={search} open={editOpen} onOpenChange={setEditOpen} />
       <SearchFiltersDrawer search={search} open={filtersOpen} onOpenChange={setFiltersOpen} />
+      {/* Монтується лише відкритим: рядків пошуку багато, а вікну потрібні запити критеріїв і оголошень. */}
+      {criteriaOpen && <CriteriaManagerDialog search={search} onClose={() => setCriteriaOpen(false)} />}
       <SearchVariantsDialog
         open={variantsOpen}
         onOpenChange={setVariantsOpen}

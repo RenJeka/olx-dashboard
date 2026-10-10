@@ -7,6 +7,7 @@ import {
   LuFilter,
   LuFolderInput,
   LuLayers,
+  LuListChecks,
   LuPencil,
   LuTrash2,
 } from 'react-icons/lu';
@@ -21,6 +22,7 @@ interface Props {
   onEdit: () => void;
   onFilters: () => void;
   onVariants: () => void;
+  onCriteria: () => void;
   onArchiveToggle: () => void;
   onDeleteRequest: () => void;
 }
@@ -35,6 +37,7 @@ export function SearchRowMenu({
   onEdit,
   onFilters,
   onVariants,
+  onCriteria,
   onArchiveToggle,
   onDeleteRequest,
 }: Props) {
@@ -66,6 +69,11 @@ export function SearchRowMenu({
             <Menu.Item value="variants" onSelect={onVariants}>
               <HStack gap={2}>
                 <LuLayers /> <Text>Варіанти пошуку{synonymsCount > 0 ? ` (${synonymsCount})` : ''}</Text>
+              </HStack>
+            </Menu.Item>
+            <Menu.Item value="criteria" onSelect={onCriteria}>
+              <HStack gap={2}>
+                <LuListChecks /> <Text>Плюси та мінуси</Text>
               </HStack>
             </Menu.Item>
 

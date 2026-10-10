@@ -16,12 +16,21 @@ export const COMMIT_CHUNK = 50;
 export const ANALYZE_CHUNK = 200;
 /** Підпис режиму (мінуси/плюси). */
 export const MODE_LABELS: Record<'cons' | 'pros', string> = { cons: 'Мінуси', pros: 'Плюси' };
+/** Палітра режиму (мінуси — червоні, плюси — зелені): перемикачі, чипи, теги. */
+export const MODE_PALETTE: Record<'cons' | 'pros', string> = { cons: 'danger', pros: 'success' };
 /** Джерело аналізу при commit (listings.analysis_source). */
 export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
 /** Позначка моделі для ручного імпорту. */
 export const MANUAL_MODEL = 'manual';
 /** Підписи рушіїв авто-режиму кроків 1–2. */
 export const ANALYSIS_ENGINE_LABELS = { llm: 'LLM', jev: 'Jev' } as const;
+/**
+ * Поріг ймовірності Jev на кроці 2 (мінуси/плюси): типовий і межі — дзеркало JEV_CRITERIA_THRESHOLD(_MIN/_MAX)
+ * у server/src/analysis/constants.ts (docs/plans/jev-threshold-setting.md).
+ */
+export const JEV_CRITERIA_THRESHOLD_DEFAULT = 0.7;
+export const JEV_CRITERIA_THRESHOLD_MIN = 0.3;
+export const JEV_CRITERIA_THRESHOLD_MAX = 0.95;
 
 // ── AI Вибір (ранжування) ──────────────────────────────────────────────────────
 /** Підпис псевдо-вкладки/scope «Найкращі кандидати» (ai_picks) — спільний для таблиці й майстра. */
@@ -76,6 +85,12 @@ export const SCAN_KIND_LABELS: Record<string, string> = {
 };
 
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
+/**
+ * Verify-прохід («Перевірити неактивні») доступний. Вимкнено: OLX відповідає 403 на сторінки оголошень —
+ * дзеркало HTML_FALLBACK_ENABLED сервера (той самий HTML-канал); повернути true при закритті P-005
+ * (docs/plans/old/verify-403-guard.md).
+ */
+export const VERIFY_PROBE_AVAILABLE = false;
 /** Скільки хвилин живе закешований план аналізу скану (дзеркалить PLAN_TTL_MIN у server/src/scanner.ts). */
 export const SCAN_PLAN_TTL_MIN = 30;
 export const DEEP_SCAN_PAGE_LIMIT = 40;

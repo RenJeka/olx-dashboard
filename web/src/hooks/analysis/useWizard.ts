@@ -25,7 +25,7 @@ export function useWizard(search: Search, selectedIds: number[], open: boolean) 
 
   // Compose sub-hooks
   const scopeHook = useAnalysisScope(search.id, selectedIds, open, store.scope);
-  const criteriaHook = useAnalysisCriteria(search.id);
+  const criteriaHook = useAnalysisCriteria(search.id, savedCriteria);
   const matchingHook = useAnalysisMatching(search.id, scopeHook.effectiveIds);
   const reviewHook = useAnalysisReview(search.id, scopeHook.listingById);
   const commitHook = useAnalysisCommit(search.id, reviewHook.commitItems, reviewHook.overwriteCount, apiAvailable);

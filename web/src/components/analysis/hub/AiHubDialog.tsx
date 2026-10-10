@@ -1,5 +1,5 @@
 import { Box, Stack } from '@chakra-ui/react';
-import { LuScanSearch, LuSparkles, LuTrophy } from 'react-icons/lu';
+import { LuListChecks, LuScanSearch, LuSparkles, LuTrophy } from 'react-icons/lu';
 import {
   DialogBackdrop,
   DialogBody,
@@ -18,6 +18,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSelect: (mode: AiHubMode) => void;
+  /** Хаб повністю закрився (після анімації). */
+  onExitComplete?: () => void;
 }
 
 const STEPS = [
@@ -48,10 +50,11 @@ const STEPS = [
 ];
 
 /** Хаб AI-інструментів: 3 послідовних кроки workflow (фільтр → аналіз → вибір). */
-export function AiHubDialog({ search, open, onClose, onSelect }: Props) {
+export function AiHubDialog({ search, open, onClose, onSelect, onExitComplete }: Props) {
   return (
     <DialogRoot
       open={open}
+      onExitComplete={onExitComplete}
       onOpenChange={(d) => {
         if (!d.open) onClose();
       }}
@@ -76,6 +79,11 @@ export function AiHubDialog({ search, open, onClose, onSelect }: Props) {
                   icon={step.icon}
                   colorPalette={step.colorPalette}
                   onRun={() => onSelect(step.mode)}
+                  secondary={
+                    step.mode === 'analysis'
+                      ? { label: 'Плюси та мінуси', icon: LuListChecks, onClick: () => onSelect('criteria') }
+                      : undefined
+                  }
                 />
                 {i < STEPS.length - 1 && (
                   <Box w="1px" h={4} bg="border.subtle" ml={7.5} />

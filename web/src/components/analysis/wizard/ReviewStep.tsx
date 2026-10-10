@@ -17,6 +17,7 @@ import { Tooltip } from '../../ui/tooltip';
 import { stripDescriptionHtml } from '../../../utils/format';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import { useListingsDetails } from '../../../api';
+import { MODE_PALETTE } from '../../../constants';
 import type { useWizard } from '../../../hooks/analysis/useWizard';
 import type { AnalyzedListing, Listing } from '../../../types';
 
@@ -86,7 +87,7 @@ function CriteriaTags({
             disabled={!it.evidence && it.probability === undefined}
           >
             <Badge
-              colorPalette={included ? (mode === 'cons' ? 'danger' : 'success') : 'gray'}
+              colorPalette={included ? MODE_PALETTE[mode] : 'gray'}
               variant={included ? 'subtle' : 'outline'}
               textDecoration={included ? undefined : 'line-through'}
               borderWidth={it.ok ? undefined : '1px'}

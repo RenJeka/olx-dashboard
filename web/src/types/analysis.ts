@@ -46,9 +46,22 @@ export interface AnalysisStatus {
   jevModel?: string;
 }
 
-export interface AnalysisCriteria {
-  cons: string[];
-  pros: string[];
+/** Категорія критерію (docs/plans/criteria-categories.md): назва + синоніми + чи йде в аналіз. */
+export interface CriterionGroup {
+  name: string;
+  aliases: string[];
+  enabled: boolean;
+}
+
+/** Категорії критеріїв пошуку за режимом (searches.analysis_criteria). */
+export type CriteriaConfig = Record<AnalysisMode, CriterionGroup[]>;
+
+/** Відповідь POST /criteria/remap. */
+export interface RemapCriteriaResult {
+  criteria: CriteriaConfig;
+  /** Оголошень, у яких змінились пункти. */
+  updated: number;
+  filtered_out_count: number | null;
 }
 
 export interface MatchedItem {
