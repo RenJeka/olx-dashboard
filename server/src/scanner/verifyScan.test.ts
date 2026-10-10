@@ -3,7 +3,7 @@ import { dbGet, dbRun } from '../db/db.js';
 import { createSearch, getListing, insertListing, resetDb } from '../test/db.js';
 import type { ProbeResult } from '../scraper/verifier.js';
 
-// Запобіжник verify-проходу від 403 OLX (docs/plans/verify-403-guard.md): проба й паузи замокані —
+// Запобіжник verify-проходу від 403 OLX (docs/plans/old/verify-403-guard.md): проба й паузи замокані —
 // жодного запиту до OLX і жодного очікування.
 const probe = vi.hoisted(() => vi.fn<(url: string) => Promise<ProbeResult>>());
 vi.mock('../scraper/verifier.js', () => ({ probeListingPage: probe }));

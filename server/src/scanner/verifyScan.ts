@@ -16,7 +16,7 @@ const VERIFY_PAGE_CAP = 50;
 const VERIFY_BATCH_SIZE = 3;
 /**
  * Скільки `403` поспіль зупиняють прохід: OLX (CloudFront) блокує HTML-сторінки з Node
- * (docs/olx-api.md §6, з 2026-10-03) — решта запитів марна (docs/plans/verify-403-guard.md, обхід — P-005).
+ * (docs/olx-api.md §6, з 2026-10-03) — решта запитів марна (docs/plans/old/verify-403-guard.md, обхід — P-005).
  */
 export const VERIFY_BLOCK_STREAK = VERIFY_BATCH_SIZE;
 export const VERIFY_BLOCKED_ERROR =

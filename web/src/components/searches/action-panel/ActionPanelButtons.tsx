@@ -30,7 +30,7 @@ export function ActionPanelButtons({
   onRunVerifyPass,
   onStartAnalysis,
 }: Props) {
-  // Verify вимкнено, поки OLX відповідає 403 на сторінки оголошень (P-005, docs/plans/verify-403-guard.md).
+  // Verify вимкнено, поки OLX відповідає 403 на сторінки оголошень (P-005, docs/plans/old/verify-403-guard.md).
   const canVerify = VERIFY_PROBE_AVAILABLE && verifyCandidates > 0;
 
   return (

@@ -535,7 +535,7 @@ GET <listing.url>
 > ⚠️ З 2026-10-03 сторінка оголошення теж віддає `403` (CloudFront, як §3) → проба завжди `unknown`;
 > REST `api/v1/offers/<id>/` — теж `403` (2026-10-10). Тому кнопка «Перевірити неактивні» вимкнена
 > (`VERIFY_PROBE_AVAILABLE` у `web/src/constants.ts`), а прохід зупиняється після серії `403`
-> (`VERIFY_BLOCK_STREAK` у `scanner/verifyScan.ts`) — [verify-403-guard](plans/verify-403-guard.md).
+> (`VERIFY_BLOCK_STREAK` у `scanner/verifyScan.ts`) — [verify-403-guard](plans/old/verify-403-guard.md).
 
 Заголовки — `REQUEST_HEADERS` з `selectors.ts` (ті самі, що для HTML-fallback пошуку),
 `redirect: 'manual'` (НЕ йдемо за 3xx-редіректами — opaque-redirect трактуємо як `unknown`).
