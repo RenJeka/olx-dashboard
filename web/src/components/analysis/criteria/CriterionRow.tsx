@@ -12,12 +12,13 @@ interface Props {
   checked: boolean;
   onCheck: () => void;
   busy: boolean;
-  onToggleEnabled: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-  onDetachAlias: (alias: string) => void;
-  /** Лише для пункту «лише в оголошеннях»: додати як категорію. */
-  onAdd: () => void;
+  /** Дії категорії (рядок із `row.group`). */
+  onToggleEnabled?: () => void;
+  onRename?: () => void;
+  onDelete?: () => void;
+  onDetachAlias?: (alias: string) => void;
+  /** Дія пункту «лише в оголошеннях»: додати як категорію. */
+  onAdd?: () => void;
 }
 
 /** Рядок вікна «Плюси та мінуси»: категорія з синонімами або пункт, що є лише в оголошеннях. */
@@ -94,7 +95,7 @@ export function CriterionRow({
                   h={4}
                   aria-label={`Вийняти «${a}» з категорії`}
                   disabled={busy}
-                  onClick={() => onDetachAlias(a)}
+                  onClick={() => onDetachAlias?.(a)}
                 >
                   <LuX />
                 </IconButton>

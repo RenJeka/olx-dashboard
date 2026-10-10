@@ -1,21 +1,12 @@
-import {
-  Badge,
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  Stack,
-  Text,
-  Wrap,
-} from '@chakra-ui/react';
-import {
-  LuWandSparkles,
-  LuPlus,
-  LuListChecks,
-} from 'react-icons/lu';
-import { ManualAssistant } from '../ManualAssistant';
+import type { RefObject } from 'react';
+import { Badge, Button, HStack, Stack, Text, Wrap } from '@chakra-ui/react';
+import { LuListChecks } from 'react-icons/lu';
+import { ModeToggle } from '../ModeToggle';
+import { CriteriaInputBar } from '../criteria/CriteriaInputBar';
 import { ScopeSelector } from '../ScopeSelector';
 import { Tooltip } from '../../ui/tooltip';
+import { MODE_PALETTE } from '../../../constants';
+import { categoriesFirst } from '../../../utils/criteria';
 import { sortAlpha } from '../../../utils/sort';
 import type { useWizard } from '../../../hooks/analysis/useWizard';
 
@@ -25,10 +16,12 @@ interface Props {
   w: Actions;
   /** Відкрити вікно «Плюси та мінуси» (перегляд, об'єднання, видалення). */
   onManageCriteria: () => void;
+  /** Контент модалки майстра — для вікна вибору згенерованих критеріїв поверх неї. */
+  portalRef: RefObject<HTMLElement | null>;
 }
 
 /** Крок 1: вибір режиму, scope, критеріїв (категорій пошуку). */
-export function CriteriaStep({ w, onManageCriteria }: Props) {
+export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
   const {
     mode, setMode,
     scope, setScope,
@@ -37,31 +30,20 @@ export function CriteriaStep({ w, onManageCriteria }: Props) {
     modeLabel, chosenCount, counts,
     apiAvailable,
     toggleCriterion, addCustom,
-    handleGenerateCriteria, generateCriteriaIsPending,
-    openCriteriaAssistant,
-    showCriteriaAssistant, criteriaParts,
-    handleImportCriteria, importCriteriaIsPending,
+    criteriaGeneration,
     goToMatching, saveCriteriaIsPending,
     reset, bindSearch, computeDefaultScope,
     statusFilter,
     savedGroups,
   } = w;
   const aliasesOf = new Map(savedGroups.map((g) => [g.name, g.aliases]));
-  // Як у вікні «Плюси та мінуси»: спершу категорії (є синоніми), далі окремі — кожна частина за алфавітом.
-  const isCategory = (c: string) => (aliasesOf.get(c)?.length ?? 0) > 0;
-  const chips = [...sortAlpha(available.filter(isCategory)), ...sortAlpha(available.filter((c) => !isCategory(c)))];
+  // Як у вікні «Плюси та мінуси»: спершу категорії (є синоніми), далі окремі.
+  const chips = categoriesFirst(available, (c) => (aliasesOf.get(c)?.length ?? 0) > 0).flat();
 
   return (
     <Stack gap={4}>
       {/* Перемикач режиму */}
-      <HStack gap={1}>
-        <Button size="xs" variant={mode === 'cons' ? 'solid' : 'outline'} colorPalette="danger" onClick={() => setMode('cons')}>
-          Мінуси
-        </Button>
-        <Button size="xs" variant={mode === 'pros' ? 'solid' : 'outline'} colorPalette="success" onClick={() => setMode('pros')}>
-          Плюси
-        </Button>
-      </HStack>
+      <ModeToggle mode={mode} onChange={setMode} />
 
       {/* Перемикач обсягу */}
       <ScopeSelector value={scope} onChange={setScope} counts={counts} statusFilter={statusFilter} />
@@ -86,7 +68,7 @@ export function CriteriaStep({ w, onManageCriteria }: Props) {
               <Button
                 size="xs"
                 variant={selected.has(c) ? 'solid' : 'outline'}
-                colorPalette={mode === 'cons' ? 'danger' : 'success'}
+                colorPalette={MODE_PALETTE[mode]}
                 onClick={() => toggleCriterion(c)}
                 maxW="260px"
               >
@@ -109,39 +91,14 @@ export function CriteriaStep({ w, onManageCriteria }: Props) {
         )}
       </Wrap>
 
-      <HStack gap={2}>
-        <Input
-          size="sm"
-          placeholder="Додати свій критерій…"
-          value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addCustom()}
-        />
-        <IconButton size="sm" variant="outline" aria-label="Додати" onClick={addCustom}>
-          <LuPlus />
-        </IconButton>
-      </HStack>
-
-      <HStack gap={2} wrap="wrap">
-        {apiAvailable && (
-          <Button size="sm" colorPalette="purple" onClick={handleGenerateCriteria} loading={generateCriteriaIsPending}>
-            <LuWandSparkles /> Згенерувати
-          </Button>
-        )}
-        <Button size="sm" variant="outline" onClick={openCriteriaAssistant}>
-          Згенерувати вручну
-        </Button>
-      </HStack>
-
-      {showCriteriaAssistant && (
-        <ManualAssistant
-          title="Помічник: генерація критеріїв"
-          parts={criteriaParts}
-          pasteLabel="Розпізнати критерії"
-          onSubmit={handleImportCriteria}
-          submitting={importCriteriaIsPending}
-        />
-      )}
+      <CriteriaInputBar
+        value={customInput}
+        onChange={setCustomInput}
+        onAdd={addCustom}
+        apiAvailable={apiAvailable}
+        generation={criteriaGeneration}
+        portalRef={portalRef}
+      />
 
       <HStack justify="space-between">
         <HStack gap={2}>

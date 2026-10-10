@@ -16,6 +16,8 @@ export const COMMIT_CHUNK = 50;
 export const ANALYZE_CHUNK = 200;
 /** Підпис режиму (мінуси/плюси). */
 export const MODE_LABELS: Record<'cons' | 'pros', string> = { cons: 'Мінуси', pros: 'Плюси' };
+/** Палітра режиму (мінуси — червоні, плюси — зелені): перемикачі, чипи, теги. */
+export const MODE_PALETTE: Record<'cons' | 'pros', string> = { cons: 'danger', pros: 'success' };
 /** Джерело аналізу при commit (listings.analysis_source). */
 export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
 /** Позначка моделі для ручного імпорту. */

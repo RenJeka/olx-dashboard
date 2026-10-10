@@ -88,19 +88,8 @@ export function useAnalysisCriteria(searchId: number, savedCriteria: CriteriaCon
   const chosenCount = available.filter((c) => selected.has(c)).length;
 
   return {
-    showCriteriaAssistant: generation.showAssistant,
-    setShowCriteriaAssistant: generation.setShowAssistant,
-    criteriaParts: generation.assistantParts,
+    criteriaGeneration: generation,
     toggleCriterion, addCustom,
-    handleGenerateCriteria: generation.handleGenerate,
-    generateCriteriaIsPending: generation.generatePending,
-    openCriteriaAssistant: generation.openAssistant,
-    handleImportCriteria: generation.handleImport,
-    importCriteriaIsPending: generation.importPending,
-    newCriteria: generation.candidates,
-    addNewCriteria: generation.addCandidates,
-    addNewCriteriaPending: generation.addPending,
-    dismissNewCriteria: generation.dismissCandidates,
     goToMatching,
     saveCriteriaIsPending: saveCriteria.isPending,
     chosenCount,

@@ -18,7 +18,12 @@ source: сесія 2026-10-10 (P-015, діалог «Перейменувати 
 3. Монтувати вкладений діалог **лише на час показу** (`{open && <Dialog open … />}`): Ark `Portal` читає
    `container` один раз при монтуванні — змонтований заздалегідь (поки ref порожній) лишиться в `body`.
 
-Приклад — `CriteriaManagerDialog` (усередині майстра) і його `MergeCriteriaDialog`/`DeleteCriteriaDialog`.
+4. Якщо діалог, що монтується лише відкритим, відкривається **замість** іншої модалки (хаб AI → вікно), монтувати
+   його після `onExitComplete` попередньої: змонтований, поки та ще закривається, він стає вкладеним шаром і
+   закривається разом із нею за ~50 мс (`AiToolsHub`, 2026-10-10). Пункт меню (Ark Menu) так не робить.
+
+Готова обгортка для пунктів 1–3 — `web/src/components/analysis/criteria/NestedDialog.tsx`; приклади —
+`CriteriaManagerDialog` (усередині майстра) і його `MergeCriteriaDialog` / `DeleteCriteriaDialog` / `NewCriteriaDialog`.
 
 ## Чого не робити
 - Лише `modal={false}` без `portalRef` — для діалогу з самими кнопками досить, для полів вводу — ні.

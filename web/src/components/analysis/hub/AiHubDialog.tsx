@@ -18,6 +18,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSelect: (mode: AiHubMode) => void;
+  /** Хаб повністю закрився (після анімації). */
+  onExitComplete?: () => void;
 }
 
 const STEPS = [
@@ -48,10 +50,11 @@ const STEPS = [
 ];
 
 /** Хаб AI-інструментів: 3 послідовних кроки workflow (фільтр → аналіз → вибір). */
-export function AiHubDialog({ search, open, onClose, onSelect }: Props) {
+export function AiHubDialog({ search, open, onClose, onSelect, onExitComplete }: Props) {
   return (
     <DialogRoot
       open={open}
+      onExitComplete={onExitComplete}
       onOpenChange={(d) => {
         if (!d.open) onClose();
       }}

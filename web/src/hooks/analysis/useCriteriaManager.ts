@@ -4,7 +4,14 @@ import { toaster } from '../../components/ui/toaster';
 import { showErrorToast } from '../../utils/toast';
 import { sortAlpha } from '../../utils/sort';
 import { parseBullets } from '../../utils/localFilters';
-import { absorbIncoming, groupKeys, orphanPhrases, phraseKey } from '../../utils/criteria';
+import {
+  absorbIncoming,
+  categoriesFirst,
+  countListingsWithAny,
+  groupKeys,
+  orphanPhrases,
+  phraseKey,
+} from '../../utils/criteria';
 import { useCriteriaGeneration } from './useCriteriaGeneration';
 import type { AnalysisMode, CriterionGroup } from '../../types';
 
@@ -21,13 +28,13 @@ export interface CriterionRowData {
  * завантажених оголошень (без запитів у Turso), вибір для об'єднання/видалення, генерація й додавання.
  * Зміни списку зберігаються одразу (PUT), об'єднання/перейменування/видалення — через remap.
  */
-export function useCriteriaManager(searchId: number, open: boolean, initialMode: AnalysisMode) {
+export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) {
   const [mode, setModeState] = useState<AnalysisMode>(initialMode);
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const { data: config, isLoading } = useSavedCriteria(open ? searchId : null);
-  const { data: listings } = useListings(open ? searchId : null);
+  const { data: config, isLoading } = useSavedCriteria(searchId);
+  const { data: listings } = useListings(searchId);
   const save = useSaveCriteria();
   const remap = useRemapCriteria();
 
@@ -38,28 +45,22 @@ export function useCriteriaManager(searchId: number, open: boolean, initialMode:
     () => (listings ?? []).map((l) => new Set(parseBullets(l[mode]).map(phraseKey))),
     [listings, mode],
   );
-  const countWithAny = (keys: Iterable<string>) => {
-    const set = new Set(keys);
-    return listingKeys.filter((lk) => [...lk].some((k) => set.has(k))).length;
-  };
-
   const rows = useMemo(() => {
-    const countFor = (keys: string[]) => {
-      const set = new Set(keys);
-      return listingKeys.filter((lk) => [...lk].some((k) => set.has(k))).length;
-    };
     const byName = new Map(groups.map((g) => [g.name, g]));
     const toRow = (name: string): CriterionRowData => {
       const group = byName.get(name) as CriterionGroup;
-      return { name, group, count: countFor(groupKeys(group)) };
+      return { name, group, count: countListingsWithAny(listingKeys, groupKeys(group)) };
     };
-    // Спершу категорії (є синоніми), далі окремі критерії — кожна частина за алфавітом.
-    const categories = sortAlpha(groups.filter((g) => g.aliases.length > 0).map((g) => g.name)).map(toRow);
-    const singles = sortAlpha(groups.filter((g) => g.aliases.length === 0).map((g) => g.name)).map(toRow);
+    const [categoryNames, singleNames] = categoriesFirst(
+      groups.map((g) => g.name),
+      (name) => (byName.get(name)?.aliases.length ?? 0) > 0,
+    );
+    const categories = categoryNames.map(toRow);
+    const singles = singleNames.map(toRow);
     const orphans: CriterionRowData[] = sortAlpha(orphanPhrases(listings ?? [], mode, groups)).map((name) => ({
       name,
       group: null,
-      count: countFor([phraseKey(name)]),
+      count: countListingsWithAny(listingKeys, [phraseKey(name)]),
     }));
     const q = phraseKey(filter);
     const matches = (r: CriterionRowData) =>
@@ -148,11 +149,11 @@ export function useCriteriaManager(searchId: number, open: boolean, initialMode:
   return {
     mode, setMode,
     filter, setFilter,
-    selected, toggleSelected, clearSelected: () => setSelected(new Set()),
+    selected, toggleSelected,
     isLoading,
     groups,
     rows,
-    affectedCount: (names: string[]) => countWithAny(keysOf(names)),
+    affectedCount: (names: string[]) => countListingsWithAny(listingKeys, keysOf(names)),
     addPhrases,
     toggleEnabled,
     detachAlias,

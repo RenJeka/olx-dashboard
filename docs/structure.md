@@ -211,6 +211,7 @@ olx-dashboard/
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
         │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
         │   │   ├── ScopeSelector.tsx        # спільний селектор «Обсяг» (all/tab/selected/candidates) — однаковий на всіх 3 етапах AI
+        │   │   ├── ModeToggle.tsx           # перемикач «Мінуси / Плюси» (крок 1 майстра, вікно «Плюси та мінуси»)
         │   │   ├── relevance/               # workflow «Семантична класифікація (AI Фільтр)»
 │   │   │   ├── RelevanceFilterDialog.tsx # оболонка діалогу (DialogRoot)
 │   │   │   ├── RelevanceSetupForm.tsx    # форма запуску (авто + ручний ZIP)
@@ -220,8 +221,12 @@ olx-dashboard/
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
         │   │   ├── criteria/               # вікно «Плюси та мінуси» + вибір згенерованого (docs/plans/criteria-categories.md)
-        │   │   │   ├── CriteriaManagerDialog.tsx # категорії мінусів/плюсів: перегляд, генерація, «в аналізі», об'єднання/видалення
+        │   │   │   ├── CriteriaManagerDialog.tsx # вікно: режим, фільтр, «в аналізі», об'єднання/видалення (монтувати лише відкритим)
+        │   │   │   ├── CriteriaList.tsx     # розділи: категорії → окремі → «лише в оголошеннях», кожен за алфавітом
         │   │   │   ├── CriterionRow.tsx     # рядок: категорія з синонімами або пункт «лише в оголошеннях»
+        │   │   │   ├── CriteriaInputBar.tsx # свій критерій + «Згенерувати» + помічник + вибір згенерованого — спільне з кроком 1
+        │   │   │   ├── NestedDialog.tsx     # обгортка діалогу поверх модалки (portalRef, modal=false, без закриття кліком повз)
+        │   │   │   ├── NewCriteriaDialog.tsx    # вибір згенерованих/розпізнаних критеріїв перед додаванням
         │   │   │   ├── MergeCriteriaDialog.tsx  # об'єднати / перейменувати (назва + синоніми + «зачепить N»)
         │   │   │   └── DeleteCriteriaDialog.tsx # видалити зі списку (і з оголошень за галочкою)
         │   │   └── wizard/                 # workflow «AI-аналіз» (4-етапний майстер мінуси/плюси)

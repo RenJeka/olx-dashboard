@@ -2,6 +2,7 @@
 // server/src/analysis/criteria.ts: ключ формулювання й поглинання згенерованих синонімів.
 import type { AnalysisMode, CriterionGroup, Listing } from '../types';
 import { parseBullets } from './localFilters';
+import { sortAlpha } from './sort';
 
 /** Згортання пробілів + trim. */
 export function cleanCriterion(value: string): string {
@@ -45,19 +46,18 @@ export function absorbIncoming(
   return { groups: out, added };
 }
 
-/** Скільки оголошень містить кожне формулювання (ключ phraseKey) у полі режиму. */
-export function countPhrases(listings: Listing[], mode: AnalysisMode): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const l of listings) {
-    const keys = new Set(parseBullets(l[mode]).map(phraseKey));
-    for (const k of keys) counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  return counts;
+/** Скільки оголошень (набори ключів їхніх пунктів) мають хоча б одне з формулювань `keys`. */
+export function countListingsWithAny(listingKeys: Set<string>[], keys: Iterable<string>): number {
+  const wanted = [...keys];
+  return listingKeys.filter((lk) => wanted.some((k) => lk.has(k))).length;
 }
 
-/** Скільки оголошень має хоча б одне з формулювань `keys` (для «зачепить N оголошень»). */
-export function countListingsWithAny(listings: Listing[], mode: AnalysisMode, keys: Set<string>): number {
-  return listings.filter((l) => parseBullets(l[mode]).some((b) => keys.has(phraseKey(b)))).length;
+/**
+ * Порядок показу: спершу категорії (є синоніми), далі окремі критерії — кожна частина за алфавітом.
+ * Спільне для вікна «Плюси та мінуси» й чипів майстра.
+ */
+export function categoriesFirst(names: string[], isCategory: (name: string) => boolean): [string[], string[]] {
+  return [sortAlpha(names.filter(isCategory)), sortAlpha(names.filter((n) => !isCategory(n)))];
 }
 
 /** Усі ключі формулювань категорії (назва + синоніми). */

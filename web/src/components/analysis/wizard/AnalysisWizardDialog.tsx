@@ -20,7 +20,6 @@ import { MatchingStep } from './MatchingStep';
 import { ReviewStep } from './ReviewStep';
 import { CommitStep } from './CommitStep';
 import { CriteriaManagerDialog } from '../criteria/CriteriaManagerDialog';
-import { NewCriteriaDialog } from '../criteria/NewCriteriaDialog';
 import type { Search } from '../../../types';
 
 interface Props {
@@ -87,7 +86,7 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
         </DialogHeader>
 
         <DialogBody pb={6}>
-          {w.step === 1 && <CriteriaStep w={w} onManageCriteria={() => setCriteriaManagerOpen(true)} />}
+          {w.step === 1 && <CriteriaStep w={w} portalRef={contentRef} onManageCriteria={() => setCriteriaManagerOpen(true)} />}
           {w.step === 2 && <MatchingStep w={w} />}
           {w.step === 3 && <ReviewStep w={w} />}
           {w.step === 4 && <CommitStep w={w} onClose={onClose} />}
@@ -103,22 +102,12 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
         onConfirm={() => void w.doCommit(onClose)}
       />
       <DescriptionDialog listing={w.openDescriptionListing} onClose={() => w.setOpenDescriptionListing(null)} />
-      {w.newCriteria && (
-        <NewCriteriaDialog
-          portalRef={contentRef}
-          candidates={w.newCriteria}
-          pending={w.addNewCriteriaPending}
-          onAdd={(phrases) => void w.addNewCriteria(phrases)}
-          onClose={w.dismissNewCriteria}
-        />
-      )}
-      {/* Монтується лише на час показу: Ark Portal читає portalRef один раз при монтуванні. */}
+      {/* Монтується лише на час показу (див. CriteriaManagerDialog). */}
       {criteriaManagerOpen && (
         <CriteriaManagerDialog
           search={search}
           initialMode={w.mode}
           portalRef={contentRef}
-          open
           onClose={() => {
             setCriteriaManagerOpen(false);
             // Перечитати чипи з оновлених категорій (незбережений вибір кроку 1 скидається).

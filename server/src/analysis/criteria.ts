@@ -5,7 +5,7 @@ import { BULLET_PREFIX } from './constants.js';
 import { parseBullets } from './text.js';
 
 /** Згортання пробілів + trim (формулювання критерію). */
-export function cleanCriterion(value: string): string {
+function cleanCriterion(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
@@ -96,7 +96,7 @@ export function remapBullets(text: string | null, keys: Set<string>, to: string 
 }
 
 /** Те саме для масиву рядків (local_filters.cons/pros). */
-export function remapList(items: string[], keys: Set<string>, to: string | null): string[] {
+function remapList(items: string[], keys: Set<string>, to: string | null): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const item of items) {

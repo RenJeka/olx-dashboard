@@ -1,20 +1,9 @@
-import { useEffect, useState, type RefObject } from 'react';
-import { Button, Field, Input, Stack, Text, Wrap, Badge } from '@chakra-ui/react';
-import {
-  DialogBackdrop,
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from '../../ui/dialog';
+import { useState, type RefObject } from 'react';
+import { Badge, Button, Field, Input, Stack, Text, Wrap } from '@chakra-ui/react';
+import { NestedDialog } from './NestedDialog';
 
 interface Props {
-  /** Контент вікна «Плюси та мінуси» — рендер усередині нього, інакше його фокус-пастка блокує поля. */
   portalRef: RefObject<HTMLElement | null>;
-  open: boolean;
   onClose: () => void;
   /** «Об'єднати в категорію» (кілька) чи «Перейменувати» (одна). */
   title: string;
@@ -37,71 +26,19 @@ function suggestName(names: string[]): string {
  * Діалог об'єднання/перейменування: назва категорії (можна взяти будь-яку з обраних або ввести нову),
  * решта формулювань стає синонімами; у зачеплених оголошеннях пункти перейменовуються.
  */
-export function MergeCriteriaDialog({ portalRef, open, onClose, title, names, aliases, affected, pending, onConfirm }: Props) {
-  const [name, setName] = useState('');
-
-  useEffect(() => {
-    if (open) setName(names.length === 1 ? (names[0] ?? '') : suggestName(names));
-  }, [open, names]);
+export function MergeCriteriaDialog({ portalRef, onClose, title, names, aliases, affected, pending, onConfirm }: Props) {
+  const [name, setName] = useState(() => (names.length === 1 ? (names[0] ?? '') : suggestName(names)));
 
   const trimmed = name.trim();
   const synonyms = [...names, ...aliases].filter((n) => n.trim().toLowerCase() !== trimmed.toLowerCase());
 
   return (
-    <DialogRoot
-      open={open}
-      onOpenChange={(d) => !d.open && onClose()}
-      size="sm"
-      placement="center"
-      // Поверх вікна «Плюси та мінуси»: modal=false (див. ConfirmActionDialog) + рендер у його DOM (portalRef).
-      modal={false}
-      closeOnInteractOutside={false}
-    >
-      <DialogBackdrop />
-      <DialogContent portalRef={portalRef}>
-        <DialogCloseTrigger />
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <Stack gap={3}>
-            <Field.Root>
-              <Field.Label>Назва категорії</Field.Label>
-              <Input
-                size="sm"
-                value={name}
-                autoFocus
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && trimmed && !pending && onConfirm(trimmed)}
-              />
-            </Field.Root>
-            <Wrap gap={1}>
-              {names.map((n) => (
-                <Button key={n} size="2xs" variant="outline" onClick={() => setName(n)}>
-                  {n}
-                </Button>
-              ))}
-            </Wrap>
-            {synonyms.length > 0 && (
-              <Stack gap={1}>
-                <Text textStyle="sm" color="fg.muted">
-                  Стануть синонімами (у питаннях AI — як приклади):
-                </Text>
-                <Wrap gap={1}>
-                  {synonyms.map((s) => (
-                    <Badge key={s} variant="subtle">
-                      {s}
-                    </Badge>
-                  ))}
-                </Wrap>
-              </Stack>
-            )}
-            <Text textStyle="sm">
-              Зачепить оголошень: <strong>{affected}</strong> — пункти в них перейменуються, AI не запускається.
-            </Text>
-          </Stack>
-        </DialogBody>
-        <DialogFooter>
+    <NestedDialog
+      portalRef={portalRef}
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
           <Button variant="outline" size="sm" onClick={onClose}>
             Скасувати
           </Button>
@@ -114,8 +51,45 @@ export function MergeCriteriaDialog({ portalRef, open, onClose, title, names, al
           >
             Зберегти
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+        </>
+      }
+    >
+      <Stack gap={3}>
+        <Field.Root>
+          <Field.Label>Назва категорії</Field.Label>
+          <Input
+            size="sm"
+            value={name}
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && trimmed && !pending && onConfirm(trimmed)}
+          />
+        </Field.Root>
+        <Wrap gap={1}>
+          {names.map((n) => (
+            <Button key={n} size="2xs" variant="outline" onClick={() => setName(n)}>
+              {n}
+            </Button>
+          ))}
+        </Wrap>
+        {synonyms.length > 0 && (
+          <Stack gap={1}>
+            <Text textStyle="sm" color="fg.muted">
+              Стануть синонімами (у питаннях AI — як приклади):
+            </Text>
+            <Wrap gap={1}>
+              {synonyms.map((s) => (
+                <Badge key={s} variant="subtle">
+                  {s}
+                </Badge>
+              ))}
+            </Wrap>
+          </Stack>
+        )}
+        <Text textStyle="sm">
+          Зачепить оголошень: <strong>{affected}</strong> — пункти в них перейменуються, AI не запускається.
+        </Text>
+      </Stack>
+    </NestedDialog>
   );
 }

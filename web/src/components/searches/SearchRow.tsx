@@ -180,7 +180,7 @@ export function SearchRow({ search, selected, isFirst, isLast, onSelect, onDelet
       <SearchEditDialog search={search} open={editOpen} onOpenChange={setEditOpen} />
       <SearchFiltersDrawer search={search} open={filtersOpen} onOpenChange={setFiltersOpen} />
       {/* Монтується лише відкритим: рядків пошуку багато, а вікну потрібні запити критеріїв і оголошень. */}
-      {criteriaOpen && <CriteriaManagerDialog search={search} open onClose={() => setCriteriaOpen(false)} />}
+      {criteriaOpen && <CriteriaManagerDialog search={search} onClose={() => setCriteriaOpen(false)} />}
       <SearchVariantsDialog
         open={variantsOpen}
         onOpenChange={setVariantsOpen}

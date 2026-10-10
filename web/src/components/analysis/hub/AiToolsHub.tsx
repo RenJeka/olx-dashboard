@@ -22,6 +22,14 @@ interface Props {
 export function AiToolsHub({ search, selectedIds }: Props) {
   const [mode, setMode] = useState<AiHubMode>('closed');
   const close = () => setMode('closed');
+  // Вікно «Плюси та мінуси» монтується лише відкритим, тож відкриваємо його ПІСЛЯ закриття хабу: змонтоване,
+  // поки хаб ще закривається, Ark закриває разом із ним (вкладений шар dismissable-стеку).
+  const [afterHub, setAfterHub] = useState<AiHubMode | null>(null);
+  function select(next: AiHubMode) {
+    if (next !== 'criteria') return setMode(next);
+    setAfterHub(next);
+    setMode('closed');
+  }
 
   return (
     <>
@@ -29,7 +37,16 @@ export function AiToolsHub({ search, selectedIds }: Props) {
         <LuSparkles /> AI
       </Button>
 
-      <AiHubDialog search={search} open={mode === 'hub'} onClose={close} onSelect={setMode} />
+      <AiHubDialog
+        search={search}
+        open={mode === 'hub'}
+        onClose={close}
+        onSelect={select}
+        onExitComplete={() => {
+          if (afterHub) setMode(afterHub);
+          setAfterHub(null);
+        }}
+      />
 
       <RelevanceFilterDialog
         search={search}
@@ -49,7 +66,8 @@ export function AiToolsHub({ search, selectedIds }: Props) {
         open={mode === 'picks'}
         onClose={close}
       />
-      <CriteriaManagerDialog search={search} open={mode === 'criteria'} onClose={close} />
+      {/* Монтується лише відкритим: режим і запити вікна беруться при монтуванні. */}
+      {mode === 'criteria' && <CriteriaManagerDialog search={search} onClose={close} />}
     </>
   );
 }

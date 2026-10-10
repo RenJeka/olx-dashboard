@@ -1,21 +1,11 @@
 import { useState, type RefObject } from 'react';
-import { Button, HStack, Stack, Text } from '@chakra-ui/react';
-import {
-  DialogBackdrop,
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from '../../ui/dialog';
+import { Button, Stack, Text } from '@chakra-ui/react';
 import { Checkbox } from '../../ui/checkbox';
 import { sortAlpha } from '../../../utils/sort';
+import { NestedDialog } from './NestedDialog';
 import type { CriteriaCandidates } from '../../../hooks/analysis/useCriteriaGeneration';
 
 interface Props {
-  /** Контент нижньої модалки — рендер усередині неї (docs/instructions/chakra-nested-dialog-focus.md). */
   portalRef: RefObject<HTMLElement | null>;
   candidates: CriteriaCandidates;
   pending: boolean;
@@ -25,7 +15,7 @@ interface Props {
 
 /**
  * Згенеровані (LLM) чи розпізнані (ручний помічник) критерії — до додавання: обрати потрібні, додати обрані
- * або закрити без змін. Монтувати лише на час показу (Ark Portal читає portalRef при монтуванні).
+ * або закрити без змін.
  */
 export function NewCriteriaDialog({ portalRef, candidates, pending, onAdd, onClose }: Props) {
   const phrases = sortAlpha(candidates.fresh);
@@ -42,48 +32,13 @@ export function NewCriteriaDialog({ portalRef, candidates, pending, onAdd, onClo
   }
 
   return (
-    <DialogRoot
-      open
-      onOpenChange={(d) => !d.open && onClose()}
+    <NestedDialog
+      portalRef={portalRef}
       size="md"
-      placement="center"
-      scrollBehavior="inside"
-      // Поверх іншої модалки: modal=false + рендер у її DOM (portalRef); закриття — лише хрестиком/кнопкою.
-      modal={false}
-      closeOnInteractOutside={false}
-    >
-      <DialogBackdrop />
-      <DialogContent portalRef={portalRef}>
-        <DialogCloseTrigger />
-        <DialogHeader>
-          <DialogTitle>
-            {candidates.title}: нових {phrases.length}
-          </DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <Stack gap={2}>
-            {candidates.absorbed > 0 && (
-              <Text textStyle="sm" color="fg.muted">
-                Ще {candidates.absorbed} збіглися з наявними назвами чи синонімами — їх не показано.
-              </Text>
-            )}
-            <HStack>
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => setChosen(allChosen ? new Set() : new Set(phrases))}
-              >
-                {allChosen ? 'Зняти всі' : 'Обрати всі'}
-              </Button>
-            </HStack>
-            {phrases.map((p) => (
-              <Checkbox key={p} checked={chosen.has(p)} onCheckedChange={() => toggle(p)}>
-                {p}
-              </Checkbox>
-            ))}
-          </Stack>
-        </DialogBody>
-        <DialogFooter>
+      title={`${candidates.title}: нових ${phrases.length}`}
+      onClose={onClose}
+      footer={
+        <>
           <Button variant="outline" size="sm" onClick={onClose}>
             Не додавати
           </Button>
@@ -96,8 +51,24 @@ export function NewCriteriaDialog({ portalRef, candidates, pending, onAdd, onClo
           >
             Додати обрані ({chosen.size})
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+        </>
+      }
+    >
+      <Stack gap={2} align="flex-start">
+        {candidates.absorbed > 0 && (
+          <Text textStyle="sm" color="fg.muted">
+            Ще {candidates.absorbed} збіглися з наявними назвами чи синонімами — їх не показано.
+          </Text>
+        )}
+        <Button size="xs" variant="ghost" onClick={() => setChosen(allChosen ? new Set() : new Set(phrases))}>
+          {allChosen ? 'Зняти всі' : 'Обрати всі'}
+        </Button>
+        {phrases.map((p) => (
+          <Checkbox key={p} checked={chosen.has(p)} onCheckedChange={() => toggle(p)}>
+            {p}
+          </Checkbox>
+        ))}
+      </Stack>
+    </NestedDialog>
   );
 }
