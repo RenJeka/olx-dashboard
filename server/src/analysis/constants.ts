@@ -36,6 +36,9 @@ export const JEV_RELEVANCE_THRESHOLD = 0.5;
 /** Крок 2: noul критерію ≥ порогу → критерій знайдено (замість evidence для рушія Jev). Підібрано разом із межею
  *  «так/ні» в питанні (criteriaQuestions): 0.7 — майже без хибних і пропусків (експеримент 2026-10-06). */
 export const JEV_CRITERIA_THRESHOLD = 0.7;
+/** Межі порогу кроку 2, який людина задає в налаштуваннях AI (docs/plans/jev-threshold-setting.md). */
+export const JEV_CRITERIA_THRESHOLD_MIN = 0.3;
+export const JEV_CRITERIA_THRESHOLD_MAX = 0.95;
 
 // ── Чанкування / ліміти ──────────────────────────────────────────────────────
 /** Авто-режим: дрібні батчі (модель деградує на довгому контексті). */

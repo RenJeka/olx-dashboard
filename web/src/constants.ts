@@ -24,6 +24,13 @@ export const ANALYSIS_SOURCE = { API: 'api', IMPORT: 'import' } as const;
 export const MANUAL_MODEL = 'manual';
 /** Підписи рушіїв авто-режиму кроків 1–2. */
 export const ANALYSIS_ENGINE_LABELS = { llm: 'LLM', jev: 'Jev' } as const;
+/**
+ * Поріг ймовірності Jev на кроці 2 (мінуси/плюси): типовий і межі — дзеркало JEV_CRITERIA_THRESHOLD(_MIN/_MAX)
+ * у server/src/analysis/constants.ts (docs/plans/jev-threshold-setting.md).
+ */
+export const JEV_CRITERIA_THRESHOLD_DEFAULT = 0.7;
+export const JEV_CRITERIA_THRESHOLD_MIN = 0.3;
+export const JEV_CRITERIA_THRESHOLD_MAX = 0.95;
 
 // ── AI Вибір (ранжування) ──────────────────────────────────────────────────────
 /** Підпис псевдо-вкладки/scope «Найкращі кандидати» (ai_picks) — спільний для таблиці й майстра. */

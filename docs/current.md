@@ -40,8 +40,10 @@
 
 - [jev-model](plans/jev-model.md) — етапи 0–3 у проді (етап 3 — PR #65: нове питання, поріг 0.7); лишилась ручна
   перевірка кроку 2 в UI людиною.
-- [criteria-categories](plans/criteria-categories.md) (P-015) — код запушено в `feat/criteria-categories`; лишились
-  ручні test-cases людини і крок 7 (проба Jev «назва» vs «назва + приклади»).
+- [criteria-categories](plans/criteria-categories.md) (P-015) — код запушено в `feat/criteria-categories`; крок 7
+  (проба Jev) зроблено — приклади лишаються; лишились ручні test-cases людини.
+- [jev-threshold-setting](plans/jev-threshold-setting.md) — поріг Jev кроку 2 в «Налаштування» → AI; у тій самій гілці;
+  лишився платний ручний прогін людиною.
 
 ## Що враховувати
 
@@ -65,7 +67,6 @@
 
 - Відкрити PR `feat/criteria-categories` (і спершу чи злити PR #66), ручні test-cases плану
   [criteria-categories](plans/criteria-categories.md); перед першим об'єднанням критеріїв на проді — бекап Turso.
-- Крок 7 плану criteria-categories — платна проба Jev (`npm run jev:probe -- --search 2 --mode cons [--no-aliases]`).
 
 - Ручна перевірка кроку 2 рушієм Jev в UI (більше мінусів/плюсів, ніж до PR #65) — тоді план `jev-model` → ✅ і в `old/`.
 - Коли видаляти бекап-гілку Turso `olx-dashboard-bak-20260930`.

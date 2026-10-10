@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { Badge, Heading, HStack, Input, SegmentGroup, Stack, Text, Textarea } from '@chakra-ui/react';
+import { Badge, Button, Heading, HStack, Input, SegmentGroup, Stack, Text, Textarea } from '@chakra-ui/react';
 import { LuSparkles } from 'react-icons/lu';
 import { Switch } from '../../ui/switch';
 import { useAnalysisStatus } from '../../../api';
 import { useSettingsStore } from '../../../stores/settingsStore';
-import { ANALYSIS_ENGINE_LABELS } from '../../../constants';
+import {
+  ANALYSIS_ENGINE_LABELS,
+  JEV_CRITERIA_THRESHOLD_DEFAULT,
+  JEV_CRITERIA_THRESHOLD_MAX,
+  JEV_CRITERIA_THRESHOLD_MIN,
+} from '../../../constants';
 import type { AnalysisEngine } from '../../../types';
 
 const ENGINE_ITEMS = (Object.keys(ANALYSIS_ENGINE_LABELS) as AnalysisEngine[]).map((value) => ({
@@ -12,7 +17,15 @@ const ENGINE_ITEMS = (Object.keys(ANALYSIS_ENGINE_LABELS) as AnalysisEngine[]).m
   label: ANALYSIS_ENGINE_LABELS[value],
 }));
 
-/** Секція налаштувань «AI-аналіз»: статус ключа, рушій кроків 1–2, модель, reasoning, додаткові критерії. */
+/** Введене значення порогу → у межах MIN…MAX, кроком 0.05; не число — типовий. */
+function clampThreshold(raw: string): number {
+  const v = Number(raw.replace(',', '.'));
+  if (!Number.isFinite(v)) return JEV_CRITERIA_THRESHOLD_DEFAULT;
+  const clamped = Math.min(JEV_CRITERIA_THRESHOLD_MAX, Math.max(JEV_CRITERIA_THRESHOLD_MIN, v));
+  return Math.round(clamped * 20) / 20;
+}
+
+/** Секція налаштувань «AI-аналіз»: статус ключа, рушій кроків 1–2, поріг Jev, модель, reasoning, додаткові критерії. */
 export function AnalysisSection() {
   const { data: status } = useAnalysisStatus();
   const analysisModel = useSettingsStore((s) => s.analysisModel);
@@ -21,6 +34,9 @@ export function AnalysisSection() {
   const setAnalysisReasoning = useSettingsStore((s) => s.setAnalysisReasoning);
   const analysisEngine = useSettingsStore((s) => s.analysisEngine);
   const setAnalysisEngine = useSettingsStore((s) => s.setAnalysisEngine);
+  const jevThreshold = useSettingsStore((s) => s.jevCriteriaThreshold);
+  const setJevThreshold = useSettingsStore((s) => s.setJevCriteriaThreshold);
+  const [localThreshold, setLocalThreshold] = useState(String(jevThreshold));
   const analysisExtraCriteria = useSettingsStore((s) => s.analysisExtraCriteria);
   const setAnalysisExtraCriteria = useSettingsStore((s) => s.setAnalysisExtraCriteria);
   
@@ -59,6 +75,47 @@ export function AnalysisSection() {
             : 'LLM — модель нижче; знайдене підтверджується цитатою з опису.'}
         </Text>
       </Stack>
+
+      {analysisEngine === 'jev' && (
+        <Stack gap={1}>
+          <Text textStyle="xs" color="fg.muted">
+            Поріг Jev для мінусів/плюсів ({JEV_CRITERIA_THRESHOLD_MIN}–{JEV_CRITERIA_THRESHOLD_MAX})
+          </Text>
+          <HStack gap={2}>
+            <Input
+              size="sm"
+              maxW="100px"
+              type="number"
+              inputMode="decimal"
+              step={0.05}
+              min={JEV_CRITERIA_THRESHOLD_MIN}
+              max={JEV_CRITERIA_THRESHOLD_MAX}
+              value={localThreshold}
+              onChange={(e) => setLocalThreshold(e.target.value)}
+              onBlur={() => {
+                const next = clampThreshold(localThreshold);
+                setJevThreshold(next);
+                setLocalThreshold(String(next));
+              }}
+            />
+            {jevThreshold !== JEV_CRITERIA_THRESHOLD_DEFAULT && (
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => {
+                  setJevThreshold(JEV_CRITERIA_THRESHOLD_DEFAULT);
+                  setLocalThreshold(String(JEV_CRITERIA_THRESHOLD_DEFAULT));
+                }}
+              >
+                Типово ({JEV_CRITERIA_THRESHOLD_DEFAULT})
+              </Button>
+            )}
+          </HStack>
+          <Text textStyle="xs" color="fg.subtle">
+            Категорія знайдена, якщо ймовірність Jev ≥ порогу. Вище — менше хибних, але більше пропусків; нижче — навпаки.
+          </Text>
+        </Stack>
+      )}
 
       <Stack gap={1}>
         <Text textStyle="xs" color="fg.muted">

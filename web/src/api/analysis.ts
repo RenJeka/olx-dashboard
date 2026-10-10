@@ -130,6 +130,7 @@ export function useAnalyze() {
       model,
       reasoning,
       engine,
+      threshold,
     }: {
       searchId: number;
       mode: AnalysisMode;
@@ -137,10 +138,12 @@ export function useAnalyze() {
       model?: string;
       reasoning?: boolean;
       engine?: AnalysisEngine;
+      /** Поріг Jev (лише для engine='jev'). */
+      threshold?: number;
     }) =>
       api<AnalyzeResponse>(`/api/searches/${searchId}/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ mode, ids, model, reasoning, engine }),
+        body: JSON.stringify({ mode, ids, model, reasoning, engine, threshold }),
       }),
   });
 }

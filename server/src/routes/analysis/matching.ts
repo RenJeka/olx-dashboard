@@ -17,7 +17,7 @@ import {
   PREVIEW_XLSX_WIDTHS,
   isMode,
 } from '../../analysis/constants.js';
-import { runJevMatching } from '../../analysis/jevEngine.js';
+import { resolveCriteriaThreshold, runJevMatching } from '../../analysis/jevEngine.js';
 import { chat } from '../../analysis/openrouter.js';
 import { mergeResults, parseMatchingResponse } from '../../analysis/parse.js';
 import {
@@ -38,7 +38,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
   // Авто matching (LLM — чанки по AUTO_CHUNK_SIZE; Jev — пул по оголошенню). НЕ пише в БД.
   app.post<{
     Params: { id: string };
-    Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string };
+    Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string; threshold?: number };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
     const search = await getSearch(id);
@@ -61,8 +61,9 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
 
     const listings = await loadListings(id, ids);
     if (req.body.engine === 'jev') {
-      const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing));
-      getLogger('analysis').info({ searchId: id, mode: req.body.mode, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
+      const threshold = resolveCriteriaThreshold(req.body.threshold);
+      const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing), { threshold });
+      getLogger('analysis').info({ searchId: id, mode: req.body.mode, threshold, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
       return response;
     }
     const descriptions = descriptionMap(listings);

@@ -2,7 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { RowSelectionState, VisibilityState } from '@tanstack/react-table';
 import type { AnalysisEngine } from '../types';
-import { SETTINGS_STORAGE_KEY, DEFAULT_AUTO_REFRESH_INTERVAL_MIN, DEFAULT_ANALYSIS_MODEL } from '../constants';
+import {
+  SETTINGS_STORAGE_KEY,
+  DEFAULT_AUTO_REFRESH_INTERVAL_MIN,
+  DEFAULT_ANALYSIS_MODEL,
+  JEV_CRITERIA_THRESHOLD_DEFAULT,
+} from '../constants';
 
 interface SettingsState {
   // Ефемерний стан (не персиститься)
@@ -46,6 +51,10 @@ interface SettingsState {
   /** Рушій авто-режиму кроків 1–2 (генерація критеріїв і AI Вибір — завжди LLM). */
   analysisEngine: AnalysisEngine;
   setAnalysisEngine: (engine: AnalysisEngine) => void;
+
+  /** Поріг ймовірності Jev на кроці 2: категорія знайдена, якщо ймовірність ≥ порогу. */
+  jevCriteriaThreshold: number;
+  setJevCriteriaThreshold: (threshold: number) => void;
 
   analysisExtraCriteria: string;
   setAnalysisExtraCriteria: (criteria: string) => void;
@@ -102,6 +111,9 @@ export const useSettingsStore = create<SettingsState>()(
       analysisEngine: 'llm',
       setAnalysisEngine: (analysisEngine) => set({ analysisEngine }),
 
+      jevCriteriaThreshold: JEV_CRITERIA_THRESHOLD_DEFAULT,
+      setJevCriteriaThreshold: (jevCriteriaThreshold) => set({ jevCriteriaThreshold }),
+
       analysisExtraCriteria: '',
       setAnalysisExtraCriteria: (analysisExtraCriteria) => set({ analysisExtraCriteria }),
     }),
@@ -120,6 +132,7 @@ export const useSettingsStore = create<SettingsState>()(
         analysisModel: state.analysisModel,
         analysisReasoning: state.analysisReasoning,
         analysisEngine: state.analysisEngine,
+        jevCriteriaThreshold: state.jevCriteriaThreshold,
         analysisExtraCriteria: state.analysisExtraCriteria,
       }),
     }

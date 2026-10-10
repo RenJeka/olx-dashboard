@@ -1,14 +1,14 @@
 // Проба кроку 2 рушієм Jev (docs/plans/jev-model.md → етап 3): показати дослівно, що йде в Decisions API
 // і що повертається, по кожному критерію. Викликає продовий runJevMatching, а сирі тіла бере перехопленням
 // fetch — тож бачимо саме те, що шле прод, а не копію логіки. Лише SELECT, у БД нічого не пише.
-//   npm run jev:probe -- --search <id> [--top 5 | --ids 12,34] [--mode cons|pros] [--out <file>]
+//   npm run jev:probe -- --search <id> [--top 5 | --ids 12,34] [--mode cons|pros] [--no-aliases] [--threshold 0.7] [--out <file>]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hasApiKey } from './analysis/config.js';
-import { JEV_CRITERIA_THRESHOLD, JEV_DECISIONS_URL, MATCHING_DESC_SLICE, isMode } from './analysis/constants.js';
+import { JEV_DECISIONS_URL, MATCHING_DESC_SLICE, isMode } from './analysis/constants.js';
 import { criterionKey, listingState } from './analysis/jev.js';
-import { runJevMatching } from './analysis/jevEngine.js';
+import { resolveCriteriaThreshold, runJevMatching } from './analysis/jevEngine.js';
 import { toPromptListing } from './analysis/promptData.js';
 import { buildChunkListings } from './analysis/prompts.js';
 import { aliasMap, enabledGroups, parseCriteriaConfig, phraseKey } from './analysis/criteria.js';
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   const searchId = Number(arg('search'));
   const mode = arg('mode') ?? 'cons';
   if (!Number.isFinite(searchId) || !isMode(mode)) {
-    console.error('Використання: npm run jev:probe -- --search <id> [--top N | --ids a,b] [--mode cons|pros] [--no-aliases] [--out <file>]');
+    console.error('Використання: npm run jev:probe -- --search <id> [--top N | --ids a,b] [--mode cons|pros] [--no-aliases] [--threshold 0.7] [--out <file>]');
     process.exit(1);
   }
   if (!hasApiKey()) {
@@ -78,6 +78,7 @@ async function main(): Promise<void> {
   // Категорії «в аналізі»; --no-aliases — питання лише з назвою (порівняння з «назва + приклади»).
   const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), mode);
   const withAliases = !process.argv.includes('--no-aliases');
+  const threshold = resolveCriteriaThreshold(arg('threshold') === undefined ? undefined : Number(arg('threshold')));
   // Пункт збереженого аналізу → назва категорії (старі прогони могли писати синонім).
   const toCategory = aliasMap(criteria);
   const categoryOf = (c: string) => toCategory.get(phraseKey(c));
@@ -97,7 +98,7 @@ async function main(): Promise<void> {
 
   const captured: Captured[] = [];
   captureDecisions(captured);
-  const response = await runJevMatching(criteria, mode, rows.map(toPromptListing), withAliases);
+  const response = await runJevMatching(criteria, mode, rows.map(toPromptListing), { withAliases, threshold });
 
   const chunks = new Map(buildChunkListings(rows.map(toPromptListing)).map((c) => [c.id, c]));
   const engineById = new Map(response.results.map((r) => [r.id, r.items]));
@@ -136,7 +137,7 @@ async function main(): Promise<void> {
           criterion: group.name,
           question: questions[key]?.instructions ?? null,
           probability: typeof p === 'number' ? p : null,
-          passed: typeof p === 'number' && p >= JEV_CRITERIA_THRESHOLD,
+          passed: typeof p === 'number' && p >= threshold,
           llmFound: llm.some((c) => categoryOf(c) === group.name),
         };
       }),
@@ -153,7 +154,7 @@ async function main(): Promise<void> {
     search: { id: searchId, query: search.query },
     mode,
     withAliases,
-    threshold: JEV_CRITERIA_THRESHOLD,
+    threshold,
     descSlice: MATCHING_DESC_SLICE,
     model: response.model,
     usage: response.usage,
@@ -165,7 +166,7 @@ async function main(): Promise<void> {
   writeFileSync(out, JSON.stringify(report, null, 2));
 
   console.log(
-    `Пошук #${searchId} «${search.query}», режим ${mode}, категорій ${criteria.length}${withAliases ? '' : ' (без синонімів у питанні)'}, поріг ${JEV_CRITERIA_THRESHOLD}`,
+    `Пошук #${searchId} «${search.query}», режим ${mode}, категорій ${criteria.length}${withAliases ? '' : ' (без синонімів у питанні)'}, поріг ${threshold}`,
   );
   console.log(`Модель ${response.model}, запитів ${response.usage?.requests}, $${response.usage?.cost.toFixed(6)}`);
   if (response.errors.length > 0) console.log('Помилки:', response.errors.join('; '));

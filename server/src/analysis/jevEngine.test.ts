@@ -6,7 +6,7 @@ import { matchingRoutes } from '../routes/analysis/matching.js';
 import { db } from '../db/db.js';
 import { JEV_CRITERIA_THRESHOLD, JEV_RELEVANCE_THRESHOLD } from './constants.js';
 import type { JevQuestion, JevResult, JevState } from './jev.js';
-import { runJevMatching, runJevRelevance } from './jevEngine.js';
+import { resolveCriteriaThreshold, runJevMatching, runJevRelevance } from './jevEngine.js';
 import type { PromptListing } from './prompts.js';
 
 // decide замокано: мережі немає, відповідь Jev задає тест (за назвою з state).
@@ -92,6 +92,26 @@ describe('runJevMatching (крок 2)', () => {
     expect(Object.keys(decideMock.mock.calls[0]![1])).toEqual(['cons_0', 'cons_1']);
     expect(res.usage?.requests).toBe(2);
   });
+
+  it('поріг з налаштувань: 0.9 відсікає 0.8, типовий (0.7) — ні', async () => {
+    answerWith({ 'Полиця A': { cons_0: 0.8 } });
+    const groups = [{ name: 'зламана', aliases: [], enabled: true }];
+    const strict = await runJevMatching(groups, 'cons', [listing(1, 'Полиця A')], { threshold: 0.9 });
+    const byDefault = await runJevMatching(groups, 'cons', [listing(1, 'Полиця A')]);
+
+    expect(strict.results[0]?.items).toEqual([]);
+    expect(byDefault.results[0]?.items).toHaveLength(1);
+  });
+});
+
+describe('resolveCriteriaThreshold', () => {
+  it('число в межах — як є; поза межами чи не число — типовий поріг', () => {
+    expect(resolveCriteriaThreshold(0.85)).toBe(0.85);
+    expect(resolveCriteriaThreshold(0.1)).toBe(JEV_CRITERIA_THRESHOLD);
+    expect(resolveCriteriaThreshold(1)).toBe(JEV_CRITERIA_THRESHOLD);
+    expect(resolveCriteriaThreshold('0.8')).toBe(JEV_CRITERIA_THRESHOLD);
+    expect(resolveCriteriaThreshold(undefined)).toBe(JEV_CRITERIA_THRESHOLD);
+  });
 });
 
 // ── Маршрути: engine='jev' ──────────────────────────────────────────────────
@@ -148,5 +168,15 @@ describe('маршрути з engine=jev', () => {
     expect(an.json()).toMatchObject({ results: [{ items: [{ criterion: 'подряпини', probability: 0.75, evidence: '' }] }], usage: { requests: 1 } });
     // Вимкнена категорія («в аналізі» = ні) у Jev не йде.
     expect(Object.keys(decideMock.mock.calls.at(-1)![1])).toEqual(['cons_0']);
+  });
+
+  it('крок 2: threshold з тіла запиту застосовується (0.8 відсікає 0.75)', async () => {
+    answerWith({ 'iPhone 13 128GB': { cons_0: 0.75 } });
+    const an = await app.inject({
+      method: 'POST',
+      url: `/api/searches/${searchId}/analyze`,
+      payload: { engine: 'jev', mode: 'cons', threshold: 0.8 },
+    });
+    expect(an.json()).toMatchObject({ results: [{ items: [] }] });
   });
 });

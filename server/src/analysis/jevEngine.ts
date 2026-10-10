@@ -14,6 +14,8 @@ import type {
 import {
   JEV_CONCURRENCY,
   JEV_CRITERIA_THRESHOLD,
+  JEV_CRITERIA_THRESHOLD_MAX,
+  JEV_CRITERIA_THRESHOLD_MIN,
   JEV_MODEL,
   JEV_RELEVANCE_THRESHOLD,
   JEV_SHORT_DESC_SLICE,
@@ -87,16 +89,30 @@ export async function runJevRelevance(
   return { results, errors: run.errors, usage: run.usage, model: run.model };
 }
 
+/** Поріг кроку 2 з налаштувань людини: число в межах MIN…MAX, інакше — типовий JEV_CRITERIA_THRESHOLD. */
+export function resolveCriteriaThreshold(value: unknown): number {
+  return typeof value === 'number' && value >= JEV_CRITERIA_THRESHOLD_MIN && value <= JEV_CRITERIA_THRESHOLD_MAX
+    ? value
+    : JEV_CRITERIA_THRESHOLD;
+}
+
+interface MatchingOptions {
+  /** false — питання лише з назвою категорії (порівняння в `jev:probe`). */
+  withAliases?: boolean;
+  /** Поріг ймовірності (вже перевірений `resolveCriteriaThreshold`). */
+  threshold?: number;
+}
+
 /**
  * Крок 2: по noul на кожен критерій режиму на повному state (опис ≤ MATCHING_DESC_SLICE);
- * критерій знайдено, якщо p ≥ JEV_CRITERIA_THRESHOLD. evidence немає (Jev не повертає текст) —
+ * критерій знайдено, якщо p ≥ порогу (типово JEV_CRITERIA_THRESHOLD). evidence немає (Jev не повертає текст) —
  * `ok: true` означає «ймовірність ≥ порогу», сама ймовірність — у `probability`.
  */
 export async function runJevMatching(
   groups: CriterionGroup[],
   mode: AnalysisMode,
   listings: PromptListing[],
-  withAliases = true,
+  { withAliases = true, threshold = JEV_CRITERIA_THRESHOLD }: MatchingOptions = {},
 ): Promise<AnalyzeResponse> {
   const byMode: Record<AnalysisMode, CriterionGroup[]> = { cons: [], pros: [], [mode]: groups };
   const questions = criteriaQuestions(byMode, 'en', withAliases);
@@ -106,7 +122,7 @@ export async function runJevMatching(
   for (const [id, r] of run.byId) {
     const items = groups.flatMap((g, i) => {
       const a = r.answers[criterionKey(mode, i)];
-      return a?.type === 'noul' && a.noul >= JEV_CRITERIA_THRESHOLD
+      return a?.type === 'noul' && a.noul >= threshold
         ? [{ criterion: g.name, evidence: '', ok: true, probability: a.noul }]
         : [];
     });

@@ -36,7 +36,8 @@ High-level огляд усіх AI-кроків OLX Dashboard: як влашто�
   EN-питання з ціллю й усіма синонімами пошуку → `relevant` при p ≥ `JEV_RELEVANCE_THRESHOLD`, `reason` «Jev 0.xx».
 - **Крок 2:** повний state (опис ≤ `MATCHING_DESC_SLICE`), noul на кожну категорію «в аналізі» — EN-питання «чи має товар
   такий мінус/плюс» (синоніми категорії — приклади в дужках, `e.g. …`) з межею `criteria` («прямо сказано або явно випливає» / «не згадано або протилежне»,
-  `criteriaQuestions` у `jev.ts`) → критерій знайдено при p ≥ `JEV_CRITERIA_THRESHOLD`; `evidence` порожній, `ok: true`, ймовірність — у `probability` (підказка тегу
+  `criteriaQuestions` у `jev.ts`) → критерій знайдено при p ≥ порогу (типово `JEV_CRITERIA_THRESHOLD`; людина змінює в
+  «Налаштування» → AI, поле `threshold` у `/analyze`, межі `JEV_CRITERIA_THRESHOLD_MIN/MAX`); `evidence` порожній, `ok: true`, ймовірність — у `probability` (підказка тегу
   в «Перевірці»). Commit пише в `analysis_model` версію Jev з відповіді.
 - Відповідь несе `usage {requests, cost}` і `model`; UI показує вартість прогону тостом, сервер — у stdout-лог.
 - Числові критерії («батарея 70%») Jev пропускає → кодом, [P-013](parking.md). Пілоти й пороги — план
