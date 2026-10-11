@@ -53,7 +53,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    // Лише категорії з позначкою «в аналізі» (docs/plans/criteria-categories.md).
+    // Лише категорії з позначкою «в аналізі» (docs/plans/old/criteria-categories.md).
     const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
     if (criteria.length === 0) {
       return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });

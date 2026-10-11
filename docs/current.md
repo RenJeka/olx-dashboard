@@ -13,21 +13,21 @@
 лагодження швидкості S17 → P-010). Харнес закрито ([dev-deploy-harness](plans/old/dev-deploy-harness.md) ✅,
 2026-10-04). Зараз — **«модель JEV»**: рушій «Jev» для кроків 1–2 на проді (етап 2, PR #63). Етап 3 (пропуски мінусів
 на кроці 2) розв'язано в коді: питання з межею «так/ні» + поріг 0.7 (PR #65, злито й задеплоєно 2026-10-06).
-Керування критеріями мінусів/плюсів і групування синонімів у категорії ([P-015](parking.md)) — у коді, PR #67
-відкрито, не злито ([criteria-categories](plans/criteria-categories.md)). Далі — автоматичне групування критеріїв і
-перехід LLM на Claude Haiku 5.5 з аудитом промптів (плани схвалено 2026-10-11).
+Керування критеріями мінусів/плюсів, категорії синонімів ([criteria-categories](plans/old/criteria-categories.md),
+PR #67) і кнопка «Згрупувати автоматично» ([criteria-auto-group](plans/old/criteria-auto-group.md), PR #68) — на проді
+з 2026-10-11. Далі — перехід LLM на Claude Haiku 5.5 з аудитом промптів (план схвалено 2026-10-11).
 
 ## Де ми зараз
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-11 pr67-new-plans](handoffs/2026-10-11-pr67-new-plans.md): PR #67 (категорії
-  критеріїв, вікно «Плюси та мінуси», поріг Jev, запобіжник verify від `403`), плани автогрупування й аудиту промптів. Рушій за замовчуванням — LLM; Jev —
-  перемикач у налаштуваннях AI.
+- Останній хендоф — [2026-10-11 criteria-auto-group](handoffs/2026-10-11-criteria-auto-group.md): злиття PR #67 і #68
+  (категорії критеріїв, вікно «Плюси та мінуси», поріг Jev, запобіжник verify від `403`, автогрупування). Рушій за
+  замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
-- Бекап прод-БД від 2026-09-30: гілка Turso `olx-dashboard-bak-20260930` (захищена від видалення) + SQL-дамп
-  у теці ключів агента ([secrets-in-sources](instructions/secrets-in-sources.md)).
+- Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента,
+  [secrets-in-sources](instructions/secrets-in-sources.md)) і `olx-dashboard-bak-20261011` (перед злиттям PR #67).
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
   «Прод». GitHub — через `gh` ([github-cli](instructions/github-cli.md)); зливати PR після зеленого CI агент
   може, коли людина це дозволила в діалозі.
@@ -41,19 +41,19 @@
 
 - [jev-model](plans/jev-model.md) — етапи 0–3 у проді (етап 3 — PR #65: нове питання, поріг 0.7); лишилась ручна
   перевірка кроку 2 в UI людиною.
-- [criteria-categories](plans/criteria-categories.md) (P-015) — PR #67; лишились ручні test-cases людини.
-- [jev-threshold-setting](plans/jev-threshold-setting.md) — поріг Jev кроку 2 в «Налаштування» → AI; у тій самій гілці;
+- [jev-threshold-setting](plans/jev-threshold-setting.md) — поріг Jev кроку 2 в «Налаштування» → AI; у проді (PR #67);
   лишився платний ручний прогін людиною.
-- [criteria-auto-group](plans/old/criteria-auto-group.md) — кнопка «Згрупувати автоматично»; схвалено, **наступна в роботі**.
-- [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md) — Haiku 5.5, аудит промптів (плюси в мінусах і навпаки),
-  замір точності `llm:eval`; після автогрупування.
+- [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md) — Haiku 5.5, аудит промптів (плюси в мінусах і навпаки,
+  автогрупування), замір точності `llm:eval`; **наступний у роботі**.
 
 ## Що враховувати
 
 - Запасного каналу збору немає: HTML-fallback вимкнено (OLX відповідає `403`), ідея обходу — [P-005](parking.md).
-- Verify-проба («Перевірити неактивні») теж отримує `403`: у гілці `feat/criteria-categories` кнопку вимкнено, прохід
-  зупиняється після серії `403` ([verify-403-guard](plans/old/verify-403-guard.md)); обхід — P-005.
-- PR #67 включає коміт PR #66 (`c2159c0`): злиття #67 приносить і зміни #66, після чого #66 можна закрити.
+- Verify-проба («Перевірити неактивні») теж отримує `403`: кнопку вимкнено, прохід зупиняється після серії `403`
+  ([verify-403-guard](plans/old/verify-403-guard.md)); обхід — P-005.
+- Автогрупування на `gemini-2.5-flash-lite` часом об'єднує різне за змістом — людина знімає зайве у вікні
+  «Запропоновані категорії»; приклади — у [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md).
+- Браузер агента (wmux): пункти меню «⋮» — лише клавіатурою ([wmux-browser-ark-menu](instructions/wmux-browser-ark-menu.md)).
 - Ручні test-cases для людини — [manual-test-cases](instructions/manual-test-cases.md).
 - Діалог поверх іншої модалки з полями вводу — [chakra-nested-dialog-focus](instructions/chakra-nested-dialog-focus.md).
 - Великий пошук `iphone` на проді: таблиця й пошук в описі повільні — переважно очікування даних із Turso,
@@ -68,14 +68,13 @@
 
 ## Відкриті питання (чекають людину)
 
-- У якій гілці робити автогрупування: продовжити `feat/criteria-categories` (PR #67 росте) чи спершу злити #67.
-- Ручні test-cases [criteria-categories](plans/criteria-categories.md) → злиття PR #67 (деплой) за «так»; перед першим
-  об'єднанням критеріїв на проді — бекап Turso.
+- Злиття docs-PR закриття сесії 2026-10-11 (деплой) — за «так».
 - Ручна перевірка кроку 2 рушієм Jev в UI (більше мінусів/плюсів, ніж до PR #65) — тоді план `jev-model` → ✅ і в `old/`.
-- Коли видаляти бекап-гілку Turso `olx-dashboard-bak-20260930`.
+- Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930` і `olx-dashboard-bak-20261011`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).
 
 ## Наступний крок
 
-Нова сесія: реалізувати [criteria-auto-group](plans/old/criteria-auto-group.md) — спершу спитати людину про гілку.
+Нова сесія: [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md) — Haiku 5.5 і аудит промптів; платні заміри — після
+«так» людини.

@@ -287,7 +287,7 @@ const CRITERION_BOUNDARY: Record<JevLang, { true: string; false: string }> = {
 
 /**
  * Текст noul-питання категорії (без межі `criteria`). Синоніми категорії — приклади в дужках
- * (docs/plans/criteria-categories.md): одне питання на категорію замість питання на кожне формулювання.
+ * (docs/plans/old/criteria-categories.md): одне питання на категорію замість питання на кожне формулювання.
  */
 function criterionInstructions(mode: AnalysisMode, group: CriterionGroup, lang: JevLang, withAliases: boolean): string {
   const examples = withAliases && group.aliases.length > 0 ? group.aliases.map((a) => `"${a}"`).join(', ') : '';

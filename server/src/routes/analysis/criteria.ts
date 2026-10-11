@@ -24,7 +24,7 @@ import { recomputeFilteredOut } from '../../scraper/refilter.js';
 import type { CriteriaConfig, LocalFilters } from '../../types.js';
 
 export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
-  // Категорії критеріїв пошуку (docs/plans/criteria-categories.md; старий формат нормалізується).
+  // Категорії критеріїв пошуку (docs/plans/old/criteria-categories.md; старий формат нормалізується).
   app.get<{ Params: { id: string } }>('/api/searches/:id/criteria', async (req, reply) => {
     const search = await getSearch(Number(req.params.id));
     if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });

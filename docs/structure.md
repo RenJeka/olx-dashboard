@@ -95,7 +95,7 @@ olx-dashboard/
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
 │       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getCriteriaConfig/loadListings
-│       │   ├── criteria.ts   # категорії критеріїв (docs/plans/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
+│       │   ├── criteria.ts   # категорії критеріїв (docs/plans/old/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
@@ -220,7 +220,7 @@ olx-dashboard/
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
-        │   │   ├── criteria/               # вікно «Плюси та мінуси» + вибір згенерованого (docs/plans/criteria-categories.md)
+        │   │   ├── criteria/               # вікно «Плюси та мінуси» + вибір згенерованого (docs/plans/old/criteria-categories.md)
         │   │   │   ├── CriteriaManagerDialog.tsx # вікно: режим, фільтр, «в аналізі», об'єднання/видалення (монтувати лише відкритим)
         │   │   │   ├── CriteriaList.tsx     # розділи: категорії → окремі → «лише в оголошеннях», кожен за алфавітом
         │   │   │   ├── CriterionRow.tsx     # рядок: категорія з синонімами або пункт «лише в оголошеннях»

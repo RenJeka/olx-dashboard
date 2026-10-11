@@ -1,4 +1,4 @@
-// Категорії критеріїв мінусів/плюсів (docs/plans/criteria-categories.md): формат searches.analysis_criteria,
+// Категорії критеріїв мінусів/плюсів (docs/plans/old/criteria-categories.md): формат searches.analysis_criteria,
 // синоніми, перейменування пунктів в оголошеннях. Єдине джерело — не парсити analysis_criteria деінде.
 import type { AnalysisMode, CriteriaConfig, CriterionGroup, LocalFilters } from '../types.js';
 import { BULLET_PREFIX } from './constants.js';

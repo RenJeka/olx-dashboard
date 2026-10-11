@@ -1,4 +1,4 @@
-// Категорії критеріїв мінусів/плюсів на фронті (docs/plans/criteria-categories.md). Дзеркало частини
+// Категорії критеріїв мінусів/плюсів на фронті (docs/plans/old/criteria-categories.md). Дзеркало частини
 // server/src/analysis/criteria.ts: ключ формулювання й поглинання згенерованих синонімів.
 import type { AnalysisMode, CriterionGroup, Listing } from '../types';
 import { parseBullets } from './localFilters';

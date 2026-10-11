@@ -30,3 +30,5 @@ AI) сюди не дублюється — вона в документах із
 | [jev-pilot](jev-pilot.md) | Треба порівняти Jev з LLM на пошуку, подивитись сирий вхід/вихід кроку 2 (`jev:probe`) чи підібрати поріг (скіл `jev-pilot`) |
 | [prod-data-via-turso-mcp](prod-data-via-turso-mcp.md) | Агенту потрібні рядки з прод-БД у файл; читання ключів заблоковано |
 | [render-mcp-no-env](render-mcp-no-env.md) | Треба знати env чи rewrite сервісів Render або звірити `render.yaml` з продом |
+| [wmux-browser-ark-menu](wmux-browser-ark-menu.md) | Агент у браузері wmux не може обрати пункт меню застосунку («⋮» → …) |
+| [plan-archive-links](plan-archive-links.md) | Переносиш завершений план в `docs/plans/old/` і правиш посилання на нього |
