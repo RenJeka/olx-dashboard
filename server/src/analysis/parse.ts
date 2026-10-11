@@ -124,6 +124,7 @@ export function parseGroupSuggestions(raw: string, groups: CriterionGroup[]): Gr
   const out: GroupSuggestion[] = [];
 
   for (const entry of list) {
+    if (!entry || typeof entry !== 'object') continue;
     const obj = entry as { name?: unknown; members?: unknown };
     const rawMembers = Array.isArray(obj.members) ? obj.members : [];
     const members: string[] = [];

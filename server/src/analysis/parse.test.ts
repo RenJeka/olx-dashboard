@@ -176,6 +176,7 @@ describe('parseGroupSuggestions — перевірки пропозицій ав
     const raw = '```json\n[{"name":"стан","members":["б/в стан","експлуатований"]}]\n```';
     expect(parseGroupSuggestions(raw, groups)).toHaveLength(1);
     expect(parse({ groups: [] })).toEqual([]);
+    expect(parse({ groups: [null, 'x', { name: 'стан', members: ['б/в стан', 'експлуатований'] }] })).toHaveLength(1);
     expect(() => parseGroupSuggestions('не json', groups)).toThrow();
   });
 });
