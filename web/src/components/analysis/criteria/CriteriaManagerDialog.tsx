@@ -1,6 +1,6 @@
 import { useRef, useState, type RefObject } from 'react';
 import { Button, HStack, Input, Spinner, Stack, Text } from '@chakra-ui/react';
-import { LuCombine, LuSearch, LuTrash2 } from 'react-icons/lu';
+import { LuCombine, LuGroup, LuSearch, LuTrash2 } from 'react-icons/lu';
 import {
   DialogBackdrop,
   DialogBody,
@@ -17,10 +17,11 @@ import { CriteriaInputBar } from './CriteriaInputBar';
 import { CriteriaList } from './CriteriaList';
 import { MergeCriteriaDialog } from './MergeCriteriaDialog';
 import { DeleteCriteriaDialog } from './DeleteCriteriaDialog';
+import { GroupSuggestionsDialog } from './GroupSuggestionsDialog';
 import { useAnalysisStatus } from '../../../api';
 import { useCriteriaManager } from '../../../hooks/analysis/useCriteriaManager';
 import { useIsMobile } from '../../../hooks/useIsMobile';
-import { MODE_PALETTE } from '../../../constants';
+import { MODE_LABELS, MODE_PALETTE } from '../../../constants';
 import type { AnalysisMode, Search } from '../../../types';
 
 interface Props {
@@ -53,6 +54,7 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
   const contentRef = useRef<HTMLDivElement>(null);
 
   const busy = m.savePending || m.remapPending;
+  const apiAvailable = status?.apiAvailable ?? false;
   const selectedNames = [...m.selected];
   const subAliases = (sub?.names ?? []).flatMap((n) => m.groups.find((g) => g.name === n)?.aliases ?? []);
 
@@ -107,9 +109,25 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
               onChange={setCustomInput}
               onAdd={() => void addCustom()}
               addDisabled={busy}
-              apiAvailable={status?.apiAvailable ?? false}
+              apiAvailable={apiAvailable}
               generation={m.generation}
               portalRef={contentRef}
+              extraActions={
+                // Автогрупування (docs/plans/old/criteria-auto-group.md): LLM, тож лише з ключем і ≥ 2 критеріями.
+                apiAvailable &&
+                m.groups.length >= 2 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    colorPalette="purple"
+                    loading={m.suggestPending}
+                    disabled={busy}
+                    onClick={() => void m.suggestGroups()}
+                  >
+                    <LuGroup /> Згрупувати автоматично
+                  </Button>
+                )
+              }
             />
             {m.isLoading ? (
               <Spinner size="sm" />
@@ -161,6 +179,17 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
           affected={m.affectedCount(sub.names)}
           pending={m.remapPending}
           onConfirm={(name) => void confirmRemap(name)}
+        />
+      )}
+      {m.suggestions && (
+        <GroupSuggestionsDialog
+          portalRef={contentRef}
+          modeLabel={MODE_LABELS[m.mode]}
+          suggestions={m.suggestions}
+          affectedCount={m.affectedCount}
+          pending={m.remapPending}
+          onApply={(merges) => void m.applyMerges(merges)}
+          onClose={m.dismissSuggestions}
         />
       )}
       {sub?.kind === 'delete' && (

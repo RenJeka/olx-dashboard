@@ -44,7 +44,7 @@
 - [criteria-categories](plans/criteria-categories.md) (P-015) — PR #67; лишились ручні test-cases людини.
 - [jev-threshold-setting](plans/jev-threshold-setting.md) — поріг Jev кроку 2 в «Налаштування» → AI; у тій самій гілці;
   лишився платний ручний прогін людиною.
-- [criteria-auto-group](plans/criteria-auto-group.md) — кнопка «Згрупувати автоматично»; схвалено, **наступна в роботі**.
+- [criteria-auto-group](plans/old/criteria-auto-group.md) — кнопка «Згрупувати автоматично»; схвалено, **наступна в роботі**.
 - [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md) — Haiku 5.5, аудит промптів (плюси в мінусах і навпаки),
   замір точності `llm:eval`; після автогрупування.
 
@@ -78,4 +78,4 @@
 
 ## Наступний крок
 
-Нова сесія: реалізувати [criteria-auto-group](plans/criteria-auto-group.md) — спершу спитати людину про гілку.
+Нова сесія: реалізувати [criteria-auto-group](plans/old/criteria-auto-group.md) — спершу спитати людину про гілку.

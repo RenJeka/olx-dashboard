@@ -141,7 +141,7 @@ olx-dashboard/
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/old/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
-│               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import/.../remap, GET .../prompt
+│               ├── criteria.ts # A4: GET/PUT /criteria, POST .../generate/.../import/.../group-suggest/.../remap, GET .../prompt
 │               ├── matching.ts # A5: POST /analyze, GET /analyze/package.zip, POST /analyze/import+export
 │               └── commit.ts   # POST /api/listings/analyze/commit (запис cons/pros у БД)
 │
@@ -228,6 +228,7 @@ olx-dashboard/
         │   │   │   ├── NestedDialog.tsx     # обгортка діалогу поверх модалки (portalRef, modal=false, без закриття кліком повз)
         │   │   │   ├── NewCriteriaDialog.tsx    # вибір згенерованих/розпізнаних критеріїв перед додаванням
         │   │   │   ├── MergeCriteriaDialog.tsx  # об'єднати / перейменувати (назва + синоніми + «зачепить N»)
+        │   │   │   ├── GroupSuggestionsDialog.tsx # «Згрупувати автоматично»: прийняти групи/членів, назва, merges (docs/plans/old/criteria-auto-group.md)
         │   │   │   └── DeleteCriteriaDialog.tsx # видалити зі списку (і з оголошень за галочкою)
         │   │   └── wizard/                 # workflow «AI-аналіз» (4-етапний майстер мінуси/плюси)
         │   │       ├── AnalysisWizardDialog.tsx # оболонка діалогу (DialogRoot + степер + switch по кроках)
