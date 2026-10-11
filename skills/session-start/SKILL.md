@@ -21,7 +21,8 @@ description: "Почати сесію в olx-dashboard: прочитати curre
   `git fetch --quiet && git log --oneline -1 origin/main`.
 - **CI `main` і відкриті PR:** `gh run list --branch main --limit 1`, `gh pr list` (без `gh` — запасний
   шлях з [github-cli](../../docs/instructions/github-cli.md)).
-- **Render** (якщо MCP доступний): `list_services` → сервіси `olx-dashboard-api` і `olx-dashboard` —
+- **Render** (якщо MCP доступний; у кожен виклик — `workspaceId` з `list_workspaces`, «My Workspace»
+  `tea-d8mh9lrbc2fs73dvtbv0`, інакше «no workspace selected»): `list_services` → сервіси `olx-dashboard-api` і `olx-dashboard` —
   гілка; `list_deploys` (limit 1) — статус і коміт live-деплою; збігається з `origin/main`?
 - **Turso:** не чіпати без потреби (`AGENTS.md` → «Turso-економія»). Лише якщо `current.md` чи хендоф прямо чекають перевірки БД —
   спершу спитати людину.

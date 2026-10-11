@@ -24,7 +24,7 @@ export function useAnalysisStatus() {
   });
 }
 
-/** Категорії критеріїв пошуку (cons/pros; docs/plans/criteria-categories.md). */
+/** Категорії критеріїв пошуку (cons/pros; docs/plans/old/criteria-categories.md). */
 export function useSavedCriteria(searchId: number | null) {
   return useQuery({
     queryKey: ['criteria', searchId],

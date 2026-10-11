@@ -22,6 +22,9 @@ source: хендоф 2026-09-30-stability-harness-access; сесія 2026-10-01 
 - Без `gh` (запасний шлях): посилання `https://github.com/RenJeka/olx-dashboard/compare/main...<гілка>?expand=1`;
   CI — публічний API `https://api.github.com/repos/RenJeka/olx-dashboard/actions/runs?branch=<гілка>&per_page=1`.
 
+- Закрити чужий/зайвий PR (`gh pr close`) auto-mode агента блокує як запис у зовнішню систему — дати людині
+  команду `! gh pr close <N> --comment "…"` (префікс `!` запускає її в сесії).
+
 ## Чого не робити
 - Не пробувати GitHub MCP-плагін (`plugin:engineering:github`) через OAuth: «Incompatible auth server:
   does not support dynamic client registration».

@@ -4,7 +4,7 @@ import { db, dbAll, dbGet } from '../../db/db.js';
 import { createSearch, insertListing, resetDb } from '../../test/db.js';
 import { criteriaRoutes } from './criteria.js';
 
-// Категорії критеріїв (docs/plans/criteria-categories.md): GET/PUT і remap на тимчасовій БД.
+// Категорії критеріїв (docs/plans/old/criteria-categories.md): GET/PUT і remap на тимчасовій БД.
 // Автогрупування (docs/plans/old/criteria-auto-group.md): chat замокано — мережі немає, відповідь LLM задає тест.
 const chatMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<string>>());
 vi.mock('../../analysis/openrouter.js', () => ({ chat: chatMock }));

@@ -60,7 +60,7 @@ export interface PickResult {
 export type AnalysisMode = 'cons' | 'pros';
 
 /**
- * Категорія критерію (docs/plans/criteria-categories.md): назва, яку пише аналіз, + синоніми — формулювання,
+ * Категорія критерію (docs/plans/old/criteria-categories.md): назва, яку пише аналіз, + синоніми — формулювання,
  * що зводяться до неї (LLM-генерація, старі прогони, ручний едіт) + чи йде в аналіз (`enabled`).
  */
 export interface CriterionGroup {

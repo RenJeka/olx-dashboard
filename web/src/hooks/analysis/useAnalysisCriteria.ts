@@ -7,7 +7,7 @@ import { useCriteriaGeneration } from './useCriteriaGeneration';
 import type { CriteriaConfig, CriterionGroup } from '../../types';
 
 /**
- * Логіка кроку 1 (Критерії): чипи = категорії пошуку (docs/plans/criteria-categories.md); обраний чип =
+ * Логіка кроку 1 (Критерії): чипи = категорії пошуку (docs/plans/old/criteria-categories.md); обраний чип =
  * категорія «в аналізі». Генерація/імпорт — спільний хук: нові формулювання спершу показуються в
  * `NewCriteriaDialog`, збіги з назвою чи синонімом поглинаються наявною категорією. «Далі» зберігає позначки й нові категорії, нічого не видаляючи.
  */

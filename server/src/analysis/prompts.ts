@@ -35,7 +35,7 @@ export interface PromptListing {
 /**
  * Промпт генерації критеріїв: базовий каркас + доповнення специфічними для категорії
  * на основі семпла описів. Вивід — JSON {"criteria": ["...", ...]}. `existing` — наявні категорії пошуку
- * (з синонімами): модель не повторює й не перефразовує їх (docs/plans/criteria-categories.md).
+ * (з синонімами): модель не повторює й не перефразовує їх (docs/plans/old/criteria-categories.md).
  */
 export function buildCriteriaPrompt(
   category: string,

@@ -46,7 +46,7 @@ export interface AnalysisStatus {
   jevModel?: string;
 }
 
-/** Категорія критерію (docs/plans/criteria-categories.md): назва + синоніми + чи йде в аналіз. */
+/** Категорія критерію (docs/plans/old/criteria-categories.md): назва + синоніми + чи йде в аналіз. */
 export interface CriterionGroup {
   name: string;
   aliases: string[];

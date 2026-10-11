@@ -111,7 +111,7 @@ reduce — теж судження, яке агент робить сам, чи�
 
 ## Категорії критеріїв і вікно «Плюси та мінуси»
 
-План — [criteria-categories](plans/criteria-categories.md) (P-015).
+План — [criteria-categories](plans/old/criteria-categories.md) (P-015).
 
 - **Формат** `searches.analysis_criteria`: `{cons: [{name, aliases[], enabled}], pros: […]}` — категорія, її синоніми
   (інші формулювання того самого мінуса/плюса) і позначка «в аналізі». Старий формат (масив рядків) читається як

@@ -1,6 +1,6 @@
 # Автоматичне групування критеріїв у категорії
 
-> **Статус:** ✅ виконано (2026-10-11) · продовження [criteria-categories](../criteria-categories.md) · гілка `feat/criteria-auto-group` (від `main` після злиття PR #67) · ручний test-case 2 (кроки 1–6) пройдено людиною 2026-10-11
+> **Статус:** ✅ виконано (2026-10-11) · продовження [criteria-categories](criteria-categories.md) · гілка `feat/criteria-auto-group` (від `main` після злиття PR #67) · ручний test-case 2 (кроки 1–6) пройдено людиною 2026-10-11
 
 ## Контекст
 
