@@ -1,5 +1,6 @@
 import { dbAll, dbGet, dbRun } from '../db/db.js';
-import type { PickCandidate } from '../types.js';
+import type { CriteriaConfig, PickCandidate } from '../types.js';
+import { parseCriteriaConfig } from './criteria.js';
 import { PICK_CANDIDATES_LIMIT } from './constants.js';
 
 export interface ListingRow {
@@ -18,17 +19,13 @@ export async function getSearch(
   );
 }
 
-export async function getSavedCriteria(searchId: number): Promise<{ cons: string[]; pros: string[] }> {
+/** Категорії критеріїв пошуку (searches.analysis_criteria; старий формат нормалізується в criteria.ts). */
+export async function getCriteriaConfig(searchId: number): Promise<CriteriaConfig> {
   const row = await dbGet<{ analysis_criteria: string }>(
     'SELECT analysis_criteria FROM searches WHERE id = ?',
     [searchId],
   );
-  try {
-    const parsed = JSON.parse(row?.analysis_criteria || '{}') as { cons?: string[]; pros?: string[] };
-    return { cons: parsed.cons ?? [], pros: parsed.pros ?? [] };
-  } catch {
-    return { cons: [], pros: [] };
-  }
+  return parseCriteriaConfig(row?.analysis_criteria);
 }
 
 /**

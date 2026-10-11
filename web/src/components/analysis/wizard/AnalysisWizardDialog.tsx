@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAnalysisWizardStore } from '../../../stores/analysisWizardStore';
 import { Stack } from '@chakra-ui/react';
 import {
@@ -19,6 +19,7 @@ import { CriteriaStep } from './CriteriaStep';
 import { MatchingStep } from './MatchingStep';
 import { ReviewStep } from './ReviewStep';
 import { CommitStep } from './CommitStep';
+import { CriteriaManagerDialog } from '../criteria/CriteriaManagerDialog';
 import type { Search } from '../../../types';
 
 interface Props {
@@ -32,16 +33,18 @@ interface Props {
 export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Props) {
   const isMobile = useIsMobile();
   const w = useWizard(search, selectedIds, open);
+  const [criteriaManagerOpen, setCriteriaManagerOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  // Завантажуємо критерії лише при першому відкритті або зміні режиму на кроці 1.
+  // Завантажуємо категорії при першому відкритті, зміні режиму на кроці 1 або після вікна «Плюси та мінуси»:
+  // чипи — усі категорії режиму, обрані — з позначкою «в аналізі».
   useEffect(() => {
     if (!open || !w.savedCriteria) return;
     if (w.step !== 1 || w.mode === w.criteriaLoadedMode) return;
     const saved = w.savedCriteria[w.mode] ?? [];
     w.setStep(1); // ensure we stay on step 1 during load
-    // Apply saved criteria
-    useAnalysisWizardStore.getState().setAvailable(saved);
-    useAnalysisWizardStore.getState().setSelected(new Set(saved));
+    useAnalysisWizardStore.getState().setAvailable(saved.map((g) => g.name));
+    useAnalysisWizardStore.getState().setSelected(new Set(saved.filter((g) => g.enabled).map((g) => g.name)));
     w.setCriteriaLoadedMode(w.mode);
   }, [open, w.mode, w.savedCriteria, w.step, w.criteriaLoadedMode]);
 
@@ -68,7 +71,7 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
       closeOnInteractOutside={false}
     >
       <DialogBackdrop />
-      <DialogContent>
+      <DialogContent ref={contentRef}>
         <DialogCloseTrigger />
         <DialogHeader>
           <Stack gap={3} w="full">
@@ -83,7 +86,7 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
         </DialogHeader>
 
         <DialogBody pb={6}>
-          {w.step === 1 && <CriteriaStep w={w} />}
+          {w.step === 1 && <CriteriaStep w={w} portalRef={contentRef} onManageCriteria={() => setCriteriaManagerOpen(true)} />}
           {w.step === 2 && <MatchingStep w={w} />}
           {w.step === 3 && <ReviewStep w={w} />}
           {w.step === 4 && <CommitStep w={w} onClose={onClose} />}
@@ -99,6 +102,19 @@ export function AnalysisWizardDialog({ search, selectedIds, open, onClose }: Pro
         onConfirm={() => void w.doCommit(onClose)}
       />
       <DescriptionDialog listing={w.openDescriptionListing} onClose={() => w.setOpenDescriptionListing(null)} />
+      {/* Монтується лише на час показу (див. CriteriaManagerDialog). */}
+      {criteriaManagerOpen && (
+        <CriteriaManagerDialog
+          search={search}
+          initialMode={w.mode}
+          portalRef={contentRef}
+          onClose={() => {
+            setCriteriaManagerOpen(false);
+            // Перечитати чипи з оновлених категорій (незбережений вибір кроку 1 скидається).
+            w.setCriteriaLoadedMode(null);
+          }}
+        />
+      )}
     </DialogRoot>
   );
 }

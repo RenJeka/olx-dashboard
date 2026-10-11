@@ -11,10 +11,12 @@ AI) сюди не дублюється — вона в документах із
 | [git-checkout-discards-changes](git-checkout-discards-changes.md) | Хочеш відкотити тестову зміну у файлі з іншими незакоміченими правками |
 | [pipe-hides-exit-code](pipe-hides-exit-code.md) | Запускаєш перевірку й обрізаєш вивід пайпом |
 | [crlf-line-endings](crlf-line-endings.md) | Точна заміна не знаходить рядок або `sed -i` змінив увесь файл |
+| [chakra-nested-dialog-focus](chakra-nested-dialog-focus.md) | У діалозі поверх іншої модалки не можна друкувати в поле |
 | [tsx-top-level-await-mts](tsx-top-level-await-mts.md) | Пишеш одноразовий tsx-скрипт з top-level `await` |
 | [render-env-change-redeploys](render-env-change-redeploys.md) | Змінюєш env сервісу на Render |
 | [turso-create-branch-timeout](turso-create-branch-timeout.md) | Turso MCP `create_branch` повернув таймаут |
 | [absolute-paths-for-user](absolute-paths-for-user.md) | Даєш людині шлях до файлу в інструкції |
+| [manual-test-cases](manual-test-cases.md) | Пишеш ручні test-cases, які людина проходитиме в UI |
 | [prod-scan-monitoring](prod-scan-monitoring.md) | Людина запустила довгий скан на проді, треба стежити, чи доживає і чим закінчився |
 | [github-cli](github-cli.md) | Треба відкрити PR, подивитись CI чи логи впалого прогону; перелогінити `gh` |
 | [docs-check-untracked-files](docs-check-untracked-files.md) | Пишеш у доках шлях до незакоміченого файлу; `docs:check` зелений локально, червоний у CI |

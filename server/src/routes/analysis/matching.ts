@@ -17,7 +17,7 @@ import {
   PREVIEW_XLSX_WIDTHS,
   isMode,
 } from '../../analysis/constants.js';
-import { runJevMatching } from '../../analysis/jevEngine.js';
+import { resolveCriteriaThreshold, runJevMatching } from '../../analysis/jevEngine.js';
 import { chat } from '../../analysis/openrouter.js';
 import { mergeResults, parseMatchingResponse } from '../../analysis/parse.js';
 import {
@@ -27,7 +27,8 @@ import {
   buildMatchingPrompt,
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
-import { getSearch, getSavedCriteria, loadListings } from '../../analysis/repo.js';
+import { getSearch, loadListings } from '../../analysis/repo.js';
+import { enabledGroups, parseCriteriaConfig } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';
 import { buildXlsxBuffer } from '../../export/xlsx.js';
 import { getLogger } from '../../logger.js';
@@ -37,10 +38,11 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
   // Авто matching (LLM — чанки по AUTO_CHUNK_SIZE; Jev — пул по оголошенню). НЕ пише в БД.
   app.post<{
     Params: { id: string };
-    Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string };
+    Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string; threshold?: number };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    const search = await getSearch(id);
+    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!hasApiKey()) {
       return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
@@ -51,15 +53,17 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    const criteria = (await getSavedCriteria(id))[req.body.mode];
+    // Лише категорії з позначкою «в аналізі» (docs/plans/criteria-categories.md).
+    const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
     if (criteria.length === 0) {
       return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
     }
 
     const listings = await loadListings(id, ids);
     if (req.body.engine === 'jev') {
-      const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing));
-      getLogger('analysis').info({ searchId: id, mode: req.body.mode, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
+      const threshold = resolveCriteriaThreshold(req.body.threshold);
+      const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing), { threshold });
+      getLogger('analysis').info({ searchId: id, mode: req.body.mode, threshold, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
       return response;
     }
     const descriptions = descriptionMap(listings);
@@ -92,12 +96,13 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+      const search = await getSearch(id);
+      if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
       if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
 
-      const criteria = (await getSavedCriteria(id))[req.body.mode];
+      const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
       if (criteria.length === 0) {
         return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
@@ -130,11 +135,13 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; raw?: string; accumulated?: AnalyzedListing[] };
   }>('/api/searches/:id/analyze/import', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    const search = await getSearch(id);
+    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
 
-    const criteria = (await getSavedCriteria(id))[req.body.mode];
+    // Усі категорії режиму — для зведення синонімів до назви (вимкнені теж не шкодять).
+    const criteria = parseCriteriaConfig(search.analysis_criteria)[req.body.mode];
     const listings = await loadListings(id, []);
     const descriptions = descriptionMap(listings);
 

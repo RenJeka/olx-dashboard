@@ -1,6 +1,6 @@
 // Єдине джерело промптів LLM-аналізу — спільне для авто (OpenRouter) і ручного режиму.
 // НЕ дублювати тексти промптів деінде.
-import type { AnalysisMode } from '../types.js';
+import type { AnalysisMode, CriterionGroup } from '../types.js';
 import {
   BASE_SCAFFOLD,
   CRITERIA_DESC_SLICE,
@@ -33,13 +33,15 @@ export interface PromptListing {
 
 /**
  * Промпт генерації критеріїв: базовий каркас + доповнення специфічними для категорії
- * на основі семпла описів. Вивід — JSON {"criteria": ["...", ...]}.
+ * на основі семпла описів. Вивід — JSON {"criteria": ["...", ...]}. `existing` — наявні категорії пошуку
+ * (з синонімами): модель не повторює й не перефразовує їх (docs/plans/criteria-categories.md).
  */
 export function buildCriteriaPrompt(
   category: string,
   sampleDescriptions: string[],
   mode: AnalysisMode,
   extra?: string,
+  existing: CriterionGroup[] = [],
 ): string {
   const scaffold = BASE_SCAFFOLD[mode].map((c) => `- ${c}`).join('\n');
   const samples = sampleDescriptions
@@ -58,6 +60,10 @@ export function buildCriteriaPrompt(
     'Приклади описів оголошень:',
     samples || '(описів недостатньо — спирайся на категорію та базовий каркас)',
     extra ? `\nДодаткові побажання користувача: ${extra}` : '',
+    existing.length > 0
+      ? '\nУже є критерії (НЕ повторюй їх і НЕ перефразовуй — лише нові, іншого змісту):\n' +
+        existing.map((g) => `- ${criterionLabel(g)}`).join('\n')
+      : '',
     '',
     'Правила:',
     `- Поверни не більше ${MAX_CRITERIA} критеріїв.`,
@@ -104,15 +110,24 @@ export interface ChunkListing {
   description: string;
 }
 
+/** Категорія з синонімами для промпту: `дефект екрану (сюди ж: тріснутий екран, зламаний екран)`. */
+function criterionLabel(g: CriterionGroup): string {
+  return g.aliases.length > 0 ? `${g.name} (сюди ж: ${g.aliases.join(', ')})` : g.name;
+}
+
 /** Роль + завдання + список дозволених критеріїв (спільне для matching-промптів). */
-function matchingRoleAndCriteria(criteria: string[], mode: AnalysisMode): string {
-  const criteriaList = criteria.map((c, i) => `${i + 1}. ${c}`).join('\n');
+function matchingRoleAndCriteria(groups: CriterionGroup[], mode: AnalysisMode): string {
+  const criteriaList = groups.map((g, i) => `${i + 1}. ${criterionLabel(g)}`).join('\n');
+  const hasAliases = groups.some((g) => g.aliases.length > 0);
   return [
     `Ти — асистент для аналізу оголошень OLX. Знайди ${MODE_NOUN[mode]} у кожному оголошенні.`,
     '',
-    'Список дозволених критеріїв (criterion МАЄ бути рівно одним із цих рядків):',
+    'Список дозволених критеріїв (criterion МАЄ бути рівно назвою одного з них — текстом до дужок):',
     criteriaList,
-  ].join('\n');
+    hasAliases ? '«Сюди ж» — приклади формулювань, що належать до цього критерію; у criterion їх не пиши.' : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** Анти-галюцинаційні правила + формат відповіді (спільне для matching-промптів). */
@@ -150,14 +165,14 @@ function buildListingBlock(l: PromptListing): string {
  * Авто-режим (`/analyze`): оголошення вставляються інлайн у текст промпту.
  */
 export function buildMatchingPrompt(
-  criteria: string[],
+  groups: CriterionGroup[],
   listings: PromptListing[],
   mode: AnalysisMode,
 ): string {
   const items = listings.map(buildListingBlock).join('\n\n');
 
   return [
-    matchingRoleAndCriteria(criteria, mode),
+    matchingRoleAndCriteria(groups, mode),
     '',
     'Оголошення:',
     items,
@@ -175,9 +190,9 @@ export function buildMatchingPrompt(
  * на «дослідження датасету / вичищення false positives», через яку слабкі моделі зациклюються.
  * Останній рядок — мінімальний fallback для асистента без виконання коду.
  */
-export function buildManualZipInstructions(criteria: string[], mode: AnalysisMode): string {
+export function buildManualZipInstructions(groups: CriterionGroup[], mode: AnalysisMode): string {
   return [
-    matchingRoleAndCriteria(criteria, mode),
+    matchingRoleAndCriteria(groups, mode),
     '',
     'Це МЕХАНІЧНЕ завдання на 2 кроки, А НЕ дослідницька задача. Виконай рівно два кроки нижче',
     'й зупинись. Не аналізуй датасет, не оптимізуй точність — це робить готовий движок.',
@@ -190,7 +205,8 @@ export function buildManualZipInstructions(criteria: string[], mode: AnalysisMod
     ]),
     '',
     'КРОК 1. Створи поруч з `analyze.py` ЄДИНИЙ новий файл `patterns.json` — JSON-обʼєкт, де КЛЮЧ',
-    '— це ТОЧНИЙ рядок критерію зі списку вище, а ЗНАЧЕННЯ — Python-regex для цього критерію.',
+    '— це ТОЧНА назва критерію зі списку вище (без дужок «сюди ж»), а ЗНАЧЕННЯ — Python-regex для',
+    'цього критерію (формулювання «сюди ж» — теж у regex).',
     'Пиши regex ЛИШЕ зі своїх мовних знань (НЕ звіряючись з даними). «Приблизно правильно» —',
     'достатньо; движок сам відкидає заперечення й вирізає докази. Правила для regex:',
     '   - альтернація `|` синонімів УКРАЇНСЬКОЮ та РОСІЙСЬКОЮ + типовий сленг;',

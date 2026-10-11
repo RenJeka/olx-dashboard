@@ -11,6 +11,9 @@ import {
   runPool,
   type JevQuestion,
 } from './jev.js';
+import type { CriterionGroup } from '../types.js';
+
+const group = (name: string, aliases: string[] = []): CriterionGroup => ({ name, aliases, enabled: true });
 
 const questions: Record<string, JevQuestion> = {
   relevant: { type: 'noul', instructions: 'Is it?' },
@@ -71,8 +74,11 @@ describe('state і питання', () => {
     expect(relevanceQuestion('iphone 13', [], 'uk').instructions).toMatch(/^Чи це оголошення .*"iphone 13"/);
   });
 
-  it('criteriaQuestions + criteriaAbove: поріг відбирає канонічні критерії за режимом', () => {
-    const criteria = { cons: ['без торгу', 'подряпини'], pros: ['можливий торг'] };
+  it('criteriaQuestions + criteriaAbove: поріг відбирає назви категорій за режимом', () => {
+    const criteria = {
+      cons: [group('без торгу'), group('подряпини', ['потертості', 'сколи'])],
+      pros: [group('можливий торг')],
+    };
     const q = criteriaQuestions(criteria, 'en');
     expect(Object.keys(q)).toEqual(['cons_0', 'cons_1', 'pros_0']);
     expect(q.cons_0).toEqual({
@@ -80,6 +86,10 @@ describe('state і питання', () => {
       instructions: 'Does this item have the following drawback: "без торгу"?',
       criteria: { true: 'Stated or clearly implied.', false: 'Not mentioned, or the opposite.' },
     });
+    expect(q.cons_1?.instructions).toBe('Does this item have the following drawback: "подряпини" (e.g. "потертості", "сколи")?');
+    expect(criteriaQuestions(criteria, 'en', false).cons_1?.instructions).toBe(
+      'Does this item have the following drawback: "подряпини"?',
+    );
     expect(q.pros_0?.instructions).toContain('advantage: "можливий торг"');
     const result = parseDecisionsResponse(
       {
@@ -98,7 +108,7 @@ describe('state і питання', () => {
   });
 
   it('ключ релевантності не перетинається з ключами критеріїв', () => {
-    expect(Object.keys(criteriaQuestions({ cons: ['a'], pros: ['b'] }, 'en'))).not.toContain(RELEVANT_KEY);
+    expect(Object.keys(criteriaQuestions({ cons: [group('a')], pros: [group('b')] }, 'en'))).not.toContain(RELEVANT_KEY);
   });
 });
 

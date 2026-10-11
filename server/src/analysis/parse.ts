@@ -1,6 +1,7 @@
 // Парсинг відповідей LLM (критерії + matching) + верифікація evidence.
 // Спільне для авто (OpenRouter) і ручного режиму (вставлений текст із чату).
-import type { AnalyzedListing, MatchedItem } from '../types.js';
+import type { AnalyzedListing, CriterionGroup, MatchedItem } from '../types.js';
+import { aliasMap, phraseKey } from './criteria.js';
 import { MAX_CRITERIA, MAX_SYNONYMS } from './constants.js';
 import { evidenceConfirmed } from './text.js';
 
@@ -104,16 +105,17 @@ interface RawMatch {
 
 /**
  * Парс відповіді matching + верифікація evidence. Приймає масив [{id, items:[{criterion,
- * evidence}]}]. criterion лишаємо лише з дозволеного списку (нормалізація регістру);
+ * evidence}]}]. criterion зводиться до назви категорії: збіг із назвою чи синонімом (без регістру),
+ * хвіст «(сюди ж: …)», якщо модель скопіювала рядок списку цілком, відкидається;
  * ok=true якщо evidence підтверджено як підрядок опису.
  *
  * @param descriptions  id → plain-text опис (для substring-перевірки)
- * @param allowed       дозволені критерії (нормалізовані ключі lowercase → канонічний рядок)
+ * @param groups        категорії режиму (назва + синоніми)
  */
 export function parseMatchingResponse(
   raw: string,
   descriptions: Map<number, string>,
-  allowed: string[],
+  groups: CriterionGroup[],
 ): AnalyzedListing[] {
   let data: unknown;
   try {
@@ -131,8 +133,7 @@ export function parseMatchingResponse(
     throw new Error('Очікувався масив [{id, items}]');
   }
 
-  const allowedMap = new Map<string, string>();
-  for (const c of allowed) allowedMap.set(c.toLowerCase().trim(), c);
+  const allowedMap = aliasMap(groups);
 
   const out: AnalyzedListing[] = [];
   for (const entry of arr) {
@@ -147,12 +148,13 @@ export function parseMatchingResponse(
 
     for (const it of rawItems) {
       const obj = it as { criterion?: unknown; evidence?: unknown };
-      const criterionRaw = typeof obj.criterion === 'string' ? normalizeCriterion(obj.criterion) : '';
+      const criterionRaw =
+        typeof obj.criterion === 'string' ? normalizeCriterion(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '')) : '';
       const evidence = typeof obj.evidence === 'string' ? obj.evidence.trim() : '';
       if (!criterionRaw) continue;
 
       // Зводимо criterion до канонічного з дозволеного списку (якщо є збіг).
-      const canonical = allowedMap.get(criterionRaw.toLowerCase()) ?? criterionRaw;
+      const canonical = allowedMap.get(phraseKey(criterionRaw)) ?? criterionRaw;
       const key = canonical.toLowerCase();
       if (seenCriteria.has(key)) continue;
       seenCriteria.add(key);

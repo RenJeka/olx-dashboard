@@ -14,6 +14,14 @@ import { withScanRun } from './scanRunLifecycle.js';
 const VERIFY_PAGE_CAP = 50;
 /** Розмір батчу — як у фетчерах (graphql/fetcher.ts, olxFetcher.ts). */
 const VERIFY_BATCH_SIZE = 3;
+/**
+ * Скільки `403` поспіль зупиняють прохід: OLX (CloudFront) блокує HTML-сторінки з Node
+ * (docs/olx-api.md §6, з 2026-10-03) — решта запитів марна (docs/plans/old/verify-403-guard.md, обхід — P-005).
+ */
+export const VERIFY_BLOCK_STREAK = VERIFY_BATCH_SIZE;
+export const VERIFY_BLOCKED_ERROR =
+  `OLX блокує сторінки оголошень (HTTP 403) — перевірку зупинено після ${VERIFY_BLOCK_STREAK} спроб, ` +
+  'статуси не змінено. Обхід — P-005 (docs/parking.md).';
 
 interface VerifyCandidateRow {
   id: number;
@@ -119,6 +127,7 @@ const FINALIZE_VERIFY_SQL = `UPDATE scan_runs SET finished_at = ?, found = ?, ne
  *
  * Маркери (docs/olx-api.md §3.4, верифіковано live 2026-06-12): 404|410 → dead;
  * 200 + `ad_description` → alive; інше → unknown (статус не змінюється).
+ * `403` VERIFY_BLOCK_STREAK разів поспіль → прохід зупиняється з VERIFY_BLOCKED_ERROR.
  */
 export async function runVerify(searchId: number): Promise<VerifyResult> {
   const search = await dbGet('SELECT id FROM searches WHERE id = ?', [searchId]);
@@ -149,6 +158,8 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     };
     const unknownIssues: string[] = [];
     let aborted = false;
+    let streak403 = 0;
+    let blocked = false;
 
     for (let i = 0; i < candidates.length; i++) {
       if (ctx.shouldAbort()) {
@@ -158,6 +169,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
       const candidate = candidates[i] as VerifyCandidateRow;
       const probe = await probeListingPage(candidate.url);
       result.checked++;
+      streak403 = probe.httpStatus === 403 ? streak403 + 1 : 0;
 
       if (probe.verdict === 'dead') {
         result.dead++;
@@ -199,6 +211,11 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
         ctx.runId,
       ]);
 
+      if (streak403 >= VERIFY_BLOCK_STREAK) {
+        blocked = true;
+        break;
+      }
+
       if (i < candidates.length - 1) {
         if ((i + 1) % VERIFY_BATCH_SIZE === 0) {
           await interruptibleSleep(randomDelayMs(BATCH_PAUSE_MIN_MS, BATCH_PAUSE_MAX_MS), ctx.shouldAbort);
@@ -208,7 +225,11 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
       }
     }
 
-    const error = unknownIssues.length > 0 ? `verify unknown: ${unknownIssues.join('; ')}` : null;
+    const error = blocked
+      ? VERIFY_BLOCKED_ERROR
+      : unknownIssues.length > 0
+        ? `verify unknown: ${unknownIssues.join('; ')}`
+        : null;
     const warning = aborted ? `Зупинено користувачем — перевірено ${result.checked} з ${total}` : null;
 
     await dbRun(FINALIZE_VERIFY_SQL, [

@@ -59,11 +59,18 @@ export interface PickResult {
 /** Режим аналізу: мінуси чи плюси. Критерії й промпти різні, механіка однакова. */
 export type AnalysisMode = 'cons' | 'pros';
 
-/** Критерії аналізу на рівні пошуку (searches.analysis_criteria, JSON). */
-export interface AnalysisCriteria {
-  cons: string[];
-  pros: string[];
+/**
+ * Категорія критерію (docs/plans/criteria-categories.md): назва, яку пише аналіз, + синоніми — формулювання,
+ * що зводяться до неї (LLM-генерація, старі прогони, ручний едіт) + чи йде в аналіз (`enabled`).
+ */
+export interface CriterionGroup {
+  name: string;
+  aliases: string[];
+  enabled: boolean;
 }
+
+/** Критерії аналізу на рівні пошуку (searches.analysis_criteria, JSON) — пул категорій за режимом. */
+export type CriteriaConfig = Record<AnalysisMode, CriterionGroup[]>;
 
 /** Один знайдений збіг критерію в оголошенні (повертає LLM + прапорець верифікації). */
 export interface MatchedItem {

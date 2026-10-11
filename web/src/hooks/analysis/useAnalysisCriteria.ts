@@ -1,54 +1,51 @@
-import { useState } from 'react';
 import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
-import { useGenerateCriteria, fetchCriteriaPrompt, useImportCriteria, useSaveCriteria } from '../../api';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useSaveCriteria } from '../../api';
 import { showErrorToast } from '../../utils/toast';
 import { toaster } from '../../components/ui/toaster';
-import type { AnalysisMode, PackagePart } from '../../types';
+import { absorbIncoming, aliasLookup, phraseKey } from '../../utils/criteria';
+import { useCriteriaGeneration } from './useCriteriaGeneration';
+import type { CriteriaConfig, CriterionGroup } from '../../types';
 
 /**
- * Логіка кроку 1 (Критерії): управління списком критеріїв для AI-аналізу.
- * Дозволяє генерувати нові критерії через LLM, імпортувати з ручного режиму,
- * додавати власні та обирати потрібні для наступного кроку.
+ * Логіка кроку 1 (Критерії): чипи = категорії пошуку (docs/plans/criteria-categories.md); обраний чип =
+ * категорія «в аналізі». Генерація/імпорт — спільний хук: нові формулювання спершу показуються в
+ * `NewCriteriaDialog`, збіги з назвою чи синонімом поглинаються наявною категорією. «Далі» зберігає позначки й нові категорії, нічого не видаляючи.
  */
-export function useAnalysisCriteria(searchId: number) {
+export function useAnalysisCriteria(searchId: number, savedCriteria: CriteriaConfig | undefined) {
   const {
-    mode, setMode,
+    mode,
     available, setAvailable,
     selected, setSelected,
     customInput, setCustomInput,
     setStep,
   } = useAnalysisWizardStore();
 
-  const [showCriteriaAssistant, setShowCriteriaAssistant] = useState(false);
-  const [criteriaParts, setCriteriaParts] = useState<PackagePart[]>([]);
-
-  const generateCriteria = useGenerateCriteria();
-  const importCriteria = useImportCriteria();
   const saveCriteria = useSaveCriteria();
+  const savedGroups = savedCriteria?.[mode] ?? [];
 
-  const model = useSettingsStore.getState().analysisModel;
-  const reasoning = useSettingsStore.getState().analysisReasoning;
-  const extra = useSettingsStore.getState().analysisExtraCriteria;
-
-  function mergeCriteria(incoming: string[]) {
-    setAvailable((prev) => {
-      const set = new Set(prev.map((c) => c.toLowerCase()));
-      const merged = [...prev];
-      for (const c of incoming) {
-        if (!set.has(c.toLowerCase())) {
-          merged.push(c);
-          set.add(c.toLowerCase());
-        }
-      }
-      return merged;
-    });
-    setSelected((prev) => {
-      const next = new Set(prev);
-      for (const c of incoming) next.add(c);
-      return next;
-    });
+  /**
+   * Категорії режиму з урахуванням ще не збережених чипів (позначка — з вибору в майстрі). Збережені
+   * категорії, яких немає серед чипів, лишаються як є — PUT замінює список цілком.
+   */
+  function currentGroups(): CriterionGroup[] {
+    const { available: names, selected: chosen } = useAnalysisWizardStore.getState();
+    const byName = new Map(savedGroups.map((g) => [g.name, g]));
+    const shown = names.map((name) => ({ ...(byName.get(name) ?? { name, aliases: [] }), enabled: chosen.has(name) }));
+    const nameSet = new Set(names);
+    return [...shown, ...savedGroups.filter((g) => !nameSet.has(g.name))];
   }
+
+  function mergeCriteria(incoming: string[]): number {
+    const { added } = absorbIncoming(currentGroups(), incoming);
+    setAvailable((prev) => [...prev, ...added]);
+    setSelected((prev) => new Set([...prev, ...added]));
+    return added.length;
+  }
+
+  const generation = useCriteriaGeneration(searchId, mode, {
+    freshOf: (criteria) => absorbIncoming(currentGroups(), criteria).added,
+    onAdd: mergeCriteria,
+  });
 
   function toggleCriterion(c: string) {
     setSelected((prev) => {
@@ -62,59 +59,26 @@ export function useAnalysisCriteria(searchId: number) {
   function addCustom() {
     const c = customInput.trim();
     if (!c) return;
-    mergeCriteria([c]);
+    if (mergeCriteria([c]) === 0) {
+      // Уже є як назва чи синонім — обрати наявну категорію.
+      const existing = aliasLookup(currentGroups()).get(phraseKey(c));
+      if (existing) {
+        setAvailable((prev) => (prev.includes(existing) ? prev : [...prev, existing]));
+        setSelected((prev) => new Set([...prev, existing]));
+        toaster.create({ type: 'info', title: `Уже є категорія «${existing}» — обрано` });
+      }
+    }
     setCustomInput('');
   }
 
-  async function handleGenerateCriteria() {
-    try {
-      const { criteria } = await generateCriteria.mutateAsync({
-        searchId,
-        mode,
-        model,
-        reasoning,
-        extra,
-      });
-      mergeCriteria(criteria);
-      toaster.create({ type: 'success', title: `Згенеровано критеріїв: ${criteria.length}` });
-    } catch (err) {
-      showErrorToast('Помилка генерації', err);
-    }
-  }
-
-  async function openCriteriaAssistant() {
-    setShowCriteriaAssistant(true);
-    try {
-      const { prompt } = await fetchCriteriaPrompt(searchId, mode, extra);
-      setCriteriaParts([{ name: `критерії-${mode}.txt`, content: prompt }]);
-    } catch (err) {
-      showErrorToast('Не вдалося підготувати промпт', err);
-    }
-  }
-
-  function handleImportCriteria(raw: string) {
-    importCriteria.mutate(
-      { searchId, mode, raw },
-      {
-        onSuccess: ({ criteria }) => {
-          mergeCriteria(criteria);
-          toaster.create({ type: 'success', title: `Розпізнано критеріїв: ${criteria.length}` });
-        },
-        onError: (err) => showErrorToast('Помилка розбору', err),
-      },
-    );
-  }
-
   async function goToMatching() {
-    const chosen = available.filter((c) => selected.has(c));
-    if (chosen.length === 0) {
+    if (!available.some((c) => selected.has(c))) {
       toaster.create({ type: 'error', title: 'Оберіть хоча б один критерій' });
       return;
     }
     try {
-      await saveCriteria.mutateAsync(
-        mode === 'cons' ? { searchId, cons: chosen } : { searchId, pros: chosen },
-      );
+      const groups = currentGroups();
+      await saveCriteria.mutateAsync(mode === 'cons' ? { searchId, cons: groups } : { searchId, pros: groups });
       setStep(2);
     } catch (err) {
       showErrorToast('Не вдалося зберегти критерії', err);
@@ -124,16 +88,11 @@ export function useAnalysisCriteria(searchId: number) {
   const chosenCount = available.filter((c) => selected.has(c)).length;
 
   return {
-    showCriteriaAssistant, setShowCriteriaAssistant,
-    criteriaParts,
+    criteriaGeneration: generation,
     toggleCriterion, addCustom,
-    handleGenerateCriteria,
-    generateCriteriaIsPending: generateCriteria.isPending,
-    openCriteriaAssistant,
-    handleImportCriteria,
-    importCriteriaIsPending: importCriteria.isPending,
     goToMatching,
     saveCriteriaIsPending: saveCriteria.isPending,
     chosenCount,
+    savedGroups,
   };
 }
