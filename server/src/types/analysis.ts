@@ -72,6 +72,18 @@ export interface CriterionGroup {
 /** Критерії аналізу на рівні пошуку (searches.analysis_criteria, JSON) — пул категорій за режимом. */
 export type CriteriaConfig = Record<AnalysisMode, CriterionGroup[]>;
 
+/** Пропозиція автогрупування (docs/plans/old/criteria-auto-group.md): назва категорії + ≥ 2 назви критеріїв режиму. */
+export interface GroupSuggestion {
+  name: string;
+  members: string[];
+}
+
+/** Одне об'єднання в `POST /criteria/remap` (`merges`): формулювання `from` → категорія `to`. */
+export interface CriteriaMerge {
+  from: string[];
+  to: string;
+}
+
 /** Один знайдений збіг критерію в оголошенні (повертає LLM + прапорець верифікації). */
 export interface MatchedItem {
   /** Нормалізований критерій з обраного списку. */

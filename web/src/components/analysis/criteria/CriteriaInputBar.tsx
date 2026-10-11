@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Button, HStack, IconButton, Input, Stack } from '@chakra-ui/react';
 import { LuPlus, LuWandSparkles } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
@@ -15,13 +15,24 @@ interface Props {
   generation: ReturnType<typeof useCriteriaGeneration>;
   /** Контент модалки, у якій стоїть панель, — для вікна вибору згенерованого поверх неї. */
   portalRef: RefObject<HTMLElement | null>;
+  /** Додаткові кнопки в ряд із «Згенерувати» (вікно «Плюси та мінуси» — «Згрупувати автоматично»). */
+  extraActions?: ReactNode;
 }
 
 /**
  * Додавання критеріїв: свій критерій, «Згенерувати» (LLM), «Згенерувати вручну» (помічник: промпт → вставка).
  * Спільне для кроку 1 майстра й вікна «Плюси та мінуси»; згенероване йде у вікно вибору (`NewCriteriaDialog`).
  */
-export function CriteriaInputBar({ value, onChange, onAdd, addDisabled, apiAvailable, generation, portalRef }: Props) {
+export function CriteriaInputBar({
+  value,
+  onChange,
+  onAdd,
+  addDisabled,
+  apiAvailable,
+  generation,
+  portalRef,
+  extraActions,
+}: Props) {
   return (
     <Stack gap={3}>
       <HStack gap={2}>
@@ -50,6 +61,7 @@ export function CriteriaInputBar({ value, onChange, onAdd, addDisabled, apiAvail
         <Button size="sm" variant="outline" onClick={() => void generation.openAssistant()}>
           Згенерувати вручну
         </Button>
+        {extraActions}
       </HStack>
       {generation.showAssistant && (
         <ManualAssistant

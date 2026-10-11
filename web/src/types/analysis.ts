@@ -56,6 +56,18 @@ export interface CriterionGroup {
 /** Категорії критеріїв пошуку за режимом (searches.analysis_criteria). */
 export type CriteriaConfig = Record<AnalysisMode, CriterionGroup[]>;
 
+/** Пропозиція автогрупування (docs/plans/old/criteria-auto-group.md): назва категорії + ≥ 2 назви критеріїв. */
+export interface GroupSuggestion {
+  name: string;
+  members: string[];
+}
+
+/** Одне об'єднання в POST /criteria/remap (`merges`). */
+export interface CriteriaMerge {
+  from: string[];
+  to: string;
+}
+
 /** Відповідь POST /criteria/remap. */
 export interface RemapCriteriaResult {
   criteria: CriteriaConfig;

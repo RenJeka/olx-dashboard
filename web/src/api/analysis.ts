@@ -9,7 +9,9 @@ import type {
   AnalyzedListing,
   CommitItem,
   CriteriaConfig,
+  CriteriaMerge,
   CriterionGroup,
+  GroupSuggestion,
   RemapCriteriaResult,
 } from '../types';
 
@@ -56,6 +58,27 @@ export function useGenerateCriteria() {
   });
 }
 
+/** Автогрупування (LLM): пропозиції, які критерії режиму об'єднати. НЕ зберігає. */
+export function useSuggestGroups() {
+  return useMutation({
+    mutationFn: ({
+      searchId,
+      mode,
+      model,
+      reasoning,
+    }: {
+      searchId: number;
+      mode: AnalysisMode;
+      model?: string;
+      reasoning?: boolean;
+    }) =>
+      api<{ groups: GroupSuggestion[] }>(`/api/searches/${searchId}/criteria/group-suggest`, {
+        method: 'POST',
+        body: JSON.stringify({ mode, model, reasoning }),
+      }),
+  });
+}
+
 /** Готовий промпт генерації критеріїв (ручний режим). */
 export function fetchCriteriaPrompt(searchId: number, mode: AnalysisMode, extra?: string): Promise<{ prompt: string }> {
   const q = new URLSearchParams({ mode });
@@ -89,7 +112,8 @@ export function useSaveCriteria() {
 
 /**
  * Об'єднати / перейменувати (`to` — назва) або видалити (`to = null`) формулювання: категорії + пункти в
- * оголошеннях і локальних фільтрах (`listings: false` — видалити лише зі списку).
+ * оголошеннях і локальних фільтрах (`listings: false` — видалити лише зі списку). `merges` — кілька
+ * об'єднань одним запитом (автогрупування); тоді `from`/`to` не передаються.
  */
 export function useRemapCriteria() {
   const qc = useQueryClient();
@@ -100,16 +124,18 @@ export function useRemapCriteria() {
       from,
       to,
       listings,
+      merges,
     }: {
       searchId: number;
       mode: AnalysisMode;
-      from: string[];
-      to: string | null;
+      from?: string[];
+      to?: string | null;
       listings?: boolean;
+      merges?: CriteriaMerge[];
     }) =>
       api<RemapCriteriaResult>(`/api/searches/${searchId}/criteria/remap`, {
         method: 'POST',
-        body: JSON.stringify({ mode, from, to, listings }),
+        body: JSON.stringify({ mode, from, to, listings, merges }),
       }),
     onSuccess: (data, { searchId }) => {
       qc.setQueryData(['criteria', searchId], data.criteria);

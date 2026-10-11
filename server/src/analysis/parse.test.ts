@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeResults, parseMatchingResponse } from './parse.js';
+import { mergeResults, parseGroupSuggestions, parseMatchingResponse } from './parse.js';
 import { parseRelevanceResponse, prefilterCandidates } from './relevance.js';
 
 describe('parseMatchingResponse — анти-галюцинація evidence', () => {
@@ -111,5 +111,71 @@ describe('prefilterCandidates — бренд + номер моделі пору�
   it('синоніми лише розширюють коло кандидатів', () => {
     const items = [l(1, 'Айфон 5 білий')];
     expect(prefilterCandidates('iphone 5', items, ['айфон 5']).candidates).toHaveLength(1);
+  });
+});
+
+describe('parseGroupSuggestions — перевірки пропозицій автогрупування', () => {
+  const groups = [
+    { name: 'тріснутий екран', aliases: [], enabled: true },
+    { name: 'зламаний екран', aliases: ['розбитий екран'], enabled: true },
+    { name: 'засвіт', aliases: [], enabled: true },
+    { name: 'б/в стан', aliases: [], enabled: true },
+    { name: 'експлуатований', aliases: [], enabled: false },
+    { name: 'без торгу', aliases: [], enabled: true },
+  ];
+  const parse = (data: unknown) => parseGroupSuggestions(JSON.stringify(data), groups);
+
+  it('члени зводяться до назв зі списку (регістр, синонім, «сюди ж»); невідомий член відкинутий', () => {
+    expect(
+      parse({
+        groups: [
+          { name: 'дефект екрану', members: ['Тріснутий екран', 'розбитий екран', 'вигаданий критерій'] },
+          { name: 'стан', members: ['б/в стан (сюди ж: ношений)', 'експлуатований'] },
+        ],
+      }),
+    ).toEqual([
+      { name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] },
+      { name: 'стан', members: ['б/в стан', 'експлуатований'] },
+    ]);
+  });
+
+  it('член у двох групах лишається в першій; група з одного члена відкинута', () => {
+    expect(
+      parse({
+        groups: [
+          { name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] },
+          { name: 'екран', members: ['зламаний екран', 'засвіт'] },
+          { name: 'торг', members: ['без торгу', 'без торгу'] },
+        ],
+      }),
+    ).toEqual([{ name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] }]);
+  });
+
+  it('назва: порожня, > 6 слів, збіг з критерієм поза групою чи з назвою іншої групи → перший член', () => {
+    const result = parse({
+      groups: [
+        { name: '', members: ['тріснутий екран', 'зламаний екран'] },
+        { name: 'один два три чотири пʼять шість сім', members: ['б/в стан', 'експлуатований'] },
+        { name: 'без торгу', members: ['засвіт', 'розбитий екран'] },
+      ],
+    });
+    expect(result.map((s) => s.name)).toEqual(['тріснутий екран', 'б/в стан']);
+
+    expect(
+      parse({
+        groups: [
+          { name: 'дефект', members: ['тріснутий екран', 'зламаний екран'] },
+          { name: 'Дефект', members: ['б/в стан', 'засвіт'] },
+          { name: 'Засвіт', members: ['без торгу', 'експлуатований'] },
+        ],
+      }).map((s) => s.name),
+    ).toEqual(['дефект', 'б/в стан', 'без торгу']);
+  });
+
+  it('приймає масив і JSON в огорожі; порожня відповідь → []; не JSON → помилка', () => {
+    const raw = '```json\n[{"name":"стан","members":["б/в стан","експлуатований"]}]\n```';
+    expect(parseGroupSuggestions(raw, groups)).toHaveLength(1);
+    expect(parse({ groups: [] })).toEqual([]);
+    expect(() => parseGroupSuggestions('не json', groups)).toThrow();
   });
 });

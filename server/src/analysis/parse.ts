@@ -1,8 +1,8 @@
 // Парсинг відповідей LLM (критерії + matching) + верифікація evidence.
 // Спільне для авто (OpenRouter) і ручного режиму (вставлений текст із чату).
-import type { AnalyzedListing, CriterionGroup, MatchedItem } from '../types.js';
+import type { AnalyzedListing, CriterionGroup, GroupSuggestion, MatchedItem } from '../types.js';
 import { aliasMap, phraseKey } from './criteria.js';
-import { MAX_CRITERIA, MAX_SYNONYMS } from './constants.js';
+import { MAX_CRITERIA, MAX_GROUP_NAME_WORDS, MAX_SYNONYMS } from './constants.js';
 import { evidenceConfirmed } from './text.js';
 
 /** Знімає ```json … ``` обгортку (ручні вставки часто з нею). */
@@ -96,6 +96,59 @@ export function parseSynonymsResponse(raw: string): string[] {
     if (result.length >= MAX_SYNONYMS) break;
   }
   return result;
+}
+
+/**
+ * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md): приймає {groups:[…]} або масив.
+ * Член зводиться до назви критерію зі списку (регістр, синонім, хвіст «(сюди ж: …)»); невідомий — відкидається;
+ * член, уже зайнятий попередньою групою, — теж. Група з < 2 членів відкидається. Назва порожня, довша за
+ * MAX_GROUP_NAME_WORDS слів, збігається з критерієм поза групою чи з назвою попередньої групи → перший член.
+ */
+export function parseGroupSuggestions(raw: string, groups: CriterionGroup[]): GroupSuggestion[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(extractJson(raw));
+  } catch {
+    throw new Error('Не вдалося розпарсити відповідь як JSON (групування)');
+  }
+
+  const list: unknown[] = Array.isArray(data)
+    ? data
+    : data && typeof data === 'object' && Array.isArray((data as { groups?: unknown }).groups)
+      ? (data as { groups: unknown[] }).groups
+      : [];
+
+  const known = aliasMap(groups);
+  const usedMembers = new Set<string>();
+  const usedNames = new Set<string>();
+  const out: GroupSuggestion[] = [];
+
+  for (const entry of list) {
+    const obj = entry as { name?: unknown; members?: unknown };
+    const rawMembers = Array.isArray(obj.members) ? obj.members : [];
+    const members: string[] = [];
+    for (const m of rawMembers) {
+      if (typeof m !== 'string') continue;
+      const canonical = known.get(phraseKey(m.replace(/\s*\(сюди ж:.*$/i, '')));
+      if (canonical === undefined || usedMembers.has(phraseKey(canonical))) continue;
+      usedMembers.add(phraseKey(canonical));
+      members.push(canonical);
+    }
+    if (members.length < 2) continue;
+
+    const memberKeys = new Set(members.map(phraseKey));
+    const proposed = typeof obj.name === 'string' ? normalizeCriterion(obj.name) : '';
+    const clash = known.get(phraseKey(proposed));
+    const nameOk =
+      proposed !== '' &&
+      proposed.split(' ').length <= MAX_GROUP_NAME_WORDS &&
+      (clash === undefined || memberKeys.has(phraseKey(clash))) &&
+      !usedNames.has(phraseKey(proposed));
+    const name = nameOk ? proposed : (members[0] as string);
+    usedNames.add(phraseKey(name));
+    out.push({ name, members });
+  }
+  return out;
 }
 
 interface RawMatch {

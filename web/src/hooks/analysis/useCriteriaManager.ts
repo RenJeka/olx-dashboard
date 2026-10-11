@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useListings, useRemapCriteria, useSaveCriteria, useSavedCriteria } from '../../api';
+import { useListings, useRemapCriteria, useSaveCriteria, useSavedCriteria, useSuggestGroups } from '../../api';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { toaster } from '../../components/ui/toaster';
 import { showErrorToast } from '../../utils/toast';
 import { sortAlpha } from '../../utils/sort';
@@ -13,7 +14,7 @@ import {
   phraseKey,
 } from '../../utils/criteria';
 import { useCriteriaGeneration } from './useCriteriaGeneration';
-import type { AnalysisMode, CriterionGroup } from '../../types';
+import type { AnalysisMode, CriteriaMerge, CriterionGroup, GroupSuggestion } from '../../types';
 
 /** Рядок вікна: категорія зі списку пошуку або пункт, що є лише в оголошеннях. */
 export interface CriterionRowData {
@@ -32,11 +33,14 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
   const [mode, setModeState] = useState<AnalysisMode>(initialMode);
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Пропозиції автогрупування, що чекають рішення людини (вікно `GroupSuggestionsDialog`). */
+  const [suggestions, setSuggestions] = useState<GroupSuggestion[] | null>(null);
 
   const { data: config, isLoading } = useSavedCriteria(searchId);
   const { data: listings } = useListings(searchId);
   const save = useSaveCriteria();
   const remap = useRemapCriteria();
+  const suggest = useSuggestGroups();
 
   const groups = useMemo(() => config?.[mode] ?? [], [config, mode]);
 
@@ -76,6 +80,7 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
     setModeState(next);
     setSelected(new Set());
     setFilter('');
+    setSuggestions(null);
   }
 
   function toggleSelected(name: string) {
@@ -146,6 +151,34 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
     }
   }
 
+  /** «Згрупувати автоматично»: LLM пропонує групи поточного режиму; порожньо — лише тост. */
+  async function suggestGroups() {
+    const { analysisModel: model, analysisReasoning: reasoning } = useSettingsStore.getState();
+    try {
+      const { groups: found } = await suggest.mutateAsync({ searchId, mode, model, reasoning });
+      if (found.length === 0) toaster.create({ type: 'info', title: "Нічого об'єднувати" });
+      else setSuggestions(found);
+    } catch (err) {
+      showErrorToast('Помилка автогрупування', err);
+    }
+  }
+
+  /** Застосувати обрані групи одним запитом (одна транзакція, один перерахунок прихованих). */
+  async function applyMerges(merges: CriteriaMerge[]) {
+    try {
+      const res = await remap.mutateAsync({ searchId, mode, merges });
+      setSuggestions(null);
+      setSelected(new Set());
+      toaster.create({
+        type: 'success',
+        title: `Створено категорій: ${merges.length}`,
+        description: `Змінено оголошень: ${res.updated}`,
+      });
+    } catch (err) {
+      showErrorToast("Не вдалося об'єднати критерії", err);
+    }
+  }
+
   return {
     mode, setMode,
     filter, setFilter,
@@ -161,5 +194,10 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
     savePending: save.isPending,
     remapPending: remap.isPending,
     generation,
+    suggestions,
+    suggestGroups,
+    suggestPending: suggest.isPending,
+    applyMerges,
+    dismissSuggestions: () => setSuggestions(null),
   };
 }

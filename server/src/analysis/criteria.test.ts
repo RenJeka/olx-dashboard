@@ -9,7 +9,7 @@ import {
   remapBullets,
   remapLocalFilters,
 } from './criteria.js';
-import { buildCriteriaPrompt, buildMatchingPrompt } from './prompts.js';
+import { buildCriteriaPrompt, buildGroupingPrompt, buildMatchingPrompt } from './prompts.js';
 import type { CriterionGroup } from '../types.js';
 
 const g = (name: string, aliases: string[] = [], enabled = true): CriterionGroup => ({ name, aliases, enabled });
@@ -140,5 +140,12 @@ describe('промпти з категоріями', () => {
       'Уже є критерії (НЕ повторюй їх і НЕ перефразовуй — лише нові, іншого змісту):\n- дефект екрану (сюди ж: тріснутий екран, зламаний екран)\n- без торгу',
     );
     expect(buildCriteriaPrompt('macbook', [], 'cons')).not.toContain('Уже є критерії');
+  });
+
+  it('групування: усі критерії режиму з синонімами, формат {groups}, без описів оголошень', () => {
+    const prompt = buildGroupingPrompt('macbook', groups, 'cons');
+    expect(prompt).toContain('- дефект екрану (сюди ж: тріснутий екран, зламаний екран)\n- без торгу');
+    expect(prompt).toContain('{"groups": [{"name": "назва категорії", "members": ["критерій 1", "критерій 2"]}]}');
+    expect(prompt).not.toContain('Приклади описів');
   });
 });
