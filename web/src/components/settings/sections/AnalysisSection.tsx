@@ -6,6 +6,7 @@ import { useAnalysisStatus } from '../../../api';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import {
   ANALYSIS_ENGINE_LABELS,
+  DEFAULT_ANALYSIS_MODEL,
   JEV_CRITERIA_THRESHOLD_DEFAULT,
   JEV_CRITERIA_THRESHOLD_MAX,
   JEV_CRITERIA_THRESHOLD_MIN,
@@ -126,7 +127,7 @@ export function AnalysisSection() {
           value={localModel}
           onChange={(e) => setLocalModel(e.target.value)}
           onBlur={() => setAnalysisModel(localModel)}
-          placeholder="google/gemini-2.5-flash-lite"
+          placeholder={DEFAULT_ANALYSIS_MODEL}
         />
       </Stack>
 

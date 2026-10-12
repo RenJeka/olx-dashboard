@@ -142,6 +142,16 @@ describe('промпти з категоріями', () => {
     expect(buildCriteriaPrompt('macbook', [], 'cons')).not.toContain('Уже є критерії');
   });
 
+  it('генерація: визначення полярності режиму й критерії протилежного — у блоці «не включай»', () => {
+    const prompt = buildCriteriaPrompt('macbook', [], 'cons', undefined, [], [g('повна комплектація', ['з коробкою'])]);
+    expect(prompt).toContain('Переваги — НЕ мінуси');
+    expect(prompt).toContain(
+      'Це плюси (переваги) товару — НЕ включай їх і їхні перефразування:\n- повна комплектація (сюди ж: з коробкою)',
+    );
+    expect(buildCriteriaPrompt('macbook', [], 'pros')).toContain('Недоліки — НЕ плюси');
+    expect(buildCriteriaPrompt('macbook', [], 'pros')).not.toContain('НЕ включай їх');
+  });
+
   it('групування: усі критерії режиму з синонімами, формат {groups}, без описів оголошень', () => {
     const prompt = buildGroupingPrompt('macbook', groups, 'cons');
     expect(prompt).toContain('- дефект екрану (сюди ж: тріснутий екран, зламаний екран)\n- без торгу');

@@ -5,6 +5,7 @@ import {
   ANALYSIS_ERRORS,
   DEFAULT_MODEL,
   DEFAULT_SAMPLE_SIZE,
+  OPPOSITE_MODE,
   isMode,
 } from '../../analysis/constants.js';
 import {
@@ -16,7 +17,7 @@ import {
   serializeCriteriaConfig,
 } from '../../analysis/criteria.js';
 import { chat } from '../../analysis/openrouter.js';
-import { parseCriteriaResponse, parseGroupSuggestions } from '../../analysis/parse.js';
+import { excludeOppositeCriteria, parseCriteriaResponse, parseGroupSuggestions } from '../../analysis/parse.js';
 import { buildCriteriaPrompt, buildGroupingPrompt, pickSample } from '../../analysis/prompts.js';
 import { getSearch, loadListings } from '../../analysis/repo.js';
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../../db/db.js';
@@ -46,12 +47,15 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
 
     const listings = await loadListings(id, []);
     const sample = pickSample(listings, req.body.sampleSize ?? DEFAULT_SAMPLE_SIZE);
+    const config = parseCriteriaConfig(search.analysis_criteria);
+    const opposite = config[OPPOSITE_MODE[req.body.mode]];
     const prompt = buildCriteriaPrompt(
       search.name,
       sample.map((l) => l.description ?? ''),
       req.body.mode,
       req.body.extra,
-      parseCriteriaConfig(search.analysis_criteria)[req.body.mode],
+      config[req.body.mode],
+      opposite,
     );
 
     try {
@@ -59,7 +63,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
         model: req.body.model ?? DEFAULT_MODEL,
         reasoning: req.body.reasoning,
       });
-      return { criteria: parseCriteriaResponse(raw) };
+      return { criteria: excludeOppositeCriteria(parseCriteriaResponse(raw), opposite) };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return reply.code(502).send({ error: message });
@@ -101,12 +105,14 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
 
       const listings = await loadListings(id, []);
       const sample = pickSample(listings, DEFAULT_SAMPLE_SIZE);
+      const config = parseCriteriaConfig(search.analysis_criteria);
       const prompt = buildCriteriaPrompt(
         search.name,
         sample.map((l) => l.description ?? ''),
         req.query.mode,
         req.query.extra,
-        parseCriteriaConfig(search.analysis_criteria)[req.query.mode],
+        config[req.query.mode],
+        config[OPPOSITE_MODE[req.query.mode]],
       );
       return { prompt };
     },

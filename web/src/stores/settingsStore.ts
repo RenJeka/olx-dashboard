@@ -7,7 +7,19 @@ import {
   DEFAULT_AUTO_REFRESH_INTERVAL_MIN,
   DEFAULT_ANALYSIS_MODEL,
   JEV_CRITERIA_THRESHOLD_DEFAULT,
+  LEGACY_DEFAULT_ANALYSIS_MODELS,
+  SETTINGS_STORAGE_VERSION,
 } from '../constants';
+
+/** Міграція збережених налаштувань між версіями персисту. v0 → v1: колишній дефолт моделі → новий дефолт. */
+export function migrateSettings(persisted: unknown, version: number): unknown {
+  if (!persisted || typeof persisted !== 'object') return persisted;
+  const state = { ...(persisted as Record<string, unknown>) };
+  if (version < 1 && typeof state.analysisModel === 'string' && LEGACY_DEFAULT_ANALYSIS_MODELS.includes(state.analysisModel)) {
+    state.analysisModel = DEFAULT_ANALYSIS_MODEL;
+  }
+  return state;
+}
 
 interface SettingsState {
   // Ефемерний стан (не персиститься)
@@ -119,6 +131,8 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: SETTINGS_STORAGE_KEY,
+      version: SETTINGS_STORAGE_VERSION,
+      migrate: (persisted, version) => migrateSettings(persisted, version) as SettingsState,
       partialize: (state) => ({
         selectedSearchId: state.selectedSearchId,
         expandedSearchGroups: state.expandedSearchGroups,

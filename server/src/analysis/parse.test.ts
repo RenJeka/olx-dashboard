@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { mergeResults, parseGroupSuggestions, parseMatchingResponse } from './parse.js';
+import {
+  contradictsNegatedCriterion,
+  excludeOppositeCriteria,
+  mergeResults,
+  parseGroupSuggestions,
+  parseMatchingResponse,
+} from './parse.js';
 import { parseRelevanceResponse, prefilterCandidates } from './relevance.js';
 
 describe('parseMatchingResponse — анти-галюцинація evidence', () => {
@@ -50,6 +56,50 @@ describe('parseMatchingResponse — анти-галюцинація evidence', (
 
   it('невалідний JSON → зрозуміла помилка', () => {
     expect(() => parseMatchingResponse('не json', descriptions, allowed)).toThrow(/JSON/);
+  });
+
+  it('номер зі списку зрізається; критерій поза списком відкидається', () => {
+    const raw = JSON.stringify([
+      {
+        id: 1,
+        items: [
+          { criterion: '1. Подряпини', evidence: 'подряпини' },
+          { criterion: 'Батарея менше 85%', evidence: 'Батарея 87%' },
+        ],
+      },
+    ]);
+    expect(parseMatchingResponse(raw, descriptions, allowed)[0]?.items).toEqual([
+      { criterion: 'Подряпини', evidence: 'подряпини', ok: true },
+    ]);
+  });
+
+  it('критерій-заперечення з evidence без заперечення → ok=false (H3)', () => {
+    const raw = JSON.stringify([{ id: 1, items: [{ criterion: 'Не працює Face ID', evidence: 'Face ID працює' }] }]);
+    expect(parseMatchingResponse(raw, descriptions, allowed)[0]?.items[0]).toMatchObject({ ok: false });
+  });
+});
+
+describe('contradictsNegatedCriterion', () => {
+  it('«не X» + evidence з X без заперечення — суперечність', () => {
+    expect(contradictsNegatedCriterion('не повна комплектація', 'Повна комплектація, коробка')).toBe(true);
+    expect(contradictsNegatedCriterion('без торгу', 'Торг можливий')).toBe(true);
+  });
+
+  it('заперечення чи обмеження в evidence, інші слова, звичайний критерій — не суперечність', () => {
+    expect(contradictsNegatedCriterion('не повна комплектація', 'В комплекті тільки ноутбук')).toBe(false);
+    expect(contradictsNegatedCriterion('не повна комплектація', 'Без зарядного пристрою')).toBe(false);
+    expect(contradictsNegatedCriterion('без торгу', 'Ціна остаточна')).toBe(false);
+    expect(contradictsNegatedCriterion('Не працює Face ID', 'Face ID не працює')).toBe(false);
+    expect(contradictsNegatedCriterion('повна комплектація', 'повна комплектація')).toBe(false);
+  });
+});
+
+describe('excludeOppositeCriteria', () => {
+  it('відкидає назви й синоніми протилежного режиму (регістр, пробіли), решту лишає', () => {
+    const pros = [{ name: 'Повна комплектація', aliases: ['з коробкою'], enabled: true }];
+    expect(excludeOppositeCriteria(['повна  комплектація', 'З коробкою', 'не повна комплектація'], pros)).toEqual([
+      'не повна комплектація',
+    ]);
   });
 
   it('mergeResults: об’єднання за id, новіший item перетирає за criterion', () => {

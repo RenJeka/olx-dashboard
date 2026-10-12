@@ -26,6 +26,44 @@ function normalizeCriterion(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+/** Номер рядка списку, який модель копіює в назву критерію: «5. сервісна батарея», «2) …». */
+const LIST_NUMBER_RE = /^\d+\s*[.)]\s*/;
+/** Критерій-заперечення: «не працює Face ID», «без коробки», «немає зарядного». */
+const NEGATED_CRITERION_RE = /^(не|без|немає|нема|відсутн\p{L}*)\s+(.+)$/iu;
+/** Слова заперечення чи обмеження в evidence. */
+const NEGATION_WORDS = /^(не|ні|без|немає|нема|нет|відсутн\p{L}*|отсутств\p{L}*|тільки|лише|только)$/u;
+/** Скільки перших літер слова звіряти (грубий стем: «повна» ~ «повний», «торгу» ~ «торг»). */
+const STEM_LENGTH = 4;
+
+function words(text: string): string[] {
+  return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/**
+ * Evidence суперечить критерію-запереченню (docs/plans/llm-haiku-prompt-audit.md, H3): критерій «не X», а evidence
+ * містить усі слова X без жодного заперечення — «Не працює Face ID» + «Face ID працює», «не повна комплектація» +
+ * «повна комплектація». Такий фрагмент є в описі, тож перевірку підрядка проходить — ловимо окремо.
+ */
+export function contradictsNegatedCriterion(criterion: string, evidence: string): boolean {
+  const m = NEGATED_CRITERION_RE.exec(criterion.trim());
+  if (!m) return false;
+  const evWords = words(evidence);
+  if (evWords.some((w) => NEGATION_WORDS.test(w))) return false;
+  const stems = words(m[2] as string)
+    .filter((w) => w.length >= 2)
+    .map((w) => w.slice(0, STEM_LENGTH));
+  return stems.length > 0 && stems.every((stem) => evWords.some((w) => w.startsWith(stem)));
+}
+
+/**
+ * Згенеровані критерії без тих, що вже є назвою чи синонімом протилежного режиму: «повна комплектація» у плюсах →
+ * не пропонувати її в мінусах (docs/plans/llm-haiku-prompt-audit.md, H2).
+ */
+export function excludeOppositeCriteria(criteria: string[], opposite: CriterionGroup[]): string[] {
+  const taken = aliasMap(opposite);
+  return criteria.filter((c) => !taken.has(phraseKey(c)));
+}
+
 /**
  * Парс відповіді генерації критеріїв: приймає масив рядків АБО {criteria:[...]}.
  * Нормалізує, дедуплікує (case-insensitive), відкидає порожні, обрізає до MAX_CRITERIA.
@@ -203,12 +241,15 @@ export function parseMatchingResponse(
     for (const it of rawItems) {
       const obj = it as { criterion?: unknown; evidence?: unknown };
       const criterionRaw =
-        typeof obj.criterion === 'string' ? normalizeCriterion(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '')) : '';
+        typeof obj.criterion === 'string'
+          ? normalizeCriterion(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '').replace(LIST_NUMBER_RE, ''))
+          : '';
       const evidence = typeof obj.evidence === 'string' ? obj.evidence.trim() : '';
       if (!criterionRaw) continue;
 
-      // Зводимо criterion до канонічного з дозволеного списку (якщо є збіг).
-      const canonical = allowedMap.get(phraseKey(criterionRaw)) ?? criterionRaw;
+      // Зводимо criterion до канонічного з дозволеного списку; поза списком («7 GB» при «8 GB») — відкидаємо.
+      const canonical = allowedMap.get(phraseKey(criterionRaw));
+      if (!canonical) continue;
       const key = canonical.toLowerCase();
       if (seenCriteria.has(key)) continue;
       seenCriteria.add(key);
@@ -216,7 +257,7 @@ export function parseMatchingResponse(
       items.push({
         criterion: canonical,
         evidence,
-        ok: evidenceConfirmed(evidence, description),
+        ok: evidenceConfirmed(evidence, description) && !contradictsNegatedCriterion(canonical, evidence),
       });
     }
 

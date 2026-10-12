@@ -11,6 +11,7 @@ import {
   MAX_PARAMS_IN_PROMPT,
   MAX_SYNONYMS,
   MODE_NOUN,
+  OPPOSITE_MODE,
   SAMPLE_SCORE_LENGTH_CAP,
   SAMPLE_SIGNAL_TOKEN_WEIGHT,
   SIGNAL_TOKENS,
@@ -35,7 +36,8 @@ export interface PromptListing {
 /**
  * Промпт генерації критеріїв: базовий каркас + доповнення специфічними для категорії
  * на основі семпла описів. Вивід — JSON {"criteria": ["...", ...]}. `existing` — наявні категорії пошуку
- * (з синонімами): модель не повторює й не перефразовує їх (docs/plans/old/criteria-categories.md).
+ * (з синонімами): модель не повторює й не перефразовує їх (docs/plans/old/criteria-categories.md). `opposite` —
+ * категорії протилежного режиму: «не включати» (docs/plans/llm-haiku-prompt-audit.md, H1–H2).
  */
 export function buildCriteriaPrompt(
   category: string,
@@ -43,6 +45,7 @@ export function buildCriteriaPrompt(
   mode: AnalysisMode,
   extra?: string,
   existing: CriterionGroup[] = [],
+  opposite: CriterionGroup[] = [],
 ): string {
   const scaffold = BASE_SCAFFOLD[mode].map((c) => `- ${c}`).join('\n');
   const samples = sampleDescriptions
@@ -53,6 +56,7 @@ export function buildCriteriaPrompt(
     `Ти — асистент для аналізу оголошень OLX. Категорія пошуку: "${category}".`,
     `Завдання: скласти список коротких КРИТЕРІЇВ, що описують ${MODE_NOUN[mode]}, ` +
       `за якими далі шукатимуть збіги в описах оголошень.`,
+    POLARITY_RULES[mode],
     '',
     'Базовий каркас (обовʼязково включити доречні з них):',
     scaffold,
@@ -64,6 +68,10 @@ export function buildCriteriaPrompt(
     existing.length > 0
       ? '\nУже є критерії (НЕ повторюй їх і НЕ перефразовуй — лише нові, іншого змісту):\n' +
         existing.map((g) => `- ${criterionLabel(g)}`).join('\n')
+      : '',
+    opposite.length > 0
+      ? `\nЦе ${MODE_NOUN[OPPOSITE_MODE[mode]]} — НЕ включай їх і їхні перефразування:\n` +
+        opposite.map((g) => `- ${criterionLabel(g)}`).join('\n')
       : '',
     '',
     'Правила:',
@@ -141,6 +149,21 @@ export interface ChunkListing {
   characteristics: string;
   description: string;
 }
+
+/** Визначення полярності режиму для генерації критеріїв: описи здебільшого хвалять товар, тож мінуси потребують
+ *  явної заборони переваг (замір «до» — docs/plans/llm-haiku-prompt-audit.md). */
+const POLARITY_RULES: Record<AnalysisMode, string> = {
+  cons: [
+    'Мінус — те, що робить товар гіршим чи ризикованішим для покупця: дефект, знос, несправність, неповний комплект,',
+    'блокування, умови продажу на шкоду покупцю. Переваги — НЕ мінуси, навіть якщо в описах їх більшість:',
+    '«повна комплектація», «ідеальний стан», «батарея 97%», «корпус у хорошому стані» сюди НЕ включай.',
+  ].join('\n'),
+  pros: [
+    'Плюс — те, що робить товар кращим чи вигіднішим для покупця: хороший стан, повний комплект, гарантія,',
+    'вигідні умови. Недоліки — НЕ плюси: «є подряпини», «не вмикається», «без зарядного пристрою», «на запчастини»',
+    'сюди НЕ включай.',
+  ].join('\n'),
+};
 
 /** Категорія з синонімами для промпту: `дефект екрану (сюди ж: тріснутий екран, зламаний екран)`. */
 function criterionLabel(g: CriterionGroup): string {

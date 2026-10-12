@@ -87,6 +87,7 @@ olx-dashboard/
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/jev-model.md)
 │       ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/jev-model.md)
+│       ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/llm-haiku-prompt-audit.md)
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
@@ -103,7 +104,8 @@ olx-dashboard/
 │       │   ├── openrouter.ts # chat()/chatWithUsage() — POST /chat/completions (json_object, ретрай, зняття code-fence; usage.cost для замірів)
 │       │   ├── jev.ts        # Jev через OpenRouter Decisions API (docs/jev.md): decide (ретраї, спільна пауза на 429), runPool, listingState, relevanceQuestion/criteriaQuestions/criteriaAbove
 │       │   ├── jevEngine.ts  # рушій «Jev» кроків 1–2: runJevRelevance / runJevMatching (пороги JEV_*_THRESHOLD, usage + model у відповіді)
-│       │   ├── parse.ts      # парс відповідей LLM (критерії/matching/синоніми) + верифікація evidence (substring) + мерж результатів
+│       │   ├── parse.ts      # парс відповідей LLM (критерії/matching/синоніми) + верифікація evidence (substring, заперечення) + критерії поза списком / протилежного режиму + мерж результатів
+│       │   ├── llmEval.ts    # формат файлів llm:eval, ключі міток, підрахунок метрик (чисті функції, Vitest)
 │       │   ├── text.ts       # stripHtml/normalizeForMatch/evidenceConfirmed/parseBullets
 │       │   ├── aiPicks.ts    # AI Вибір (план docs/plans/old/AI-auto-top.md): buildPickPrompt/parsePickResponse/runAiPicks/toPickItems/buildPickManualZipInstructions (map-reduce НА ФАЙЛАХ без скриптів: агент заповнює ПОРОЖНІ nominations/nominees-NNN.json заготовки в ZIP→сам пише output.json; уніфіковано з кроками 1–2 через manualZip.ts, docs/ai-flow.md)
 │       │   ├── relevance.ts  # семантичний фільтр: prefilterCandidates (евристичний пре-фільтр бренд+модель перед ШІ, тепер з aliases-синонімами), buildRelevancePrompt/parseRelevanceResponse/runRelevance/buildRelevanceZipInstructions (ZIP пре-сідить ПОРОЖНІ classifications/result-NNN.json заготовки — агент заповнює; уніфіковано з AI Вибір через manualZip.ts, docs/ai-flow.md) (docs/plans/old/semantic-relevance-filter.md, docs/plans/old/search-synonyms.md)

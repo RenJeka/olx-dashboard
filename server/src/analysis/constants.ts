@@ -4,7 +4,7 @@ import type { AnalysisMode } from '../types.js';
 
 // ── Модель / OpenRouter ──────────────────────────────────────────────────────
 /** Дефолтна модель (редагована у налаштуваннях фронтенду, передається в тілі запиту). */
-export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
+export const DEFAULT_MODEL = 'anthropic/claude-haiku-5.5';
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 /** Заголовки атрибуції OpenRouter (HTTP-Referer / X-Title). */
 export const OPENROUTER_REFERER = 'http://localhost:5173';
@@ -109,6 +109,8 @@ export function isMode(value: unknown): value is AnalysisMode {
 // ── Мапи режиму ────────────────────────────────────────────────────────────────
 /** Підпис режиму (заголовок колонки/файлу). */
 export const MODE_LABEL: Record<AnalysisMode, string> = { cons: 'Мінуси', pros: 'Плюси' };
+/** Протилежний режим (критерії плюсів — «не включати» при генерації мінусів і навпаки). */
+export const OPPOSITE_MODE: Record<AnalysisMode, AnalysisMode> = { cons: 'pros', pros: 'cons' };
 /** Іменник режиму для промптів. */
 export const MODE_NOUN: Record<AnalysisMode, string> = {
   cons: 'мінуси (недоліки) товару',
