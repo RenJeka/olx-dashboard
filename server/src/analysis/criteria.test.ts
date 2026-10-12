@@ -155,7 +155,7 @@ describe('промпти з категоріями', () => {
   it('групування: усі критерії режиму з синонімами, формат {groups}, без описів оголошень', () => {
     const prompt = buildGroupingPrompt('macbook', groups, 'cons');
     expect(prompt).toContain('- дефект екрану (сюди ж: тріснутий екран, зламаний екран)\n- без торгу');
-    expect(prompt).toContain('{"groups": [{"name": "назва категорії", "members": ["критерій 1", "критерій 2"]}]}');
+    expect(prompt).toContain('{"items": [{"criterion": "критерій 1", "aspect": "аспект"}]}');
     expect(prompt).not.toContain('Приклади описів');
   });
 });

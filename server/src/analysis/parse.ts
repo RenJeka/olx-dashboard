@@ -2,7 +2,7 @@
 // Спільне для авто (OpenRouter) і ручного режиму (вставлений текст із чату).
 import type { AnalyzedListing, CriterionGroup, GroupSuggestion, MatchedItem } from '../types.js';
 import { aliasMap, phraseKey } from './criteria.js';
-import { MAX_CRITERIA, MAX_GROUP_NAME_WORDS, MAX_SYNONYMS } from './constants.js';
+import { MAX_CRITERIA, MAX_SYNONYMS } from './constants.js';
 import { evidenceConfirmed } from './text.js';
 
 /** Знімає ```json … ``` обгортку (ручні вставки часто з нею). */
@@ -137,10 +137,11 @@ export function parseSynonymsResponse(raw: string): string[] {
 }
 
 /**
- * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md): приймає {groups:[…]} або масив.
- * Член зводиться до назви критерію зі списку (регістр, синонім, хвіст «(сюди ж: …)»); невідомий — відкидається;
- * член, уже зайнятий попередньою групою, — теж. Група з < 2 членів відкидається. Назва порожня, довша за
- * MAX_GROUP_NAME_WORDS слів, збігається з критерієм поза групою чи з назвою попередньої групи → перший член.
+ * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md, docs/plans/llm-haiku-prompt-audit.md):
+ * {items: [{criterion, aspect}]} або масив таких пунктів. Критерій зводиться до назви зі списку (регістр, синонім,
+ * хвіст «(сюди ж: …)»); невідомий чи повторний — відкидається. Критерії з однаковим аспектом (без регістру й зайвих
+ * пробілів) — одна група; група з < 2 членів відкидається. Члени — у порядку списку; назва групи — член із
+ * найбільшою кількістю синонімів (за рівності — перший у списку), тож назва завжди є критерієм цієї групи.
  */
 export function parseGroupSuggestions(raw: string, groups: CriterionGroup[]): GroupSuggestion[] {
   let data: unknown;
@@ -152,42 +153,38 @@ export function parseGroupSuggestions(raw: string, groups: CriterionGroup[]): Gr
 
   const list: unknown[] = Array.isArray(data)
     ? data
-    : data && typeof data === 'object' && Array.isArray((data as { groups?: unknown }).groups)
-      ? (data as { groups: unknown[] }).groups
+    : data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)
+      ? (data as { items: unknown[] }).items
       : [];
 
   const known = aliasMap(groups);
-  const usedMembers = new Set<string>();
-  const usedNames = new Set<string>();
-  const out: GroupSuggestion[] = [];
+  const order = new Map(groups.map((g, i) => [phraseKey(g.name), i]));
+  const aliasCount = new Map(groups.map((g) => [phraseKey(g.name), g.aliases.length]));
+  const seen = new Set<string>();
+  const byAspect = new Map<string, string[]>();
 
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
-    const obj = entry as { name?: unknown; members?: unknown };
-    const rawMembers = Array.isArray(obj.members) ? obj.members : [];
-    const members: string[] = [];
-    for (const m of rawMembers) {
-      if (typeof m !== 'string') continue;
-      const canonical = known.get(phraseKey(m.replace(/\s*\(сюди ж:.*$/i, '')));
-      if (canonical === undefined || usedMembers.has(phraseKey(canonical))) continue;
-      usedMembers.add(phraseKey(canonical));
-      members.push(canonical);
-    }
-    if (members.length < 2) continue;
+    const obj = entry as { criterion?: unknown; aspect?: unknown };
+    if (typeof obj.criterion !== 'string' || typeof obj.aspect !== 'string') continue;
+    const canonical = known.get(phraseKey(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '')));
+    const aspect = normalizeCriterion(obj.aspect).toLowerCase();
+    if (canonical === undefined || aspect === '' || seen.has(phraseKey(canonical))) continue;
+    seen.add(phraseKey(canonical));
+    byAspect.set(aspect, [...(byAspect.get(aspect) ?? []), canonical]);
+  }
 
-    const memberKeys = new Set(members.map(phraseKey));
-    const proposed = typeof obj.name === 'string' ? normalizeCriterion(obj.name) : '';
-    const clash = known.get(phraseKey(proposed));
-    const nameOk =
-      proposed !== '' &&
-      proposed.split(' ').length <= MAX_GROUP_NAME_WORDS &&
-      (clash === undefined || memberKeys.has(phraseKey(clash))) &&
-      !usedNames.has(phraseKey(proposed));
-    const name = nameOk ? proposed : (members[0] as string);
-    usedNames.add(phraseKey(name));
+  const rank = (name: string) => order.get(phraseKey(name)) ?? 0;
+  const out: GroupSuggestion[] = [];
+  for (const members of byAspect.values()) {
+    if (members.length < 2) continue;
+    members.sort((a, b) => rank(a) - rank(b));
+    const name = members.reduce((best, m) =>
+      (aliasCount.get(phraseKey(m)) ?? 0) > (aliasCount.get(phraseKey(best)) ?? 0) ? m : best,
+    );
     out.push({ name, members });
   }
-  return out;
+  return out.sort((a, b) => rank(a.members[0] as string) - rank(b.members[0] as string));
 }
 
 interface RawMatch {
