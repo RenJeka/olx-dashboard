@@ -44,7 +44,7 @@ LLM на Claude Haiku 5.5, заміряти точність; окремо — �
 
 - PR #70 — відкритий, CI — дивитись `gh pr checks 70`.
 - `server/src/llmEval.ts`, `server/src/analysis/llmEval.ts` — фінал; `npm run llm:eval`.
-- `server/data/llm-eval/` (gitignored): `before*.json`, `after.json`, `m60-*.json`, `labels.json` (розмітка агента),
+- server/data/llm-eval/ (gitignored): `before*.json`, `after.json`, `m60-*.json`, `labels.json` (розмітка агента),
   разові `group-probe.ts`, `group-synthetic.ts`.
 
 ## Verbatim essentials
@@ -54,7 +54,7 @@ LLM на Claude Haiku 5.5, заміряти точність; окремо — �
 - Автогрупування Haiku на поточних критеріях «macbook m1»: плюси — одна група «повна комплектація + оригінальна коробка +
   з зарядним пристроєм + з чохлом», мінуси — нічого.
 - Команди: `npm run llm:eval -- run --search 2 --tag after --budget 0.09`;
-  `npm run llm:eval -- report server/data/llm-eval/after.json` (мітки — `server/data/llm-eval/labels.json`).
+  `npm run llm:eval -- report server/data/llm-eval/after.json` (мітки — server/data/llm-eval/labels.json).
 
 ## Working preferences
 

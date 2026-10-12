@@ -101,7 +101,7 @@ reduce — теж судження, яке агент робить сам, чи�
 
 Лише вручну й платно (OpenRouter), у БД не пише. `run` ганяє генерацію критеріїв і пошук мінусів/плюсів продовим
 кодом (`buildCriteriaPrompt`/`buildMatchingPrompt` + парс) на моделях із `--models`, запобіжник `--budget` зупиняє
-за фактичним `usage.cost`; `report` дописує нерозмічене у файл міток (`server/data/llm-eval/labels.json`), суддя
+за фактичним `usage.cost`; `report` дописує нерозмічене у файл міток (server/data/llm-eval/labels.json), суддя
 (людина чи агент) ставить `label`, повторний `report` рахує хибну полярність генерації й precision пошуку. Метрики —
 `server/src/analysis/llmEval.ts`, CLI — `server/src/llmEval.ts`; результати замірів — [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md).
 
