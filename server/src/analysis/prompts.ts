@@ -36,7 +36,7 @@ export interface PromptListing {
  * Промпт генерації критеріїв: базовий каркас + доповнення специфічними для категорії
  * на основі семпла описів. Вивід — JSON {"criteria": ["...", ...]}. `existing` — наявні категорії пошуку
  * (з синонімами): модель не повторює й не перефразовує їх (docs/plans/old/criteria-categories.md). `opposite` —
- * категорії протилежного режиму: «не включати» (docs/plans/llm-haiku-prompt-audit.md, H1–H2).
+ * категорії протилежного режиму: «не включати» (docs/plans/old/llm-haiku-prompt-audit.md, H1–H2).
  */
 export function buildCriteriaPrompt(
   category: string,
@@ -87,7 +87,7 @@ export function buildCriteriaPrompt(
 /**
  * Промпт автогрупування критеріїв (docs/plans/old/criteria-auto-group.md): модель лише називає АСПЕКТ товару
  * для кожного критерію, групи складає код (parseGroupSuggestions: однаковий аспект → категорія). Пряме «згрупуй»
- * порушувало навіть явні заборони (замір — docs/plans/llm-haiku-prompt-audit.md). Вхід — лише назви критеріїв із
+ * порушувало навіть явні заборони (замір — docs/plans/old/llm-haiku-prompt-audit.md). Вхід — лише назви критеріїв із
  * синонімами (без описів оголошень і PII). Вивід — JSON {"items": [{"criterion", "aspect"}]}.
  */
 export function buildGroupingPrompt(category: string, groups: CriterionGroup[], mode: AnalysisMode): string {
@@ -154,7 +154,7 @@ export interface ChunkListing {
 }
 
 /** Визначення полярності режиму для генерації критеріїв: описи здебільшого хвалять товар, тож мінуси потребують
- *  явної заборони переваг (замір «до» — docs/plans/llm-haiku-prompt-audit.md). */
+ *  явної заборони переваг (замір «до» — docs/plans/old/llm-haiku-prompt-audit.md). */
 const POLARITY_RULES: Record<AnalysisMode, string> = {
   cons: [
     'Мінус — те, що робить товар гіршим чи ризикованішим для покупця: дефект, знос, несправність, неповний комплект,',

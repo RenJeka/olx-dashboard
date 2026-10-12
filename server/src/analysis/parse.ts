@@ -40,7 +40,7 @@ function words(text: string): string[] {
 }
 
 /**
- * Evidence суперечить критерію-запереченню (docs/plans/llm-haiku-prompt-audit.md, H3): критерій «не X», а evidence
+ * Evidence суперечить критерію-запереченню (docs/plans/old/llm-haiku-prompt-audit.md, H3): критерій «не X», а evidence
  * містить усі слова X без жодного заперечення — «Не працює Face ID» + «Face ID працює», «не повна комплектація» +
  * «повна комплектація». Такий фрагмент є в описі, тож перевірку підрядка проходить — ловимо окремо.
  */
@@ -57,7 +57,7 @@ export function contradictsNegatedCriterion(criterion: string, evidence: string)
 
 /**
  * Згенеровані критерії без тих, що вже є назвою чи синонімом протилежного режиму: «повна комплектація» у плюсах →
- * не пропонувати її в мінусах (docs/plans/llm-haiku-prompt-audit.md, H2).
+ * не пропонувати її в мінусах (docs/plans/old/llm-haiku-prompt-audit.md, H2).
  */
 export function excludeOppositeCriteria(criteria: string[], opposite: CriterionGroup[]): string[] {
   const taken = aliasMap(opposite);
@@ -137,7 +137,7 @@ export function parseSynonymsResponse(raw: string): string[] {
 }
 
 /**
- * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md, docs/plans/llm-haiku-prompt-audit.md):
+ * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md, docs/plans/old/llm-haiku-prompt-audit.md):
  * {items: [{criterion, aspect}]} або масив таких пунктів. Критерій зводиться до назви зі списку (регістр, синонім,
  * хвіст «(сюди ж: …)»); невідомий чи повторний — відкидається. Критерії з однаковим аспектом (без регістру й зайвих
  * пробілів) — одна група; група з < 2 членів відкидається. Члени — у порядку списку; назва групи — член із

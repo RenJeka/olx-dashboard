@@ -15,15 +15,16 @@
 на кроці 2) розв'язано в коді: питання з межею «так/ні» + поріг 0.7 (PR #65, злито й задеплоєно 2026-10-06).
 Керування критеріями мінусів/плюсів, категорії синонімів ([criteria-categories](plans/old/criteria-categories.md),
 PR #67) і кнопка «Згрупувати автоматично» ([criteria-auto-group](plans/old/criteria-auto-group.md), PR #68) — на проді
-з 2026-10-11. Далі — перехід LLM на Claude Haiku 5.5 з аудитом промптів (план схвалено 2026-10-11).
+з 2026-10-11. Перехід LLM на Claude Haiku 5.5 з аудитом промптів і автогрупуванням за аспектом
+([llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) ✅) — у PR #70, ще не злитий.
 
 ## Де ми зараз
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-11 criteria-auto-group](handoffs/2026-10-11-criteria-auto-group.md): злиття PR #67 і #68
-  (категорії критеріїв, вікно «Плюси та мінуси», поріг Jev, запобіжник verify від `403`, автогрупування). Рушій за
-  замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
+- Останній хендоф — [2026-10-12 llm-haiku-prompt-audit](handoffs/2026-10-12-llm-haiku-prompt-audit.md): PR #70
+  (дефолт `anthropic/claude-haiku-5.5`, запобіжники полярності, автогрупування за аспектом, `npm run llm:eval`) —
+  відкритий, не задеплоєний. Рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента,
@@ -43,17 +44,18 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
   перевірка кроку 2 в UI людиною.
 - [jev-threshold-setting](plans/jev-threshold-setting.md) — поріг Jev кроку 2 в «Налаштування» → AI; у проді (PR #67);
   лишився платний ручний прогін людиною.
-- [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md) — Haiku 5.5, аудит промптів (плюси в мінусах і навпаки,
-  автогрупування), замір точності `llm:eval`; **наступний у роботі**.
 
 ## Що враховувати
 
 - Запасного каналу збору немає: HTML-fallback вимкнено (OLX відповідає `403`), ідея обходу — [P-005](parking.md).
 - Verify-проба («Перевірити неактивні») теж отримує `403`: кнопку вимкнено, прохід зупиняється після серії `403`
   ([verify-403-guard](plans/old/verify-403-guard.md)); обхід — P-005.
-- Автогрупування на `gemini-2.5-flash-lite` часом об'єднує різне за змістом — людина знімає зайве у вікні
-  «Запропоновані категорії»; приклади — у [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md).
-- Браузер агента (wmux): пункти меню «⋮» — лише клавіатурою ([wmux-browser-ark-menu](instructions/wmux-browser-ark-menu.md)).
+- Точність пошуку мінусів LLM низька й від моделі не залежить: заважають розмиті назви критеріїв («сервісна батарея»,
+  «не повна комплектація») — заміри в [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md); заміряти зміни
+  промптів — `npm run llm:eval` ([ai-flow](ai-flow.md) → «Замір точності LLM»). Промпти — універсальні під будь-які
+  категорії товарів.
+- Браузер агента (wmux): пункти меню «⋮» — лише клавіатурою ([wmux-browser-ark-menu](instructions/wmux-browser-ark-menu.md));
+  панель у прихованому workspace — [wmux-browser-hidden-pane](instructions/wmux-browser-hidden-pane.md).
 - Ручні test-cases для людини — [manual-test-cases](instructions/manual-test-cases.md).
 - Діалог поверх іншої модалки з полями вводу — [chakra-nested-dialog-focus](instructions/chakra-nested-dialog-focus.md).
 - Великий пошук `iphone` на проді: таблиця й пошук в описі повільні — переважно очікування даних із Turso,
@@ -68,7 +70,9 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Відкриті питання (чекають людину)
 
-- Злиття docs-PR закриття сесії 2026-10-11 (деплой) — за «так».
+- Злиття PR #70 (деплой) — за «так»; потім ручний test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md)
+  і кнопка «Згрупувати автоматично» в UI.
+- Що робити з точністю пошуку мінусів: точніші назви критеріїв, рушій Jev чи база типових критеріїв ([P-016](parking.md)).
 - Ручна перевірка кроку 2 рушієм Jev в UI (більше мінусів/плюсів, ніж до PR #65) — тоді план `jev-model` → ✅ і в `old/`.
 - Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930` і `olx-dashboard-bak-20261011`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
@@ -76,5 +80,4 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Наступний крок
 
-Нова сесія: [llm-haiku-prompt-audit](plans/llm-haiku-prompt-audit.md) — Haiku 5.5 і аудит промптів; платні заміри — після
-«так» людини.
+CI PR #70 зелений → злиття (= деплой) після «так» людини → `npm run smoke`.

@@ -1,4 +1,4 @@
-// Замір точності LLM-кроків «критерії» і «мінуси/плюси» (docs/plans/llm-haiku-prompt-audit.md): формат файлів
+// Замір точності LLM-кроків «критерії» і «мінуси/плюси» (docs/plans/old/llm-haiku-prompt-audit.md): формат файлів
 // прогону й міток, ключі міток і підрахунок метрик. Без мережі й БД — лише чисті функції (CLI — src/llmEval.ts).
 import type { AnalysisMode } from '../types.js';
 import { phraseKey } from './criteria.js';

@@ -7,7 +7,7 @@ export const DEFAULT_PAGE_SIZE = 50;
 export const DEFAULT_AUTO_REFRESH_INTERVAL_MIN = 30;
 export const DEFAULT_ANALYSIS_MODEL = 'anthropic/claude-haiku-5.5';
 /** Колишні дефолти моделі: збережене в браузері значення, що дорівнює одному з них, міграція налаштувань замінює на
- *  DEFAULT_ANALYSIS_MODEL (власну модель людини не чіпає; docs/plans/llm-haiku-prompt-audit.md). */
+ *  DEFAULT_ANALYSIS_MODEL (власну модель людини не чіпає; docs/plans/old/llm-haiku-prompt-audit.md). */
 export const LEGACY_DEFAULT_ANALYSIS_MODELS = ['google/gemini-2.5-flash-lite'];
 /** Версія персисту налаштувань (zustand persist `version`); зростає з кожною міграцією. */
 export const SETTINGS_STORAGE_VERSION = 1;

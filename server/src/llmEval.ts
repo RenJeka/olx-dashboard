@@ -1,4 +1,4 @@
-// Замір точності LLM-кроків «критерії» і «мінуси/плюси» (docs/plans/llm-haiku-prompt-audit.md). Лише вручну, ПЛАТНО
+// Замір точності LLM-кроків «критерії» і «мінуси/плюси» (docs/plans/old/llm-haiku-prompt-audit.md). Лише вручну, ПЛАТНО
 // (OpenRouter). У БД нічого не пише — лише SELECT із БД з server/.env. Суддя — людина чи агент: `report` дописує
 // нерозмічені пункти у файл міток, той їх розмічає (`label`), повторний `report` рахує метрики.
 //   npm run llm:eval -- run --search <id> --tag before [--models a,b] [--runs 2] [--listings 20] [--budget 0.15] [--out <file>]
