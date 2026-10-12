@@ -39,6 +39,8 @@ LLM на Claude Haiku 5.5, заміряти точність; окремо — �
   `docs/instructions/scripted-edit-assert.md`.
 - **Кліки/скріншоти, коли панель браузера wmux у прихованому workspace:** → `docs/instructions/wmux-browser-hidden-pane.md`;
   перевірено через локальний API.
+- **Шляхи до gitignored `server/data/llm-eval/…` у бектиках:** локально `docs:check` зелений, у CI червоний (вже відома
+  пастка `docs/instructions/docs-check-untracked-files.md`) → писати звичайним текстом; виправлено комітом у PR #70.
 
 ## Artifacts
 
