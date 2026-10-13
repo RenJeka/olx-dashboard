@@ -16,7 +16,7 @@
 Керування критеріями мінусів/плюсів, категорії синонімів ([criteria-categories](plans/old/criteria-categories.md),
 PR #67) і кнопка «Згрупувати автоматично» ([criteria-auto-group](plans/old/criteria-auto-group.md), PR #68) — на проді
 з 2026-10-11. Перехід LLM на Claude Haiku 5.5 з аудитом промптів і автогрупуванням за аспектом
-([llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) ✅) — у PR #70, ще не злитий.
+([llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) ✅, PR #70) — на проді з 2026-10-13.
 
 ## Де ми зараз
 
@@ -24,7 +24,7 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
 - Останній хендоф — [2026-10-12 llm-haiku-prompt-audit](handoffs/2026-10-12-llm-haiku-prompt-audit.md): PR #70
   (дефолт `anthropic/claude-haiku-5.5`, запобіжники полярності, автогрупування за аспектом, `npm run llm:eval`) —
-  відкритий, не задеплоєний. Рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
+  злито й задеплоєно 2026-10-13, smoke зелений. Рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента,
@@ -70,7 +70,7 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Відкриті питання (чекають людину)
 
-- Злиття PR #70 (деплой) — за «так»; потім ручний test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md)
+- Ручний test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md)
   і кнопка «Згрупувати автоматично» в UI.
 - Що робити з точністю пошуку мінусів: точніші назви критеріїв, рушій Jev чи база типових критеріїв ([P-016](parking.md)).
 - Ручна перевірка кроку 2 рушієм Jev в UI (більше мінусів/плюсів, ніж до PR #65) — тоді план `jev-model` → ✅ і в `old/`.
@@ -80,4 +80,5 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Наступний крок
 
-CI PR #70 зелений → злиття (= деплой) після «так» людини → `npm run smoke`.
+Ручні перевірки людиною на проді: test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) (модель
+Haiku в налаштуваннях, «Мінуси» → «Згенерувати» без плюсів) і «Згрупувати автоматично».
