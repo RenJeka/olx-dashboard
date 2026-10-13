@@ -164,11 +164,18 @@ describe('POST /criteria/group-suggest', () => {
 
   it('пропозиції LLM проходять перевірки; критерії режиму — у промпті', async () => {
     chatMock.mockResolvedValue(
-      JSON.stringify({ groups: [{ name: 'дефект екрану', members: ['Тріснутий екран', 'зламаний екран', 'вигадка'] }] }),
+      JSON.stringify({
+        items: [
+          { criterion: 'Тріснутий екран', aspect: 'екран' },
+          { criterion: 'зламаний екран', aspect: 'Екран' },
+          { criterion: 'вигадка', aspect: 'екран' },
+          { criterion: 'без торгу', aspect: 'ціна' },
+        ],
+      }),
     );
     const res = await suggest({ mode: 'cons' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ groups: [{ name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] }] });
+    expect(res.json()).toEqual({ groups: [{ name: 'тріснутий екран', members: ['тріснутий екран', 'зламаний екран'] }] });
     const [messages] = chatMock.mock.calls[0] as [{ content: string }[]];
     expect(messages[0]?.content).toContain('- без торгу');
   });

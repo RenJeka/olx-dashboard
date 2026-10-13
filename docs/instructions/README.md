@@ -31,4 +31,5 @@ AI) сюди не дублюється — вона в документах із
 | [prod-data-via-turso-mcp](prod-data-via-turso-mcp.md) | Агенту потрібні рядки з прод-БД у файл; читання ключів заблоковано |
 | [render-mcp-no-env](render-mcp-no-env.md) | Треба знати env чи rewrite сервісів Render або звірити `render.yaml` з продом |
 | [wmux-browser-ark-menu](wmux-browser-ark-menu.md) | Агент у браузері wmux не може обрати пункт меню застосунку («⋮» → …) |
+| [wmux-browser-hidden-pane](wmux-browser-hidden-pane.md) | Браузер wmux пише «guest is not producing frames» або кліки відмовляють — панель у прихованому workspace |
 | [plan-archive-links](plan-archive-links.md) | Переносиш завершений план в `docs/plans/old/` і правиш посилання на нього |

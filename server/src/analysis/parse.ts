@@ -2,7 +2,7 @@
 // Спільне для авто (OpenRouter) і ручного режиму (вставлений текст із чату).
 import type { AnalyzedListing, CriterionGroup, GroupSuggestion, MatchedItem } from '../types.js';
 import { aliasMap, phraseKey } from './criteria.js';
-import { MAX_CRITERIA, MAX_GROUP_NAME_WORDS, MAX_SYNONYMS } from './constants.js';
+import { MAX_CRITERIA, MAX_SYNONYMS } from './constants.js';
 import { evidenceConfirmed } from './text.js';
 
 /** Знімає ```json … ``` обгортку (ручні вставки часто з нею). */
@@ -24,6 +24,44 @@ function extractJson(text: string): string {
 
 function normalizeCriterion(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+/** Номер рядка списку, який модель копіює в назву критерію: «5. сервісна батарея», «2) …». */
+const LIST_NUMBER_RE = /^\d+\s*[.)]\s*/;
+/** Критерій-заперечення: «не працює Face ID», «без коробки», «немає зарядного». */
+const NEGATED_CRITERION_RE = /^(не|без|немає|нема|відсутн\p{L}*)\s+(.+)$/iu;
+/** Слова заперечення чи обмеження в evidence. */
+const NEGATION_WORDS = /^(не|ні|без|немає|нема|нет|відсутн\p{L}*|отсутств\p{L}*|тільки|лише|только)$/u;
+/** Скільки перших літер слова звіряти (грубий стем: «повна» ~ «повний», «торгу» ~ «торг»). */
+const STEM_LENGTH = 4;
+
+function words(text: string): string[] {
+  return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/**
+ * Evidence суперечить критерію-запереченню (docs/plans/old/llm-haiku-prompt-audit.md, H3): критерій «не X», а evidence
+ * містить усі слова X без жодного заперечення — «Не працює Face ID» + «Face ID працює», «не повна комплектація» +
+ * «повна комплектація». Такий фрагмент є в описі, тож перевірку підрядка проходить — ловимо окремо.
+ */
+export function contradictsNegatedCriterion(criterion: string, evidence: string): boolean {
+  const m = NEGATED_CRITERION_RE.exec(criterion.trim());
+  if (!m) return false;
+  const evWords = words(evidence);
+  if (evWords.some((w) => NEGATION_WORDS.test(w))) return false;
+  const stems = words(m[2] as string)
+    .filter((w) => w.length >= 2)
+    .map((w) => w.slice(0, STEM_LENGTH));
+  return stems.length > 0 && stems.every((stem) => evWords.some((w) => w.startsWith(stem)));
+}
+
+/**
+ * Згенеровані критерії без тих, що вже є назвою чи синонімом протилежного режиму: «повна комплектація» у плюсах →
+ * не пропонувати її в мінусах (docs/plans/old/llm-haiku-prompt-audit.md, H2).
+ */
+export function excludeOppositeCriteria(criteria: string[], opposite: CriterionGroup[]): string[] {
+  const taken = aliasMap(opposite);
+  return criteria.filter((c) => !taken.has(phraseKey(c)));
 }
 
 /**
@@ -99,10 +137,11 @@ export function parseSynonymsResponse(raw: string): string[] {
 }
 
 /**
- * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md): приймає {groups:[…]} або масив.
- * Член зводиться до назви критерію зі списку (регістр, синонім, хвіст «(сюди ж: …)»); невідомий — відкидається;
- * член, уже зайнятий попередньою групою, — теж. Група з < 2 членів відкидається. Назва порожня, довша за
- * MAX_GROUP_NAME_WORDS слів, збігається з критерієм поза групою чи з назвою попередньої групи → перший член.
+ * Парс відповіді автогрупування (docs/plans/old/criteria-auto-group.md, docs/plans/old/llm-haiku-prompt-audit.md):
+ * {items: [{criterion, aspect}]} або масив таких пунктів. Критерій зводиться до назви зі списку (регістр, синонім,
+ * хвіст «(сюди ж: …)»); невідомий чи повторний — відкидається. Критерії з однаковим аспектом (без регістру й зайвих
+ * пробілів) — одна група; група з < 2 членів відкидається. Члени — у порядку списку; назва групи — член із
+ * найбільшою кількістю синонімів (за рівності — перший у списку), тож назва завжди є критерієм цієї групи.
  */
 export function parseGroupSuggestions(raw: string, groups: CriterionGroup[]): GroupSuggestion[] {
   let data: unknown;
@@ -114,42 +153,38 @@ export function parseGroupSuggestions(raw: string, groups: CriterionGroup[]): Gr
 
   const list: unknown[] = Array.isArray(data)
     ? data
-    : data && typeof data === 'object' && Array.isArray((data as { groups?: unknown }).groups)
-      ? (data as { groups: unknown[] }).groups
+    : data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)
+      ? (data as { items: unknown[] }).items
       : [];
 
   const known = aliasMap(groups);
-  const usedMembers = new Set<string>();
-  const usedNames = new Set<string>();
-  const out: GroupSuggestion[] = [];
+  const order = new Map(groups.map((g, i) => [phraseKey(g.name), i]));
+  const aliasCount = new Map(groups.map((g) => [phraseKey(g.name), g.aliases.length]));
+  const seen = new Set<string>();
+  const byAspect = new Map<string, string[]>();
 
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue;
-    const obj = entry as { name?: unknown; members?: unknown };
-    const rawMembers = Array.isArray(obj.members) ? obj.members : [];
-    const members: string[] = [];
-    for (const m of rawMembers) {
-      if (typeof m !== 'string') continue;
-      const canonical = known.get(phraseKey(m.replace(/\s*\(сюди ж:.*$/i, '')));
-      if (canonical === undefined || usedMembers.has(phraseKey(canonical))) continue;
-      usedMembers.add(phraseKey(canonical));
-      members.push(canonical);
-    }
-    if (members.length < 2) continue;
+    const obj = entry as { criterion?: unknown; aspect?: unknown };
+    if (typeof obj.criterion !== 'string' || typeof obj.aspect !== 'string') continue;
+    const canonical = known.get(phraseKey(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '')));
+    const aspect = normalizeCriterion(obj.aspect).toLowerCase();
+    if (canonical === undefined || aspect === '' || seen.has(phraseKey(canonical))) continue;
+    seen.add(phraseKey(canonical));
+    byAspect.set(aspect, [...(byAspect.get(aspect) ?? []), canonical]);
+  }
 
-    const memberKeys = new Set(members.map(phraseKey));
-    const proposed = typeof obj.name === 'string' ? normalizeCriterion(obj.name) : '';
-    const clash = known.get(phraseKey(proposed));
-    const nameOk =
-      proposed !== '' &&
-      proposed.split(' ').length <= MAX_GROUP_NAME_WORDS &&
-      (clash === undefined || memberKeys.has(phraseKey(clash))) &&
-      !usedNames.has(phraseKey(proposed));
-    const name = nameOk ? proposed : (members[0] as string);
-    usedNames.add(phraseKey(name));
+  const rank = (name: string) => order.get(phraseKey(name)) ?? 0;
+  const out: GroupSuggestion[] = [];
+  for (const members of byAspect.values()) {
+    if (members.length < 2) continue;
+    members.sort((a, b) => rank(a) - rank(b));
+    const name = members.reduce((best, m) =>
+      (aliasCount.get(phraseKey(m)) ?? 0) > (aliasCount.get(phraseKey(best)) ?? 0) ? m : best,
+    );
     out.push({ name, members });
   }
-  return out;
+  return out.sort((a, b) => rank(a.members[0] as string) - rank(b.members[0] as string));
 }
 
 interface RawMatch {
@@ -203,12 +238,15 @@ export function parseMatchingResponse(
     for (const it of rawItems) {
       const obj = it as { criterion?: unknown; evidence?: unknown };
       const criterionRaw =
-        typeof obj.criterion === 'string' ? normalizeCriterion(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '')) : '';
+        typeof obj.criterion === 'string'
+          ? normalizeCriterion(obj.criterion.replace(/\s*\(сюди ж:.*$/i, '').replace(LIST_NUMBER_RE, ''))
+          : '';
       const evidence = typeof obj.evidence === 'string' ? obj.evidence.trim() : '';
       if (!criterionRaw) continue;
 
-      // Зводимо criterion до канонічного з дозволеного списку (якщо є збіг).
-      const canonical = allowedMap.get(phraseKey(criterionRaw)) ?? criterionRaw;
+      // Зводимо criterion до канонічного з дозволеного списку; поза списком («7 GB» при «8 GB») — відкидаємо.
+      const canonical = allowedMap.get(phraseKey(criterionRaw));
+      if (!canonical) continue;
       const key = canonical.toLowerCase();
       if (seenCriteria.has(key)) continue;
       seenCriteria.add(key);
@@ -216,7 +254,7 @@ export function parseMatchingResponse(
       items.push({
         criterion: canonical,
         evidence,
-        ok: evidenceConfirmed(evidence, description),
+        ok: evidenceConfirmed(evidence, description) && !contradictsNegatedCriterion(canonical, evidence),
       });
     }
 

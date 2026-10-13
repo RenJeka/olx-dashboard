@@ -4,7 +4,7 @@ import type { AnalysisMode } from '../types.js';
 
 // ── Модель / OpenRouter ──────────────────────────────────────────────────────
 /** Дефолтна модель (редагована у налаштуваннях фронтенду, передається в тілі запиту). */
-export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
+export const DEFAULT_MODEL = 'anthropic/claude-haiku-5.5';
 export const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 /** Заголовки атрибуції OpenRouter (HTTP-Referer / X-Title). */
 export const OPENROUTER_REFERER = 'http://localhost:5173';
@@ -55,8 +55,6 @@ export const MAX_ANALYZE_IDS = 200;
 export const MANUAL_ZIP_CHUNK_SIZE = 50;
 /** Ліміт критеріїв (узгоджено з промптом). */
 export const MAX_CRITERIA = 50;
-/** Ліміт слів у назві категорії з автогрупування (узгоджено з промптом, docs/plans/old/criteria-auto-group.md). */
-export const MAX_GROUP_NAME_WORDS = 6;
 /** Ліміт синонімів пошукового запиту (docs/plans/search-synonyms.md, узгоджено з промптом). */
 export const MAX_SYNONYMS = 15;
 /** Розмір семпла описів для генерації критеріїв. */
@@ -109,6 +107,8 @@ export function isMode(value: unknown): value is AnalysisMode {
 // ── Мапи режиму ────────────────────────────────────────────────────────────────
 /** Підпис режиму (заголовок колонки/файлу). */
 export const MODE_LABEL: Record<AnalysisMode, string> = { cons: 'Мінуси', pros: 'Плюси' };
+/** Протилежний режим (критерії плюсів — «не включати» при генерації мінусів і навпаки). */
+export const OPPOSITE_MODE: Record<AnalysisMode, AnalysisMode> = { cons: 'pros', pros: 'cons' };
 /** Іменник режиму для промптів. */
 export const MODE_NOUN: Record<AnalysisMode, string> = {
   cons: 'мінуси (недоліки) товару',

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { mergeResults, parseGroupSuggestions, parseMatchingResponse } from './parse.js';
+import {
+  contradictsNegatedCriterion,
+  excludeOppositeCriteria,
+  mergeResults,
+  parseGroupSuggestions,
+  parseMatchingResponse,
+} from './parse.js';
 import { parseRelevanceResponse, prefilterCandidates } from './relevance.js';
 
 describe('parseMatchingResponse — анти-галюцинація evidence', () => {
@@ -50,6 +56,50 @@ describe('parseMatchingResponse — анти-галюцинація evidence', (
 
   it('невалідний JSON → зрозуміла помилка', () => {
     expect(() => parseMatchingResponse('не json', descriptions, allowed)).toThrow(/JSON/);
+  });
+
+  it('номер зі списку зрізається; критерій поза списком відкидається', () => {
+    const raw = JSON.stringify([
+      {
+        id: 1,
+        items: [
+          { criterion: '1. Подряпини', evidence: 'подряпини' },
+          { criterion: 'Батарея менше 85%', evidence: 'Батарея 87%' },
+        ],
+      },
+    ]);
+    expect(parseMatchingResponse(raw, descriptions, allowed)[0]?.items).toEqual([
+      { criterion: 'Подряпини', evidence: 'подряпини', ok: true },
+    ]);
+  });
+
+  it('критерій-заперечення з evidence без заперечення → ok=false (H3)', () => {
+    const raw = JSON.stringify([{ id: 1, items: [{ criterion: 'Не працює Face ID', evidence: 'Face ID працює' }] }]);
+    expect(parseMatchingResponse(raw, descriptions, allowed)[0]?.items[0]).toMatchObject({ ok: false });
+  });
+});
+
+describe('contradictsNegatedCriterion', () => {
+  it('«не X» + evidence з X без заперечення — суперечність', () => {
+    expect(contradictsNegatedCriterion('не повна комплектація', 'Повна комплектація, коробка')).toBe(true);
+    expect(contradictsNegatedCriterion('без торгу', 'Торг можливий')).toBe(true);
+  });
+
+  it('заперечення чи обмеження в evidence, інші слова, звичайний критерій — не суперечність', () => {
+    expect(contradictsNegatedCriterion('не повна комплектація', 'В комплекті тільки ноутбук')).toBe(false);
+    expect(contradictsNegatedCriterion('не повна комплектація', 'Без зарядного пристрою')).toBe(false);
+    expect(contradictsNegatedCriterion('без торгу', 'Ціна остаточна')).toBe(false);
+    expect(contradictsNegatedCriterion('Не працює Face ID', 'Face ID не працює')).toBe(false);
+    expect(contradictsNegatedCriterion('повна комплектація', 'повна комплектація')).toBe(false);
+  });
+});
+
+describe('excludeOppositeCriteria', () => {
+  it('відкидає назви й синоніми протилежного режиму (регістр, пробіли), решту лишає', () => {
+    const pros = [{ name: 'Повна комплектація', aliases: ['з коробкою'], enabled: true }];
+    expect(excludeOppositeCriteria(['повна  комплектація', 'З коробкою', 'не повна комплектація'], pros)).toEqual([
+      'не повна комплектація',
+    ]);
   });
 
   it('mergeResults: об’єднання за id, новіший item перетирає за criterion', () => {
@@ -114,7 +164,7 @@ describe('prefilterCandidates — бренд + номер моделі пору�
   });
 });
 
-describe('parseGroupSuggestions — перевірки пропозицій автогрупування', () => {
+describe('parseGroupSuggestions — групи за аспектом', () => {
   const groups = [
     { name: 'тріснутий екран', aliases: [], enabled: true },
     { name: 'зламаний екран', aliases: ['розбитий екран'], enabled: true },
@@ -124,59 +174,45 @@ describe('parseGroupSuggestions — перевірки пропозицій ав
     { name: 'без торгу', aliases: [], enabled: true },
   ];
   const parse = (data: unknown) => parseGroupSuggestions(JSON.stringify(data), groups);
+  const item = (criterion: string, aspect: string) => ({ criterion, aspect });
 
-  it('члени зводяться до назв зі списку (регістр, синонім, «сюди ж»); невідомий член відкинутий', () => {
+  it('однаковий аспект (регістр, пробіли) → група; критерій зводиться до назви (синонім, «сюди ж»); невідомий відкинутий', () => {
     expect(
       parse({
-        groups: [
-          { name: 'дефект екрану', members: ['Тріснутий екран', 'розбитий екран', 'вигаданий критерій'] },
-          { name: 'стан', members: ['б/в стан (сюди ж: ношений)', 'експлуатований'] },
+        items: [
+          item('Тріснутий екран', 'Екран'),
+          item('розбитий екран', ' екран '),
+          item('вигаданий критерій', 'екран'),
+          item('б/в стан (сюди ж: ношений)', 'загальний стан'),
+          item('експлуатований', 'загальний  стан'),
+          item('без торгу', 'ціна'),
         ],
       }),
     ).toEqual([
-      { name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] },
-      { name: 'стан', members: ['б/в стан', 'експлуатований'] },
+      { name: 'зламаний екран', members: ['тріснутий екран', 'зламаний екран'] },
+      { name: 'б/в стан', members: ['б/в стан', 'експлуатований'] },
     ]);
   });
 
-  it('член у двох групах лишається в першій; група з одного члена відкинута', () => {
+  it('повторний критерій лишається з першим аспектом; група з одного члена відкинута; «(протилежне)» — окремий аспект', () => {
     expect(
       parse({
-        groups: [
-          { name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] },
-          { name: 'екран', members: ['зламаний екран', 'засвіт'] },
-          { name: 'торг', members: ['без торгу', 'без торгу'] },
+        items: [
+          item('засвіт', 'екран'),
+          item('тріснутий екран', 'екран'),
+          item('засвіт', 'підсвітка'),
+          item('б/в стан', 'стан'),
+          item('експлуатований', 'стан (протилежне)'),
         ],
       }),
-    ).toEqual([{ name: 'дефект екрану', members: ['тріснутий екран', 'зламаний екран'] }]);
+    ).toEqual([{ name: 'тріснутий екран', members: ['тріснутий екран', 'засвіт'] }]);
   });
 
-  it('назва: порожня, > 6 слів, збіг з критерієм поза групою чи з назвою іншої групи → перший член', () => {
-    const result = parse({
-      groups: [
-        { name: '', members: ['тріснутий екран', 'зламаний екран'] },
-        { name: 'один два три чотири пʼять шість сім', members: ['б/в стан', 'експлуатований'] },
-        { name: 'без торгу', members: ['засвіт', 'розбитий екран'] },
-      ],
-    });
-    expect(result.map((s) => s.name)).toEqual(['тріснутий екран', 'б/в стан']);
-
-    expect(
-      parse({
-        groups: [
-          { name: 'дефект', members: ['тріснутий екран', 'зламаний екран'] },
-          { name: 'Дефект', members: ['б/в стан', 'засвіт'] },
-          { name: 'Засвіт', members: ['без торгу', 'експлуатований'] },
-        ],
-      }).map((s) => s.name),
-    ).toEqual(['дефект', 'б/в стан', 'без торгу']);
-  });
-
-  it('приймає масив і JSON в огорожі; порожня відповідь → []; не JSON → помилка', () => {
-    const raw = '```json\n[{"name":"стан","members":["б/в стан","експлуатований"]}]\n```';
+  it('приймає масив і JSON в огорожі; порожня відповідь → []; сміттєві пункти пропускаються; не JSON → помилка', () => {
+    const raw = '```json\n[{"criterion":"б/в стан","aspect":"стан"},{"criterion":"експлуатований","aspect":"стан"}]\n```';
     expect(parseGroupSuggestions(raw, groups)).toHaveLength(1);
-    expect(parse({ groups: [] })).toEqual([]);
-    expect(parse({ groups: [null, 'x', { name: 'стан', members: ['б/в стан', 'експлуатований'] }] })).toHaveLength(1);
+    expect(parse({ items: [] })).toEqual([]);
+    expect(parse({ items: [null, 'x', { criterion: 1 }, item('б/в стан', 'стан'), item('експлуатований', 'стан')] })).toHaveLength(1);
     expect(() => parseGroupSuggestions('не json', groups)).toThrow();
   });
 });

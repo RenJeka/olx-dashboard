@@ -48,7 +48,7 @@ npm run scan -- --search <id>
   1. Отримай ключ на https://openrouter.ai/keys
   2. `cp server/.env.example server/.env` і впиши `OPENROUTER_API_KEY=...`
   3. Перезапусти `npm run dev`. Модель/`reasoning`/додаткові критерії — у «Налаштування →
-     AI-аналіз» (дефолт `google/gemini-2.5-flash-lite`).
+     AI-аналіз» (дефолт `anthropic/claude-haiku-5.5`).
 
 `server/.env` ігнорується git (закомічено лише `.env.example`). Аналіз запускається **тільки
 вручну** (ніколи зі сканів/автооновлення). Деталі — [`docs/ai-flow.md`](docs/ai-flow.md).
