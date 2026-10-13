@@ -15,7 +15,8 @@ source: хендоф 2026-09-30-stability-harness-access; сесія 2026-10-01 
 - PR: `gh pr create --base main --head <гілка> --title "…" --body-file -` (вимоги до тексту —
   [`docs/rules.md`](../rules.md) → «Git»). Перед створенням — зелений CI гілки.
 - CI: `gh run list --branch <гілка> --limit 1`; дочекатись — `gh run watch <id> --exit-status`; причина
-  падіння — `gh run view <id> --log-failed`.
+  падіння — `gh run view <id> --log-failed`. Не `gh pr checks <N> --watch`: він чекає ще й рев'ю CodeRabbit (теж
+  check PR) і за 5 хв таймауту Bash не завершився (2026-10-13), хоча CI був зелений за хвилину.
 - Повторний вхід (токен відкликано/протух): `gh auth login --hostname github.com --web --git-protocol ssh
   --skip-ssh-key` у фоні, людині — код і https://github.com/login/device. Код діє **15 хвилин** —
   запускати лише коли людина готова.
