@@ -22,7 +22,8 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-12 llm-haiku-prompt-audit](handoffs/2026-10-12-llm-haiku-prompt-audit.md): PR #70
+- Останній хендоф — [2026-10-13 release-pr70](handoffs/2026-10-13-release-pr70.md) (реліз; деталі змін —
+  [2026-10-12 llm-haiku-prompt-audit](handoffs/2026-10-12-llm-haiku-prompt-audit.md)): PR #70
   (дефолт `anthropic/claude-haiku-5.5`, запобіжники полярності, автогрупування за аспектом, `npm run llm:eval`) —
   злито й задеплоєно 2026-10-13, smoke зелений. Рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
