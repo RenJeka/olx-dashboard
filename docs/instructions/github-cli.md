@@ -19,7 +19,8 @@ source: хендоф 2026-09-30-stability-harness-access; сесія 2026-10-01 
   check PR) і за 5 хв таймауту Bash не завершився (2026-10-13), хоча CI був зелений за хвилину.
 - Повторний вхід (токен відкликано/протух): `gh auth login --hostname github.com --web --git-protocol ssh
   --skip-ssh-key` у фоні, людині — код і https://github.com/login/device. Код діє **15 хвилин** —
-  запускати лише коли людина готова.
+  запускати лише коли людина готова. Людина без доступу до ПК (керує через Remote Control) вводить код з телефона —
+  сторінка працює в будь-якому браузері з входом у GitHub.
 - Без `gh` (запасний шлях): посилання `https://github.com/RenJeka/olx-dashboard/compare/main...<гілка>?expand=1`;
   CI — публічний API `https://api.github.com/repos/RenJeka/olx-dashboard/actions/runs?branch=<гілка>&per_page=1`.
 

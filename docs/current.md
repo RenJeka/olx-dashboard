@@ -17,10 +17,8 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-16 db-copy-prod](handoffs/2026-10-16-db-copy-prod.md): робочий ПК налаштовано, CLI
-  `npm run db:copy-prod` (копія прод-БД у локальний файл) — у гілці `feat/db-copy-prod`, PR не відкрито; прод не
-  змінювався. Останній реліз — [2026-10-13 release-pr70](handoffs/2026-10-13-release-pr70.md); модель і рушії AI —
-  [ai-flow](ai-flow.md).
+- Останній хендоф і реліз — [2026-10-16 docs-audit](handoffs/2026-10-16-docs-audit.md): аудит документації й
+  `npm run db:copy-prod` (копія прод-БД у локальний файл) — на проді, smoke ✅. Модель і рушії AI — [ai-flow](ai-flow.md).
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента
@@ -70,12 +68,12 @@
 - Що робити з точністю пошуку мінусів: точніші назви критеріїв, рушій Jev чи база типових критеріїв ([P-016](parking.md)).
 - Ручні перевірки рушія Jev в UI — у примітках архівних планів [jev-model](plans/old/jev-model.md) (крок 2) і
   [jev-threshold-setting](plans/old/jev-threshold-setting.md) (test-case 3, платно).
+- Чи видаляти порожній старий файл `server/data/olx-bak-2026-10-16T12-28-23-237Z.db` (робочий ПК).
 - Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930` і `olx-dashboard-bak-20261011`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).
 
 ## Наступний крок
 
-Людина дивиться таблицю оголошень на локальній копії проду (http://localhost:5173) і вирішує, чи відкривати PR з
-`feat/db-copy-prod`. Далі — ручні перевірки людиною на проді: test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) (модель
+Ручні перевірки людиною на проді: test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) (модель
 Haiku в налаштуваннях, «Мінуси» → «Згенерувати» без плюсів) і «Згрупувати автоматично».
