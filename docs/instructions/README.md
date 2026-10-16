@@ -32,4 +32,6 @@ AI) сюди не дублюється — вона в документах із
 | [render-mcp-no-env](render-mcp-no-env.md) | Треба знати env чи rewrite сервісів Render або звірити `render.yaml` з продом |
 | [wmux-browser-ark-menu](wmux-browser-ark-menu.md) | Агент у браузері wmux не може обрати пункт меню застосунку («⋮» → …) |
 | [wmux-browser-hidden-pane](wmux-browser-hidden-pane.md) | Браузер wmux пише «guest is not producing frames» або кліки відмовляють — панель у прихованому workspace |
+| [libsql-windows-file-lock](libsql-windows-file-lock.md) | Скрипт чи тест перейменовує/видаляє файл libSQL-БД і отримує `EPERM` навіть після `close()` |
+| [turso-mcp-scope-403](turso-mcp-scope-403.md) | Turso MCP: список БД читається, а SQL-запит — `403 missing required scope "db:mint-token"` |
 | [plan-archive-links](plan-archive-links.md) | Переносиш завершений план в `docs/plans/old/` і правиш посилання на нього |

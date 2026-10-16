@@ -12,6 +12,7 @@
     "jev:probe": "tsx src/jevProbe.ts",
     "llm:eval": "tsx src/llmEval.ts",
     "migrate:posted-at": "tsx src/migratePostedAt.ts",
+    "db:copy-prod": "tsx src/copyProd.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

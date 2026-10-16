@@ -22,10 +22,10 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф — [2026-10-13 release-pr70](handoffs/2026-10-13-release-pr70.md) (реліз; деталі змін —
-  [2026-10-12 llm-haiku-prompt-audit](handoffs/2026-10-12-llm-haiku-prompt-audit.md)): PR #70
-  (дефолт `anthropic/claude-haiku-5.5`, запобіжники полярності, автогрупування за аспектом, `npm run llm:eval`) —
-  злито й задеплоєно 2026-10-13, smoke зелений. Рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
+- Останній хендоф — [2026-10-16 db-copy-prod](handoffs/2026-10-16-db-copy-prod.md): робочий ПК налаштовано, CLI
+  `npm run db:copy-prod` (копія прод-БД у локальний файл) — у гілці `feat/db-copy-prod`, PR не відкрито; прод не
+  змінювався. Останній реліз — PR #70 ([2026-10-13 release-pr70](handoffs/2026-10-13-release-pr70.md)): дефолт
+  `anthropic/claude-haiku-5.5`, рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента,
@@ -68,6 +68,10 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 - Jev MCP/skills jevai.org для агента встановлено глобально, але MCP зараз відповідає `401` — ключ перевипустити
   ([jev-agent-setup](instructions/jev-agent-setup.md)).
 - Локально `SQLITE_BUSY` / зайнятий 3001 — старі `tsx watch` ([local-dev-port-busy](instructions/local-dev-port-busy.md)).
+- Локальна БД на робочому ПК — копія проду на 2026-10-16 (`npm run db:copy-prod`, [development](development.md) §4):
+  AI-кнопки локально платні так само, як на проді. Read-only токен Turso, вставлений у чат 2026-10-16, людина
+  вирішила лишити (діє до ≈ 2026-11-15).
+- Turso MCP: SQL-запит → `403 … db:mint-token` — перепідключити ([turso-mcp-scope-403](instructions/turso-mcp-scope-403.md)).
 
 ## Відкриті питання (чекають людину)
 
@@ -81,5 +85,6 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Наступний крок
 
-Ручні перевірки людиною на проді: test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) (модель
+Людина дивиться таблицю оголошень на локальній копії проду (http://localhost:5173) і вирішує, чи відкривати PR з
+`feat/db-copy-prod`. Далі — ручні перевірки людиною на проді: test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) (модель
 Haiku в налаштуваннях, «Мінуси» → «Згенерувати» без плюсів) і «Згрупувати автоматично».
