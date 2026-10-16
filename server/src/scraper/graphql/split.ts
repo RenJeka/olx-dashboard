@@ -264,7 +264,7 @@ export class SplitScanner {
       } catch (err) {
         // Збій вичерпав ретраї (мережа / 403 анти-бот) посеред бісекції — НЕ валимо весь
         // варіант: перериваємо розбиття, скануємо вже знайдені бакети частковим покриттям
-        // (docs/plans/scan-failure-recovery.md). Жодного бакету ще немає → analyzeSplit
+        // (docs/plans/old/scan-failure-recovery.md). Жодного бакету ще немає → analyzeSplit
         // поверне noSplit-fallback.
         probeError = err instanceof Error ? err.message : String(err);
         logWarn('scanner', `bisect ₴${interval.from}–${interval.to}`, probeError, {

@@ -94,7 +94,7 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         all.push(item);
       }
 
-      // Інкрементальне збереження (docs/plans/scan-failure-recovery.md) — лише deep:
+      // Інкрементальне збереження (docs/plans/old/scan-failure-recovery.md) — лише deep:
       // звичайний скан (≤3 запити) пише один раз у finalize, без зайвих Turso-записів.
       if (deep) await options?.onListings?.(page.items);
 

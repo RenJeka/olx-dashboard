@@ -19,7 +19,7 @@ export const graphqlFetcher = new GraphqlOlxFetcher();
 export const htmlFetcher = new HtmlOlxFetcher();
 
 /**
- * Нота порятунку варіанта (docs/plans/scan-failure-recovery.md): збій пізнього варіанта
+ * Нота порятунку варіанта (docs/plans/old/scan-failure-recovery.md): збій пізнього варіанта
  * (синоніма) завершує скан достроково, зібране попередніми варіантами лишається в БД.
  * Спільна для звичайного (`fetchAllQueries`) і планового (`runDeepScanFromPlan`) сканів,
  * щоб текст warning був однаковий.
@@ -58,7 +58,7 @@ export async function fetchWithFallback(
   aborted: boolean;
 }> {
   try {
-    // Глибокий скан — оркестратор із авто-розбиттям по ціні (docs/plans/price-range-split.md);
+    // Глибокий скан — оркестратор із авто-розбиттям по ціні (docs/plans/old/price-range-split.md);
     // звичайний — один прохід. HTML-fallback не розбивається (немає visible_total_count).
     const onGraphqlProgress: FetchOptions['onProgress'] | undefined = options?.onProgress
       ? (p: ScanProgress) => options.onProgress!({ ...p, method: p.method ?? 'GraphQL' })
@@ -113,7 +113,7 @@ export async function fetchWithFallback(
 }
 
 /**
- * Сканує основний query + усі синоніми (docs/plans/search-synonyms.md), зливає видачі по
+ * Сканує основний query + усі синоніми (docs/plans/old/search-synonyms.md), зливає видачі по
  * olxId. 1 query (без синонімів) — без змін поведінки, делегує fetchWithFallback напряму.
  * >1 query — завжди partial=true: union кількох незалежних видач не відсортований глобально
  * за last_refresh, тож вікно покриття statusEngine (CLAUDE.md) застосовувати небезпечно —
@@ -141,7 +141,7 @@ export async function fetchAllQueries(
   // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів).
   // `maxTotal` тримаємо монотонно-незменшуваним і завжди ≥ `done`, щоб праве число лічильника
   // не стрибало вниз і не опускалося нижче лівого, коли черговий варіант дрібний або фаза
-  // бісекції не дає `total` (інакше — баг «103/3», docs/plans/scan-progress-detail.md).
+  // бісекції не дає `total` (інакше — баг «103/3», docs/plans/old/scan-progress-detail.md).
   let doneOffset = 0;
   let totalOffset = 0;
   let maxTotal = 0;
@@ -175,7 +175,7 @@ export async function fetchAllQueries(
       // Збій пізнього варіанта (напр. анти-бот OLX після сотень запитів: GraphQL 403 і
       // HTML-fallback теж упав) НЕ валить скан — усе зібране попередніми варіантами
       // зберігається, скан завершується достроково з warning
-      // (docs/plans/scan-failure-recovery.md). Перший варіант без даних → чесна помилка.
+      // (docs/plans/old/scan-failure-recovery.md). Перший варіант без даних → чесна помилка.
       if (merged.size === 0) throw err;
       const message = err instanceof Error ? err.message : String(err);
       logError('scanner', `variant «${variant}» ${vi + 1}/${variants.length}`, err, {

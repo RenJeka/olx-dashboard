@@ -31,7 +31,7 @@ export const MANUAL_MODEL = 'manual';
 export const ANALYSIS_ENGINE_LABELS = { llm: 'LLM', jev: 'Jev' } as const;
 /**
  * Поріг ймовірності Jev на кроці 2 (мінуси/плюси): типовий і межі — дзеркало JEV_CRITERIA_THRESHOLD(_MIN/_MAX)
- * у server/src/analysis/constants.ts (docs/plans/jev-threshold-setting.md).
+ * у server/src/analysis/constants.ts (docs/plans/old/jev-threshold-setting.md).
  */
 export const JEV_CRITERIA_THRESHOLD_DEFAULT = 0.7;
 export const JEV_CRITERIA_THRESHOLD_MIN = 0.3;

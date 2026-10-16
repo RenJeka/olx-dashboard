@@ -52,7 +52,7 @@ olx-dashboard/
 │   ├── package.json          # test: vitest (тести — src/**/*.test.ts, хелпери — src/test/); deps: fastify, @fastify/cors, @libsql/client (Turso/libSQL), cheerio, exceljs, archiver
 │   ├── tsconfig.json         # module/moduleResolution: NodeNext (typecheck, включно з тестами)
 │   ├── tsconfig.build.json   # production-збірка в dist/ без *.test.ts і src/test/
-│   ├── vitest.config.ts      # Vitest: тимчасова БД libSQL (TURSO_DATABASE_URL), послідовні файли, прибирання
+│   ├── vitest.config.ts      # Vitest: тимчасова БД libSQL (TURSO_DATABASE_URL), послідовні файли, прибирання (src/test/globalSetup.ts)
 │   ├── scripts/
 │   │   └── copyAssets.mjs    # postbuild: копіює не-TS асети (schema.sql, analyze.py) у dist (tsc їх не копіює)
 │   ├── data/
@@ -85,8 +85,8 @@ olx-dashboard/
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
 │       │   └── verifyScan.ts # runVerify (P1+P2 кандидати, probeListingPage), countVerifyCandidates
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
-│       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/jev-model.md)
-│       ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/jev-model.md)
+│       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
+│       ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/old/llm-haiku-prompt-audit.md)
 │       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
 │       ├── copyProd.ts       # CLI копія прод-БД (Turso, лише SELECT) у server/data/olx.db, npm run db:copy-prod (docs/plans/old/db-copy-prod.md)
@@ -190,13 +190,15 @@ olx-dashboard/
         │   │   ├── ProjectCreateDialog.tsx # модалка створення проекту (назва)
         │   │   ├── ProjectEditDialog.tsx   # модалка перейменування проекту
         │   │   ├── ProjectDeleteDialog.tsx # alert-діалог видалення проекту (пошуки → «Без проекту», не видаляються)
-        │   │   ├── NewSearchForm.tsx       # акордеон-секція форми створення пошуку (презентаційний, стан — useNewSearchForm)
+        │   │   ├── SearchCreateDialog.tsx  # модалка створення пошуку (кнопка «Новий пошук»; стан — useNewSearchForm)
         │   │   ├── SearchRow.tsx           # рядок пошуку: назва/запит/ціна, бейдж синонімів, реордер ↑/↓, SearchRowMenu
         │   │   ├── SearchRowMenu.tsx       # 3-dot меню рядка (редагувати/фільтри/варіанти/перемістити в проект/архів/видалення)
         │   │   ├── SearchDeleteDialog.tsx  # alert-діалог підтвердження видалення пошуку
         │   │   ├── SearchVariantsDialog.tsx # контрольований модал «Варіанти пошуку»: синоніми query (docs/plans/old/search-synonyms.md) — список + генерація авто/ручна (ManualAssistant)
         │   │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку" (обгортка)
         │   │   ├── local-filters/          # компоненти локальних фільтрів
+        │   │   │   ├── CollapsibleFilter.tsx # згортувана секція фільтра (шапка + перемикач інверсії)
+        │   │   │   ├── CategoryFilter.tsx  # фільтр категорій (дерево наших/OLX)
         │   │   │   ├── PriceFilter.tsx     # фільтр діапазону цін
         │   │   │   └── TagsFilter.tsx      # універсальний фільтр тегів (міста, продавці, плюси/мінуси)
         │   │   ├── SearchEditDialog.tsx    # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/old/search-row-edit.md)
@@ -205,7 +207,8 @@ olx-dashboard/
         │   │   │   ├── ActionPanelStats.tsx      # картки лічильників (у БД / застарілі / verify-кандидати)
         │   │   │   ├── ActionPanelLastScan.tsx   # банер останнього скану (помилка/попередження, ScanWarningSummary)
         │   │   │   ├── ScanWarningSummary.tsx    # людино-зрозуміле зведення scan_runs.warning (стат-чипи + акордеон нотаток)
-        │   │   │   ├── ActionPanelButtons.tsx    # 4 картки-кнопки: швидкий/глибокий скан, аналіз перед сканом, перевірка неактивних
+        │   │   │   ├── ActionPanelButtons.tsx    # картки-кнопки: швидкий/глибокий скан, аналіз перед сканом, перевірка неактивних
+        │   │   │   ├── ScanStatusChip.tsx        # індикатор активного скану в шапці, коли модалку згорнуто
         │   │   │   ├── ScanProgressPanel.tsx     # деталізований прогрес скану (сегментована смуга + ETA + кнопка «Зупинити»)
         │   │   │   └── ScanPlanReportDialog.tsx  # звіт двофазного deep-скану: ціновий спектр + ETA + розбивка по синонімах; «Зробити новий аналіз», planValid (docs/plans/old/deep-scan-stop-and-history.md)
         │   │   └── index.ts                # барель: export { Searches }
@@ -216,10 +219,14 @@ olx-dashboard/
         │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
         │   │   ├── ScopeSelector.tsx        # спільний селектор «Обсяг» (all/tab/selected/candidates) — однаковий на всіх 3 етапах AI
         │   │   ├── ModeToggle.tsx           # перемикач «Мінуси / Плюси» (крок 1 майстра, вікно «Плюси та мінуси»)
+        │   │   ├── hub/                     # хаб AI: кнопка «AI» у шапці → картки кроків workflow
+        │   │   │   ├── AiToolsHub.tsx       # кнопка «AI» + перемикання хаб → діалог кроку
+        │   │   │   ├── AiHubDialog.tsx      # діалог хабу з картками кроків
+        │   │   │   └── AiHubStepCard.tsx    # картка одного кроку
         │   │   ├── relevance/               # workflow «Семантична класифікація (AI Фільтр)»
-│   │   │   ├── RelevanceFilterDialog.tsx # оболонка діалогу (DialogRoot)
-│   │   │   ├── RelevanceSetupForm.tsx    # форма запуску (авто + ручний ZIP)
-│   │   │   └── RelevanceResultsList.tsx  # список результатів з ручним коригуванням
+        │   │   │   ├── RelevanceFilterDialog.tsx # оболонка діалогу (DialogRoot)
+        │   │   │   ├── RelevanceSetupForm.tsx    # форма запуску (авто + ручний ZIP)
+        │   │   │   └── RelevanceResultsList.tsx  # список результатів з ручним коригуванням
         │   │   ├── ai-picks/               # workflow «AI Вибір» (план docs/plans/old/AI-auto-top.md)
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
@@ -247,10 +254,11 @@ olx-dashboard/
         │   │   └── sections/
         │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
         │   │       ├── AutoRefreshSection.tsx # секція "Автооновлення" (перемикач, інтервал)
-        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, модель, reasoning, додаткові критерії)
+        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, рушій LLM/Jev, модель, поріг Jev, reasoning, додаткові критерії)
         │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
+        │   ├── ErrorBoundary.tsx  # глобальний перехоплювач помилок рендеру React
         │   ├── table/             # компоненти таблиці оголошень
         │   │   ├── index.ts       # барель-експорт основних частин таблиці (Header, Body, Pagination, FilterBar)
         │   │   ├── HeaderLabel.tsx # заголовок колонки з іконкою
@@ -264,8 +272,10 @@ olx-dashboard/
         │   │   ├── PhotoCell.tsx  # мініатюра фото + Tooltip-галерея (збільшення при наведенні, photo_urls)
         │   │   ├── ProsConsCell.tsx # інлайн-едіт плюсів/мінусів (Popover + textarea)
         │   │   ├── HighlightText.tsx # підсвітка збігів пошукового запиту (Mark)
-        │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup з useListingsUiStore), "показати filtered_out", пошук
-        │   │   ├── BulkActionBar.tsx # панель масових дій над виділеними рядками (зміна статусу)
+        │   │   ├── topbar/        # панель над таблицею
+        │   │   │   ├── ListingsFilterBar.tsx # рядок фільтрів: статус (SegmentGroup з useListingsUiStore), "показати filtered_out", пошук
+        │   │   │   ├── SearchInput.tsx # поле пошуку по таблиці (у назві / в описі)
+        │   │   │   └── BulkActionBar.tsx # панель масових дій над виділеними рядками (зміна статусу)
         │   │   ├── DescriptionTooltip.tsx # тултіп для попереднього перегляду опису
         │   │   └── TablePagination.tsx # панель пагінації (Chakra Pagination + вибір pageSize)
         │   └── ui/                # Chakra UI v3 snippets
@@ -286,7 +296,7 @@ olx-dashboard/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         │   ├── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
         │   ├── useSearchActionPanel.ts # стан панелі дій пошуку: швидкий/глибокий скан, verify, двофазний deep-скан (аналіз → звіт → запуск)
-        │   ├── useIsMobile.ts    # useBreakpointValue < md (768px) — для responsive JS-розгалужень
+        │   ├── useIsMobile.ts    # useBreakpointValue < md — для responsive JS-розгалужень
         │   ├── useDebouncedValue.ts # значення з паузою (серверний пошук в описі)
         │   ├── useListingsMap.ts  # мемоїзована Map<id, Listing> з масиву listings (спільний для AI-діалогів)
         │   ├── useZipDownload.ts  # хук для паттерну «завантажити ZIP» (downloading/downloaded/download)
@@ -302,7 +312,7 @@ olx-dashboard/
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)
         │   ├── useRelevanceFlow.ts # логіка семантичної класифікації (AI Фільтр)
-        │   ├── useNewSearchForm.ts # стан і сабміт форми створення нового пошуку (NewSearchForm)
+        │   ├── useNewSearchForm.ts # стан і сабміт форми створення нового пошуку (SearchCreateDialog)
         │   ├── useLocalFiltersForm.ts # стан форми локальних фільтрів (SearchFiltersDrawer)
         │   └── useSearchRowActions.ts # мутації рядка пошуку: архівування/видалення/пересортування (SearchRow)
         ├── pages/

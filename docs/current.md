@@ -9,14 +9,9 @@
 розробки й деплою**, **(3) «модель JEV»** — здешевити AI-кроки 1–2 без втрати якості через decision-модель Jev
 ([jev](jev.md)). Історія цін (Етап 3) — не пріоритет ([P-001](parking.md)).
 
-Стабільність закрито ([stability-baseline](plans/old/stability-baseline.md) ✅, 2026-10-04; S15 ⏸ → P-005,
-лагодження швидкості S17 → P-010). Харнес закрито ([dev-deploy-harness](plans/old/dev-deploy-harness.md) ✅,
-2026-10-04). Зараз — **«модель JEV»**: рушій «Jev» для кроків 1–2 на проді (етап 2, PR #63). Етап 3 (пропуски мінусів
-на кроці 2) розв'язано в коді: питання з межею «так/ні» + поріг 0.7 (PR #65, злито й задеплоєно 2026-10-06).
-Керування критеріями мінусів/плюсів, категорії синонімів ([criteria-categories](plans/old/criteria-categories.md),
-PR #67) і кнопка «Згрупувати автоматично» ([criteria-auto-group](plans/old/criteria-auto-group.md), PR #68) — на проді
-з 2026-10-11. Перехід LLM на Claude Haiku 5.5 з аудитом промптів і автогрупуванням за аспектом
-([llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) ✅, PR #70) — на проді з 2026-10-13.
+Стабільність і харнес закрито ([stability-baseline](plans/old/stability-baseline.md),
+[dev-deploy-harness](plans/old/dev-deploy-harness.md)); рушій Jev, керування критеріями й Claude Haiku — на проді
+(історія — [plans/old/](plans/old/README.md)). Що з AI зараз працює — [ai-flow](ai-flow.md).
 
 ## Де ми зараз
 
@@ -24,14 +19,14 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
 - Останній хендоф — [2026-10-16 db-copy-prod](handoffs/2026-10-16-db-copy-prod.md): робочий ПК налаштовано, CLI
   `npm run db:copy-prod` (копія прод-БД у локальний файл) — у гілці `feat/db-copy-prod`, PR не відкрито; прод не
-  змінювався. Останній реліз — PR #70 ([2026-10-13 release-pr70](handoffs/2026-10-13-release-pr70.md)): дефолт
-  `anthropic/claude-haiku-5.5`, рушій за замовчуванням — LLM; Jev — перемикач у налаштуваннях AI.
+  змінювався. Останній реліз — [2026-10-13 release-pr70](handoffs/2026-10-13-release-pr70.md); модель і рушії AI —
+  [ai-flow](ai-flow.md).
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
-- Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента,
-  [secrets-in-sources](instructions/secrets-in-sources.md)) і `olx-dashboard-bak-20261011` (перед злиттям PR #67).
+- Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента
+  на домашньому ПК, [secrets-in-sources](instructions/secrets-in-sources.md)) і `olx-dashboard-bak-20261011`.
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
-  «Прод». GitHub — через `gh` ([github-cli](instructions/github-cli.md)); зливати PR після зеленого CI агент
+  «Прод». GitHub — через `gh` на обох ПК ([github-cli](instructions/github-cli.md)); зливати PR після зеленого CI агент
   може, коли людина це дозволила в діалозі.
 - Харнес розробки (CI, тести, перевірки) — `AGENTS.md` → «Перевірка»; харнес сесій — `AGENTS.md` → «Сесія».
 - Реліз: чекліст, відкат і бекап Turso — [deploy-render-turso](deploy-render-turso.md) → «Реліз, відкат, бекап»;
@@ -41,10 +36,7 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Активні плани
 
-- [jev-model](plans/jev-model.md) — етапи 0–3 у проді (етап 3 — PR #65: нове питання, поріг 0.7); лишилась ручна
-  перевірка кроку 2 в UI людиною.
-- [jev-threshold-setting](plans/jev-threshold-setting.md) — поріг Jev кроку 2 в «Налаштування» → AI; у проді (PR #67);
-  лишився платний ручний прогін людиною.
+Немає.
 
 ## Що враховувати
 
@@ -65,8 +57,8 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 - Моніторинг скану на проді — [prod-scan-monitoring](instructions/prod-scan-monitoring.md).
 - Рядки з прод-БД агенту — лише через Turso MCP або команду людини; читання ключів блокує auto-mode
   ([prod-data-via-turso-mcp](instructions/prod-data-via-turso-mcp.md)).
-- Jev MCP/skills jevai.org для агента встановлено глобально, але MCP зараз відповідає `401` — ключ перевипустити
-  ([jev-agent-setup](instructions/jev-agent-setup.md)).
+- Jev MCP/skills jevai.org для агента: домашній ПК — встановлено, але MCP відповідає `401` (ключ перевипустити);
+  робочий ПК — не встановлено ([jev-agent-setup](instructions/jev-agent-setup.md)).
 - Локально `SQLITE_BUSY` / зайнятий 3001 — старі `tsx watch` ([local-dev-port-busy](instructions/local-dev-port-busy.md)).
 - Локальна БД на робочому ПК — копія проду на 2026-10-16 (`npm run db:copy-prod`, [development](development.md) §4):
   AI-кнопки локально платні так само, як на проді. Read-only токен Turso, вставлений у чат 2026-10-16, людина
@@ -75,10 +67,9 @@ PR #67) і кнопка «Згрупувати автоматично» ([criter
 
 ## Відкриті питання (чекають людину)
 
-- Ручний test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md)
-  і кнопка «Згрупувати автоматично» в UI.
 - Що робити з точністю пошуку мінусів: точніші назви критеріїв, рушій Jev чи база типових критеріїв ([P-016](parking.md)).
-- Ручна перевірка кроку 2 рушієм Jev в UI (більше мінусів/плюсів, ніж до PR #65) — тоді план `jev-model` → ✅ і в `old/`.
+- Ручні перевірки рушія Jev в UI — у примітках архівних планів [jev-model](plans/old/jev-model.md) (крок 2) і
+  [jev-threshold-setting](plans/old/jev-threshold-setting.md) (test-case 3, платно).
 - Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930` і `olx-dashboard-bak-20261011`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).

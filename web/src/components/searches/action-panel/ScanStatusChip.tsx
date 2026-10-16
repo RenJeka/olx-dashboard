@@ -13,7 +13,7 @@ interface Props {
 
 /**
  * Компактний індикатор активного скану в хедері — з'являється, коли модалку сканування згорнуто,
- * а скан ще йде (docs/plans/scan-progress-detail.md). Клік повертає модалку з тим самим прогресом.
+ * а скан ще йде (docs/plans/old/scan-progress-detail.md). Клік повертає модалку з тим самим прогресом.
  */
 export function ScanStatusChip({ scanKind, status, onClick }: Props) {
   const progress =

@@ -71,7 +71,7 @@ export interface GraphqlResponse {
   errors?: Array<{ message: string }>;
 }
 
-/** Ціновий бакет для split-скану (бісекція діапазону цін, docs/plans/price-range-split.md). */
+/** Ціновий бакет для split-скану (бісекція діапазону цін, docs/plans/old/price-range-split.md). */
 export interface PriceBucket {
   from: number;
   to: number;
@@ -82,7 +82,7 @@ export interface PriceBucket {
 }
 
 /**
- * Результат аналітичної (probe) фази split-скану (docs/plans/two-phase-deep-scan.md):
+ * Результат аналітичної (probe) фази split-скану (docs/plans/old/two-phase-deep-scan.md):
  * root-зондування + межі ціни + бісекція на бакети — БЕЗ допагінації листів. `scanFromPlan`
  * довершує збір за цим планом, не повторюючи жодного з probe-запитів.
  */
@@ -100,7 +100,7 @@ export interface SplitPlan {
   /** Чому `noSplit=true` без природньої малості — `scanFromPlan` додає це у warning. */
   fallbackReason?: string;
   /**
-   * Бісекцію перервано збоєм посеред розбиття (docs/plans/scan-failure-recovery.md) —
+   * Бісекцію перервано збоєм посеред розбиття (docs/plans/old/scan-failure-recovery.md) —
    * бакети покривають лише частину цінового діапазону. `scanFromPlan` додає це у warning
    * (скан стає частковим), аналітичний звіт показує як попередження.
    */

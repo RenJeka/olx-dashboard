@@ -22,7 +22,7 @@ const OPTIONS: { value: string; label: string; palette: string }[] = [
 /**
  * Select-бейдж «Активності» (olx_status). Ручна зміна — разова підказка БЕЗ захисту:
  * наступний GraphQL-скан/verify, що побачить оголошення, перепише реальним значенням від
- * OLX (docs/plans/honest-olx-status.md). Тултіп показує свіжість (last_seen_at).
+ * OLX (docs/plans/old/honest-olx-status.md). Тултіп показує свіжість (last_seen_at).
  */
 export function ActivityCell({ listing }: Props) {
   const updateListing = useUpdateListing();

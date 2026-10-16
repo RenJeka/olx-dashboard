@@ -24,7 +24,7 @@ export interface ScanResult {
   new_count: number;
   /**
    * Сирих оголошень до cross-variant дедупу (сума по варіантах синонімів/бакетах).
-   * `rawFound - found` = скільки дублів злито між синонімами (docs/plans/deep-scan-stop-and-history.md).
+   * `rawFound - found` = скільки дублів злито між синонімами (docs/plans/old/deep-scan-stop-and-history.md).
    * Для скану без синонімів дорівнює `found`.
    */
   rawFound?: number;
@@ -53,7 +53,7 @@ export interface ScanStatus {
   fetch_method: string | null;
   /** normal | deep | verify. */
   kind: string | null;
-  /** Людиномовний поточний етап (docs/plans/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
+  /** Людиномовний поточний етап (docs/plans/old/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
   stage: string | null;
   /** Позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify. */
   sub_done: number | null;
@@ -81,7 +81,7 @@ export interface LastScanInfo {
  * Відповідь GET /api/searches/:id/stats — лише `last_scan` (1 рядок scan_runs).
  * Агрегати `in_db`/`stale_count`/`verify_candidates` НЕ рахуються на сервері: фронт виводить їх
  * із уже завантаженого масиву listings, щоб не робити зайвий 408-рядковий прохід на кожен вибір
- * пошуку (Turso reads, docs/plans/turso-stats-clientside.md).
+ * пошуку (Turso reads, docs/plans/old/turso-stats-clientside.md).
  */
 export interface LastScanResponse {
   last_scan: LastScanInfo | null;
@@ -113,13 +113,13 @@ export interface FetchSearchResult {
   bucketsUsed?: number;
   /**
    * Скан перервано через `FetchOptions.shouldAbort` (кнопка «Зупинити») — `listings`
-   * містить частково зібране, яке все одно треба зберегти (docs/plans/deep-scan-stop-and-history.md).
+   * містить частково зібране, яке все одно треба зберегти (docs/plans/old/deep-scan-stop-and-history.md).
    */
   aborted?: boolean;
 }
 
 /**
- * Знімок прогресу скану (docs/plans/scan-progress-detail.md). `total` відсутній під час
+ * Знімок прогресу скану (docs/plans/old/scan-progress-detail.md). `total` відсутній під час
  * indeterminate-фаз (зондування/бісекція deep-split) — UI показує «Підготовка…». `stage` —
  * короткий людиномовний опис поточної дії (транзієнтний текст, перезаписується щотику,
  * у т.ч. під час пауз). `subDone`/`subTotal` — позиція в реальній підпослідовності роботи
@@ -147,11 +147,11 @@ export interface FetchOptions {
   onProgress?: (progress: ScanProgress) => void;
   /**
    * Опитується фетчером перед кожним запитом/ітерацією. `true` → припинити збір і повернути
-   * вже зібране з `aborted: true` (кнопка «Зупинити», docs/plans/deep-scan-stop-and-history.md).
+   * вже зібране з `aborted: true` (кнопка «Зупинити», docs/plans/old/deep-scan-stop-and-history.md).
    */
   shouldAbort?: () => boolean;
   /**
-   * Інкрементальне збереження (docs/plans/scan-failure-recovery.md): фетчер віддає
+   * Інкрементальне збереження (docs/plans/old/scan-failure-recovery.md): фетчер віддає
    * новозібрані оголошення по ходу скану (сторінка deep-скану / ціновий бакет / варіант
    * синоніма), щоб збій наприкінці довгого скану не втрачав усе зібране. Реалізація
    * (`ScanPersister.flushSafe`) дедуплікує повтори й НЕ кидає помилок.
@@ -168,7 +168,7 @@ export interface OlxFetcher {
 }
 
 // ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ───────────
-// (docs/plans/two-phase-deep-scan.md). DTO для фронта — без важких page0/RawListing[],
+// (docs/plans/old/two-phase-deep-scan.md). DTO для фронта — без важких page0/RawListing[],
 // лише підсумки для звіту.
 
 /** Підсумок одного цінового бакету split-скану — для стрічки «ціновий спектр» у звіті. */

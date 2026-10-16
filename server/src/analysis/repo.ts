@@ -47,7 +47,7 @@ export async function setRelevanceTarget(searchId: number, target: string): Prom
 }
 
 /**
- * Синоніми query (docs/plans/search-synonyms.md) як alias-назви товару для AI-фільтра
+ * Синоніми query (docs/plans/old/search-synonyms.md) як alias-назви товару для AI-фільтра
  * релевантності — оголошення, що продає товар під будь-яким із синонімів, теж релевантне.
  */
 export async function getRelevanceAliases(searchId: number): Promise<string[]> {

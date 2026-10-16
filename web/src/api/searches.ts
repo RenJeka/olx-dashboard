@@ -70,7 +70,7 @@ export function useReorderSearches() {
  * Статистика для панелі дій. `last_scan` — зі звуженого `/stats` (1 рядок scan_runs); агрегати
  * `in_db`/`stale_count`/`verify_candidates` рахуються на клієнті з кешу `['listings', searchId]`
  * (`useListings` дедуплікується з таблицею — зайвого запиту немає), щоб не робити 408-рядковий
- * прохід на сервері. docs/plans/turso-stats-clientside.md.
+ * прохід на сервері. docs/plans/old/turso-stats-clientside.md.
  */
 export function useSearchStats(searchId: number | null) {
   const lastScanQuery = useQuery({
@@ -89,7 +89,7 @@ export function useSearchStats(searchId: number | null) {
   return { ...lastScanQuery, data };
 }
 
-/** Загальне редагування пошуку (назва/запит/api_filters/синоніми) — docs/plans/search-row-edit.md. */
+/** Загальне редагування пошуку (назва/запит/api_filters/синоніми) — docs/plans/old/search-row-edit.md. */
 export function useUpdateSearch() {
   const qc = useQueryClient();
   return useMutation({
@@ -114,7 +114,7 @@ export function useUpdateSearch() {
   });
 }
 
-/** Архівувати/розархівувати пошук (docs/plans/archive-searches.md). */
+/** Архівувати/розархівувати пошук (docs/plans/old/archive-searches.md). */
 export function useArchiveSearch() {
   const qc = useQueryClient();
   return useMutation({

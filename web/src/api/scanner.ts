@@ -32,7 +32,7 @@ export function useVerify() {
 }
 
 /**
- * Аналітична (probe) фаза двофазного глибокого скану (docs/plans/two-phase-deep-scan.md):
+ * Аналітична (probe) фаза двофазного глибокого скану (docs/plans/old/two-phase-deep-scan.md):
  * лише зондування + бісекція, повертає звіт ScanPlan для ScanPlanReportDialog.
  */
 export function useAnalyzeScan() {
@@ -72,7 +72,7 @@ export function useScanStatus(searchId: number | null, enabled: boolean) {
   });
 }
 
-/** Зупинка активного скану (docs/plans/deep-scan-stop-and-history.md): зібране зберігається у БД. */
+/** Зупинка активного скану (docs/plans/old/deep-scan-stop-and-history.md): зібране зберігається у БД. */
 export function useStopScan() {
   return useMutation({
     mutationKey: ['scan-stop'],

@@ -1,6 +1,6 @@
 // Доменні типи OLX Dashboard. Без `any` у доменному ядрі (scraper/db/logic).
 
-/** Проект — група пошуків (docs/plans/projects.md). */
+/** Проект — група пошуків (docs/plans/old/projects.md). */
 export interface Project {
   id: number;
   name: string;
@@ -60,7 +60,7 @@ export interface SearchConfig {
   query: string;
   categoryId?: number | null;
   apiFilters: ApiFilters;
-  /** Синоніми query (docs/plans/search-synonyms.md) — скануються разом, видача зливається по olx_id. */
+  /** Синоніми query (docs/plans/old/search-synonyms.md) — скануються разом, видача зливається по olx_id. */
   querySynonyms?: string[];
 }
 
@@ -72,7 +72,7 @@ export interface ParamKeyInfo {
 }
 
 /**
- * Вузол дерева категорій OLX для пошуку (facet, docs/plans/category-counts-and-filter.md).
+ * Вузол дерева категорій OLX для пошуку (facet, docs/plans/old/category-counts-and-filter.md).
  * `id` — category id (збігається з listings.category_id); `path` — назви предків root→leaf;
  * `olxCount` — лічильник OLX для запиту (включно з підкатегоріями, як віддає facet).
  */

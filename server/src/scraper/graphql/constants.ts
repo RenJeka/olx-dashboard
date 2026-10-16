@@ -18,7 +18,7 @@ export const MAX_OFFSET = 1000;
 /** Кількість запитів від offset=0 до offset=MAX_OFFSET включно. */
 export const MAX_PAGES = MAX_OFFSET / PAGE_LIMIT + 1;
 
-// ── Авто-розбиття глибокого скану по цінових діапазонах (docs/plans/price-range-split.md) ──
+// ── Авто-розбиття глибокого скану по цінових діапазонах (docs/plans/old/price-range-split.md) ──
 
 /** Поріг visible_total_count, за яким бакет ще ділиться (= вікно пагінації OLX). */
 export const SPLIT_THRESHOLD = MAX_OFFSET;
@@ -28,14 +28,14 @@ export const MIN_PRICE_WIDTH = 1;
 
 /**
  * Глобальний запобіжник: максимум листів-бакетів (проти лавини запитів).
- * Підвищено 40→60 (docs/plans/deep-scan-stop-and-history.md): дуже великі пошуки
+ * Підвищено 40→60 (docs/plans/old/deep-scan-stop-and-history.md): дуже великі пошуки
  * (десятки тисяч оголошень) потребують більше бакетів для повного покриття без обрізання.
  */
 export const MAX_BUCKETS = 60;
 
 /**
  * Глобальний запобіжник: максимум HTTP-запитів на весь split-скан (на варіант query).
- * Підвищено 200→400 (docs/plans/deep-scan-stop-and-history.md): страховка для дуже
+ * Підвищено 200→400 (docs/plans/old/deep-scan-stop-and-history.md): страховка для дуже
  * великих пошуків, щоб усі дані доходили до користувача. Якщо ліміт усе одно впирається —
  * scanFromPlan ставить `warning` (capHit) і скан позначається частковим.
  */

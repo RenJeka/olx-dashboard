@@ -1,4 +1,4 @@
-// ── Семантичний фільтр релевантності (docs/plans/semantic-relevance-filter.md) ──
+// ── Семантичний фільтр релевантності (docs/plans/old/semantic-relevance-filter.md) ──
 
 export interface RelevanceItem {
   id: number;
@@ -22,7 +22,7 @@ export interface RelevanceResponse {
   model?: string;
 }
 
-// ── AI Вибір позицій (план docs/plans/AI-auto-top.md) ────────────────────────
+// ── AI Вибір позицій (план docs/plans/old/AI-auto-top.md) ────────────────────────
 
 export interface PickItem {
   id: number;
@@ -35,7 +35,7 @@ export interface PickResult {
   summary: string;
 }
 
-// ── LLM-аналіз (план docs/plans/llm-analysis.md) ─────────────────────────────
+// ── LLM-аналіз (план docs/plans/old/llm-analysis.md) ─────────────────────────────
 
 export type AnalysisMode = 'cons' | 'pros';
 

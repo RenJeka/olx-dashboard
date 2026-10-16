@@ -208,7 +208,7 @@ export function prefilterCandidates(
   aliases: string[] = [],
 ): { candidates: PromptListing[]; rejected: RelevanceItem[] } {
   const names = [target, ...aliases];
-  // Синоніми (docs/plans/search-synonyms.md) — union брендів/моделей з усіх назв. Лише
+  // Синоніми (docs/plans/old/search-synonyms.md) — union брендів/моделей з усіх назв. Лише
   // РОЗШИРЮЄ коло кандидатів (ніколи не звужує) — безпечно: гірше зайвий запуск ШІ, ніж
   // мовчазний false-negative через пропущений синонім.
   const wordsSet = new Set<string>();

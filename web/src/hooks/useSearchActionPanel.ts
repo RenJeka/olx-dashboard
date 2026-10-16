@@ -32,7 +32,7 @@ function isUserAbort(err: unknown): boolean {
 
 /**
  * Опис результату скану для toast: дедуп між синонімами (сирих/злито дублів,
- * docs/plans/deep-scan-stop-and-history.md) + позначка зупинки користувачем.
+ * docs/plans/old/deep-scan-stop-and-history.md) + позначка зупинки користувачем.
  */
 function describeScanResult(r: ScanResult, deep: boolean): { title: string; description: string } {
   const bucketsSuffix = r.bucketsUsed != null && r.bucketsUsed > 1 ? ` · діапазонів ${r.bucketsUsed}` : '';
@@ -53,7 +53,7 @@ function describeScanResult(r: ScanResult, deep: boolean): { title: string; desc
 
 /**
  * Хук керування станом та логікою панелі дій пошуку (сканування, перевірка неактивних,
- * двофазний глибокий скан — аналіз → звіт → підтверджений запуск, docs/plans/two-phase-deep-scan.md).
+ * двофазний глибокий скан — аналіз → звіт → підтверджений запуск, docs/plans/old/two-phase-deep-scan.md).
  */
 export function useSearchActionPanel(search: Search) {
   const [scanKind, setScanKind] = useState<'normal' | 'deep' | 'verify' | 'analyze' | null>(null);

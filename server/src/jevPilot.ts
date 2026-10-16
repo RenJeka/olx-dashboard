@@ -1,4 +1,4 @@
-// Пілот Jev для AI-кроків 1+2 (docs/plans/jev-model.md): заміряє вартість і згоду Jev з еталоном
+// Пілот Jev для AI-кроків 1+2 (docs/plans/old/jev-model.md): заміряє вартість і згоду Jev з еталоном
 // на вибірці. Нічого не пише в БД — лише читає JSON-вибірку й пише звіт поруч.
 //   npm run jev:pilot -- --export <searchId> [--limit N]   # вибірка з БД з server/.env (лише SELECT)
 //   npm run jev:pilot -- [--sample <path>] [--limit N] [--variants L,A1s,A1f,A2,B,UK]

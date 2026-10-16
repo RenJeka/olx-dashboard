@@ -47,7 +47,7 @@ function parseLocationDate(raw?: string): {
 const SEARCH_LOCAL_FILTERS_SQL = 'SELECT local_filters FROM searches WHERE id = ?';
 
 // Поля наявних рядків: для злиття (COALESCE) перед filtered_out + для діфу «чи реально щось
-// змінилось» (docs/plans/turso-write-optimization.md). Якщо у GraphQL-рядка жодне бізнес-поле
+// змінилось» (docs/plans/old/turso-write-optimization.md). Якщо у GraphQL-рядка жодне бізнес-поле
 // не змінилось — повний UPSERT пропускаємо (лишається дешевий touch last_seen_at/miss_count),
 // щоб не множити Turso "rows written" на 4 (таблиця + 3 індекси) за кожен незмінний рядок.
 // `id` НЕ потрібен — filtered_out пишеться у тому ж UPSERT (не окремим UPDATE by id).
@@ -367,7 +367,7 @@ export async function upsertListings(
     const filteredOutInt = filteredOut ? 1 : 0;
 
     // Класифікація запису: повний UPSERT лише для нових / HTML-fallback / реально змінених
-    // GraphQL-рядків. Незмінні GraphQL-рядки → дешевий touch (docs/plans/turso-write-optimization.md).
+    // GraphQL-рядків. Незмінні GraphQL-рядки → дешевий touch (docs/plans/old/turso-write-optimization.md).
     const needsUpsert =
       existing === undefined ||
       !hasStructuredData ||
@@ -447,7 +447,7 @@ export async function upsertListings(
 
 /**
  * Які з переданих olx_id уже є в БД — для оцінки «~нових» у звіті аналітичної фази
- * глибокого скану (docs/plans/two-phase-deep-scan.md). Батч одним запитом замість N окремих.
+ * глибокого скану (docs/plans/old/two-phase-deep-scan.md). Батч одним запитом замість N окремих.
  */
 export async function selectKnownOlxIds(olxIds: number[]): Promise<Set<number>> {
   if (olxIds.length === 0) return new Set();

@@ -14,7 +14,7 @@ interface LogsQuery {
 }
 
 /**
- * Технічний журнал застосунку (docs/plans/logging-system.md): перегляд і очищення
+ * Технічний журнал застосунку (docs/plans/old/logging-system.md): перегляд і очищення
  * app_logs. Пишуть сюди logError/logWarn (server/src/logger.ts).
  */
 export async function logsRoutes(app: FastifyInstance): Promise<void> {

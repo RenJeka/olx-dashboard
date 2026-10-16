@@ -1,4 +1,4 @@
-// ── Зупинка скану (docs/plans/deep-scan-stop-and-history.md) ──────────────────
+// ── Зупинка скану (docs/plans/old/deep-scan-stop-and-history.md) ──────────────────
 // Single-user локальний застосунок: один активний скан на пошук. Прапорець ставить
 // requestStopScan (роут POST /scan/stop), фетчери опитують його через FetchOptions.shouldAbort.
 // При зупинці зібране все одно зберігається (upsert), вікно покриття пропускається.

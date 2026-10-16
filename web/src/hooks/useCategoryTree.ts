@@ -11,7 +11,7 @@ import type { CategoryOption } from '../types';
 /**
  * Будує вкладене дерево категорій + лічильники «наших» В ПАМ'ЯТІ з уже завантажених listings
  * (0 додаткових запитів до БД; читає кеш TanStack Query). Рендериться рекурсивно зі
- * згортанням гілок. Див. docs/plans/category-counts-and-filter.md.
+ * згортанням гілок. Див. docs/plans/old/category-counts-and-filter.md.
  */
 export function useCategoryTree(
   searchId: number,

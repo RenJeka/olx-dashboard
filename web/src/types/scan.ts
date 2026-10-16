@@ -37,7 +37,7 @@ export interface ScanStatus {
   requests_total: number | null;
   fetch_method: string | null;
   kind: string | null;
-  /** Людиномовний поточний етап (docs/plans/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
+  /** Людиномовний поточний етап (docs/plans/old/scan-progress-detail.md), напр. «Синонім «X» (2/4)». */
   stage: string | null;
   /** Позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify. */
   sub_done: number | null;
@@ -64,7 +64,7 @@ export interface LastScanInfo {
 /**
  * Відповідь сервера GET /api/searches/:id/stats — лише `last_scan` (1 рядок scan_runs).
  * Дзеркало server `LastScanResponse`. Агрегати рахуються на клієнті (`computeListingStats`),
- * docs/plans/turso-stats-clientside.md.
+ * docs/plans/old/turso-stats-clientside.md.
  */
 export interface LastScanResponse {
   last_scan: LastScanInfo | null;
@@ -84,7 +84,7 @@ export interface SearchStats {
 }
 
 // ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ───────────
-// (docs/plans/two-phase-deep-scan.md). Дзеркало DTO server/src/types.ts.
+// (docs/plans/old/two-phase-deep-scan.md). Дзеркало DTO server/src/types.ts.
 
 /** Підсумок одного цінового бакету split-скану — для стрічки «ціновий спектр» у звіті. */
 export interface PriceBucketSummary {
@@ -136,7 +136,7 @@ export interface ScanPlan {
 
 /**
  * Останній збережений аналіз (GET /api/searches/:id/last-analysis,
- * docs/plans/deep-scan-stop-and-history.md). `planValid` — часова валідність (у межах TTL 30 хв
+ * docs/plans/old/deep-scan-stop-and-history.md). `planValid` — часова валідність (у межах TTL 30 хв
  * за `finished_at`): true → звіт ще запускний (сервер за потреби перезондує); false →
  * протермінований, потрібен новий аналіз.
  */

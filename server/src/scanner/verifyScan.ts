@@ -53,8 +53,8 @@ export const P2_CONDITION = `
 `;
 
 /**
- * Кандидати verify-проходу (≤ cap, P1 спершу). Реалізація — `docs/plans/verify-pass.md` групи B1.
- * `p1Count` — межа фаз (P1 живість / P2 дозаповнення) для прогресу (docs/plans/scan-progress-detail.md).
+ * Кандидати verify-проходу (≤ cap, P1 спершу). Реалізація — `docs/plans/old/verify-pass.md` групи B1.
+ * `p1Count` — межа фаз (P1 живість / P2 дозаповнення) для прогресу (docs/plans/old/scan-progress-detail.md).
  */
 async function loadVerifyCandidates(
   searchId: number,
@@ -119,7 +119,7 @@ const FINALIZE_VERIFY_SQL = `UPDATE scan_runs SET finished_at = ?, found = ?, ne
      stage = NULL, sub_done = NULL, sub_total = NULL WHERE id = ?`;
 
 /**
- * Verify-прохід (Етап 2 A3, `docs/plans/verify-pass.md`): пряма перевірка сторінок
+ * Verify-прохід (Етап 2 A3, `docs/plans/old/verify-pass.md`): пряма перевірка сторінок
  * оголошень — живість (P1, давно не бачені) + дозаповнення description/seller_name
  * для рядків за межами вікна пагінації GraphQL (P2). До VERIFY_PAGE_CAP сторінок,
  * батчі по VERIFY_BATCH_SIZE з паузами (як глибокий скан). Прогрес — через
@@ -140,7 +140,7 @@ export async function runVerify(searchId: number): Promise<VerifyResult> {
     const total = candidates.length;
     const p2Count = total - p1Count;
     // Сегментована смуга прогресу має сенс лише коли ОБИДВІ фази мають кандидатів — інакше
-    // прохід однофазний і sub_total лишаємо NULL (docs/plans/scan-progress-detail.md).
+    // прохід однофазний і sub_total лишаємо NULL (docs/plans/old/scan-progress-detail.md).
     const hasTwoPhases = p1Count > 0 && p2Count > 0;
     await dbRun('UPDATE scan_runs SET requests_done = 0, requests_total = ? WHERE id = ?', [
       total,

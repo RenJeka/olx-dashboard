@@ -242,8 +242,8 @@ flowchart LR
 | `auth/*` | **Google OAuth «ворота»** single-user (план `plans/google-oauth-gate.md`) — замок доступу, НЕ мультиюзер (жодної таблиці `users`/`user_id`). `config.ts` — env `GOOGLE_CLIENT_ID`/`ALLOWED_EMAILS`/`SESSION_SECRET`/`AUTH_COOKIE_SECURE`/`AUTH_DISABLED`, кукі-флаги (прод cross-site: `Secure`+`SameSite=None`; локал http: `Lax`), `assertAuthConfigured()` (fail-fast, якщо auth on без ключів). `plugin.ts` — `fastify-plugin` (non-encapsulated, щоб глобальний хук бачив усі роути): реєструє `@fastify/cookie`+`@fastify/jwt` (сесійний JWT у httpOnly-кукі `olx_session`), декоратор `verifyGoogleIdToken` (`google-auth-library` `OAuth2Client.verifyIdToken` → перевірка `aud`+`email_verified`+allowlist), глобальний `onRequest`-замок на `/api/*` (пропускає `/health`, `/api/auth/*`, CORS-preflight). `routes.ts` — `POST /api/auth/google` (обмін Google ID-token на сесійну кукі), `GET /api/auth/me`, `POST /api/auth/logout`. `AUTH_DISABLED=true` (лише dev) вимикає замок повністю. |
 | `index.ts` | Fastify bootstrap, `assertAuthConfigured()` (fail-fast), CORS для `WEB_ORIGIN` з `credentials:true`, реєстрація `authPlugin`+`authRoutes` ДО доменних роутів (`searchesRoutes`/`projectsRoutes`/`listingsRoutes`/`analysisRoutes`/`aiPicksRoutes`/`relevanceRoutes`), `/health`, слухає `:3001`. |
 | `scan.ts` | CLI-обгортка над `runScan` (`npm run scan -- --search <id>`). |
-| `jevPilot.ts` | CLI-пілот Jev (`npm run jev:pilot`, план `plans/jev-model.md`): читає JSON-вибірку (не БД), ганяє варіанти L (поточний LLM) / A (релевантність на короткому state → критерії для релевантних) / B (усе одним запитом), пише звіт вартості й згоди з еталоном. |
-| `jevProbe.ts` | CLI-проба кроку 2 рушієм Jev (`npm run jev:probe -- --search <id> [--top N \| --ids a,b]`, етап 3 плану `plans/jev-model.md`): лише SELECT із БД, викликає продовий `runJevMatching`, перехоплює `fetch` до Decisions API і пише дослівні запит/відповідь + ймовірність по кожному критерію в JSON (server/data/jev-pilot/). |
+| `jevPilot.ts` | CLI-пілот Jev (`npm run jev:pilot`, план `plans/old/jev-model.md`): читає JSON-вибірку (не БД), ганяє варіанти L (поточний LLM) / A (релевантність на короткому state → критерії для релевантних) / B (усе одним запитом), пише звіт вартості й згоди з еталоном. |
+| `jevProbe.ts` | CLI-проба кроку 2 рушієм Jev (`npm run jev:probe -- --search <id> [--top N \| --ids a,b]`, етап 3 плану `plans/old/jev-model.md`): лише SELECT із БД, викликає продовий `runJevMatching`, перехоплює `fetch` до Decisions API і пише дослівні запит/відповідь + ймовірність по кожному критерію в JSON (server/data/jev-pilot/). |
 | `analysis/jev.ts` | Клієнт **Jev** (decision-модель, [`jev.md`](./jev.md)) через OpenRouter Decisions API: `decide` (валідація відповіді, ретраї 429/5xx/402-in-flight зі спільною паузою), `runPool`, state оголошення без PII, noul-питання релевантності й критеріїв. |
 | `analysis/jevEngine.ts` | **Рушій «Jev»** кроків 1–2 ([`ai-flow.md`](./ai-flow.md) → «Рушій Jev»): `runJevRelevance` (префільтр → Jev на короткому state, поріг `JEV_RELEVANCE_THRESHOLD`, `reason` «Jev 0.xx») і `runJevMatching` (noul на кожен критерій, поріг `JEV_CRITERIA_THRESHOLD`, `probability` замість `evidence`); відповідь — той самий контракт + `usage`/`model`. Викликається з `routes/relevance.ts` і `routes/analysis/matching.ts` при `engine: 'jev'`. |
 | `llmEval.ts` | CLI-замір точності LLM-кроків «критерії» і «мінуси/плюси» (`npm run llm:eval -- run --search <id> --tag <t> [--models a,b] [--budget 0.15]` / `report <файли>`, план `plans/old/llm-haiku-prompt-audit.md`): лише SELECT із БД, продові промпти й парс, запобіжник бюджету за `usage.cost`; суддя розмічає server/data/llm-eval/labels.json, метрики — `analysis/llmEval.ts` ([`ai-flow.md`](./ai-flow.md) → «Замір точності LLM»). |
@@ -411,11 +411,11 @@ flowchart LR
 - `hooks/useIsMobile.ts` — `useIsMobile()`: `useBreakpointValue({ base: true, md: false }) ??
   false` — єдине джерело "мобільний/desktop" для умовного рендеру (size/layout
   branching), напр. у `Searches.tsx` та `AnalysisWizardDialog.tsx`. Breakpoint —
-  Chakra default `md` (768px).
+  Chakra default `md`.
 - `components/table/` — ізольовані компоненти таблиці оголошень:
   - `HeaderLabel.tsx` — заголовок колонки з відповідною Lucide-іконкою.
   - `columns.tsx` — визначення колонок для TanStack Table (включно з display-колонкою
-    `select` для bulk-дій, 36px, `enableSorting/enableResizing/enableHiding: false`) та
+    `select` для bulk-дій, `enableSorting/enableResizing/enableHiding: false`) та
     список `TOGGLEABLE_COLUMNS` (без `select`).
   - `ListingsTableHeader.tsx` — заголовок таблиці `<thead>` із підтримкою сортування та
     ресайзу колонок (`columnResizeMode: 'onEnd'`); ресайз-хендл рендериться лише якщо
@@ -453,7 +453,10 @@ flowchart LR
   - `DescriptionTooltip.tsx` — інтерактивний тултіп з прокруткою для попереднього перегляду тексту опису. Клік по вмісту відкриває `DescriptionDialog`.
   - `TablePagination.tsx` — панель пагінації під таблицею: `Pagination.Root` (Chakra UI v3) з номерами сторінок, prev/next, текстом «N–M з T» та селектором розміру сторінки (25/50/100/200). Прихована, якщо рядків ≤ 25.
 - `App.tsx` — компоновка сторінки (Header, Searches sidebar, ListingsTable). Керує станом видимості бічної панелі (`searchesVisible`). `selectedId` може стати `null` (видалення активного пошуку) — тоді `ListingsTable` показує заглушку «Обери пошук зліва». `useAutoRefresh(autoRefreshEnabled, autoRefreshIntervalMin)` викликається тут.
-- `components/Header.tsx` — шапка сайту («OLX Dashboard» + бейдж «авто: N хв» (`LuTimer`), кнопка згортання/розгортання бічної панелі, інформація про активний обраний пошук з підсвіткою, `SearchActionPanel` (кнопка виклику модального вікна) та `SettingsDrawer`). Responsive: зовнішній `HStack` з `wrap="wrap" rowGap={2}` (права група кнопок переноситься на новий рядок на вузьких екранах); текст «OLX Dashboard» прихований на `base` (іконка лишається); бейдж вибраного пошуку — `ml={{ base: 0, md: '80px' }}` з `lineClamp={1}`/`maxW={{ base: '40vw' }}`.
+- `components/Header.tsx` — шапка сайту: назва, бейдж автооновлення, кнопка бічної панелі, активний пошук,
+  `SearchActionPanel` («Сканувати»; усередині — `ScanStatusChip`, індикатор скану при згорнутій модалці), хаб AI
+  (`AiToolsHub`), журнал (`LogsDialog`), `SettingsDrawer`, вихід. На вузьких екранах права група кнопок
+  переноситься на новий рядок, назва ховається.
 - `components/DescriptionDialog.tsx` — модальне вікно повного опису оголошення (`DialogRoot
   size="lg" placement="center" scrollBehavior="inside"`): фото/назва/ціна/місто в хедері,
   повний текст опису (скрол) у тілі, «Відкрити на OLX» + «Закрити» у футері. Відкривається
@@ -466,12 +469,14 @@ flowchart LR
 - `components/ConfirmActionDialog.tsx` — спільний діалог підтвердження довгої дії
   (`DialogRoot role="alertdialog"`, патерн діалогу видалення пошуку): title/description/
   confirmLabel + `Checkbox` «Більше не питати» (`onConfirm(skipNextTime)`). Використовується
-  для глибокого скану в `SearchActionPanel`; для verify — заплановано (A3).
-- `components/searches/` — бічна панель (sidebar), розбита на дрібні компоненти (рефакторинг,
-  раніше — один файл `Searches.tsx`):
+  для глибокого скану в `SearchActionPanel` і в майстрі AI (`AnalysisWizardDialog`).
+- `components/ErrorBoundary.tsx` — глобальний перехоплювач помилок рендеру React (замість білого екрана).
+- `components/analysis/hub/` — хаб AI: кнопка «AI» у шапці (`AiToolsHub`) відкриває `AiHubDialog` з картками
+  кроків workflow (`AiHubStepCard`); клік по кроку закриває хаб і відкриває діалог цього кроку.
+- `components/searches/` — бічна панель (sidebar), розбита на дрібні компоненти:
   - `Searches.tsx` — точка входу: на мобільному (`useIsMobile()`) вміст (`SearchesPanel`)
-    рендериться всередині overlay `DrawerRoot placement="start" size="xs"` (керується пропом
-    `visible`/`onVisibleChange` з `App.tsx`); на desktop — постійна панель `w="80"`. Тримає
+    рендериться всередині overlay `DrawerRoot` (керується пропом
+    `visible`/`onVisibleChange` з `App.tsx`); на desktop — постійна панель. Тримає
     `useNewSearchForm()` і рендерить його `SearchVariantsDialog` окремо від акордеону (Dialog
     через Portal, незалежно від Drawer/aside-обгортки).
   - `SearchesPanel.tsx` — `Accordion.Root`: секції-проекти (`ProjectAccordionItem` на кожен
@@ -488,8 +493,8 @@ flowchart LR
   - `ProjectCreateDialog.tsx`/`ProjectEditDialog.tsx`/`ProjectDeleteDialog.tsx` — діалоги
     створення/перейменування (поле «Назва») та підтвердження видалення (пошуки переходять у
     «Без проекту», не видаляються).
-  - `NewSearchForm.tsx` — презентаційна форма створення пошуку; увесь стан і `submit` —
-    у хуку `hooks/useNewSearchForm.ts`.
+  - `SearchCreateDialog.tsx` — модалка створення пошуку (назва/запит/ціна/варіанти), відкривається кнопкою
+    «Новий пошук» у `SearchesPanel`; стан і `submit` — у хуку `hooks/useNewSearchForm.ts`.
   - `SearchRow.tsx` — назва/запит/ціна, бейдж синонімів (тултіп зі списком), крапка-індикатор
     активних `local_filters`; мутації архівування/видалення/реордеру — хук
     `hooks/useSearchRowActions.ts`.
@@ -558,9 +563,8 @@ flowchart LR
   без `parts` (`emptyHint` з підказкою прогнати ZIP через агента/чат і вставити єдиний JSON); крок 3 —
   спільні рендер-фрагменти рядка (`renderPhotoTitle`/`renderDescriptionBlock`/
   `renderCriteriaTags`, без дублювання логіки toggle/evidence) рендеряться або в
-  desktop-таблиці (Chakra `Table.Root`, `tableLayout: 'fixed'`, скрол `maxH="50vh"`), або —
-  на мобільному — як стек карток (`Stack maxH="60vh" overflowY="auto"`, кожна картка `Box
-  p={3} borderWidth="1px" rounded="md"` зі вмістом фото+назва → опис → теги): фото+назва |
+  desktop-таблиці (Chakra `Table.Root` зі скролом), або —
+  на мобільному — як стек карток зі вмістом фото+назва → опис → теги): фото+назва |
   опис (`DescriptionTooltip`+`DescriptionDialog`, підсвітка `HighlightText` за evidence
   включених критеріїв, `lineClamp` 3 на desktop / 4 на мобільному) | теги критеріїв (клік —
   toggle include/exclude через

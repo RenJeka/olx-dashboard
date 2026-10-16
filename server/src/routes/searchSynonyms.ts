@@ -1,4 +1,4 @@
-// Генерація синонімів пошукового запиту (docs/plans/search-synonyms.md). Stateless — НЕ
+// Генерація синонімів пошукового запиту (docs/plans/old/search-synonyms.md). Stateless — НЕ
 // прив'язано до searchId, бо має працювати ще ДО збереження пошуку (форма створення).
 import type { FastifyInstance } from 'fastify';
 import { hasApiKey } from '../analysis/config.js';

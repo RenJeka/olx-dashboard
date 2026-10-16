@@ -1,5 +1,5 @@
 /**
- * Єдиний сервіс логування (docs/plans/logging-system.md).
+ * Єдиний сервіс логування (docs/plans/old/logging-system.md).
  *
  * Ядро — pino (той самий, що вбудований у Fastify; передається в нього через
  * `loggerInstance`, тож HTTP-логи і наші йдуть одним потоком). Поверх — персистентний

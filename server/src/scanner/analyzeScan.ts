@@ -35,7 +35,7 @@ import { logError } from '../logger.js';
 import { runScan } from './runScan.js';
 
 // ── Двофазний глибокий скан: аналіз → звіт → підтверджений запуск ────────────
-// (docs/plans/two-phase-deep-scan.md). Аналітична фаза (analyzeScan) виконує лише probe
+// (docs/plans/old/two-phase-deep-scan.md). Аналітична фаза (analyzeScan) виконує лише probe
 // (root + межі ціни + бісекція) і кешує SplitPlan-и на сервері — runDeepScanFromPlan
 // довершує збір за тим самим планом, не повторюючи жодного probe-запиту.
 
@@ -72,7 +72,7 @@ export function isPlanCached(planToken: string): boolean {
  * Чи аналіз ще «свіжий» за часом завершення (у межах TTL) — time-based валідність звіту для UI.
  * НЕ прив'язана до in-memory кешу: звіт лишається запускним протягом TTL навіть після
  * перезапуску сервера чи закриття діалогу — `runDeepScanFromPlan` за потреби перезондує
- * (docs/plans/two-phase-deep-scan.md).
+ * (docs/plans/old/two-phase-deep-scan.md).
  */
 export function isAnalysisFresh(finishedAt: string | null | undefined): boolean {
   if (!finishedAt) return false;
@@ -329,7 +329,7 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
     };
 
     // Зберігаємо повний ScanPlan у scan_runs.scan_plan — для перегляду останнього аналізу
-    // після закриття діалогу (GET /last-analysis, docs/plans/deep-scan-stop-and-history.md).
+    // після закриття діалогу (GET /last-analysis, docs/plans/old/deep-scan-stop-and-history.md).
     await dbRun(FINALIZE_ANALYZE_SQL, [
       new Date().toISOString(),
       warnings.length > 0 ? warnings.join('; ') : null,
@@ -393,7 +393,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
 
   return withScanRun(searchId, 'deep', async (ctx) => {
     // Інкрементальне збереження: зібране flush-иться в БД по ходу скану, щоб збій
-    // наприкінці довгого проходу не втрачав усе (docs/plans/scan-failure-recovery.md).
+    // наприкінці довгого проходу не втрачав усе (docs/plans/old/scan-failure-recovery.md).
     const persister = new ScanPersister(searchId);
     const variants = cached.plans;
     const merged = new Map<number, RawListing>();
@@ -474,7 +474,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
             ? `graphql failed: ${graphqlMessage}; html fallback failed: ${htmlMessage}`
             : htmlFallbackDisabledMessage(graphqlMessage);
           // Збій пізнього варіанта НЕ валить скан: усе зібране (і вже flush-нуте) лишається,
-          // скан завершується достроково з warning (docs/plans/scan-failure-recovery.md).
+          // скан завершується достроково з warning (docs/plans/old/scan-failure-recovery.md).
           if (merged.size > 0) {
             logError('scanner', `plan-variant «${variant}» ${vi + 1}/${variants.length}`, htmlErr, {
               searchId,

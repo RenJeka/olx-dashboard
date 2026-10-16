@@ -3,7 +3,7 @@ import { logError } from '../logger.js';
 import type { RawListing, ScanResult } from '../types.js';
 
 /**
- * Інкрементальне збереження результатів скану (docs/plans/scan-failure-recovery.md).
+ * Інкрементальне збереження результатів скану (docs/plans/old/scan-failure-recovery.md).
  *
  * Великий глибокий скан (сотні запитів, ~година) раніше жив цілком у пам'яті й писався в БД
  * один раз наприкінці — будь-який збій дорогою втрачав УСЕ зібране. Persister дозволяє

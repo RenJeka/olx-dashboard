@@ -8,16 +8,16 @@ export interface Search {
   local_filters: string;
   visible_total_count: number | null;
   sort_order: number;
-  /** JSON-масив альтернативних пошукових запитів (синоніми query, docs/plans/search-synonyms.md). */
+  /** JSON-масив альтернативних пошукових запитів (синоніми query, docs/plans/old/search-synonyms.md). */
   query_synonyms: string;
-  /** 1 — пошук в архіві (docs/plans/archive-searches.md). */
+  /** 1 — пошук в архіві (docs/plans/old/archive-searches.md). */
   archived: number;
-  /** Проект, до якого віднесено пошук; null — «Без проекту» (docs/plans/projects.md). */
+  /** Проект, до якого віднесено пошук; null — «Без проекту» (docs/plans/old/projects.md). */
   project_id: number | null;
   created_at: string;
 }
 
-/** Проект — група пошуків (docs/plans/projects.md). */
+/** Проект — група пошуків (docs/plans/old/projects.md). */
 export interface Project {
   id: number;
   name: string;
@@ -104,7 +104,7 @@ export interface StoredTableState {
   pageSize: number;
 }
 
-/** Запис технічного журналу app_logs (docs/plans/logging-system.md) — GET /api/logs. */
+/** Запис технічного журналу app_logs (docs/plans/old/logging-system.md) — GET /api/logs. */
 export interface AppLogEntry {
   id: number;
   ts: string;
