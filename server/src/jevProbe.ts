@@ -1,4 +1,4 @@
-// Проба кроку 2 рушієм Jev (docs/plans/jev-model.md → етап 3): показати дослівно, що йде в Decisions API
+// Проба кроку 2 рушієм Jev (docs/plans/old/jev-model.md → етап 3): показати дослівно, що йде в Decisions API
 // і що повертається, по кожному критерію. Викликає продовий runJevMatching, а сирі тіла бере перехопленням
 // fetch — тож бачимо саме те, що шле прод, а не копію логіки. Лише SELECT, у БД нічого не пише.
 //   npm run jev:probe -- --search <id> [--top 5 | --ids 12,34] [--mode cons|pros] [--no-aliases] [--threshold 0.7] [--out <file>]

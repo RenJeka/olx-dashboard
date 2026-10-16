@@ -120,7 +120,7 @@ export function buildGroupingPrompt(category: string, groups: CriterionGroup[], 
 }
 
 /**
- * Промпт генерації синонімів пошукового запиту (docs/plans/search-synonyms.md): альтернативні
+ * Промпт генерації синонімів пошукового запиту (docs/plans/old/search-synonyms.md): альтернативні
  * назви того самого товару на OLX (різні продавці називають по-різному). Вивід —
  * JSON {"synonyms": ["...", ...]}.
  */

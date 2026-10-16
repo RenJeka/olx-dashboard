@@ -1,4 +1,4 @@
-// Smoke-перевірка деплою (npm run smoke -- [api-url] [web-url]; план — docs/plans/h4-smoke.md).
+// Smoke-перевірка деплою (npm run smoke -- [api-url] [web-url]; план — docs/plans/old/h4-smoke.md).
 // Лише GET без сесії: нічого не пише й не читає дані (гейт авторизації віддає 401).
 // Без аргументів — адреси проду (docs/deploy-render-turso.md → «Фактичний прод»).
 // Будь-який ❌ → код виходу 1.

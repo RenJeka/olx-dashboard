@@ -278,7 +278,7 @@ export function criterionKey(mode: AnalysisMode, index: number): string {
 
 /**
  * Межа «так/ні» для критеріїв. Без неї Jev читає «state» буквально й занижує ймовірності — пропускає
- * перефразовані мінуси/плюси (експеримент «формулювання × поріг», docs/plans/jev-model.md → етап 3).
+ * перефразовані мінуси/плюси (експеримент «формулювання × поріг», docs/plans/old/jev-model.md → етап 3).
  */
 const CRITERION_BOUNDARY: Record<JevLang, { true: string; false: string }> = {
   en: { true: 'Stated or clearly implied.', false: 'Not mentioned, or the opposite.' },

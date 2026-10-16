@@ -61,7 +61,7 @@ export async function dbRun(sql: string, args: InArgs = []): Promise<ResultSet> 
 /**
  * Максимум statements на один db.batch. Тисячі UPSERT/UPDATE одним batch-ем — мережевий payload у
  * мегабайти: Turso рве з'єднання (`fetch failed`; S16 — збереження фільтра на великому пошуку,
- * docs/plans/scan-failure-recovery.md — великий deep-скан). Чанки жертвують атомарністю всього
+ * docs/plans/old/scan-failure-recovery.md — великий deep-скан). Чанки жертвують атомарністю всього
  * набору (кожен чанк — окрема транзакція): частково записане краще за втрачене цілком.
  */
 export const BATCH_CHUNK = 500;
@@ -77,7 +77,7 @@ export async function dbBatchChunked(statements: InStatement[]): Promise<void> {
   }
 }
 
-// ── Автоміграція колонок (docs/plans/db-auto-migrate.md) ─────────────────────
+// ── Автоміграція колонок (docs/plans/old/db-auto-migrate.md) ─────────────────────
 
 /** Розбити тіло CREATE TABLE на визначення верхнього рівня (коми поза дужками й лапками). */
 function splitTopLevel(body: string): string[] {

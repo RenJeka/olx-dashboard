@@ -21,7 +21,7 @@ export interface ListingStats {
 /**
  * Клієнтський аналог агрегату `/stats` — рахується з масиву listings (кеш `['listings', searchId]`),
  * щоб не робити окремий 408-рядковий прохід на сервері при кожному виборі пошуку
- * (Turso reads, docs/plans/turso-stats-clientside.md). `/listings` повертає всі рядки
+ * (Turso reads, docs/plans/old/turso-stats-clientside.md). `/listings` повертає всі рядки
  * `WHERE search_id=?` без фільтра → той самий набір, що рахував сервер, тож числа збігаються.
  *
  * Предикати — дзеркало `server/src/scanner/verifyScan.ts` (P1/P2) та

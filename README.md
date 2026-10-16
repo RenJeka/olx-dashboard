@@ -6,10 +6,8 @@
 
 ## Стек
 
-- **Monorepo:** npm workspaces — `server/` + `web/`
-- **Backend:** Node.js 22 LTS, TypeScript, Fastify 5, @libsql/client (Turso/SQLite), cheerio
-- **Frontend:** React 18, Vite 6, TanStack Query/Table, Chakra UI v3 (+ next-themes, react-icons/lu)
-- **Збір даних:** GraphQL `POST /apigateway/graphql` (без браузера/Playwright); HTML-fallback вимкнено — OLX відповідає `403` (`docs/olx-api.md` §3)
+npm workspaces (`server/` — Fastify + libSQL/Turso, `web/` — React + Vite + Chakra UI); збір — GraphQL OLX без
+браузера. Повний стек і версії-обмеження — [`AGENTS.md`](AGENTS.md) → «Стек», точні версії — `package.json`.
 
 ## Швидкий старт
 
@@ -25,7 +23,7 @@ npm run dev          # server :3001 + web :5173 паралельно
 > Якщо хочеш запускати локально без логіну (для розробки): `AUTH_DISABLED=true` у `server/.env`.
 
 Відкрий http://localhost:5173 → увійди через Google → створи пошук (напр. query `iphone 13`,
-ціна 8000–15000) → натисни **Scan** → оголошення зʼявляться в таблиці. Повторний Scan не
+ціна 8000–15000) → натисни **Сканувати** → оголошення зʼявляться в таблиці. Повторний Scan не
 дублює рядки (дедуплікація по `olx_id`).
 
 CLI-скан без UI:
@@ -38,20 +36,9 @@ npm run scan -- --search <id>
 
 ## LLM-аналіз мінусів/плюсів (кнопка «AI»)
 
-Майстер «AI» (хедер) аналізує описи оголошень і знаходить **мінуси/плюси** за критеріями.
-Працює у двох рівноправних режимах:
-
-- **Безкоштовний (ручний, без ключа):** на кожному кроці — «Скопіювати промпт»/«Завантажити
-  пакет», прогін у будь-якому безкоштовному чаті (ChatGPT/Gemini/тощо) → «Вставити
-  відповідь». Ключ не потрібен.
-- **Авто (OpenRouter):** сервер сам шле запити. Потрібен ключ:
-  1. Отримай ключ на https://openrouter.ai/keys
-  2. `cp server/.env.example server/.env` і впиши `OPENROUTER_API_KEY=...`
-  3. Перезапусти `npm run dev`. Модель/`reasoning`/додаткові критерії — у «Налаштування →
-     AI-аналіз» (дефолт `anthropic/claude-haiku-5.5`).
-
-`server/.env` ігнорується git (закомічено лише `.env.example`). Аналіз запускається **тільки
-вручну** (ніколи зі сканів/автооновлення). Деталі — [`docs/ai-flow.md`](docs/ai-flow.md).
+Кнопка «AI» у шапці: фільтр релевантності, мінуси/плюси за критеріями, AI Вибір — лише вручну. Без ключа —
+ручний режим (промпт у будь-який чат); з ключем OpenRouter (`OPENROUTER_API_KEY` у `server/.env`, ключ —
+https://openrouter.ai/keys) — авто. Рушії, модель і налаштування — [`docs/ai-flow.md`](docs/ai-flow.md).
 
 ## Стан і документація
 

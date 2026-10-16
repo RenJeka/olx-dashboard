@@ -17,7 +17,7 @@ const COVERAGE_NOTE_PREFIX = 'auto-disabled: coverage miss_count=';
 const UPDATE_CANDIDATE_SQL = 'UPDATE listings SET miss_count = ? WHERE id = ?';
 // Гілка disable додатково перезаписує olx_status='inactive' — щоб колонка «Активність» у
 // таблиці була чесною (інакше лишалося б застигле 'active' від останнього скану, що бачив
-// оголошення). docs/plans/honest-olx-status.md.
+// оголошення). docs/plans/old/honest-olx-status.md.
 const UPDATE_DISABLED_SQL = `UPDATE listings SET miss_count = ?, status = 'disabled', note = ?, olx_status = 'inactive' WHERE id = ?`;
 
 /**
@@ -33,7 +33,7 @@ function appendCoverageNote(note: string | null, threshold: number): string {
 }
 
 /**
- * Вікно покриття (CLAUDE.md / docs/plans/coverage-window-fix.md). Викликається ПІСЛЯ
+ * Вікно покриття (CLAUDE.md / docs/plans/old/coverage-window-fix.md). Викликається ПІСЛЯ
  * upsertListings, лише для ПОВНИХ успішних GraphQL-сканів (не fallback, не часткових).
  *
  * Вісь вікна — `last_refresh_at` (дата підняття): OLX сортує видачу за

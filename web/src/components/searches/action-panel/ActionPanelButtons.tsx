@@ -39,7 +39,7 @@ export function ActionPanelButtons({
         Доступні дії
       </Text>
 
-      {/* Аналіз перед сканом — лише зондування + звіт, без допагінації (docs/plans/two-phase-deep-scan.md) */}
+      {/* Аналіз перед сканом — лише зондування + звіт, без допагінації (docs/plans/old/two-phase-deep-scan.md) */}
       <Button
         variant="ghost"
         onClick={() => !isScanning && onStartAnalysis()}

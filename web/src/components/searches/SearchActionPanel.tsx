@@ -64,7 +64,7 @@ export function SearchActionPanel({ search }: Props) {
 
   return (
     <>
-      {/* Згорнутий скан — індикатор у хедері повертає модалку (docs/plans/scan-progress-detail.md). */}
+      {/* Згорнутий скан — індикатор у хедері повертає модалку (docs/plans/old/scan-progress-detail.md). */}
       {isScanning && !dialogOpen && status && scanKind && (
         <ScanStatusChip scanKind={scanKind} status={status} onClick={() => setDialogOpen(true)} />
       )}
@@ -97,7 +97,7 @@ export function SearchActionPanel({ search }: Props) {
             
             <ActionPanelLastScan lastScan={lastScan} verifyCandidates={verifyCandidates} />
 
-            {/* Деталізований прогрес сканування (docs/plans/scan-progress-detail.md) */}
+            {/* Деталізований прогрес сканування (docs/plans/old/scan-progress-detail.md) */}
             {isScanning && status && scanKind && (
               <ScanProgressPanel
                 scanKind={scanKind}

@@ -41,7 +41,7 @@ High-level огляд усіх AI-кроків OLX Dashboard: як влашто�
   в «Перевірці»). Commit пише в `analysis_model` версію Jev з відповіді.
 - Відповідь несе `usage {requests, cost}` і `model`; UI показує вартість прогону тостом, сервер — у stdout-лог.
 - Числові критерії («батарея 70%») Jev пропускає → кодом, [P-013](parking.md). Пілоти й пороги — план
-  [jev-model](plans/jev-model.md).
+  [jev-model](plans/old/jev-model.md).
 
 ### Ручний (ZIP-пакет) — уніфікований агентний флоу
 Без ключа. Кнопка «Завантажити ZIP-пакет» віддає архів із `prompt.txt` + даними (+ для кроків 1–2

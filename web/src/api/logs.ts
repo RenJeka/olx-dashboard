@@ -8,7 +8,7 @@ export interface LogsFilters {
 }
 
 /**
- * Технічний журнал застосунку (docs/plans/logging-system.md). `enabled` — лише при
+ * Технічний журнал застосунку (docs/plans/old/logging-system.md). `enabled` — лише при
  * відкритому діалозі; авто-оновлення кожні 5с, поки відкрито (нові помилки видно одразу).
  */
 export function useLogs(filters: LogsFilters, enabled: boolean) {

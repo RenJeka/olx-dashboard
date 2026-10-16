@@ -1,4 +1,4 @@
-// Рушій «Jev» для AI-кроків 1–2 (docs/ai-flow.md → «Рушій Jev», пілоти — docs/plans/jev-model.md).
+// Рушій «Jev» для AI-кроків 1–2 (docs/ai-flow.md → «Рушій Jev», пілоти — docs/plans/old/jev-model.md).
 // Поруч з LLM-рушієм (OpenRouter chat) і ручним ZIP: той самий контракт відповіді, але замість
 // evidence — ймовірність ≥ порогу. Один state = один запит Decisions API, паралельно пулом.
 // Нічого не пише в БД; генерація критеріїв і AI Вибір лишаються на LLM (Jev не генерує текст).

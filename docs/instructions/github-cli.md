@@ -9,9 +9,9 @@ source: хендоф 2026-09-30-stability-harness-access; сесія 2026-10-01 
 Треба відкрити PR, подивитись CI чи логи впалого прогону.
 
 ## Що робити
-- `gh` встановлено (`winget install GitHub.cli`), вхід — акаунт `RenJeka`. Якщо `gh` не знаходиться в
-  PATH (сесія, відкрита до встановлення) — повний шлях `C:\Program Files\GitHub CLI\gh.exe`.
-  Перевірка: `gh auth status`.
+- `gh` встановлено на домашньому й робочому ПК (`winget install GitHub.cli`), вхід — акаунт `RenJeka`. Якщо `gh`
+  не знаходиться в PATH (сесія, відкрита до встановлення) — повний шлях `C:\Program Files\GitHub CLI\gh.exe`
+  (Git Bash: `"/c/Program Files/GitHub CLI/gh.exe"`). Перевірка: `gh auth status`.
 - PR: `gh pr create --base main --head <гілка> --title "…" --body-file -` (вимоги до тексту —
   [`docs/rules.md`](../rules.md) → «Git»). Перед створенням — зелений CI гілки.
 - CI: `gh run list --branch <гілка> --limit 1`; дочекатись — `gh run watch <id> --exit-status`; причина

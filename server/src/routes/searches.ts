@@ -27,11 +27,11 @@ interface SearchBody {
   api_filters?: unknown;
   local_filters?: unknown;
   cron_enabled?: number;
-  /** Синоніми query (docs/plans/search-synonyms.md). */
+  /** Синоніми query (docs/plans/old/search-synonyms.md). */
   query_synonyms?: string[];
-  /** Архів пошуку (docs/plans/archive-searches.md): 1 — в архіві. */
+  /** Архів пошуку (docs/plans/old/archive-searches.md): 1 — в архіві. */
   archived?: number;
-  /** Проект (docs/plans/projects.md): id проекту або null — «Без проекту». */
+  /** Проект (docs/plans/old/projects.md): id проекту або null — «Без проекту». */
   project_id?: number | null;
 }
 
@@ -236,7 +236,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Аналітична (probe) фаза двофазного глибокого скану (docs/plans/two-phase-deep-scan.md):
+  // Аналітична (probe) фаза двофазного глибокого скану (docs/plans/old/two-phase-deep-scan.md):
   // root + межі ціни + бісекція по кожному варіанту query, БЕЗ допагінації листів. Повертає
   // звіт ScanPlan для ScanPlanReportDialog; план кешується на сервері під planToken.
   app.post<{ Params: { id: string }; Querystring: { deep?: string } }>(
@@ -273,7 +273,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Зупинка активного скану (docs/plans/deep-scan-stop-and-history.md): ставить abort-прапорець,
+  // Зупинка активного скану (docs/plans/old/deep-scan-stop-and-history.md): ставить abort-прапорець,
   // активний скан завершиться частковим успіхом і збереже вже зібране у БД.
   app.post<{ Params: { id: string } }>('/api/searches/:id/scan/stop', async (req) => {
     const id = Number(req.params.id);
@@ -313,7 +313,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Останній збережений аналіз (kind='analyze') — для перегляду без повторного зондування
-  // (docs/plans/deep-scan-stop-and-history.md). planValid — часова валідність (у межах TTL за
+  // (docs/plans/old/deep-scan-stop-and-history.md). planValid — часова валідність (у межах TTL за
   // finished_at): true → звіт ще запускний (за потреби runDeepScanFromPlan перезондує);
   // false → аналіз протермінований, потрібен новий.
   app.get<{ Params: { id: string } }>(
@@ -427,7 +427,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
 
   // Останній скан для панелі дій. Агрегати in_db/stale_count/verify_candidates НЕ рахуємо тут:
   // фронт виводить їх із уже завантаженого масиву listings, щоб не робити зайвий 408-рядковий
-  // SUM(CASE…)-прохід на кожен вибір пошуку (Turso reads, docs/plans/turso-stats-clientside.md).
+  // SUM(CASE…)-прохід на кожен вибір пошуку (Turso reads, docs/plans/old/turso-stats-clientside.md).
   app.get<{ Params: { id: string } }>('/api/searches/:id/stats', async (req, reply) => {
     const id = Number(req.params.id);
     const search = await dbGet('SELECT id FROM searches WHERE id = ?', [id]);

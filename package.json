@@ -16,6 +16,7 @@
     "jev:pilot": "npm -w server run jev:pilot --",
     "jev:probe": "npm -w server run jev:probe --",
     "migrate:posted-at": "npm -w server run migrate:posted-at",
+    "db:copy-prod": "npm -w server run db:copy-prod",
     "docs:check": "node scripts/check-doc-links.mjs",
     "smoke": "node scripts/smoke.mjs",
     "typecheck": "npm -w server exec -- tsc -p tsconfig.json --noEmit && npm -w web exec -- tsc -b --noEmit",

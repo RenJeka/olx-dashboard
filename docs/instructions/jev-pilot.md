@@ -8,7 +8,7 @@ skill: jev-pilot
 
 ## Коли застосовувати
 Треба перевірити, чи Jev ([jev](../jev.md)) дешевший і не гірший за LLM-рушій на конкретному пошуку, або
-підібрати пороги / формулювання питань. План і висновки попередніх пілотів — [plans/jev-model](../plans/jev-model.md).
+підібрати пороги / формулювання питань. План і висновки попередніх пілотів — [plans/jev-model](../plans/old/jev-model.md).
 
 ## Що робити
 1. **Ключ:** `OPENROUTER_API_KEY` у `server/.env` (його ставить людина).
@@ -38,4 +38,4 @@ skill: jev-pilot
 `report.md` має вартість для кожного варіанту без помилок запитів; у `disputes.md` усі `[ ]` заповнені.
 
 ## Пов'язане
-[jev](../jev.md), [plans/jev-model](../plans/jev-model.md), [prod-data-via-turso-mcp](prod-data-via-turso-mcp.md).
+[jev](../jev.md), [plans/jev-model](../plans/old/jev-model.md), [prod-data-via-turso-mcp](prod-data-via-turso-mcp.md).

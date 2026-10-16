@@ -45,4 +45,4 @@ OpenRouter ([jev](../jev.md)).
   ключ протух або відкликаний → людина перевипускає ключ (крок 1) і перезапускає wmux/Claude Code.
 
 ## Пов'язане
-[jev](../jev.md), [plans/jev-model](../plans/jev-model.md), [secrets-in-sources](secrets-in-sources.md).
+[jev](../jev.md), [plans/jev-model](../plans/old/jev-model.md), [secrets-in-sources](secrets-in-sources.md).

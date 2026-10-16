@@ -24,7 +24,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
 
   return withScanRun(searchId, kind, async (ctx) => {
     // Інкрементальне збереження: зібране flush-иться в БД по ходу скану, щоб збій
-    // наприкінці довгого проходу не втрачав усе (docs/plans/scan-failure-recovery.md).
+    // наприкінці довгого проходу не втрачав усе (docs/plans/old/scan-failure-recovery.md).
     const persister = new ScanPersister(searchId);
 
     const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed, rawCount, aborted } =

@@ -21,7 +21,7 @@ const PORT = Number(process.env.PORT ?? 3001);
 // Fail-fast: не піднімати сервер з відкритим гейтом (auth on, але немає ключів).
 assertAuthConfigured();
 
-// Наш кореневий pino замість вбудованого (docs/plans/logging-system.md):
+// Наш кореневий pino замість вбудованого (docs/plans/old/logging-system.md):
 // HTTP-логи Fastify і записи logError/logWarn ідуть одним потоком/форматом.
 const app = Fastify({ loggerInstance: rootLogger });
 

@@ -70,6 +70,11 @@ curl -s -o /dev/null -w "%{http_code}\n" localhost:3001/api/logs
   автоміграція відмовить (старт падає з назвою колонки): потрібен ручний rebuild таблиці з
   бекапом. Перевірити на копії: `TURSO_DATABASE_URL=file:<копія>.db npm run scan -- --search <id>`
   або старт сервера з цим env.
+- **Копія проду локально** — `npm run db:copy-prod` (план [db-copy-prod](plans/old/db-copy-prod.md)): з Turso лише
+  SELECT, кожен рядок читається один раз; пише в `server/data/olx.db`, попередній файл → `olx-bak-<час>.db`.
+  Запускає людина: `npm run dev` зупинено, у **новому** вікні PowerShell задати `$env:PROD_DB_URL`
+  (`libsql://…`) і `$env:PROD_DB_TOKEN` (токен лише для читання з дашборду Turso), після копії вікно закрити.
+  Окремі імена змінних (не `TURSO_*`) — щоб `npm run dev` у тому ж вікні не пішов у прод.
 - **Turso** — `AGENTS.md` → «Turso-економія»; заміри — скіл `turso-reads-playbook`.
 - Секрети — `AGENTS.md` → «Безпека»; поводження — `docs/instructions/secrets-in-sources.md`.
 

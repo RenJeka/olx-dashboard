@@ -111,7 +111,7 @@ function LogRow({ entry }: { entry: AppLogEntry }) {
 }
 
 /**
- * Діалог «Журнал» (docs/plans/logging-system.md): перегляд app_logs — warn+error з усіх
+ * Діалог «Журнал» (docs/plans/old/logging-system.md): перегляд app_logs — warn+error з усіх
  * модулів сервера з етапом data flow (scope/stage). Відкривається з хедера; поки відкритий —
  * авто-оновлюється (useLogs refetchInterval).
  */

@@ -26,7 +26,7 @@ export interface ListingDetails {
   id: number;
   /** HTML-опис OLX. */
   description: string | null;
-  /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/photo-gallery.md). NULL до re-scan. */
+  /** JSON-масив прев'ю-лінків усіх фото (галерея, docs/plans/old/photo-gallery.md). NULL до re-scan. */
   photo_urls: string | null;
 }
 

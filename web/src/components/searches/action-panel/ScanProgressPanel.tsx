@@ -23,14 +23,14 @@ interface Props {
   status: ScanStatus;
   /** Секунд на один запит — для оцінки "Залишилось: ~N с" (узгоджено з SearchActionPanel). */
   secondsPerRequest: number;
-  /** Зупинити скан — зібране збережеться (docs/plans/deep-scan-stop-and-history.md). */
+  /** Зупинити скан — зібране збережеться (docs/plans/old/deep-scan-stop-and-history.md). */
   onStop: () => void;
   /** Запит на зупинку вже надіслано (кнопка показує «Зупиняється…»). */
   isStopping: boolean;
 }
 
 /**
- * Деталізований прогрес скану (docs/plans/scan-progress-detail.md): заголовок (тип + метод) →
+ * Деталізований прогрес скану (docs/plans/old/scan-progress-detail.md): заголовок (тип + метод) →
  * рядок поточного етапу → сегментована "смуга подорожі" (один сегмент = одна реальна
  * підодиниця роботи: варіант синоніма / ціновий бакет / фаза verify) → загальний бар
  * запитів + ETA. Сегменти/stage рендеряться лише коли є реальні дані з бекенду — для
@@ -62,7 +62,7 @@ export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop,
 
       {/* Лічильник етапів — завжди видимий, не перетирається транзієнтним stage (напр. паузою).
           Сам stage (у т.ч. текст паузи) показуємо іконкою з тултіпом правіше, щоб обидва
-          шматки інформації були видні одночасно (docs/plans/scan-progress-detail.md). */}
+          шматки інформації були видні одночасно (docs/plans/old/scan-progress-detail.md). */}
       {status.sub_total != null ? (
         <HStack justify="space-between" align="center">
           <Text textStyle="2xs" color="fg.muted">

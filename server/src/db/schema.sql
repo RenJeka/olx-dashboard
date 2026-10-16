@@ -2,7 +2,7 @@
 -- Застосовується при старті через db.ts (CREATE TABLE IF NOT EXISTS).
 -- НЕ дублювати визначення таблиць у коді — джерело істини тут.
 
--- Проекти — групування пошуків в акордеони (docs/plans/projects.md).
+-- Проекти — групування пошуків в акордеони (docs/plans/old/projects.md).
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS searches (
   analysis_criteria TEXT DEFAULT '{}', -- JSON {cons:[{name,aliases[],enabled}], pros:[…]}: категорії критеріїв аналізу (рівень пошуку; рядок — старий формат); server/src/analysis/criteria.ts
   relevance_target TEXT DEFAULT '', -- семантичний фільтр: опис цільового товару (порожньо → query)
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
-  category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/category-counts-and-filter.md
+  category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/old/category-counts-and-filter.md
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
   project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
   created_at TEXT DEFAULT (datetime('now'))
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS listings (
 CREATE INDEX IF NOT EXISTS idx_listings_search_status ON listings(search_id, status);
 -- Вікно покриття (statusEngine): кандидати за search_id + last_refresh_at >= windowFloor.
 CREATE INDEX IF NOT EXISTS idx_listings_search_refresh ON listings(search_id, last_refresh_at);
--- Індекс по last_seen_at НАВМИСНО прибрано (docs/plans/turso-write-optimization.md):
+-- Індекс по last_seen_at НАВМИСНО прибрано (docs/plans/old/turso-write-optimization.md):
 -- last_seen_at оновлюється на кожному скані → індекс перезаписувався на КОЖНОМУ записі
 -- рядка, множачи Turso "rows written" ×N. Verify-прохід P1 (search_id + last_seen_at,
 -- ≤ кілька тисяч рядків на пошук) обходиться scan+sort без помітних втрат. DROP наявного
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS price_history (
   observed_at TEXT DEFAULT (datetime('now'))
 );
 
--- Технічний журнал застосунку (docs/plans/logging-system.md): warn+error з усіх модулів.
+-- Технічний журнал застосунку (docs/plans/old/logging-system.md): warn+error з усіх модулів.
 -- НЕ плутати зі scan_runs.error/warning (доменний підсумок скану) — сюди пишуть
 -- logError/logWarn із server/src/logger.ts, зокрема проміжні/best-effort збої, які
 -- раніше були невидимі. info/debug у БД НЕ пишуться (лише stdout) — бережемо Turso writes.
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   requests_done INTEGER DEFAULT 0,   -- прогрес глибокого скану: виконано запитів
   requests_total INTEGER,            -- прогрес глибокого скану: ціль (NULL поки невідома)
   fetch_method TEXT,                 -- GraphQL | HTML
-  stage TEXT,                        -- людиномовний поточний етап (транзієнтний текст, docs/plans/scan-progress-detail.md)
+  stage TEXT,                        -- людиномовний поточний етап (транзієнтний текст, docs/plans/old/scan-progress-detail.md)
   sub_done INTEGER,                  -- позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify
   sub_total INTEGER                  -- загальна кількість підпослідовності
 );

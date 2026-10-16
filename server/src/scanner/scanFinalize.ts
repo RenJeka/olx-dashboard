@@ -47,12 +47,12 @@ export interface FinalizeInput {
   /** visible_total_count з видачі OLX — оновлюємо в searches, якщо є. */
   visibleTotalCount?: number | null;
   notes: string[];
-  /** Поріг miss_count для auto-disable: 1 для deep, 2 для normal (docs/plans/honest-olx-status.md). */
+  /** Поріг miss_count для auto-disable: 1 для deep, 2 для normal (docs/plans/old/honest-olx-status.md). */
   missThreshold: number;
   /** Пропустити оновлення category_facet (напр. якщо був HTML-fallback без GraphQL). */
   skipCategoryRefresh?: boolean;
   /**
-   * Інкрементальний persister цього скану (docs/plans/scan-failure-recovery.md): фінальний
+   * Інкрементальний persister цього скану (docs/plans/old/scan-failure-recovery.md): фінальний
    * flush дозаписує ще не збережене, лічильники found/new_count беруться накопиченими за
    * весь скан (проміжні флаші вже записали частину). Без нього — одноразовий upsert як раніше.
    */
