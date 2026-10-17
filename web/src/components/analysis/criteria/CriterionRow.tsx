@@ -3,6 +3,7 @@ import { LuPencil, LuPlus, LuTrash2, LuX } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
+import { BaseBadge } from './BaseBadge';
 import { sortAlpha } from '../../../utils/sort';
 import type { CriterionRowData } from '../../../hooks/analysis/useCriteriaManager';
 
@@ -70,16 +71,12 @@ export function CriterionRow({
         >
           {row.name}
         </Text>
-        {base && (
-          <Tooltip content={`Базовий пункт категорії «${base.label}»`} openDelay={300}>
-            <Badge size="sm" colorPalette="accent" variant="subtle" flexShrink={0}>
-              базовий
-            </Badge>
-          </Tooltip>
+        {base && <BaseBadge base={base} />}
+        {row.count !== null && (
+          <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+            у {row.count} огол.
+          </Text>
         )}
-        <Text textStyle="xs" color="fg.muted" flexShrink={0}>
-          у {row.count} огол.
-        </Text>
         {base ? null : group ? (
           <>
             <IconButton size="2xs" variant="ghost" aria-label="Перейменувати" disabled={busy} onClick={onRename}>

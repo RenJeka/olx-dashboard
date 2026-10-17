@@ -20,8 +20,29 @@ import type { AnalysisMode, CriteriaMerge, CriterionGroup, GroupSuggestion } fro
 export interface CriterionRowData {
   name: string;
   group: CriterionGroup | null;
-  /** Скільки оголошень містить назву чи будь-який синонім. */
-  count: number;
+  /** Скільки оголошень містить назву чи будь-який синонім; `null` — не рахується (набір категорії, без оголошень). */
+  count: number | null;
+}
+
+/** Розділи списку: категорії (з синонімами) → окремі критерії → пункти «лише в оголошеннях». */
+export interface CriteriaRows {
+  categories: CriterionRowData[];
+  singles: CriterionRowData[];
+  orphans: CriterionRowData[];
+}
+
+/**
+ * Що потрібно списку `CriteriaList` — спільне для вікна «Плюси та мінуси» (`useCriteriaManager`) і
+ * «Базові плюси й мінуси» (`useBaseCriteriaManager`).
+ */
+export interface CriteriaListModel {
+  rows: CriteriaRows;
+  filter: string;
+  selected: Set<string>;
+  toggleSelected: (name: string) => void;
+  toggleEnabled: (name: string) => void;
+  detachAlias: (name: string, alias: string) => void;
+  addPhrases: (phrases: string[]) => Promise<number>;
 }
 
 /**
@@ -58,7 +79,7 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
     () => (listings ?? []).map((l) => new Set(parseBullets(l[mode]).map(phraseKey))),
     [listings, mode],
   );
-  const rows = useMemo(() => {
+  const rows = useMemo((): CriteriaRows => {
     const byName = new Map(groups.map((g) => [g.name, g]));
     const toRow = (name: string): CriterionRowData => {
       const group = byName.get(name) as CriterionGroup;

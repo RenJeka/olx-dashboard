@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { Box, Text } from '@chakra-ui/react';
 import { CriterionRow } from './CriterionRow';
-import type { CriterionRowData, useCriteriaManager } from '../../../hooks/analysis/useCriteriaManager';
+import type { CriteriaListModel, CriterionRowData } from '../../../hooks/analysis/useCriteriaManager';
 
 interface Props {
-  m: ReturnType<typeof useCriteriaManager>;
+  m: CriteriaListModel;
   colorPalette: string;
   busy: boolean;
   onRename: (name: string) => void;

@@ -76,6 +76,42 @@ export interface CriteriaCategory {
 /** Відповідь GET/PUT /api/searches/:id/criteria: ефективні набори (базові + власні) + автокатегорія. */
 export type CriteriaResponse = CriteriaConfig & { category: CriteriaCategory | null };
 
+// ── Базові набори категорій OLX (docs/plans/base-criteria.md) ────────────────────
+
+/** Вузол дерева категорій OLX (GET /api/categories) + чи є в нього непорожній базовий набір. */
+export interface OlxCategoryItem {
+  id: number;
+  parentId: number | null;
+  label: string;
+  slug: string;
+  hasSet: boolean;
+}
+
+/** GET /api/categories/:id/criteria: власний набір категорії + злиті набори її предків (пункти з `base`). */
+export interface CategoryCriteriaResponse {
+  own: CriteriaConfig;
+  inherited: CriteriaConfig;
+}
+
+/** Відповідь POST /api/categories/:id/criteria/remap. */
+export interface CategoryRemapResult {
+  /** Власний набір категорії після зміни. */
+  criteria: CriteriaConfig;
+  /** Оголошень, у яких змінились пункти (пошуки категорії та її підкатегорій). */
+  updated: number;
+  /** Пошуків, у яких змінились оголошення. */
+  searches: number;
+}
+
+/** Відповідь POST /api/categories/collect. */
+export interface CollectCategoriesResult {
+  requested: number;
+  /** Скільки вузлів додано чи оновлено. */
+  changed: number;
+  /** Слова, на яких збір не вдався. */
+  failed: string[];
+}
+
 /** Пропозиція автогрупування (docs/plans/old/criteria-auto-group.md): назва категорії + ≥ 2 назви критеріїв. */
 export interface GroupSuggestion {
   name: string;

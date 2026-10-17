@@ -3,7 +3,7 @@ import { Button, HStack, IconButton, Input, Stack } from '@chakra-ui/react';
 import { LuPlus, LuWandSparkles } from 'react-icons/lu';
 import { ManualAssistant } from '../ManualAssistant';
 import { NewCriteriaDialog } from './NewCriteriaDialog';
-import type { useCriteriaGeneration } from '../../../hooks/analysis/useCriteriaGeneration';
+import type { CriteriaGenerationModel } from '../../../hooks/analysis/useCriteriaGeneration';
 
 interface Props {
   value: string;
@@ -12,7 +12,7 @@ interface Props {
   addDisabled?: boolean;
   /** «Згенерувати» (LLM) — лише коли є ключ API. */
   apiAvailable: boolean;
-  generation: ReturnType<typeof useCriteriaGeneration>;
+  generation: CriteriaGenerationModel;
   /** Контент модалки, у якій стоїть панель, — для вікна вибору згенерованого поверх неї. */
   portalRef: RefObject<HTMLElement | null>;
   /** Додаткові кнопки в ряд із «Згенерувати» (вікно «Плюси та мінуси» — «Згрупувати автоматично»). */
@@ -21,7 +21,8 @@ interface Props {
 
 /**
  * Додавання критеріїв: свій критерій, «Згенерувати» (LLM), «Згенерувати вручну» (помічник: промпт → вставка).
- * Спільне для кроку 1 майстра й вікна «Плюси та мінуси»; згенероване йде у вікно вибору (`NewCriteriaDialog`).
+ * Спільне для кроку 1 майстра, вікна «Плюси та мінуси» і «Базові плюси й мінуси» (там без помічника);
+ * згенероване йде у вікно вибору (`NewCriteriaDialog`).
  */
 export function CriteriaInputBar({
   value,
@@ -58,18 +59,20 @@ export function CriteriaInputBar({
             <LuWandSparkles /> Згенерувати
           </Button>
         )}
-        <Button size="sm" variant="outline" onClick={() => void generation.openAssistant()}>
-          Згенерувати вручну
-        </Button>
+        {generation.openAssistant && (
+          <Button size="sm" variant="outline" onClick={() => void generation.openAssistant?.()}>
+            Згенерувати вручну
+          </Button>
+        )}
         {extraActions}
       </HStack>
-      {generation.showAssistant && (
+      {generation.showAssistant && generation.handleImport && (
         <ManualAssistant
           title="Помічник: генерація критеріїв"
-          parts={generation.assistantParts}
+          parts={generation.assistantParts ?? []}
           pasteLabel="Розпізнати критерії"
           onSubmit={generation.handleImport}
-          submitting={generation.importPending}
+          submitting={generation.importPending ?? false}
         />
       )}
       {generation.candidates && (

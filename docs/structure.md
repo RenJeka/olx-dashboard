@@ -181,12 +181,13 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401)
+        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401; ApiError зі статусом)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/old/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
         │   ├── scanner.ts    # скан, verify, прогрес сканування, useAnalyzeScan/useRunScanPlan (двофазний deep-скан)
         │   ├── analysis.ts   # LLM-аналіз (мінуси/плюси)
+        │   ├── categories.ts # дерево категорій OLX і базові набори (GET/PUT/remap/generate, збір дерева; docs/plans/base-criteria.md)
         │   ├── aiPicks.ts    # AI Вибір
         │   ├── relevance.ts  # семантичний фільтр
         │   └── synonyms.ts   # синоніми пошукового запиту
@@ -240,7 +241,13 @@ olx-dashboard/
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
+        │   │   ├── base/                   # вікно «Базові плюси й мінуси» — набори категорій OLX (docs/plans/base-criteria.md)
+        │   │   │   ├── BaseCriteriaDialog.tsx # вікно: дерево ліворуч / набір праворуч (мобільний — одне під одним), вхід з «Налаштування» → «AI-аналіз»
+        │   │   │   ├── CategoryTree.tsx     # дерево: пошук за назвою, згортання, позначка «є набір», «Оновити дерево категорій»
+        │   │   │   ├── BaseCriteriaPane.tsx # набір категорії: «Мінуси / Плюси», власні пункти (CriteriaList, CriteriaInputBar, об'єднання/видалення)
+        │   │   │   └── InheritedCriteriaList.tsx # розділ «Успадковано» (пункти предків, лише перегляд)
         │   │   ├── criteria/               # вікно «Плюси та мінуси» + вибір згенерованого (docs/plans/old/criteria-categories.md)
+        │   │   │   ├── BaseBadge.tsx        # бейдж «базовий» + підказка категорії-джерела (рядок вікна, чип майстра, «Успадковано»)
         │   │   │   ├── CriteriaManagerDialog.tsx # вікно: режим, фільтр, «в аналізі», об'єднання/видалення (монтувати лише відкритим)
         │   │   │   ├── CriteriaList.tsx     # розділи: категорії → окремі → «лише в оголошеннях», кожен за алфавітом
         │   │   │   ├── CriterionRow.tsx     # рядок: категорія з синонімами або пункт «лише в оголошеннях»
@@ -315,8 +322,9 @@ olx-dashboard/
         │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
         │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (чипи = категорії, позначка «в аналізі», поглинання синонімів)
-        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»
+        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»; useCriteriaCandidates — вибір згенерованого (і для базових наборів)
         │   │   ├── useCriteriaManager.ts # логіка вікна «Плюси та мінуси» (лічильники з кешу, PUT/remap)
+        │   │   ├── useBaseCriteriaManager.ts # логіка набору категорії у вікні «Базові плюси й мінуси» — інтерфейс як у useCriteriaManager
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)
@@ -342,6 +350,7 @@ olx-dashboard/
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
             ├── download.ts       # downloadBlob()/downloadText() — завантаження файлів (експорт, ручний пакет)
             ├── clipboard.ts      # copyToClipboard() — копіювання + toast «Скопійовано»
+            ├── olxCategoryTree.ts # дерево категорій OLX з плоского списку: індекс, предки, шлях, пошук, плаский показ
             ├── sort.ts           # sortAlpha() — алфавітне сортування (укр. колація, латиниця в кінці) для синонімів і критеріїв AI
             ├── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
             ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)

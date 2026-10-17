@@ -5,6 +5,7 @@ import { ModeToggle } from '../ModeToggle';
 import { CriteriaInputBar } from '../criteria/CriteriaInputBar';
 import { ScopeSelector } from '../ScopeSelector';
 import { Tooltip } from '../../ui/tooltip';
+import { BaseBadge, baseHint } from '../criteria/BaseBadge';
 import { MODE_PALETTE } from '../../../constants';
 import { categoriesFirst } from '../../../utils/criteria';
 import { sortAlpha } from '../../../utils/sort';
@@ -65,7 +66,7 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
           return (
             <Tooltip
               key={c}
-              content={base ? `${hint} · Базовий пункт категорії «${base.label}»` : hint}
+              content={base ? `${hint} · ${baseHint(base)}` : hint}
               openDelay={300}
             >
               <Button
@@ -83,11 +84,7 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
                     +{aliases.length}
                   </Badge>
                 )}
-                {base && (
-                  <Badge size="xs" variant="subtle" colorPalette="accent">
-                    базовий
-                  </Badge>
-                )}
+                {base && <BaseBadge base={base} size="xs" tooltip={false} />}
               </Button>
             </Tooltip>
           );

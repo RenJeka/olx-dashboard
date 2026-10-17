@@ -14,7 +14,7 @@ export interface CriteriaCandidates {
   absorbed: number;
 }
 
-interface Handlers {
+export interface CandidateHandlers {
   /** Які з формулювань справді нові (решту поглинають наявні категорії). */
   freshOf: (criteria: string[]) => string[];
   /** Додати обрані людиною. */
@@ -22,18 +22,30 @@ interface Handlers {
 }
 
 /**
- * Генерація критеріїв: авто (LLM), ручний помічник (промпт → вставка відповіді). Спільне для кроку 1
- * майстра й вікна «Плюси та мінуси». Згенероване не додається одразу: нові формулювання йдуть у
- * `candidates` — людина обирає потрібні в `NewCriteriaDialog` (`addCandidates`) або закриває без змін.
+ * Що потрібно панелі `CriteriaInputBar`: «Згенерувати» + вибір згенерованого. Ручний помічник (промпт → вставка)
+ * необов'язковий: без `openAssistant` кнопки «Згенерувати вручну» немає (вікно «Базові плюси й мінуси»).
  */
-export function useCriteriaGeneration(searchId: number, mode: AnalysisMode, { freshOf, onAdd }: Handlers) {
-  const [showAssistant, setShowAssistant] = useState(false);
-  const [parts, setParts] = useState<PackagePart[]>([]);
+export interface CriteriaGenerationModel {
+  handleGenerate: () => Promise<void>;
+  generatePending: boolean;
+  candidates: CriteriaCandidates | null;
+  addCandidates: (phrases: string[]) => Promise<void>;
+  addPending: boolean;
+  dismissCandidates: () => void;
+  showAssistant?: boolean;
+  openAssistant?: () => Promise<void>;
+  assistantParts?: PackagePart[];
+  handleImport?: (raw: string) => void;
+  importPending?: boolean;
+}
+
+/**
+ * Згенероване чи розпізнане — до додавання: нові формулювання йдуть у `candidates` (вікно `NewCriteriaDialog`),
+ * людина обирає потрібні (`addCandidates`) або закриває без змін. Спільне для пошуку й категорії.
+ */
+export function useCriteriaCandidates({ freshOf, onAdd }: CandidateHandlers) {
   const [candidates, setCandidates] = useState<CriteriaCandidates | null>(null);
   const [addPending, setAddPending] = useState(false);
-
-  const generateCriteria = useGenerateCriteria();
-  const importCriteria = useImportCriteria();
 
   function offer(title: string, criteria: string[]) {
     const fresh = freshOf(criteria);
@@ -48,6 +60,39 @@ export function useCriteriaGeneration(searchId: number, mode: AnalysisMode, { fr
     }
     setCandidates({ title, fresh, absorbed });
   }
+
+  async function addCandidates(phrases: string[]) {
+    setAddPending(true);
+    try {
+      await onAdd(phrases);
+      setCandidates(null);
+      toaster.create({ type: 'success', title: `Додано критеріїв: ${phrases.length}` });
+    } catch {
+      // тост — у onAdd
+    } finally {
+      setAddPending(false);
+    }
+  }
+
+  return { offer, candidates, addCandidates, addPending, dismissCandidates: () => setCandidates(null) };
+}
+
+/**
+ * Генерація критеріїв: авто (LLM), ручний помічник (промпт → вставка відповіді). Спільне для кроку 1
+ * майстра й вікна «Плюси та мінуси». Згенероване не додається одразу: нові формулювання йдуть у
+ * `candidates` — людина обирає потрібні в `NewCriteriaDialog` (`addCandidates`) або закриває без змін.
+ */
+export function useCriteriaGeneration(
+  searchId: number,
+  mode: AnalysisMode,
+  handlers: CandidateHandlers,
+): CriteriaGenerationModel {
+  const [showAssistant, setShowAssistant] = useState(false);
+  const [parts, setParts] = useState<PackagePart[]>([]);
+  const { offer, ...pick } = useCriteriaCandidates(handlers);
+
+  const generateCriteria = useGenerateCriteria();
+  const importCriteria = useImportCriteria();
 
   async function handleGenerate() {
     const { analysisModel: model, analysisReasoning: reasoning, analysisExtraCriteria: extra } =
@@ -80,31 +125,14 @@ export function useCriteriaGeneration(searchId: number, mode: AnalysisMode, { fr
     );
   }
 
-  async function addCandidates(phrases: string[]) {
-    setAddPending(true);
-    try {
-      await onAdd(phrases);
-      setCandidates(null);
-      toaster.create({ type: 'success', title: `Додано критеріїв: ${phrases.length}` });
-    } catch {
-      // тост — у onAdd
-    } finally {
-      setAddPending(false);
-    }
-  }
-
   return {
     handleGenerate,
     generatePending: generateCriteria.isPending,
     showAssistant,
-    setShowAssistant,
     openAssistant,
     assistantParts: parts,
     handleImport,
     importPending: importCriteria.isPending,
-    candidates,
-    addCandidates,
-    addPending,
-    dismissCandidates: () => setCandidates(null),
+    ...pick,
   };
 }
