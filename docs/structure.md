@@ -270,7 +270,7 @@ olx-dashboard/
         │   │   └── sections/
         │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
         │   │       ├── AutoRefreshSection.tsx # секція "Автооновлення" (перемикач, інтервал)
-        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, рушій LLM/Jev, модель, поріг Jev, reasoning, додаткові критерії)
+        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, рушій LLM/Jev, модель, поріг Jev, reasoning, додаткові критерії, вхід у вікно «Базові плюси й мінуси»)
         │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
