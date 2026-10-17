@@ -18,21 +18,21 @@ import {
   retainAbsorbedOwn,
   serializeBaseDisabled,
 } from '../../analysis/baseCriteria.js';
-import {
-  parseCriteriaConfig,
-  phraseKey,
-  planRemap,
-  remapBullets,
-  remapLocalFilters,
-  serializeCriteriaConfig,
-} from '../../analysis/criteria.js';
+import { parseCriteriaConfig, phraseKey, serializeCriteriaConfig } from '../../analysis/criteria.js';
 import { chat } from '../../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse, parseGroupSuggestions } from '../../analysis/parse.js';
+import {
+  filterActive,
+  parseLocalFilters,
+  parseRemapOps,
+  planRemapSteps,
+  remapListingStatements,
+} from '../../analysis/remap.js';
 import { buildCriteriaPrompt, buildGroupingPrompt, pickSample } from '../../analysis/prompts.js';
 import { getSearch, loadListings } from '../../analysis/repo.js';
-import { dbAll, dbBatchChunked, dbGet, dbRun } from '../../db/db.js';
+import { dbBatchChunked, dbGet, dbRun } from '../../db/db.js';
 import { recomputeFilteredOut } from '../../scraper/refilter.js';
-import type { CriteriaConfig, LocalFilters } from '../../types.js';
+import type { CriteriaConfig } from '../../types.js';
 
 export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
   // Категорії критеріїв пошуку (docs/plans/old/criteria-categories.md; старий формат нормалізується) —
@@ -187,24 +187,9 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
     const mode = req.body.mode;
     if (!isMode(mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
-    let ops: Array<{ from: string[]; to: string | null }>;
-    if (req.body.merges !== undefined) {
-      if (!Array.isArray(req.body.merges) || req.body.merges.length === 0) {
-        return reply.code(400).send({ error: 'Не обрано жодної групи' });
-      }
-      ops = req.body.merges.map((m: unknown) => {
-        const obj = (m && typeof m === 'object' ? m : {}) as { from?: unknown; to?: unknown };
-        return { from: phraseList(obj.from), to: nonEmpty(obj.to) };
-      });
-      if (ops.some((op) => op.from.length === 0)) return reply.code(400).send({ error: 'Не обрано жодного критерію' });
-      if (ops.some((op) => op.to === null)) return reply.code(400).send({ error: 'Порожня назва категорії' });
-    } else {
-      const from = phraseList(req.body.from);
-      const to = nonEmpty(req.body.to);
-      if (from.length === 0) return reply.code(400).send({ error: 'Не обрано жодного критерію' });
-      if (req.body.to !== null && to === null) return reply.code(400).send({ error: 'Порожня назва категорії' });
-      ops = [{ from, to }];
-    }
+    const parsed = parseRemapOps(req.body);
+    if ('error' in parsed) return reply.code(400).send({ error: parsed.error });
+    const ops = parsed;
 
     const search = await dbGet<{
       analysis_criteria: string;
@@ -223,39 +208,15 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Об'єднання застосовуються по черзі до списку категорій; ті самі кроки — до пунктів оголошень і фільтрів.
-    let groups = config[mode];
-    const steps: Array<{ keys: Set<string>; to: string | null }> = [];
-    for (const op of ops) {
-      const plan = planRemap(groups, op.from, op.to);
-      groups = plan.groups;
-      steps.push({ keys: plan.keys, to: op.to });
-    }
+    const { groups, steps } = planRemapSteps(config[mode], ops);
     const nextConfig: CriteriaConfig = { ...config, [mode]: groups };
     const touchListings = ops.some((op) => op.to !== null) || req.body.listings !== false;
 
-    const statements: InStatement[] = [];
-    let localFilters: LocalFilters = {};
-    try {
-      localFilters = JSON.parse(search.local_filters || '{}') as LocalFilters;
-    } catch {
-      localFilters = {};
-    }
-    const nextFilters = touchListings
-      ? steps.reduce((f, step) => remapLocalFilters(f, mode, step.keys, step.to), localFilters)
-      : localFilters;
-
+    const localFilters = parseLocalFilters(search.local_filters);
+    let statements: InStatement[] = [];
+    let nextFilters = localFilters;
     if (touchListings) {
-      // mode — з whitelist (isMode): 'cons' | 'pros', безпечна інтерполяція.
-      const rows = await dbAll<{ id: number; val: string | null }>(
-        `SELECT id, ${mode} AS val FROM listings WHERE search_id = ? AND ${mode} <> ''`,
-        [id],
-      );
-      for (const row of rows) {
-        const next = steps.reduce((text, step) => remapBullets(text, step.keys, step.to), row.val);
-        if (next !== row.val) {
-          statements.push({ sql: `UPDATE listings SET ${mode} = ? WHERE id = ?`, args: [next, row.id] });
-        }
-      }
+      ({ statements, nextFilters } = await remapListingStatements(id, mode, steps, localFilters));
     }
     const updated = statements.length;
     // Пошук — останнім: після часткового збою чанків той самий remap повторюється з тим самим результатом.
@@ -267,22 +228,11 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
 
     // Об'єднання може змінити, кого ховає фільтр «мінуси/плюси» (було чи стало правило режиму) —
     // перерахувати приховані. Без такого правила перерахунок не потрібен (зайвий прохід по Turso).
-    const filterActive = (f: LocalFilters) => (f[mode]?.length ?? 0) > 0;
     const { filtered_out_count } =
-      touchListings && (filterActive(localFilters) || filterActive(nextFilters))
+      touchListings && (filterActive(localFilters, mode) || filterActive(nextFilters, mode))
         ? await recomputeFilteredOut(id)
         : { filtered_out_count: null };
     // Відповідь — ефективний список (як GET): клієнт кладе його в кеш критеріїв пошуку.
     return { criteria: mergeBaseCriteria(nextConfig, bases, disabled), updated, filtered_out_count };
   });
-}
-
-/** Непорожні рядки з тіла запиту (формулювання критеріїв). */
-function phraseList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.trim() !== '') : [];
-}
-
-/** Рядок із тіла запиту або null, якщо порожній чи не рядок. */
-function nonEmpty(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
 }

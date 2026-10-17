@@ -266,12 +266,12 @@ React + Chakra UI v3 + TanStack Query. Нових залежностей нем�
   — винесено з `routes/analysis/criteria.ts` без зміни поведінки remap пошуку
 - `POST /api/categories/:id/criteria/remap` (тіло як у remap пошуку) → `{ criteria: CriteriaConfig; updated: number; searches: number }`
 
-- [ ] **5.1 Тести (падають):** категорія `1502` з базовим `тріснутий екран`; пошук A (`base_category_id 80`, нащадок) і B (`base_category_id 37`, предок),
+- [x] **5.1 Тести (падають):** категорія `1502` з базовим `тріснутий екран`; пошук A (`base_category_id 80`, нащадок) і B (`base_category_id 37`, предок),
   в обох оголошення `• тріснутий екран` → remap `from ['тріснутий екран'] to 'розбитий екран'`: в A перейменовано, у B — ні; `searches: 1`.
   Наявні тести remap пошуку — зелені.
-- [ ] **5.2 Код:** оновити `base_criteria`; для кожного пошуку з `base_category_id IN descendantIds(id)` — `remapListingStatements`; один `dbBatchChunked`;
+- [x] **5.2 Код:** оновити `base_criteria`; для кожного пошуку з `base_category_id IN descendantIds(id)` — `remapListingStatements`; один `dbBatchChunked`;
   `recomputeFilteredOut` — лише де у фільтрі є правило режиму. Видалення (`to: null`) оголошень не чіпає.
-- [ ] **5.3** `npm test` → PASS.
+- [x] **5.3** `npm test` → PASS.
 
 ### Задача 6. Генерація: чернетка для категорії й коротший список у пошуку
 

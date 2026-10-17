@@ -11,7 +11,7 @@ import { cleanCriterion, normalizeGroups, parseCriteriaConfig, phraseKey } from 
 const MODES: AnalysisMode[] = ['cons', 'pros'];
 
 /** Межа глибини ланцюжка предків у рекурсивному CTE (захист від циклу в даних). */
-const MAX_CHAIN_DEPTH = 20;
+export const MAX_CHAIN_DEPTH = 20;
 
 /** Вимкнені пошуком базові пункти за режимом (назви; збіг — phraseKey з назвою чи синонімом). */
 export type BaseDisabled = Record<AnalysisMode, string[]>;

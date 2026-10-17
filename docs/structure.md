@@ -105,6 +105,7 @@ olx-dashboard/
 │       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/loadListings
 │       │   ├── criteria.ts   # категорії критеріїв (docs/plans/old/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
 │       │   ├── baseCriteria.ts # базові плюси/мінуси категорій (docs/plans/base-criteria.md): mergeBaseCriteria/stripBaseCriteria/applyCriteriaBody/retainAbsorbedOwn/getEffectiveCriteria, парс searches.base_disabled
+│       │   ├── remap.ts      # спільні кроки remap критеріїв: parseRemapOps/planRemapSteps/remapListingStatements/remapBaseDisabled (пошук і категорія)
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
@@ -149,7 +150,7 @@ olx-dashboard/
 │           ├── listings.ts   # GET /api/searches/:id/listings (легкі рядки) + details/search на вимогу + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
-│           ├── categories.ts # GET /api/categories, GET/PUT /api/categories/:id/criteria (базові набори), POST /api/categories/collect (збір дерева; паралельний → 409)
+│           ├── categories.ts # GET /api/categories, GET/PUT /api/categories/:id/criteria (базові набори), POST /api/categories/:id/criteria/remap, POST /api/categories/collect (збір дерева; паралельний → 409)
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/old/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
