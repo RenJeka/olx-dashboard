@@ -18,7 +18,7 @@ High-level огляд усіх AI-кроків OLX Dashboard: як влашто�
 - **Обсяг** — єдиний `ScopeSelector` (весь пошук / у таблиці / вибрані / найкращі кандидати),
   `docs/plans/old/ai-scope-selector.md`.
 - **Два рівноправні рушії** (нижче): авто (OpenRouter) і ручний (ZIP-пакет для агента).
-- **Ключ OpenRouter** — лише в `server/.env` (`OPENROUTER_API_KEY`), опціональний.
+- **Ключ OpenRouter** (`OPENROUTER_API_KEY`) — локально в `server/.env`, на проді — env сервісу `olx-dashboard-api`; опціональний.
 - **Промпти — єдине джерело** у `server/src/analysis/` (спільне для авто й ручного).
 
 ## Два рушії (для кожного кроку)
@@ -175,7 +175,7 @@ reduce — теж судження, яке агент робить сам, чи�
     evidence}`; сервер верифікує `evidence` як підрядок опису (анти-галюцинація); у БД пише
     лише масив `criterion`.
   - **PII продавця в промпт не йде** (тільки `id/title/description/params`).
-  - Ключ OpenRouter — лише в `server/.env` (`OPENROUTER_API_KEY`), ніколи в код/git.
+  - Ключ OpenRouter (`OPENROUTER_API_KEY`) — лише в `server/.env` / env Render, ніколи в код/git.
   - Промпти — єдине джерело `server/src/analysis/prompts.ts` (спільне для авто й ручного).
   - Зміна `title`/`description` після аналізу → `analysis_stale=1` (бейдж «застарілий
     аналіз»), без авто-переаналізу. Перезапис непорожніх `pros`/`cons` — діалог підтвердження.

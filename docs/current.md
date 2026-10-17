@@ -19,6 +19,8 @@
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
 - Останній хендоф і реліз — [2026-10-16 docs-audit](handoffs/2026-10-16-docs-audit.md): аудит документації й
   `npm run db:copy-prod` (копія прод-БД у локальний файл) — на проді, smoke ✅. Модель і рушії AI — [ai-flow](ai-flow.md).
+- AI на проді — авто-режим з 2026-10-17: `OPENROUTER_API_KEY` в API (окремий ключ з лімітом), кожна AI-кнопка
+  платна ([deploy-render-turso](deploy-render-turso.md) → «Фактичний прод»).
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента
@@ -75,5 +77,5 @@
 
 ## Наступний крок
 
-Ручні перевірки людиною на проді: test-case 3 [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) (модель
-Haiku в налаштуваннях, «Мінуси» → «Згенерувати» без плюсів) і «Згрупувати автоматично».
+Ручна перевірка людиною на проді — «Згрупувати автоматично» у вікні «Плюси та мінуси» (test-case 3
+[llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) пройдено 2026-10-17).

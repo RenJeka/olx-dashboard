@@ -43,7 +43,9 @@
 > - Static Site названо **`olx-dashboard`** → `https://olx-dashboard.onrender.com` (не `…-web`);
 > - фронт ходить в API **напряму** через `VITE_API_BASE=https://olx-dashboard-api.onrender.com`
 >   (`web/src/api/base.ts`), бекенд дозволяє CORS для `WEB_ORIGIN=https://olx-dashboard.onrender.com`;
-> - rewrite `/api/*` **прибрано** (був битий), лишається лише SPA-fallback `/*` → `/index.html`.
+> - rewrite `/api/*` **прибрано** (був битий), лишається лише SPA-fallback `/*` → `/index.html`;
+> - з 2026-10-17 в API задано **`OPENROUTER_API_KEY`** — окремий ключ `olx-dashboard-prod` з лімітом витрат в
+>   OpenRouter: AI-кнопки на проді працюють в авто-режимі й платні ([openrouter-management-key](instructions/openrouter-management-key.md)).
 > Історія переведення — `docs/plans/old/render-to-main.md`.
 
 ---
