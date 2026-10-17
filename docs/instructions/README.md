@@ -14,6 +14,7 @@ AI) сюди не дублюється — вона в документах із
 | [chakra-nested-dialog-focus](chakra-nested-dialog-focus.md) | У діалозі поверх іншої модалки не можна друкувати в поле |
 | [tsx-top-level-await-mts](tsx-top-level-await-mts.md) | Пишеш одноразовий tsx-скрипт з top-level `await` |
 | [render-env-change-redeploys](render-env-change-redeploys.md) | Змінюєш env сервісу на Render |
+| [openrouter-management-key](openrouter-management-key.md) | AI-дія падає з `OpenRouter HTTP 401 User not found` або створюєш новий ключ OpenRouter |
 | [turso-create-branch-timeout](turso-create-branch-timeout.md) | Turso MCP `create_branch` повернув таймаут |
 | [absolute-paths-for-user](absolute-paths-for-user.md) | Даєш людині шлях до файлу в інструкції |
 | [manual-test-cases](manual-test-cases.md) | Пишеш ручні test-cases, які людина проходитиме в UI |
