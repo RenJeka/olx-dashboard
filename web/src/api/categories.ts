@@ -95,10 +95,11 @@ export function useRemapCategoryCriteria() {
         method: 'POST',
         body: JSON.stringify({ mode, from, to }),
       }),
-    onSuccess: (res, { categoryId }) => {
+    onSuccess: (res, { categoryId, to }) => {
       applyOwnSet(qc, categoryId, res.criteria);
-      // Змінились пункти в оголошеннях — перечитати лише тоді (Turso-економія).
-      if (res.updated > 0) {
+      // Перейменування / злиття переписує local_filters, base_disabled і analysis_criteria пошуків навіть без змін
+      // оголошень (updated === 0), тож перечитуємо завжди. Видалення (to = null) сервер оголошень і фільтрів не чіпає.
+      if (to != null) {
         void qc.invalidateQueries({ queryKey: ['listings'] });
         void qc.invalidateQueries({ queryKey: ['filter-options'] });
         void qc.invalidateQueries({ queryKey: ['searches'] });
