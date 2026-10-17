@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS listings (
   city TEXT,
   district TEXT,
   params TEXT DEFAULT '{}',          -- JSON: всі характеристики з OLX
-  category_id INTEGER,               -- OLX category.id (числовий id листової категорії); словник назв — olxCategories.ts
+  category_id INTEGER,               -- OLX category.id (числовий id листової категорії); словник назв — таблиця olx_categories
   category_type TEXT,                -- OLX category.type (слаг верхнього рівня, напр. "electronics")
   photo_url TEXT,
   photo_urls TEXT,                   -- JSON-масив прев'ю-лінків усіх фото (галерея), NULL до re-scan
@@ -127,4 +127,14 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   stage TEXT,                        -- людиномовний поточний етап (транзієнтний текст, docs/plans/old/scan-progress-detail.md)
   sub_done INTEGER,                  -- позиція в підпослідовності (1-based): варіант синоніма / ціновий бакет / фаза verify
   sub_total INTEGER                  -- загальна кількість підпослідовності
+);
+
+-- Глобальне дерево категорій OLX (docs/plans/base-criteria.md): накопичується зі скану пошуків
+-- (facet GraphQL, docs/olx-api.md §2.11) і збирача. id збігається з listings.category_id.
+CREATE TABLE IF NOT EXISTS olx_categories (
+  id INTEGER PRIMARY KEY,            -- OLX category.id
+  parent_id INTEGER,                 -- id батька; NULL — корінь або предка не було у facet
+  label TEXT NOT NULL,               -- людська назва (укр)
+  slug TEXT NOT NULL,                -- власний слаг (останній сегмент шляху перед /q-)
+  updated_at TEXT                    -- коли рядок вставлено/востаннє реально змінено
 );

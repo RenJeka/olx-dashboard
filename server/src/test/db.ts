@@ -3,7 +3,7 @@ import { db, dbAll, dbGet, initDb } from '../db/db.js';
 import type { RawListing } from '../types.js';
 
 // Порядок — від залежних до батьківських (FK).
-const TABLES = ['price_history', 'scan_runs', 'app_logs', 'listings', 'searches', 'projects'];
+const TABLES = ['olx_categories', 'price_history', 'scan_runs', 'app_logs', 'listings', 'searches', 'projects'];
 
 /** Застосувати схему (один раз на файл) і очистити всі таблиці. */
 export async function resetDb(): Promise<void> {

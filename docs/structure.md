@@ -72,6 +72,8 @@ olx-dashboard/
 │       │   ├── scan.ts       # типи сканування, прогрес, план глибокого скану
 │       │   └── analysis.ts   # AI аналіз, relevance, aiPicks
 │       ├── types.ts          # barrel-файл експорту доменних типів + інтерфейс OlxFetcher
+│       ├── categories/        # глобальне дерево категорій OLX (таблиця olx_categories)
+│       │   └── tree.ts       # upsertCategories(nodes): пише лише нові/змінені вузли
 │       ├── scanner/           # модулі сканування (розбитий scanner.ts)
 │       │   ├── index.ts      # barrel: реекспорт runScan/analyzeScan/runDeepScanFromPlan/runVerify/requestStopScan/isPlanCached/isAnalysisFresh/countVerifyCandidates
 │       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan
@@ -120,7 +122,8 @@ olx-dashboard/
 │       │   ├── utils.ts        # спільні утиліти (sleep, randomDelayMs, slugify)
 │       │   ├── graphql/        # GraphQL-збирач (основний метод збору)
 │       │   │   ├── index.ts    # реекспорт GraphqlOlxFetcher
-│       │   │   ├── client.ts   # GraphqlClient: HTTP запити та парсинг параметрів
+│       │   │   ├── client.ts   # GraphqlClient: HTTP запити та парсинг параметрів; graphqlHeaders() — спільні заголовки
+│       │   │   ├── categories.ts # fetchCategoryFacet(query): дерево категорій через GraphQL `facets` (olx-api.md §2.11), best-effort
 │       │   │   ├── mapper.ts   # GraphqlListingMapper: перетворення сирих даних GraphQL
 │       │   │   ├── split.ts    # SplitScanner: зондування, бісекція цін, допагінація бакетів
 │       │   │   ├── fetcher.ts  # GraphqlOlxFetcher (Facade): fetchSearch/fetchSearchSplit, оркеструє client та split
@@ -133,7 +136,7 @@ olx-dashboard/
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
 │       │   ├── refilter.ts     # recomputeFilteredOut(): перерахунок filtered_out після зміни local_filters (лише змінені рядки, порціями)
 │       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
-│       │   ├── olxCategories.ts # fetchCategoryOptions(query): дерево категорій OLX (facet метаданих пошуку, olx-api.md §2.11) → CategoryOption[]; тягнеться scanner-ом, кеш у searches.category_facet
+│       │   ├── olxCategories.ts # facetToOptions/facetToNodes: чисті перетворення facet категорій OLX (olx-api.md §2.11) → CategoryOption[] / CategoryNode[]; facet тягне graphql/categories.ts, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/old/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
@@ -360,7 +363,7 @@ olx-dashboard/
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
 | Локальні фільтри (`price_range`, `cities`, `sellers`, `categories`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx` (+ `local-filters/CategoryFilter.tsx`), `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
-| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/olxCategories.ts` (facet OLX → дерево назв) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: наших/OLX), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/old/category-counts-and-filter.md` |
+| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/graphql/categories.ts` (GraphQL `facets`) + `server/src/scraper/olxCategories.ts` (facet → дерево назв) + `server/src/categories/tree.ts` (`olx_categories`) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: наших/OLX), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/old/category-counts-and-filter.md` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner/runScan.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
 | Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner/analyzeScan.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/old/two-phase-deep-scan.md` |

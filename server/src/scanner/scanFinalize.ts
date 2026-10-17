@@ -1,6 +1,8 @@
 import { dbRun } from '../db/db.js';
 import { logWarn } from '../logger.js';
-import { fetchCategoryOptions } from '../scraper/olxCategories.js';
+import { upsertCategories } from '../categories/tree.js';
+import { fetchCategoryFacet } from '../scraper/graphql/categories.js';
+import { facetToNodes, facetToOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
 import { applyScanStatuses } from '../scraper/statusEngine.js';
 import type { SearchConfig, ScanResult, RawListing } from '../types.js';
@@ -8,18 +10,20 @@ import type { ScanPersister } from './scanPersister.js';
 
 /**
  * Best-effort оновлення дерева категорій OLX (facet) для пошуку після успішного скану.
- * Один легкий запит до OLX; результат кешується у searches.category_facet (фільтр категорій
- * читає його без мережі). Помилка/недоступність → лишаємо попереднє дерево, скан не валимо.
+ * Один легкий GraphQL-запит до OLX (facets, olx-api.md §2.11); результат кешується у
+ * searches.category_facet (фільтр категорій читає його без мережі), а вузли дерева — у глобальній
+ * olx_categories (пише лише нові/змінені). Помилка/недоступність → лишаємо попереднє дерево, скан не валимо.
  * Тягнемо лише для основного `query` (синоніми дали б непорівнянні OLX-числа через перетин видач).
  */
 export async function refreshCategoryFacet(searchId: number, query: string): Promise<void> {
   try {
-    const categories = await fetchCategoryOptions(query);
-    if (categories) {
+    const facet = await fetchCategoryFacet(query);
+    if (facet) {
       await dbRun('UPDATE searches SET category_facet = ? WHERE id = ?', [
-        JSON.stringify(categories),
+        JSON.stringify(facetToOptions(facet)),
         searchId,
       ]);
+      await upsertCategories(facetToNodes(facet));
     }
   } catch (err) {
     // best-effort — дерево категорій не критичне для скану; але збій має бути видимим у журналі

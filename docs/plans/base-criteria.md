@@ -188,20 +188,20 @@ React + Chakra UI v3 + TanStack Query. Нових залежностей нем�
 - `facetToOptions(cats: FacetCategory[]): CategoryOption[]`, `facetToNodes(cats: FacetCategory[]): CategoryNode[]` — `scraper/olxCategories.ts`
 - `upsertCategories(nodes: CategoryNode[]): Promise<number>` (кількість нових/змінених) — `categories/tree.ts`
 
-- [ ] **1.1 Тести (падають):** server: `src/scraper/olxCategories.test.ts`
+- [x] **1.1 Тести (падають):** server: `src/scraper/olxCategories.test.ts`
   - `facetToNodes`: url `/elektronika/q-x`, `/elektronika/noutbuki-i-aksesuary/q-x`, `/elektronika/noutbuki-i-aksesuary/noutbuki/q-x`
     (id `37`, `1502`, `80`) → `parentId` `null`, `37`, `1502`; `slug` `elektronika`, `noutbuki-i-aksesuary`, `noutbuki`.
   - Предка немає у відповіді → `parentId: null`.
   - `facetToOptions` дає те саме, що старий `buildOptions` (`path` — назви root→leaf, `olxCount` = `count`).
   - server: `src/categories/tree.test.ts`: `upsertCategories` двічі тими самими вузлами → другий виклик `0`; змінений `label` → `1`.
-- [ ] **1.2 Схема:** `olx_categories (id INTEGER PRIMARY KEY, parent_id INTEGER, label TEXT NOT NULL, slug TEXT NOT NULL, updated_at TEXT)`.
-- [ ] **1.3 Код:** `fetchCategoryFacet` — POST на `GRAPHQL_URL`, `searchParameters`: `query`, `offset=0`, `limit=1`,
+- [x] **1.2 Схема:** `olx_categories (id INTEGER PRIMARY KEY, parent_id INTEGER, label TEXT NOT NULL, slug TEXT NOT NULL, updated_at TEXT)`.
+- [x] **1.3 Код:** `fetchCategoryFacet` — POST на `GRAPHQL_URL`, `searchParameters`: `query`, `offset=0`, `limit=1`,
   `facets=[{"field":"category","fetchLabel":true,"fetchUrl":true,"limit":150}]`; у запиті —
   `metadata { facets { category { id count label url } } }`. Не-200, `ListingError`, порожньо → `logWarn('scanner', 'category-facet', …)` і `null`.
   `upsertCategories` — `INSERT … ON CONFLICT(id) DO UPDATE … WHERE` хоч одне поле відрізняється.
-- [ ] **1.4** `refreshCategoryFacet` (`scanner/scanFinalize.ts`): `fetchCategoryFacet` → `searches.category_facet` (як було) + `upsertCategories`. REST-код і `SEARCH_METADATA_URL` прибрати.
-- [ ] **1.5** `npm run check` → зелений.
-- [ ] **1.6 Доки:** `olx-api.md` §2.11 (GraphQL `facets`, ліміт, REST → `403` з 2026-10-17) + журнал §6.
+- [x] **1.4** `refreshCategoryFacet` (`scanner/scanFinalize.ts`): `fetchCategoryFacet` → `searches.category_facet` (як було) + `upsertCategories`. REST-код і `SEARCH_METADATA_URL` прибрати.
+- [x] **1.5** `npm run check` → зелений.
+- [x] **1.6 Доки:** `olx-api.md` §2.11 (GraphQL `facets`, ліміт, REST → `403` з 2026-10-17) + журнал §6.
 
 ### Задача 2. Автокатегорія пошуку
 

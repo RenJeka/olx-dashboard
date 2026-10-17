@@ -95,3 +95,22 @@ export const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters:
     }
   }
 }`;
+
+/**
+ * Скільки категорій тягнути у facet. OLX приймає лише ліміт < 200 (верифіковано live 2026-10-17:
+ * для широкого запиту «ноутбук» при limit=150 повертає ~180 категорій) — docs/olx-api.md §2.11.
+ */
+export const CATEGORY_FACET_LIMIT = 150;
+
+/** Query дерева категорій: лише `metadata.facets.category`, самі оголошення не потрібні (limit=1). */
+export const CATEGORY_FACET_QUERY = `query CategoryFacetQuery($searchParameters: [SearchParameter!] = []) {
+  clientCompatibleListings(searchParameters: $searchParameters) {
+    __typename
+    ... on ListingSuccess {
+      metadata { facets { category { id count label url } } }
+    }
+    ... on ListingError {
+      error { code title detail status }
+    }
+  }
+}`;
