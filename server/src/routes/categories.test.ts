@@ -6,6 +6,9 @@ import { createSearch, insertListing, resetDb } from '../test/db.js';
 vi.mock('../logger.js', () => ({ logWarn: vi.fn(), logError: vi.fn() }));
 const collect = vi.hoisted(() => vi.fn());
 vi.mock('../categories/collector.js', () => ({ collectCategories: collect }));
+// Генерація чернетки: chat замокано — жодних викликів OpenRouter, відповідь LLM задає тест.
+const chatMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<string>>());
+vi.mock('../analysis/openrouter.js', () => ({ chat: chatMock }));
 
 import { categoriesRoutes } from './categories.js';
 
@@ -248,5 +251,94 @@ describe('POST /api/categories/:id/criteria/remap', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().criteria.cons.map((g: { name: string }) => g.name)).toEqual(['дефект']);
     expect((await consOf(searchA))[0]!.cons).toBe('• дефект\n• без торгу');
+  });
+});
+
+describe('POST /api/categories/:id/criteria/generate', () => {
+  let app: ReturnType<typeof Fastify>;
+  const generate = (id: number, payload: object) =>
+    app.inject({ method: 'POST', url: `/api/categories/${id}/criteria/generate`, payload });
+  const reply = (items: string[]) => JSON.stringify({ criteria: items });
+  const promptOf = (call: number) => (chatMock.mock.calls[call]![0] as Array<{ content: string }>)[0]!.content;
+
+  beforeEach(async () => {
+    await resetDb();
+    chatMock.mockReset();
+    vi.stubEnv('OPENROUTER_API_KEY', 'test-key');
+    await db.batch(
+      [
+        `INSERT INTO olx_categories (id, parent_id, label, slug) VALUES (37, NULL, 'Електроніка', 'elektronika')`,
+        `INSERT INTO olx_categories (id, parent_id, label, slug) VALUES (1502, 37, 'Ноутбуки та аксесуари', 'na')`,
+        `INSERT INTO olx_categories (id, parent_id, label, slug) VALUES (80, 1502, 'Ноутбуки', 'noutbuki')`,
+        `INSERT INTO base_criteria (category_id, criteria) VALUES (37, '{"cons":[{"name":"не працює","aliases":["не вмикається"],"enabled":true}],"pros":[]}')`,
+        `INSERT INTO base_criteria (category_id, criteria) VALUES (80, '{"cons":["розбитий екран"],"pros":["коробка"]}')`,
+      ],
+      'write',
+    );
+    app = Fastify();
+    await app.register(categoriesRoutes);
+  });
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await app.close();
+  });
+
+  it('промпт: шлях, власні й успадковані як «вже є», протилежний режим як «НЕ включай»; без описів оголошень', async () => {
+    const searchId = await createSearch();
+    await db.execute({ sql: 'UPDATE searches SET base_category_id = 80 WHERE id = ?', args: [searchId] });
+    await insertListing(searchId, 1);
+    await db.execute({ sql: "UPDATE listings SET description = 'СЕКРЕТНИЙ ОПИС' WHERE olx_id = 1" });
+    chatMock.mockResolvedValue(reply(['нова ознака']));
+
+    const res = await generate(80, { mode: 'cons', model: 'test/model' });
+    expect(res.statusCode).toBe(200);
+    expect((chatMock.mock.calls[0]![1] as { model: string }).model).toBe('test/model');
+    const prompt = promptOf(0);
+    expect(prompt).toContain('Електроніка → Ноутбуки та аксесуари → Ноутбуки');
+    expect(prompt).toContain('- розбитий екран');
+    expect(prompt).toContain('- не працює (сюди ж: не вмикається)');
+    expect(prompt).toContain('НЕ включай їх');
+    expect(prompt).toContain('- коробка');
+    expect(prompt).not.toContain('СЕКРЕТНИЙ ОПИС');
+  });
+
+  it('9 пунктів → не більше BASE_CRITERIA_DRAFT; нічого не зберігає', async () => {
+    const before = await dbAll('SELECT category_id, criteria FROM base_criteria ORDER BY category_id');
+    chatMock.mockResolvedValue(reply(['п1', 'п2', 'п3', 'п4', 'п5', 'п6', 'п7', 'п8', 'п9']));
+    const res = await generate(80, { mode: 'cons' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ criteria: ['п1', 'п2', 'п3', 'п4', 'п5', 'п6', 'п7'] });
+    expect(await dbAll('SELECT category_id, criteria FROM base_criteria ORDER BY category_id')).toEqual(before);
+  });
+
+  it('відсіює наявні (власні, успадковані, синоніми) і пункти протилежного режиму', async () => {
+    chatMock.mockResolvedValue(reply(['Не працює', 'не вмикається', 'розбитий екран', 'Коробка', 'немає зарядки']));
+    const res = await generate(80, { mode: 'cons' });
+    expect(res.json()).toEqual({ criteria: ['немає зарядки'] });
+  });
+
+  it('категорія без власного набору: успадковане протилежного режиму йде в «НЕ включай»', async () => {
+    chatMock.mockResolvedValue(reply(['щось']));
+    const res = await generate(1502, { mode: 'pros' });
+    expect(res.json()).toEqual({ criteria: ['щось'] });
+    expect(promptOf(0)).toContain('- не працює (сюди ж: не вмикається)');
+    expect(promptOf(0)).not.toContain('вже є');
+  });
+
+  it('невідома категорія → 404; невалідний режим → 400; без ключа → 409; помилка LLM → 502', async () => {
+    const missing = await generate(999, { mode: 'cons' });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json().error).toBe('Категорію не знайдено');
+    expect((await generate(80, { mode: 'bad' })).statusCode).toBe(400);
+
+    vi.stubEnv('OPENROUTER_API_KEY', '');
+    expect((await generate(80, { mode: 'cons' })).statusCode).toBe(409);
+    expect(chatMock).not.toHaveBeenCalled();
+
+    vi.stubEnv('OPENROUTER_API_KEY', 'test-key');
+    chatMock.mockRejectedValue(new Error('OpenRouter 500'));
+    const failed = await generate(80, { mode: 'cons' });
+    expect(failed.statusCode).toBe(502);
+    expect(failed.json().error).toBe('OpenRouter 500');
   });
 });

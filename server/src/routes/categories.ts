@@ -11,8 +11,18 @@ import {
   parseBaseDisabled,
   serializeBaseDisabled,
 } from '../analysis/baseCriteria.js';
-import { ANALYSIS_ERRORS, isMode } from '../analysis/constants.js';
+import { hasApiKey } from '../analysis/config.js';
+import {
+  ANALYSIS_ERRORS,
+  BASE_CRITERIA_DRAFT,
+  DEFAULT_MODEL,
+  OPPOSITE_MODE,
+  isMode,
+} from '../analysis/constants.js';
 import { parseCriteriaConfig, phraseKey, serializeCriteriaConfig } from '../analysis/criteria.js';
+import { chat } from '../analysis/openrouter.js';
+import { excludeOppositeCriteria, parseCriteriaResponse } from '../analysis/parse.js';
+import { buildBaseCriteriaPrompt } from '../analysis/prompts.js';
 import {
   filterActive,
   parseLocalFilters,
@@ -26,13 +36,25 @@ import { SEED_WORDS } from '../categories/seedWords.js';
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
 import { logError } from '../logger.js';
 import { recomputeFilteredOut } from '../scraper/refilter.js';
-import type { CategoryNode, CriteriaConfig } from '../types.js';
+import type { CategoryNode, CriteriaConfig, CriterionGroup } from '../types.js';
 
 const ALREADY_RUNNING = 'Збір дерева категорій уже йде';
 const CATEGORY_NOT_FOUND = 'Категорію не знайдено';
 
 /** Прапорець «збір іде» — in-memory (single-user, один процес). */
 let collecting = false;
+
+/** Власний набір категорії та злиті набори її предків (`inherited`, пункти з `base`) — за готовим ланцюжком. */
+async function loadOwnAndInherited(
+  chain: CategoryNode[],
+  id: number,
+): Promise<{ own: CriteriaConfig; inherited: CriteriaConfig }> {
+  const sets = await loadBaseSets(chain);
+  const none: CriteriaConfig = { cons: [], pros: [] };
+  const own = sets.find((s) => s.categoryId === id)?.config ?? none;
+  const inherited = mergeBaseCriteria(none, sets.filter((s) => s.categoryId !== id), { cons: [], pros: [] });
+  return { own, inherited };
+}
 
 export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
   // Дерево категорій для вікна «Базові плюси й мінуси»: усі вузли + чи є непорожній набір. Два читання.
@@ -68,14 +90,7 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
     const id = Number(req.params.id);
     const chain = await loadCategoryChain(id);
     if (chain.length === 0) return reply.code(404).send({ error: CATEGORY_NOT_FOUND });
-    const sets = await loadBaseSets(chain);
-    const ownSet = sets.find((s) => s.categoryId === id);
-    const own: CriteriaConfig = ownSet ? ownSet.config : { cons: [], pros: [] };
-    const inherited = mergeBaseCriteria(
-      { cons: [], pros: [] },
-      sets.filter((s) => s.categoryId !== id),
-      { cons: [], pros: [] },
-    );
+    const { own, inherited } = await loadOwnAndInherited(chain, id);
     return { own, inherited };
   });
 
@@ -96,6 +111,44 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
       [id, serializeCriteriaConfig(own)],
     );
     return own;
+  });
+
+  // Чернетка базового набору категорії від LLM (docs/plans/base-criteria.md). НЕ зберігає — людина переглядає й
+  // зберігає через PUT. У промпті лише шлях категорії та назви пунктів: «вже є» = власні + успадковані режиму,
+  // «НЕ включай» = власні + успадковані протилежного. Відповідь: без наявних, без протилежних, ≤ BASE_CRITERIA_DRAFT.
+  app.post<{
+    Params: { id: string };
+    Body: { mode?: string; model?: string; reasoning?: boolean };
+  }>('/api/categories/:id/criteria/generate', async (req, reply) => {
+    const id = Number(req.params.id);
+    const chain = await loadCategoryChain(id);
+    if (chain.length === 0) return reply.code(404).send({ error: CATEGORY_NOT_FOUND });
+    const mode = req.body?.mode;
+    if (!isMode(mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
+    if (!hasApiKey()) return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
+
+    const { own, inherited } = await loadOwnAndInherited(chain, id);
+    const both = (m: typeof mode): CriterionGroup[] => [...inherited[m], ...own[m]];
+    const existing = both(mode);
+    const opposite = both(OPPOSITE_MODE[mode]);
+    const prompt = buildBaseCriteriaPrompt(
+      chain.map((n) => n.label),
+      mode,
+      existing,
+      opposite,
+    );
+
+    try {
+      const raw = await chat([{ role: 'user', content: prompt }], {
+        model: req.body.model ?? DEFAULT_MODEL,
+        reasoning: req.body.reasoning,
+      });
+      const taken = new Set(existing.flatMap((g) => [g.name, ...g.aliases]).map(phraseKey));
+      const fresh = parseCriteriaResponse(raw).filter((c) => !taken.has(phraseKey(c)));
+      return { criteria: excludeOppositeCriteria(fresh, opposite).slice(0, BASE_CRITERIA_DRAFT) };
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   // Перейменувати / об'єднати (`to` — назва) або видалити (`to = null`) власний пункт набору категорії (тіло як у

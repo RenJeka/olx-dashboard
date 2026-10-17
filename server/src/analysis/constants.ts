@@ -53,8 +53,10 @@ export const RELEVANCE_PROXIMITY_WINDOW = 4;
 export const MAX_ANALYZE_IDS = 200;
 /** Скільки оголошень кладеться в один файл `descriptions/chunk-NNN.json` ZIP-пакета. */
 export const MANUAL_ZIP_CHUNK_SIZE = 50;
-/** Ліміт критеріїв (узгоджено з промптом). */
-export const MAX_CRITERIA = 50;
+/** Ліміт критеріїв генерації (узгоджено з промптом): короткий список — менше повторів і перефразувань. */
+export const MAX_CRITERIA = 10;
+/** Скільки пунктів максимум пропонує чернетка базового набору категорії (docs/plans/base-criteria.md). */
+export const BASE_CRITERIA_DRAFT = 7;
 /** Ліміт синонімів пошукового запиту (docs/plans/old/search-synonyms.md, узгоджено з промптом). */
 export const MAX_SYNONYMS = 15;
 /** Розмір семпла описів для генерації критеріїв. */
