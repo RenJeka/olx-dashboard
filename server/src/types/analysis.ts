@@ -67,6 +67,17 @@ export interface CriterionGroup {
   name: string;
   aliases: string[];
   enabled: boolean;
+  /**
+   * Базовий пункт категорії (docs/plans/base-criteria.md): звідки успадковано. Лише у відповідях API —
+   * ні в `searches.analysis_criteria`, ні в `base_criteria` не пишеться.
+   */
+  base?: CriterionBase;
+}
+
+/** Атрибуція базового пункту: категорія OLX, у чиєму наборі він заданий. */
+export interface CriterionBase {
+  categoryId: number;
+  label: string;
 }
 
 /** Критерії аналізу на рівні пошуку (searches.analysis_criteria, JSON) — пул категорій за режимом. */

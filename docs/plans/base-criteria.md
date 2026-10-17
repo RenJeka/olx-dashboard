@@ -245,19 +245,19 @@ React + Chakra UI v3 + TanStack Query. Нових залежностей нем�
   `PUT /api/categories/:id/criteria` (тіло як у `PUT /api/searches/:id/criteria`, оголошень не чіпає)
 - `GET /api/searches/:id/criteria` → `CriteriaConfig & { category: { id: number; path: string[] } | null }`
 
-- [ ] **4.1 Тести (падають):** `analysis/baseCriteria.test.ts`
+- [x] **4.1 Тести (падають):** `analysis/baseCriteria.test.ts`
   - база «Електроніка»: cons `не працює`; «Ноутбуки»: cons `розбитий екран`; власні cons `подряпини` → ефективні cons: `не працює`, `розбитий екран` (з `base`), `подряпини` (без `base`).
   - власний `Розбитий Екран` + базовий `розбитий екран` → один пункт з `base`, синоніми обох злиті.
   - `disabled.cons = ['не працює']` → пункт є, `enabled: false`.
   - `stripBaseCriteria` (базовий `enabled: false` + власний) → `own` без базового, `disabled.cons = ['не працює']`.
   - роут: пошук без `base_category_id` → `GET …/criteria` — лише власні, `category: null`.
   - роут: `POST /api/searches/:id/criteria/remap` з базовим пунктом у `from` → `400` «Базовий пункт змінюється у вікні «Базові плюси й мінуси»».
-- [ ] **4.2 Схема:** `base_criteria (category_id INTEGER PRIMARY KEY, criteria TEXT DEFAULT '{}', updated_at TEXT)`.
-- [ ] **4.3 Код:** `getEffectiveCriteria` — `SELECT` пошуку + один `SELECT … FROM base_criteria WHERE category_id IN (<предки>)` + шлях з `olx_categories`.
+- [x] **4.2 Схема:** `base_criteria (category_id INTEGER PRIMARY KEY, criteria TEXT DEFAULT '{}', updated_at TEXT)`.
+- [x] **4.3 Код:** `getEffectiveCriteria` — `SELECT` пошуку + один `SELECT … FROM base_criteria WHERE category_id IN (<предки>)` + шлях з `olx_categories`.
   Ефективні критерії замість `parseCriteriaConfig(search.analysis_criteria)` у: `GET …/criteria`, `…/criteria/generate` і `…/criteria/prompt`
   (базові + власні — як «вже є»), `routes/analysis/matching.ts` (усі місця). `PUT …/criteria` — через `stripBaseCriteria`, пише `analysis_criteria` і `base_disabled`.
   `group-suggest` і remap пошуку — лише власні пункти.
-- [ ] **4.4** `npm test` → PASS.
+- [x] **4.4** `npm test` → PASS.
 
 ### Задача 5. Перейменування / об'єднання базового пункту в усіх пошуках категорії
 

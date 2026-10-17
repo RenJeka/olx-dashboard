@@ -9,8 +9,18 @@ import {
   isMode,
 } from '../../analysis/constants.js';
 import {
-  normalizeGroups,
+  applyCriteriaBody,
+  baseKeys,
+  loadSearchBases,
+  mergeBaseCriteria,
+  parseBaseDisabled,
+  resolveEffectiveCriteria,
+  retainAbsorbedOwn,
+  serializeBaseDisabled,
+} from '../../analysis/baseCriteria.js';
+import {
   parseCriteriaConfig,
+  phraseKey,
   planRemap,
   remapBullets,
   remapLocalFilters,
@@ -25,14 +35,16 @@ import { recomputeFilteredOut } from '../../scraper/refilter.js';
 import type { CriteriaConfig, LocalFilters } from '../../types.js';
 
 export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
-  // Категорії критеріїв пошуку (docs/plans/old/criteria-categories.md; старий формат нормалізується).
+  // Категорії критеріїв пошуку (docs/plans/old/criteria-categories.md; старий формат нормалізується) —
+  // ефективні: базові набори автокатегорії й предків + власні (docs/plans/base-criteria.md).
   app.get<{ Params: { id: string } }>('/api/searches/:id/criteria', async (req, reply) => {
     const search = await getSearch(Number(req.params.id));
     if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
-    return parseCriteriaConfig(search.analysis_criteria);
+    const { config, category } = await resolveEffectiveCriteria(search);
+    return { ...config, category };
   });
 
-  // Генерація критеріїв (авто). Без ключа → 409. Наявні категорії йдуть у промпт («не повторюй»).
+  // Генерація критеріїв (авто). Без ключа → 409. Наявні категорії (базові + власні) йдуть у промпт («не повторюй»).
   app.post<{
     Params: { id: string };
     Body: { mode?: string; sampleSize?: number; model?: string; reasoning?: boolean; extra?: string };
@@ -47,7 +59,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
 
     const listings = await loadListings(id, []);
     const sample = pickSample(listings, req.body.sampleSize ?? DEFAULT_SAMPLE_SIZE);
-    const config = parseCriteriaConfig(search.analysis_criteria);
+    const { config } = await resolveEffectiveCriteria(search);
     const opposite = config[OPPOSITE_MODE[req.body.mode]];
     const prompt = buildCriteriaPrompt(
       search.name,
@@ -72,18 +84,25 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
 
   // Автогрупування (docs/plans/old/criteria-auto-group.md): LLM пропонує, які критерії режиму об'єднати. НЕ зберігає —
   // застосування через remap з `merges`. У промпті лише назви критеріїв; < 2 критеріїв — без виклику LLM.
+  // Лише власні пункти пошуку: базові змінюються у вікні «Базові плюси й мінуси».
   app.post<{ Params: { id: string }; Body: { mode?: string; model?: string; reasoning?: boolean } }>(
     '/api/searches/:id/criteria/group-suggest',
     async (req, reply) => {
       const search = await getSearch(Number(req.params.id));
       if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
       if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
-      const groups = parseCriteriaConfig(search.analysis_criteria)[req.body.mode];
+      const mode = req.body.mode;
+      let groups = parseCriteriaConfig(search.analysis_criteria)[mode];
+      if (search.base_category_id !== null && groups.length >= 2) {
+        // Власний пункт, поглинутий базовим (збіг формулювань), — уже базовий: не пропонуємо.
+        const locked = baseKeys((await resolveEffectiveCriteria(search)).config, mode);
+        groups = groups.filter((g) => ![g.name, ...g.aliases].some((p) => locked.has(phraseKey(p))));
+      }
       if (groups.length < 2) return { groups: [] };
       if (!hasApiKey()) return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
 
       try {
-        const raw = await chat([{ role: 'user', content: buildGroupingPrompt(search.name, groups, req.body.mode) }], {
+        const raw = await chat([{ role: 'user', content: buildGroupingPrompt(search.name, groups, mode) }], {
           model: req.body.model ?? DEFAULT_MODEL,
           reasoning: req.body.reasoning,
         });
@@ -105,7 +124,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
 
       const listings = await loadListings(id, []);
       const sample = pickSample(listings, DEFAULT_SAMPLE_SIZE);
-      const config = parseCriteriaConfig(search.analysis_criteria);
+      const { config } = await resolveEffectiveCriteria(search);
       const prompt = buildCriteriaPrompt(
         search.name,
         sample.map((l) => l.description ?? ''),
@@ -134,26 +153,29 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // Зберегти список категорій режиму цілком (вмик/вимк, додані, вийнятий синонім). Оголошень не чіпає.
-  // Приймає й старий формат (масив рядків). Відсутній режим лишається як є.
-  app.put<{ Params: { id: string }; Body: { cons?: unknown; pros?: unknown } }>(
-    '/api/searches/:id/criteria',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      const search = await getSearch(id);
-      if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+  // Приймає й старий формат (масив рядків). Відсутній режим лишається як є. Базові пункти (з полем `base`)
+  // в analysis_criteria не пишуться — лише їх вимкнення в base_disabled; поглинуті базовими власні пункти
+  // лишаються збереженими (retainAbsorbedOwn). Відповідь — як GET (ефективний список + category).
+  app.put<{ Params: { id: string }; Body: unknown }>('/api/searches/:id/criteria', async (req, reply) => {
+    const id = Number(req.params.id);
+    const search = await getSearch(id);
+    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
 
-      const current = parseCriteriaConfig(search.analysis_criteria);
-      const next: CriteriaConfig = {
-        cons: Array.isArray(req.body.cons) ? normalizeGroups(req.body.cons) : current.cons,
-        pros: Array.isArray(req.body.pros) ? normalizeGroups(req.body.pros) : current.pros,
-      };
-      await dbRun('UPDATE searches SET analysis_criteria = ? WHERE id = ?', [serializeCriteriaConfig(next), id]);
-      return next;
-    },
-  );
+    const stored = parseCriteriaConfig(search.analysis_criteria);
+    const { bases, category } = await loadSearchBases(search.base_category_id);
+    const next = applyCriteriaBody(req.body, stored, parseBaseDisabled(search.base_disabled));
+    const own = retainAbsorbedOwn(next.own, stored, bases);
+    await dbRun('UPDATE searches SET analysis_criteria = ?, base_disabled = ? WHERE id = ?', [
+      serializeCriteriaConfig(own),
+      serializeBaseDisabled(next.disabled),
+      id,
+    ]);
+    return { ...mergeBaseCriteria(own, bases, next.disabled), category };
+  });
 
   // Об'єднати / перейменувати (`to` — назва) або видалити (`to = null`) формулювання: категорії пошуку +
   // пункти в оголошеннях і локальних фільтрах. AI не викликається — це перейменування пунктів.
+  // Лише власні пункти: формулювання базового пункту (назва чи синонім) у `from` → 400.
   // `listings: false` (лише для видалення) — прибрати зі списку, оголошення не чіпати.
   // `merges: [{from, to}]` (автогрупування, docs/plans/old/criteria-auto-group.md) — кілька об'єднань одним
   // проходом по оголошеннях і одним перерахунком filtered_out; тоді `from`/`to` ігноруються.
@@ -184,14 +206,23 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
       ops = [{ from, to }];
     }
 
-    const search = await dbGet<{ analysis_criteria: string; local_filters: string }>(
-      'SELECT analysis_criteria, local_filters FROM searches WHERE id = ?',
-      [id],
-    );
+    const search = await dbGet<{
+      analysis_criteria: string;
+      local_filters: string;
+      base_category_id: number | null;
+      base_disabled: string | null;
+    }>('SELECT analysis_criteria, local_filters, base_category_id, base_disabled FROM searches WHERE id = ?', [id]);
     if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    // Базові набори читаються один раз: перевірка `from` і ефективний список у відповіді.
+    const config = parseCriteriaConfig(search.analysis_criteria);
+    const { bases } = await loadSearchBases(search.base_category_id);
+    const disabled = parseBaseDisabled(search.base_disabled);
+    const locked = baseKeys(mergeBaseCriteria(config, bases, disabled), mode);
+    if (ops.some((op) => op.from.some((f) => locked.has(phraseKey(f))))) {
+      return reply.code(400).send({ error: ANALYSIS_ERRORS.BASE_ITEM_READONLY });
+    }
 
     // Об'єднання застосовуються по черзі до списку категорій; ті самі кроки — до пунктів оголошень і фільтрів.
-    const config = parseCriteriaConfig(search.analysis_criteria);
     let groups = config[mode];
     const steps: Array<{ keys: Set<string>; to: string | null }> = [];
     for (const op of ops) {
@@ -241,7 +272,8 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
       touchListings && (filterActive(localFilters) || filterActive(nextFilters))
         ? await recomputeFilteredOut(id)
         : { filtered_out_count: null };
-    return { criteria: nextConfig, updated, filtered_out_count };
+    // Відповідь — ефективний список (як GET): клієнт кладе його в кеш критеріїв пошуку.
+    return { criteria: mergeBaseCriteria(nextConfig, bases, disabled), updated, filtered_out_count };
   });
 }
 

@@ -140,3 +140,12 @@ CREATE TABLE IF NOT EXISTS olx_categories (
   slug TEXT NOT NULL,                -- власний слаг (останній сегмент шляху перед /q-)
   updated_at TEXT                    -- коли рядок вставлено/востаннє реально змінено
 );
+
+-- Базові плюси/мінуси категорії (docs/plans/base-criteria.md): набір у форматі searches.analysis_criteria
+-- (парс — server/src/analysis/criteria.ts). Пошук успадковує набори своєї автокатегорії й усіх її предків
+-- (server/src/analysis/baseCriteria.ts); поле `base` у пунктах сюди не пишеться.
+CREATE TABLE IF NOT EXISTS base_criteria (
+  category_id INTEGER PRIMARY KEY,   -- olx_categories.id
+  criteria TEXT DEFAULT '{}',        -- JSON {cons: [{name, aliases[], enabled}], pros: […]}
+  updated_at TEXT                    -- коли набір востаннє збережено
+);

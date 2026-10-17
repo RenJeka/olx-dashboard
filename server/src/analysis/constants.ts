@@ -149,4 +149,6 @@ export const ANALYSIS_ERRORS = {
   NO_API_KEY: 'Авто-режим недоступний: немає OPENROUTER_API_KEY',
   NO_CRITERIA: 'Спершу збережіть критерії пошуку',
   EMPTY_RESPONSE: 'Порожня відповідь',
+  /** Remap пошуку не чіпає базові пункти категорії (docs/plans/base-criteria.md). */
+  BASE_ITEM_READONLY: 'Базовий пункт змінюється у вікні «Базові плюси й мінуси»',
 } as const;

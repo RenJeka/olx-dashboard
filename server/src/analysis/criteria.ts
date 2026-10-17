@@ -5,7 +5,7 @@ import { BULLET_PREFIX } from './constants.js';
 import { parseBullets } from './text.js';
 
 /** Згортання пробілів + trim (формулювання критерію). */
-function cleanCriterion(value: string): string {
+export function cleanCriterion(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
