@@ -13,6 +13,7 @@
     "dev:web": "npm -w web run dev",
     "build": "npm -w server run build && npm -w web run build",
     "scan": "npm -w server run scan --",
+    "categories:collect": "npm -w server run categories:collect --",
     "jev:pilot": "npm -w server run jev:pilot --",
     "jev:probe": "npm -w server run jev:probe --",
     "migrate:posted-at": "npm -w server run migrate:posted-at",

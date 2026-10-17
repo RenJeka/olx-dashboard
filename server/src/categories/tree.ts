@@ -5,24 +5,35 @@
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
 import type { CategoryNode, LocalFilters } from '../types.js';
 
+/** Розмір чанка id у `SELECT … WHERE id IN (…)` (ліміт SQLite на змінні). */
+const SELECT_CHUNK = 400;
+
 /**
  * Upsert вузлів дерева. Рядок пишеться лише якщо він новий або змінився хоч одним полем
  * (Turso-економія: повторний скан того самого дерева — 0 записів). Повертає кількість нових/змінених.
+ * Читає лише рядки з вхідних id. Вхідний `parentId=null` (facet без предка) не затирає збережений parent_id.
  */
 export async function upsertCategories(nodes: CategoryNode[]): Promise<number> {
   if (nodes.length === 0) return 0;
 
-  const before = new Map(
-    (
-      await dbAll<{ id: number; parent_id: number | null; label: string; slug: string }>(
-        'SELECT id, parent_id, label, slug FROM olx_categories',
-      )
-    ).map((r) => [r.id, r]),
-  );
+  // Turso-економія: читаємо лише рядки, чиї id є у вхідному наборі (а не всю таблицю).
+  const ids = [...new Set(nodes.map((n) => n.id))];
+  const before = new Map<number, { id: number; parent_id: number | null; label: string; slug: string }>();
+  for (let i = 0; i < ids.length; i += SELECT_CHUNK) {
+    const chunk = ids.slice(i, i + SELECT_CHUNK);
+    const rows = await dbAll<{ id: number; parent_id: number | null; label: string; slug: string }>(
+      `SELECT id, parent_id, label, slug FROM olx_categories WHERE id IN (${chunk.map(() => '?').join(',')})`,
+      chunk,
+    );
+    for (const r of rows) before.set(r.id, r);
+  }
 
+  // Вхідний parentId=null (facet без предка) не затирає збережений непорожній parent_id.
   const changed = nodes.filter((n) => {
     const old = before.get(n.id);
-    return !old || old.parent_id !== n.parentId || old.label !== n.label || old.slug !== n.slug;
+    if (!old) return true;
+    const parentChanged = n.parentId !== null && old.parent_id !== n.parentId;
+    return parentChanged || old.label !== n.label || old.slug !== n.slug;
   });
   if (changed.length === 0) return 0;
 
@@ -31,9 +42,10 @@ export async function upsertCategories(nodes: CategoryNode[]): Promise<number> {
       sql: `INSERT INTO olx_categories (id, parent_id, label, slug, updated_at)
             VALUES (?, ?, ?, ?, datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
-              parent_id = excluded.parent_id, label = excluded.label, slug = excluded.slug,
-              updated_at = excluded.updated_at
-            WHERE parent_id IS NOT excluded.parent_id OR label != excluded.label OR slug != excluded.slug`,
+              parent_id = COALESCE(excluded.parent_id, olx_categories.parent_id),
+              label = excluded.label, slug = excluded.slug, updated_at = excluded.updated_at
+            WHERE (excluded.parent_id IS NOT NULL AND parent_id IS NOT excluded.parent_id)
+               OR label != excluded.label OR slug != excluded.slug`,
       args: [n.id, n.parentId, n.label, n.slug],
     })),
   );

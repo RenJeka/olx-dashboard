@@ -73,7 +73,9 @@ olx-dashboard/
 │       │   └── analysis.ts   # AI аналіз, relevance, aiPicks
 │       ├── types.ts          # barrel-файл експорту доменних типів + інтерфейс OlxFetcher
 │       ├── categories/        # глобальне дерево категорій OLX (таблиця olx_categories)
-│       │   └── tree.ts       # upsertCategories (лише нові/змінені вузли), pickBaseCategory, ancestorIds/descendantIds, refreshBaseCategory
+│       │   ├── tree.ts       # upsertCategories (лише нові/змінені вузли), pickBaseCategory, ancestorIds/descendantIds, refreshBaseCategory
+│       │   ├── collector.ts  # collectCategories(words, {delayMs}): збирач дерева по списку слів (facet → upsert по слову, пауза 1–2 с)
+│       │   └── seedWords.ts  # SEED_WORDS: стартові слова по кореневих розділах OLX
 │       ├── scanner/           # модулі сканування (розбитий scanner.ts)
 │       │   ├── index.ts      # barrel: реекспорт runScan/analyzeScan/runDeepScanFromPlan/runVerify/requestStopScan/isPlanCached/isAnalysisFresh/countVerifyCandidates
 │       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan
@@ -87,6 +89,7 @@ olx-dashboard/
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
 │       │   └── verifyScan.ts # runVerify (P1+P2 кандидати, probeListingPage), countVerifyCandidates
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
+│       ├── collectCategories.ts # CLI: npm run categories:collect [-- --words "a,b"] — збір дерева категорій OLX
 │       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/old/llm-haiku-prompt-audit.md)
@@ -145,6 +148,7 @@ olx-dashboard/
 │           ├── listings.ts   # GET /api/searches/:id/listings (легкі рядки) + details/search на вимогу + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
+│           ├── categories.ts # POST /api/categories/collect (збір дерева за SEED_WORDS; паралельний виклик → 409)
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/old/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)

@@ -46,6 +46,30 @@ describe('upsertCategories', () => {
   it('порожній список → 0', async () => {
     expect(await upsertCategories([])).toBe(0);
   });
+
+  it('сторонній наявний рядок не чіпається', async () => {
+    await upsertCategories(NODES);
+    await db.execute("UPDATE olx_categories SET updated_at = '2000-01-01 00:00:00' WHERE id = 1506");
+    expect(await upsertCategories([NODES[2]!])).toBe(0);
+    const row = await dbAll<{ updated_at: string; label: string }>(
+      'SELECT updated_at, label FROM olx_categories WHERE id = 1506',
+    );
+    expect(row[0]).toEqual({ updated_at: '2000-01-01 00:00:00', label: 'Планшети' });
+  });
+
+  it('вхідний parentId=null не затирає збережений parent_id', async () => {
+    await upsertCategories(NODES);
+    const orphan = { id: 80, parentId: null, label: 'Ноутбуки', slug: 'noutbuki' };
+    expect(await upsertCategories([orphan])).toBe(0);
+    const row = await dbAll<{ parent_id: number | null }>('SELECT parent_id FROM olx_categories WHERE id = 80');
+    expect(row[0]?.parent_id).toBe(1502);
+    // зміна label при null-предку: label оновлюється, parent_id лишається
+    expect(await upsertCategories([{ ...orphan, label: 'Лептопи' }])).toBe(1);
+    const row2 = await dbAll<{ parent_id: number | null; label: string }>(
+      'SELECT parent_id, label FROM olx_categories WHERE id = 80',
+    );
+    expect(row2[0]).toEqual({ parent_id: 1502, label: 'Лептопи' });
+  });
 });
 
 describe('pickBaseCategory', () => {

@@ -228,10 +228,10 @@ React + Chakra UI v3 + TanStack Query. Нових залежностей нем�
 - `POST /api/categories/collect` → `{ requested, changed, failed }`; другий запуск, поки іде перший → `409`
 - CLI `npm run categories:collect` (`-- --words "a,b"` — свій список)
 
-- [ ] **3.1 Тест (падає):** `collector.test.ts`, `fetchCategoryFacet` замокано: 2 слова, друге → `null` → `failed: ['<друге>']`, `requested: 2`;
+- [x] **3.1 Тест (падає):** `collector.test.ts`, `fetchCategoryFacet` замокано: 2 слова, друге → `null` → `failed: ['<друге>']`, `requested: 2`;
   пауза — між запитами, не після останнього.
-- [ ] **3.2 Код** + скрипти в `server/package.json` і кореневому `package.json`; роут — `routes/categories.ts`, реєстрація — `server/src/index.ts`.
-- [ ] **3.3** `npm test` → PASS; `npm run categories:collect -- --words "ноутбук"` локально → в `olx_categories` є «Електроніка → Ноутбуки та аксесуари → Ноутбуки».
+- [x] **3.2 Код** + скрипти в `server/package.json` і кореневому `package.json`; роут — `routes/categories.ts`, реєстрація — `server/src/index.ts`.
+- [x] **3.3** `npm test` → PASS; `npm run categories:collect -- --words "ноутбук"` локально → в `olx_categories` є «Електроніка → Ноутбуки та аксесуари → Ноутбуки».
 
 ### Задача 4. Базові набори й злиття з власними пунктами
 
