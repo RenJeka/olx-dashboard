@@ -175,22 +175,34 @@ export function applyCriteriaBody(
 /**
  * Власні пункти, поглинуті базовими (збіг формулювань), у злитому списку не видно, тож клієнт їх не відлунює.
  * Щоб вони не губились при PUT, збережені пункти, що перетинаються з формулюваннями базових, лишаються
- * (у кінці списку), якщо вхідний список уже не містить їхньої назви. Їхній стан «в аналізі» відтепер несе
- * `base_disabled` (відлуння базового пункту), тож вони зберігаються з `enabled: true` — інакше вимкнений
- * поглинутий пункт назавжди вимикав би базовий.
+ * (у кінці списку), якщо вхідний список уже не містить їхньої назви. Їхній стан «в аналізі» — стан базового
+ * пункту, що їх поглинає (`disabled` — вимкнення після цього PUT): увімкнений базовий → `enabled: true` (інакше
+ * вимкнений поглинутий пункт назавжди вимикав би базовий), вимкнений → `false` (щоб пункт, що знову стане
+ * власним — базовий видалили чи змінилась автокатегорія, — не воскрес увімкненим).
  */
-export function retainAbsorbedOwn(own: CriteriaConfig, stored: CriteriaConfig, bases: BaseSet[]): CriteriaConfig {
+export function retainAbsorbedOwn(
+  own: CriteriaConfig,
+  stored: CriteriaConfig,
+  bases: BaseSet[],
+  disabled: BaseDisabled,
+): CriteriaConfig {
   if (bases.length === 0) return own;
-  const inherited = mergeBaseCriteria({ cons: [], pros: [] }, bases, emptyDisabled());
+  const inherited = mergeBaseCriteria({ cons: [], pros: [] }, bases, disabled);
   const out = { cons: [], pros: [] } as CriteriaConfig;
   for (const mode of MODES) {
-    const locked = baseKeys(inherited, mode);
+    // Формулювання (phraseKey) базового пункту → чи він увімкнений у пошуку.
+    const baseEnabled = new Map<string, boolean>();
+    for (const g of inherited[mode]) for (const p of phrasesOf(g)) baseEnabled.set(phraseKey(p), g.enabled);
     const present = new Set(own[mode].flatMap(phrasesOf).map(phraseKey));
-    const kept = stored[mode].filter(
-      (g) => !present.has(phraseKey(g.name)) && phrasesOf(g).some((p) => locked.has(phraseKey(p))),
-    );
-    out[mode] =
-      kept.length > 0 ? normalizeGroups([...own[mode], ...kept.map((g) => ({ ...g, enabled: true }))]) : own[mode];
+    const kept: CriterionGroup[] = [];
+    for (const g of stored[mode]) {
+      if (present.has(phraseKey(g.name))) continue;
+      const state = phrasesOf(g)
+        .map((p) => baseEnabled.get(phraseKey(p)))
+        .find((x) => x !== undefined);
+      if (state !== undefined) kept.push({ ...g, enabled: state });
+    }
+    out[mode] = kept.length > 0 ? normalizeGroups([...own[mode], ...kept]) : own[mode];
   }
   return out;
 }

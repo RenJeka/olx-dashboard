@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, dbAll, dbGet } from '../db/db.js';
+import { abortFlags } from '../scanner/abortControl.js';
 import { createSearch, insertListing, resetDb } from '../test/db.js';
 
 vi.mock('../logger.js', () => ({ logWarn: vi.fn(), logError: vi.fn() }));
@@ -10,6 +11,7 @@ vi.mock('../categories/collector.js', () => ({ collectCategories: collect }));
 const chatMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<string>>());
 vi.mock('../analysis/openrouter.js', () => ({ chat: chatMock }));
 
+import { criteriaRoutes } from './analysis/criteria.js';
 import { categoriesRoutes } from './categories.js';
 
 describe('POST /api/categories/collect', () => {
@@ -34,6 +36,22 @@ describe('POST /api/categories/collect', () => {
     collect.mockResolvedValueOnce({ requested: 1, changed: 0, failed: [] });
     expect((await app.inject({ method: 'POST', url: '/api/categories/collect' })).statusCode).toBe(200);
     await app.close();
+  });
+
+  it('під час скану → 409, збір не запускається', async () => {
+    const app = Fastify();
+    await app.register(categoriesRoutes);
+    collect.mockClear();
+    abortFlags.set(12345, false); // так позначає активний скан withScanRun
+    try {
+      const res = await app.inject({ method: 'POST', url: '/api/categories/collect' });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().error).toBe('Іде скан — зберіть дерево після нього');
+      expect(collect).not.toHaveBeenCalled();
+    } finally {
+      abortFlags.delete(12345);
+      await app.close();
+    }
   });
 });
 
@@ -340,5 +358,82 @@ describe('POST /api/categories/:id/criteria/generate', () => {
     const failed = await generate(80, { mode: 'cons' });
     expect(failed.statusCode).toBe(502);
     expect(failed.json().error).toBe('OpenRouter 500');
+  });
+});
+
+describe('remap категорії й поглинутий власний пункт пошуку (вимкнений базовий)', () => {
+  let app: ReturnType<typeof Fastify>;
+  let searchId: number;
+  type Item = { name: string; aliases: string[]; enabled: boolean; base?: { categoryId: number } };
+
+  const effective = async () => (await app.inject(`/api/searches/${searchId}/criteria`)).json() as { cons: Item[] };
+  const ownCons = async () => {
+    const row = await dbGet<{ analysis_criteria: string }>('SELECT analysis_criteria FROM searches WHERE id = ?', [
+      searchId,
+    ]);
+    return (JSON.parse(row!.analysis_criteria) as { cons: Item[] }).cons;
+  };
+
+  beforeEach(async () => {
+    await resetDb();
+    await db.batch(
+      [
+        `INSERT INTO olx_categories (id, parent_id, label, slug) VALUES (37, NULL, 'Електроніка', 'elektronika')`,
+        `INSERT INTO olx_categories (id, parent_id, label, slug) VALUES (80, 37, 'Ноутбуки', 'noutbuki')`,
+        `INSERT INTO base_criteria (category_id, criteria) VALUES (37, '{"cons":["тріснутий екран"],"pros":[]}')`,
+      ],
+      'write',
+    );
+    searchId = await createSearch();
+    await db.execute({
+      sql: 'UPDATE searches SET base_category_id = 80, analysis_criteria = ? WHERE id = ?',
+      args: [JSON.stringify({ cons: ['тріснутий екран', 'без торгу'], pros: [] }), searchId],
+    });
+    app = Fastify();
+    await app.register(categoriesRoutes);
+    await app.register(criteriaRoutes);
+  });
+  afterEach(() => app.close());
+
+  it('вимкнення → перейменування → видалення: власний пункт не воскресає увімкненим', async () => {
+    // Людина вимикає базовий пункт у пошуку (відлуння GET з enabled: false).
+    const before = await effective();
+    expect(before.cons.map((g) => g.name)).toEqual(['тріснутий екран', 'без торгу']);
+    const off = before.cons.map((g) => (g.base ? { ...g, enabled: false } : g));
+    await app.inject({ method: 'PUT', url: `/api/searches/${searchId}/criteria`, payload: { cons: off } });
+    // Прихований поглинутий власний пункт несе стан базового.
+    expect(await ownCons()).toEqual([
+      { name: 'без торгу', aliases: [], enabled: true },
+      { name: 'тріснутий екран', aliases: [], enabled: false },
+    ]);
+
+    // Перейменування базового пункту в категорії переписує й поглинутий власний пункт пошуку.
+    const renamed = await app.inject({
+      method: 'POST',
+      url: '/api/categories/37/criteria/remap',
+      payload: { mode: 'cons', from: ['тріснутий екран'], to: 'розбитий екран' },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(await ownCons()).toEqual([
+      { name: 'без торгу', aliases: [], enabled: true },
+      { name: 'розбитий екран', aliases: ['тріснутий екран'], enabled: false },
+    ]);
+    const afterRename = await effective();
+    expect(afterRename.cons.map((g) => [g.name, g.enabled, Boolean(g.base)])).toEqual([
+      ['розбитий екран', false, true],
+      ['без торгу', true, false],
+    ]);
+
+    // Видалення базового пункту: власний повертається — вимкненим, як був базовий.
+    await app.inject({
+      method: 'POST',
+      url: '/api/categories/37/criteria/remap',
+      payload: { mode: 'cons', from: ['розбитий екран'], to: null },
+    });
+    const afterDelete = await effective();
+    expect(afterDelete.cons).toEqual([
+      { name: 'без торгу', aliases: [], enabled: true },
+      { name: 'розбитий екран', aliases: ['тріснутий екран'], enabled: false },
+    ]);
   });
 });

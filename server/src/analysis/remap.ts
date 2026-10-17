@@ -91,6 +91,22 @@ export function planRemapSteps(
   return { groups: next, steps };
 }
 
+/**
+ * Власні пункти пошуку після remap базового пункту категорії: пункт, назва чи синонім якого збігається з `keys`
+ * кроку перейменування/об'єднання, зливається в `to` (planRemap; стан «в аналізі» зберігається) — інакше він
+ * воскрес би під старою назвою, коли базовий зникне. Кроки видалення (`to = null`) власних пунктів не чіпають:
+ * пункт пошуку лишається (як і пункти в оголошеннях). Нічого не змінилось → той самий масив.
+ */
+export function remapOwnGroups(groups: CriterionGroup[], steps: RemapStep[]): CriterionGroup[] {
+  let next = groups;
+  for (const step of steps) {
+    if (step.to === null) continue;
+    const from = next.filter((g) => [g.name, ...g.aliases].some((p) => step.keys.has(phraseKey(p)))).map((g) => g.name);
+    if (from.length > 0) next = planRemap(next, from, step.to).groups;
+  }
+  return next;
+}
+
 /** local_filters (JSON) → об'єкт; битий/порожній → `{}`. */
 export function parseLocalFilters(text: string | null | undefined): LocalFilters {
   try {

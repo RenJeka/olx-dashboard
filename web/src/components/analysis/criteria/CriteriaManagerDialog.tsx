@@ -96,7 +96,9 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
               <Text textStyle="xs" color="fg.muted">
                 {m.category && m.category.path.length > 0
                   ? `Категорія: ${m.category.path.join(' → ')}`
-                  : "Категорія ще не визначена — з'явиться після скану"}
+                  : m.hasListings
+                    ? 'Категорію не визначено — оновіть дерево категорій у «Базові плюси й мінуси»'
+                    : "Категорія ще не визначена — з'явиться після скану"}
               </Text>
             </Stack>
             <HStack gap={2} wrap="wrap">

@@ -30,15 +30,18 @@ import {
   planRemapSteps,
   remapBaseDisabled,
   remapListingStatements,
+  remapOwnGroups,
 } from '../analysis/remap.js';
 import { collectCategories } from '../categories/collector.js';
 import { SEED_WORDS } from '../categories/seedWords.js';
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
 import { logError } from '../logger.js';
+import { isAnyScanRunning } from '../scanner/abortControl.js';
 import { recomputeFilteredOut } from '../scraper/refilter.js';
 import type { CategoryNode, CriteriaConfig, CriterionGroup } from '../types.js';
 
 const ALREADY_RUNNING = 'Збір дерева категорій уже йде';
+const SCAN_RUNNING = 'Іде скан — зберіть дерево після нього';
 const CATEGORY_NOT_FOUND = 'Категорію не знайдено';
 
 /** Прапорець «збір іде» — in-memory (single-user, один процес). */
@@ -154,7 +157,9 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
   // Перейменувати / об'єднати (`to` — назва) або видалити (`to = null`) власний пункт набору категорії (тіло як у
   // remap пошуку). Пункти в оголошеннях і local_filters пошуків, чия автокатегорія — ця категорія або її
   // нащадок, переписуються тим самим планом; пошуки в предках не чіпаються. Вимкнення у `base_disabled`
-  // цих пошуків теж. Видалення оголошень не чіпає. Усі записи — одним батчем; набір категорії — останнім.
+  // цих пошуків теж; поглинуті базовим власні пункти (`analysis_criteria`) перейменовуються разом із ним
+  // (remapOwnGroups). Видалення оголошень і власних пунктів не чіпає. Усі записи — одним батчем; набір
+  // категорії — останнім.
   app.post<{
     Params: { id: string };
     Body: { mode?: string; from?: unknown; to?: unknown; merges?: unknown };
@@ -192,13 +197,19 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
     const touchListings = ops.some((op) => op.to !== null);
 
     // Пошуки піддерева категорії: рекурсивний CTE вниз від :id — без читання всього дерева.
-    const searches = await dbAll<{ id: number; local_filters: string | null; base_disabled: string | null }>(
+    const searches = await dbAll<{
+      id: number;
+      local_filters: string | null;
+      base_disabled: string | null;
+      analysis_criteria: string | null;
+    }>(
       `WITH RECURSIVE sub(id, depth) AS (
          SELECT id, 0 FROM olx_categories WHERE id = ?
          UNION
          SELECT c.id, sub.depth + 1 FROM olx_categories c JOIN sub ON c.parent_id = sub.id WHERE sub.depth < ?
        )
-       SELECT id, local_filters, base_disabled FROM searches WHERE base_category_id IN (SELECT id FROM sub)`,
+       SELECT id, local_filters, base_disabled, analysis_criteria FROM searches
+        WHERE base_category_id IN (SELECT id FROM sub)`,
       [id, MAX_CHAIN_DEPTH],
     );
 
@@ -229,6 +240,16 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
         cols.push('base_disabled = ?');
         args.push(serializeBaseDisabled(nextDisabled));
       }
+      const searchOwn = parseCriteriaConfig(search.analysis_criteria);
+      const nextGroups = remapOwnGroups(searchOwn[mode], steps);
+      if (nextGroups !== searchOwn[mode]) {
+        const before = serializeCriteriaConfig(searchOwn);
+        const after = serializeCriteriaConfig({ ...searchOwn, [mode]: nextGroups });
+        if (after !== before) {
+          cols.push('analysis_criteria = ?');
+          args.push(after);
+        }
+      }
       if (cols.length > 0) {
         statements.push({ sql: `UPDATE searches SET ${cols.join(', ')} WHERE id = ?`, args: [...args, search.id] });
       }
@@ -250,9 +271,11 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
     return { criteria: nextOwn, updated, searches: touchedSearches };
   });
 
-  // Синхронний збір дерева за SEED_WORDS (~хвилина через паузи між запитами). Паралельний виклик → 409.
+  // Синхронний збір дерева за SEED_WORDS (~хвилина через паузи між запитами). Паралельний виклик → 409;
+  // під час скану теж 409 — не ходити до OLX двома потоками одночасно (ввічливість).
   app.post('/api/categories/collect', async (_req, reply) => {
     if (collecting) return reply.code(409).send({ error: ALREADY_RUNNING });
+    if (isAnyScanRunning()) return reply.code(409).send({ error: SCAN_RUNNING });
     collecting = true;
     try {
       return await collectCategories(SEED_WORDS);

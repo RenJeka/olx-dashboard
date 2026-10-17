@@ -120,15 +120,19 @@ describe('applyCriteriaBody / retainAbsorbedOwn', () => {
     expect(applyCriteriaBody(null, current)).toEqual({ own: current, disabled: { cons: [], pros: [] } });
   });
 
-  it('збережений поглинутий пункт лишається (enabled: true), якщо вхід його не містить; непоглинуті — ні', () => {
+  it('збережений поглинутий пункт лишається зі станом базового, якщо вхід його не містить; непоглинуті — ні', () => {
     const stored = cfg([group('Не працює', ['мертвий'], false), group('подряпини')]);
-    const kept = retainAbsorbedOwn(cfg([group('без торгу')]), stored, [ELECTRONICS]);
+    // Базовий увімкнений → поглинутий зберігається увімкненим (інакше назавжди вимикав би базовий).
+    const kept = retainAbsorbedOwn(cfg([group('без торгу')]), stored, [ELECTRONICS], NONE);
     expect(kept.cons).toEqual([group('без торгу'), group('Не працює', ['мертвий'])]);
+    // Базовий вимкнений у пошуку (base_disabled) → поглинутий зберігається вимкненим.
+    const off = retainAbsorbedOwn(cfg([group('без торгу')]), stored, [ELECTRONICS], { cons: ['не працює'], pros: [] });
+    expect(off.cons).toEqual([group('без торгу'), group('Не працює', ['мертвий'], false)]);
     // Вхід уже містить пункт → без дубля.
-    const same = retainAbsorbedOwn(cfg([group('не працює')]), stored, [ELECTRONICS]);
+    const same = retainAbsorbedOwn(cfg([group('не працює')]), stored, [ELECTRONICS], NONE);
     expect(same.cons).toEqual([group('не працює')]);
     // Без баз — нічого не додається.
-    expect(retainAbsorbedOwn(cfg([]), stored, []).cons).toEqual([]);
+    expect(retainAbsorbedOwn(cfg([]), stored, [], NONE).cons).toEqual([]);
   });
 });
 

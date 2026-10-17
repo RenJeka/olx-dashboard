@@ -66,6 +66,8 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
   const groups = useMemo(() => config?.[mode] ?? [], [config, mode]);
   /** Автокатегорія пошуку (рядок під заголовком); `null` — ще не визначена. */
   const category = config?.category ?? null;
+  /** Чи є в пошуку оголошення (вже завантажені для лічильників) — підказка, чому категорії немає. */
+  const hasListings = (listings?.length ?? 0) > 0;
   /** Власні пункти пошуку: базові (`base`) змінюються лише у вікні «Базові плюси й мінуси». */
   const ownGroupCount = groups.filter((g) => !g.base).length;
   /** Обрані рядки без базових (на випадок, якщо обраний пункт став базовим після оновлення списку). */
@@ -215,6 +217,7 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
     selected, selectedNames, toggleSelected,
     isLoading,
     category,
+    hasListings,
     groups,
     ownGroupCount,
     rows,

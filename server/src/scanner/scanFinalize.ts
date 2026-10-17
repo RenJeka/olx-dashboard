@@ -79,7 +79,7 @@ const FINALIZE_SUCCESS_SQL = `UPDATE scan_runs SET finished_at = ?, found = ?, n
 
 /**
  * Спільний хвіст фіналізації скану для `runScan` і `runDeepScanFromPlan`:
- * upsert → applyScanStatuses → refreshCategoryFacet → UPDATE scan_runs.
+ * upsert → applyScanStatuses → refreshCategoryFacet → refreshBaseCategory → UPDATE scan_runs.
  */
 export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResult> {
   const {
@@ -123,8 +123,12 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   if (!stopped && !skipCategoryRefresh) {
     await refreshCategoryFacet(searchId, search.query);
   }
-  // Автокатегорія — з оголошень у БД, тож не залежить від facet; рахуємо й після зупиненого скану.
-  await refreshBaseCategorySafe(searchId);
+  // Автокатегорія — з оголошень у БД, тож не залежить від facet; рахуємо й після зупиненого скану. Без нових
+  // оголошень і з уже відомою автокатегорією розподіл не змінився — пропускаємо GROUP BY (Turso-економія);
+  // зміну фільтра «Категорії» перераховує сам PATCH пошуку.
+  if (upsertResult.new_count > 0 || search.baseCategoryId == null) {
+    await refreshBaseCategorySafe(searchId);
+  }
 
   // Формування warning-ноти.
   if (stopped) {

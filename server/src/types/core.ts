@@ -62,6 +62,11 @@ export interface SearchConfig {
   apiFilters: ApiFilters;
   /** Синоніми query (docs/plans/old/search-synonyms.md) — скануються разом, видача зливається по olx_id. */
   querySynonyms?: string[];
+  /**
+   * Автокатегорія на момент старту скану (`searches.base_category_id`, базові плюси/мінуси). Відома й скан
+   * не дав нових оголошень → фіналізація не перераховує її (зайвий GROUP BY по всіх оголошеннях у Turso).
+   */
+  baseCategoryId?: number | null;
 }
 
 /** Елемент відповіді GET /api/searches/:id/param-keys — для конструктора діапазонів локальних фільтрів. */

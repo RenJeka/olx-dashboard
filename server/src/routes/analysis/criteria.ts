@@ -164,7 +164,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
     const stored = parseCriteriaConfig(search.analysis_criteria);
     const { bases, category } = await loadSearchBases(search.base_category_id);
     const next = applyCriteriaBody(req.body, stored, parseBaseDisabled(search.base_disabled));
-    const own = retainAbsorbedOwn(next.own, stored, bases);
+    const own = retainAbsorbedOwn(next.own, stored, bases, next.disabled);
     await dbRun('UPDATE searches SET analysis_criteria = ?, base_disabled = ? WHERE id = ?', [
       serializeCriteriaConfig(own),
       serializeBaseDisabled(next.disabled),
