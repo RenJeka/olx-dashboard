@@ -1,6 +1,6 @@
 import { dbRun } from '../db/db.js';
 import { logWarn } from '../logger.js';
-import { upsertCategories } from '../categories/tree.js';
+import { refreshBaseCategory, upsertCategories } from '../categories/tree.js';
 import { fetchCategoryFacet } from '../scraper/graphql/categories.js';
 import { facetToNodes, facetToOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
@@ -30,6 +30,15 @@ export async function refreshCategoryFacet(searchId: number, query: string): Pro
     logWarn('scanner', 'category-facet', err instanceof Error ? err.message : String(err), {
       searchId,
     });
+  }
+}
+
+/** Best-effort перерахунок автокатегорії пошуку (базові плюси/мінуси); збій — лише в журнал. */
+async function refreshBaseCategorySafe(searchId: number): Promise<void> {
+  try {
+    await refreshBaseCategory(searchId);
+  } catch (err) {
+    logWarn('scanner', 'base-category', err instanceof Error ? err.message : String(err), { searchId });
   }
 }
 
@@ -114,6 +123,8 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   if (!stopped && !skipCategoryRefresh) {
     await refreshCategoryFacet(searchId, search.query);
   }
+  // Автокатегорія — з оголошень у БД, тож не залежить від facet; рахуємо й після зупиненого скану.
+  await refreshBaseCategorySafe(searchId);
 
   // Формування warning-ноти.
   if (stopped) {

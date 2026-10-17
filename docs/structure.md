@@ -73,7 +73,7 @@ olx-dashboard/
 │       │   └── analysis.ts   # AI аналіз, relevance, aiPicks
 │       ├── types.ts          # barrel-файл експорту доменних типів + інтерфейс OlxFetcher
 │       ├── categories/        # глобальне дерево категорій OLX (таблиця olx_categories)
-│       │   └── tree.ts       # upsertCategories(nodes): пише лише нові/змінені вузли
+│       │   └── tree.ts       # upsertCategories (лише нові/змінені вузли), pickBaseCategory, ancestorIds/descendantIds, refreshBaseCategory
 │       ├── scanner/           # модулі сканування (розбитий scanner.ts)
 │       │   ├── index.ts      # barrel: реекспорт runScan/analyzeScan/runDeepScanFromPlan/runVerify/requestStopScan/isPlanCached/isAnalysisFresh/countVerifyCandidates
 │       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan

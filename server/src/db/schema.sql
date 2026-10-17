@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS searches (
   category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/old/category-counts-and-filter.md
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
   project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
+  base_category_id INTEGER,          -- автокатегорія пошуку для базових плюсів/мінусів (olx_categories.id); окремо від category_id; server/src/categories/tree.ts
+  base_disabled TEXT DEFAULT '{}',   -- JSON: вимкнені базові пункти пошуку (docs/plans/base-criteria.md)
   created_at TEXT DEFAULT (datetime('now'))
 );
 

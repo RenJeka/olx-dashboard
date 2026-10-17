@@ -1,6 +1,6 @@
 # Базові плюси й мінуси за деревом категорій OLX
 
-> **Статус:** 🟢 активний · дизайн схвалено людиною 2026-10-17; план реалізації чекає схвалення · [P-016](../parking.md)
+> **Статус:** 🟢 активний · дизайн і план реалізації схвалено людиною 2026-10-17; реалізація — гілка `feat/base-criteria` · [P-016](../parking.md)
 
 ## Навіщо
 
@@ -210,14 +210,14 @@ React + Chakra UI v3 + TanStack Query. Нових залежностей нем�
 - `ancestorIds(rows: CategoryNode[], id: number): number[]` (від кореня до `id` включно); `descendantIds(rows: CategoryNode[], id: number): number[]` (`id` + нащадки)
 - `refreshBaseCategory(searchId: number): Promise<number | null>` — пише `searches.base_category_id`
 
-- [ ] **2.1 Тести (падають):** `pickBaseCategory([{categoryId: 80, n: 5}, {categoryId: 1506, n: 9}], [])` → `1506`; той самий вхід з whitelist `[80]` → `80`;
+- [x] **2.1 Тести (падають):** `pickBaseCategory([{categoryId: 80, n: 5}, {categoryId: 1506, n: 9}], [])` → `1506`; той самий вхід з whitelist `[80]` → `80`;
   `[]` → `null`; нічия → менший `categoryId`. `ancestorIds(…, 80)` → `[37, 1502, 80]`; невідомий id → `[id]`.
   `descendantIds(…, 1502)` містить `1502` і `80`, не містить `37`.
   Роут (server: `src/routes/searches.test.ts`, новий): `PATCH /api/searches/:id` з `local_filters.categories: [80]` → `base_category_id = 80`.
-- [ ] **2.2 Схема:** `searches.base_category_id INTEGER`, `searches.base_disabled TEXT DEFAULT '{}'`.
-- [ ] **2.3 Код:** `refreshBaseCategory` — `SELECT category_id, COUNT(*) AS n FROM listings WHERE search_id = ? AND category_id IS NOT NULL GROUP BY category_id`
+- [x] **2.2 Схема:** `searches.base_category_id INTEGER`, `searches.base_disabled TEXT DEFAULT '{}'`.
+- [x] **2.3 Код:** `refreshBaseCategory` — `SELECT category_id, COUNT(*) AS n FROM listings WHERE search_id = ? AND category_id IS NOT NULL GROUP BY category_id`
   + whitelist з `local_filters.categories`. Виклик — у фіналізації скану після `refreshCategoryFacet` і в `PATCH /api/searches/:id`, коли прийшов `local_filters`.
-- [ ] **2.4** `npm test` → PASS.
+- [x] **2.4** `npm test` → PASS.
 
 ### Задача 3. Збирач дерева категорій
 
