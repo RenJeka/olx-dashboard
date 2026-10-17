@@ -37,6 +37,7 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
     savedGroups,
   } = w;
   const aliasesOf = new Map(savedGroups.map((g) => [g.name, g.aliases]));
+  const baseOf = new Map(savedGroups.map((g) => [g.name, g.base]));
   // Як у вікні «Плюси та мінуси»: спершу категорії (є синоніми), далі окремі.
   const chips = categoriesFirst(available, (c) => (aliasesOf.get(c)?.length ?? 0) > 0).flat();
 
@@ -59,10 +60,12 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
       <Wrap gap={2}>
         {chips.map((c) => {
           const aliases = aliasesOf.get(c) ?? [];
+          const base = baseOf.get(c);
+          const hint = aliases.length > 0 ? `${c} · сюди ж: ${sortAlpha(aliases).join(', ')}` : c;
           return (
             <Tooltip
               key={c}
-              content={aliases.length > 0 ? `${c} · сюди ж: ${sortAlpha(aliases).join(', ')}` : c}
+              content={base ? `${hint} · Базовий пункт категорії «${base.label}»` : hint}
               openDelay={300}
             >
               <Button
@@ -78,6 +81,11 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
                 {aliases.length > 0 && (
                   <Badge size="xs" variant="subtle">
                     +{aliases.length}
+                  </Badge>
+                )}
+                {base && (
+                  <Badge size="xs" variant="subtle" colorPalette="accent">
+                    базовий
                   </Badge>
                 )}
               </Button>

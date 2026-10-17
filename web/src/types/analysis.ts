@@ -67,6 +67,15 @@ export interface CriterionBase {
 /** Категорії критеріїв пошуку за режимом (searches.analysis_criteria). */
 export type CriteriaConfig = Record<AnalysisMode, CriterionGroup[]>;
 
+/** Автокатегорія пошуку: id і шлях від кореня (docs/plans/base-criteria.md). */
+export interface CriteriaCategory {
+  id: number;
+  path: string[];
+}
+
+/** Відповідь GET/PUT /api/searches/:id/criteria: ефективні набори (базові + власні) + автокатегорія. */
+export type CriteriaResponse = CriteriaConfig & { category: CriteriaCategory | null };
+
 /** Пропозиція автогрупування (docs/plans/old/criteria-auto-group.md): назва категорії + ≥ 2 назви критеріїв. */
 export interface GroupSuggestion {
   name: string;
