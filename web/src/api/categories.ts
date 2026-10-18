@@ -10,7 +10,7 @@ import type {
   OlxCategoryItem,
 } from '../types';
 
-// Дерево категорій OLX і базові набори плюсів/мінусів (docs/plans/base-criteria.md).
+// Дерево категорій OLX і базові набори плюсів/мінусів (docs/plans/old/base-criteria.md).
 
 const CATEGORIES_KEY = ['categories'] as const;
 const categoryCriteriaKey = (categoryId: number) => ['category-criteria', categoryId] as const;

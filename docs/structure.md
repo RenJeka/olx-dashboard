@@ -104,7 +104,7 @@ olx-dashboard/
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
 │       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/loadListings
 │       │   ├── criteria.ts   # категорії критеріїв (docs/plans/old/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
-│       │   ├── baseCriteria.ts # базові плюси/мінуси категорій (docs/plans/base-criteria.md): mergeBaseCriteria/stripBaseCriteria/applyCriteriaBody/retainAbsorbedOwn/getEffectiveCriteria, парс searches.base_disabled
+│       │   ├── baseCriteria.ts # базові плюси/мінуси категорій (docs/plans/old/base-criteria.md): mergeBaseCriteria/stripBaseCriteria/applyCriteriaBody/retainAbsorbedOwn/getEffectiveCriteria, парс searches.base_disabled
 │       │   ├── remap.ts      # спільні кроки remap критеріїв: parseRemapOps/planRemapSteps/remapListingStatements/remapBaseDisabled (пошук і категорія)
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
@@ -187,7 +187,7 @@ olx-dashboard/
         │   ├── listings.ts   # оголошення, фільтри
         │   ├── scanner.ts    # скан, verify, прогрес сканування, useAnalyzeScan/useRunScanPlan (двофазний deep-скан)
         │   ├── analysis.ts   # LLM-аналіз (мінуси/плюси)
-        │   ├── categories.ts # дерево категорій OLX і базові набори (GET/PUT/remap/generate, збір дерева; docs/plans/base-criteria.md)
+        │   ├── categories.ts # дерево категорій OLX і базові набори (GET/PUT/remap/generate, збір дерева; docs/plans/old/base-criteria.md)
         │   ├── aiPicks.ts    # AI Вибір
         │   ├── relevance.ts  # семантичний фільтр
         │   └── synonyms.ts   # синоніми пошукового запиту
@@ -241,7 +241,7 @@ olx-dashboard/
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
-        │   │   ├── base/                   # вікно «Базові плюси й мінуси» — набори категорій OLX (docs/plans/base-criteria.md)
+        │   │   ├── base/                   # вікно «Базові плюси й мінуси» — набори категорій OLX (docs/plans/old/base-criteria.md)
         │   │   │   ├── BaseCriteriaDialog.tsx # вікно: дерево ліворуч / набір праворуч (мобільний — одне під одним), вхід з «Налаштування» → «AI-аналіз»
         │   │   │   ├── CategoryTree.tsx     # дерево: пошук за назвою, згортання, позначка «є набір», «Оновити дерево категорій»
         │   │   │   ├── BaseCriteriaPane.tsx # набір категорії: «Мінуси / Плюси», власні пункти (CriteriaList, CriteriaInputBar, об'єднання/видалення)

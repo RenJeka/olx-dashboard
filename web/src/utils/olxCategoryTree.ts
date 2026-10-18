@@ -1,4 +1,4 @@
-// Дерево категорій OLX для вікна «Базові плюси й мінуси» (docs/plans/base-criteria.md): будується на клієнті з
+// Дерево категорій OLX для вікна «Базові плюси й мінуси» (docs/plans/old/base-criteria.md): будується на клієнті з
 // плоского списку GET /api/categories (parentId).
 import type { OlxCategoryItem } from '../types';
 

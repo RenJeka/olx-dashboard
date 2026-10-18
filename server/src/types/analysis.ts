@@ -68,7 +68,7 @@ export interface CriterionGroup {
   aliases: string[];
   enabled: boolean;
   /**
-   * Базовий пункт категорії (docs/plans/base-criteria.md): звідки успадковано. Лише у відповідях API —
+   * Базовий пункт категорії (docs/plans/old/base-criteria.md): звідки успадковано. Лише у відповідях API —
    * ні в `searches.analysis_criteria`, ні в `base_criteria` не пишеться.
    */
   base?: CriterionBase;

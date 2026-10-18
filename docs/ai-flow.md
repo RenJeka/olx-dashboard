@@ -151,7 +151,7 @@ reduce — теж судження, яке агент робить сам, чи�
 
 ## Базові плюси й мінуси за категоріями OLX
 
-План — [base-criteria](plans/base-criteria.md) (P-016); правила успадкування й remap — [`business-rules.md`](business-rules.md) §4.
+План — [base-criteria](plans/old/base-criteria.md) (P-016); правила успадкування й remap — [`business-rules.md`](business-rules.md) §4.
 
 - **Ефективні критерії.** Усі споживачі критеріїв пошуку (вікно «Плюси та мінуси», майстер, пошук мінусів/плюсів
   LLM і Jev, ZIP, промпт генерації) читають не сирий `searches.analysis_criteria`, а **ефективні** — базові набори

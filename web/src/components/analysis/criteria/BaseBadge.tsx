@@ -16,7 +16,7 @@ interface Props {
   showSource?: boolean;
 }
 
-/** Бейдж «базовий» (docs/plans/base-criteria.md): вікно «Плюси та мінуси», крок 1 майстра, базові набори. */
+/** Бейдж «базовий» (docs/plans/old/base-criteria.md): вікно «Плюси та мінуси», крок 1 майстра, базові набори. */
 export function BaseBadge({ base, size = 'sm', tooltip = true, showSource = false }: Props) {
   const badge = (
     <Badge size={size} colorPalette="accent" variant="subtle" flexShrink={0} maxW="200px">
