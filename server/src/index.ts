@@ -15,6 +15,7 @@ import { aiPicksRoutes } from './routes/aiPicks.js';
 import { relevanceRoutes } from './routes/relevance.js';
 import { searchSynonymsRoutes } from './routes/searchSynonyms.js';
 import { logsRoutes } from './routes/logs.js';
+import { categoriesRoutes } from './routes/categories.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -64,6 +65,7 @@ await app.register(aiPicksRoutes);
 await app.register(relevanceRoutes);
 await app.register(searchSynonymsRoutes);
 await app.register(logsRoutes);
+await app.register(categoriesRoutes);
 
 app.get('/health', async () => ({ ok: true }));
 

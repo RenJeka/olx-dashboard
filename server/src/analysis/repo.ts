@@ -1,6 +1,5 @@
 import { dbAll, dbGet, dbRun } from '../db/db.js';
-import type { CriteriaConfig, PickCandidate } from '../types.js';
-import { parseCriteriaConfig } from './criteria.js';
+import type { PickCandidate } from '../types.js';
 import { PICK_CANDIDATES_LIMIT } from './constants.js';
 
 export interface ListingRow {
@@ -10,22 +9,20 @@ export interface ListingRow {
   params: string | null;
 }
 
-export async function getSearch(
-  id: number,
-): Promise<{ id: number; name: string; analysis_criteria: string } | undefined> {
-  return dbGet<{ id: number; name: string; analysis_criteria: string }>(
-    'SELECT id, name, analysis_criteria FROM searches WHERE id = ?',
-    [id],
-  );
+/** Рядок пошуку для AI-роутів; поля автокатегорії — для ефективних критеріїв (analysis/baseCriteria.ts). */
+export interface SearchRow {
+  id: number;
+  name: string;
+  analysis_criteria: string;
+  base_category_id: number | null;
+  base_disabled: string | null;
 }
 
-/** Категорії критеріїв пошуку (searches.analysis_criteria; старий формат нормалізується в criteria.ts). */
-export async function getCriteriaConfig(searchId: number): Promise<CriteriaConfig> {
-  const row = await dbGet<{ analysis_criteria: string }>(
-    'SELECT analysis_criteria FROM searches WHERE id = ?',
-    [searchId],
+export async function getSearch(id: number): Promise<SearchRow | undefined> {
+  return dbGet<SearchRow>(
+    'SELECT id, name, analysis_criteria, base_category_id, base_disabled FROM searches WHERE id = ?',
+    [id],
   );
-  return parseCriteriaConfig(row?.analysis_criteria);
 }
 
 /**

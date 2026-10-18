@@ -8,3 +8,4 @@ export * from './aiPicks';
 export * from './relevance';
 export * from './synonyms';
 export * from './logs';
+export * from './categories';

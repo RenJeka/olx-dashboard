@@ -4,6 +4,14 @@
 // При зупинці зібране все одно зберігається (upsert), вікно покриття пропускається.
 export const abortFlags = new Map<number, boolean>();
 
+/**
+ * Чи йде зараз будь-який скан у цьому процесі (звичайний, глибокий, аналіз, verify — усі через `withScanRun`).
+ * CLI-скан (`npm run scan`) іде окремим процесом і тут не видно.
+ */
+export function isAnyScanRunning(): boolean {
+  return abortFlags.size > 0;
+}
+
 /** Запит на зупинку активного скану пошуку. Повертає true, якщо скан справді виконувався. */
 export function requestStopScan(searchId: number): boolean {
   if (!abortFlags.has(searchId)) return false;

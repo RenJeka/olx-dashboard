@@ -9,7 +9,8 @@ import {
   remapBullets,
   remapLocalFilters,
 } from './criteria.js';
-import { buildCriteriaPrompt, buildGroupingPrompt, buildMatchingPrompt } from './prompts.js';
+import { BASE_CRITERIA_DRAFT, MAX_CRITERIA } from './constants.js';
+import { buildBaseCriteriaPrompt, buildCriteriaPrompt, buildGroupingPrompt, buildMatchingPrompt } from './prompts.js';
 import type { CriterionGroup } from '../types.js';
 
 const g = (name: string, aliases: string[] = [], enabled = true): CriterionGroup => ({ name, aliases, enabled });
@@ -152,10 +153,46 @@ describe('промпти з категоріями', () => {
     expect(buildCriteriaPrompt('macbook', [], 'pros')).not.toContain('НЕ включай їх');
   });
 
+  it('генерація пошуку: ліміт «не більше MAX_CRITERIA» — десять, не п’ятдесят', () => {
+    expect(MAX_CRITERIA).toBe(10);
+    expect(buildCriteriaPrompt('macbook', [], 'cons')).toContain('не більше 10 критеріїв');
+  });
+
   it('групування: усі критерії режиму з синонімами, формат {groups}, без описів оголошень', () => {
     const prompt = buildGroupingPrompt('macbook', groups, 'cons');
     expect(prompt).toContain('- дефект екрану (сюди ж: тріснутий екран, зламаний екран)\n- без торгу');
     expect(prompt).toContain('{"items": [{"criterion": "критерій 1", "aspect": "аспект"}]}');
     expect(prompt).not.toContain('Приклади описів');
+  });
+});
+
+describe('buildBaseCriteriaPrompt (чернетка набору категорії)', () => {
+  const path = ['Електроніка', 'Ноутбуки та аксесуари', 'Ноутбуки'];
+
+  it('шлях категорії, ліміт BASE_CRITERIA_DRAFT, «вже є» і «НЕ включай» протилежного', () => {
+    expect(BASE_CRITERIA_DRAFT).toBe(7);
+    const prompt = buildBaseCriteriaPrompt(
+      path,
+      'cons',
+      [g('не працює', ['не вмикається'])],
+      [g('повна комплектація', ['з коробкою'])],
+    );
+    expect(prompt).toContain('Електроніка → Ноутбуки та аксесуари → Ноутбуки');
+    expect(prompt).toContain('не більше 7');
+    expect(prompt).toContain('вже є');
+    expect(prompt).toContain('- не працює (сюди ж: не вмикається)');
+    expect(prompt).toContain(
+      'Це плюси (переваги) товару — НЕ включай їх і їхні перефразування:\n- повна комплектація (сюди ж: з коробкою)',
+    );
+    expect(prompt).toContain('Переваги — НЕ мінуси'); // спільні POLARITY_RULES
+    expect(buildBaseCriteriaPrompt(path, 'pros', [], [])).toContain('Недоліки — НЕ плюси');
+  });
+
+  it('порожні existing/opposite — без відповідних блоків; описів оголошень немає', () => {
+    const prompt = buildBaseCriteriaPrompt(path, 'cons', [], []);
+    expect(prompt).not.toContain('вже є');
+    expect(prompt).not.toContain('НЕ включай їх');
+    expect(prompt).not.toContain('Приклади описів');
+    expect(prompt).toContain('{"criteria": [');
   });
 });

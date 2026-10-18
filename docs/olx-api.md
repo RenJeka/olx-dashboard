@@ -441,30 +441,35 @@ laquesis (A/B-тести olxcdn.com).
 - `filter_float_price:from` у живому запиті фронтенду — у тому самому форматі,
   що ми шлемо (значення рядком). Повторно верифіковано.
 
-### 2.11 Дерево категорій (facet метаданих пошуку) — верифіковано live 2026-06-23
+### 2.11 Дерево категорій (GraphQL `facets`) — верифіковано live 2026-10-17
 
-Для фільтра «Категорії» (`docs/plans/old/category-counts-and-filter.md`) дерево категорій із
-**назвами + ієрархією + лічильниками** тягнеться ОДНИМ запитом:
+Для фільтра «Категорії» (`docs/plans/old/category-counts-and-filter.md`) і глобального дерева `olx_categories`
+(`docs/plans/base-criteria.md`) дерево категорій із **назвами + ієрархією + лічильниками** тягнеться ОДНИМ
+GraphQL-запитом (той самий `POST /apigateway/graphql`, §2.1) з facet у `searchParameters`:
 
-```
-GET https://www.olx.ua/api/v1/offers/metadata/search/?query=<q>&facets=[{"field":"category","fetchLabel":true,"fetchUrl":true,"limit":100}]
-```
+- `query` — пошуковий запит, `offset=0`, `limit=1` (самі оголошення не потрібні);
+- `facets=[{"field":"category","fetchLabel":true,"fetchUrl":true,"limit":150}]` (рядок JSON).
+  **Ліміт:** OLX приймає лише `limit` < 200; використовуємо `150`. Для широкого запиту (напр. «ноутбук»)
+  відповідь містить більше елементів, ніж `limit`, тож це не жорстка межа кількості (гіпотеза, середня впевненість);
+- у query лише `... on ListingSuccess { metadata { facets { category { id count label url } } } }`
+  (+ `... on ListingError { error { code title detail status } }`).
 
-Відповідь — `data.facets.category[]`, елемент: `{ id, count, label, url }`:
+Відповідь — `metadata.facets.category[]`, елемент: `{ id, count, label, url }`:
 - `label` — людська назва категорії (укр);
 - `count` — к-сть оголошень OLX для запиту в цій категорії (включно з підкатегоріями);
-- `url` — слаг-шлях, що кодує ПОВНУ ієрархію: `/hobbi-otdyh-i-sport/velo/velosipedy/q-<q>`
+- `url` — **відносний** слаг-шлях, що кодує ПОВНУ ієрархію: `/hobbi-otdyh-i-sport/velo/velosipedy/q-<q>`
   (останній слаг перед `/q-` — власний; попередні — предки). Кожен предок присутній окремим
-  елементом (його `count` ≥ `count` нащадка), тож дерево назв будується суто з цієї відповіді.
+  елементом (його `count` ≥ `count` нащадка), тож дерево будується суто з цієї відповіді.
 
-Числовий `id` збігається з per-listing `category.id` (§2.7) — facet годиться як джерело назв для
-нашого `listings.category_id`. Реалізація — `server/src/scraper/olxCategories.ts`
-(`fetchCategoryOptions`), тягнеться `scanner/scanFinalize.ts` після успішного скану й кешується в
-`searches.category_facet`.
+Числовий `id` збігається з per-listing `category.id` (§2.7). Реалізація — `server/src/scraper/graphql/categories.ts`
+(`fetchCategoryFacet`) + чисті перетворення `server/src/scraper/olxCategories.ts` (`facetToOptions`/`facetToNodes`);
+викликається `scanner/scanFinalize.ts` після успішного скану: кеш у `searches.category_facet` + upsert у
+`olx_categories`. Помилка (не-200, `ListingError`, порожній facet) → `logWarn('scanner','category-facet')`,
+старе дерево лишається, скан не падає.
 
-**Що НЕ працює (перевірено live):** `…/api/v1/categories/` → deprecated / access denied;
-`…/api/v1/offers/metadata/search-categories/` → лише `{id, count}` без назв (параметр `facets`
-там ігнорується).
+**Що НЕ працює (перевірено live):** REST `GET /api/v1/offers/metadata/search/?facets=…` → `403` з 2026-10-17
+(раніше працював, верифіковано 2026-06-23); `…/api/v1/categories/` → deprecated / access denied;
+`…/api/v1/offers/metadata/search-categories/` → лише `{id, count}` без назв (параметр `facets` там ігнорується).
 
 ---
 
@@ -636,3 +641,4 @@ DOM-селектори простіші й достатні).
 | 2026-06-30 | Глибокий скан після «Аналізу перед скануванням» падав із оманливою HTML-помилкою «Карток не знайдено… рендериться через JS». Наживо підтверджено: GraphQL і HTML працюють (200, 50 карток; `__NEXT_DATA__` зник, але `[data-cy="l-card"]` є). Реальна причина — ОДИН транзієнтний GraphQL-збій (429/5xx/не-JSON) посеред пагінації валив увесь скан (`fetchPage` без ретраю), а `runDeepScanFromPlan` ковтав причину GraphQL (inline HTML-fallback без try/catch) | ретрай транзієнтних збоїв у `client.fetchPage` (3 спроби, бекоф; детерміновані 4xx/схема/ListingError — без ретраю); об'єднана помилка `graphql failed:…; html fallback failed:…` у `runDeepScanFromPlan`; частковий успіх при транзієнтному винятку посеред пагінації (`fetchSearch`/`scanSingleBucket`) замість обвалу — §2.8/§2.9 |
 | 2026-10-03 | OLX (CloudFront) відповідає `403` на будь-яку HTML-сторінку з Node: пошук (`/d/uk/list/`, `/uk/list/`, `/list/`), головна, сторінка оголошення; заголовки Firefox 91 і сучасного Chrome — без різниці. GraphQL з того ж IP працює. Гіпотеза (середня впевненість): блок за TLS-відбитком Node | HTML-fallback вимкнено (`HTML_FALLBACK_ENABLED`), скан падає з причиною GraphQL; ідея обходу — [P-005](parking.md); verify-проба §3.4 теж дає `unknown` |
 | 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/old/price-range-split.md`, §2.9 |
+| 2026-10-17 | REST facet категорій `GET /api/v1/offers/metadata/search/?facets=…` (працював 2026-06-23) відповідає `403`; фільтр «Категорії» не отримував дерево. GraphQL `facets` у `searchParameters` (`facets=[{"field":"category",…,"limit":150}]`, `metadata { facets { category { id count label url } } }`) працює: 200, ~180 категорій для запиту «ноутбук»; OLX приймає лише `limit` < 200 | `fetchCategoryFacet` (`scraper/graphql/categories.ts`) замість REST; перетворення `facetToOptions`/`facetToNodes`; вузли дерева — в `olx_categories` (`categories/tree.ts`) — §2.11, `docs/plans/base-criteria.md` |

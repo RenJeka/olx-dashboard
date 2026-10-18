@@ -20,8 +20,29 @@ import type { AnalysisMode, CriteriaMerge, CriterionGroup, GroupSuggestion } fro
 export interface CriterionRowData {
   name: string;
   group: CriterionGroup | null;
-  /** Скільки оголошень містить назву чи будь-який синонім. */
-  count: number;
+  /** Скільки оголошень містить назву чи будь-який синонім; `null` — не рахується (набір категорії, без оголошень). */
+  count: number | null;
+}
+
+/** Розділи списку: категорії (з синонімами) → окремі критерії → пункти «лише в оголошеннях». */
+export interface CriteriaRows {
+  categories: CriterionRowData[];
+  singles: CriterionRowData[];
+  orphans: CriterionRowData[];
+}
+
+/**
+ * Що потрібно списку `CriteriaList` — спільне для вікна «Плюси та мінуси» (`useCriteriaManager`) і
+ * «Базові плюси й мінуси» (`useBaseCriteriaManager`).
+ */
+export interface CriteriaListModel {
+  rows: CriteriaRows;
+  filter: string;
+  selected: Set<string>;
+  toggleSelected: (name: string) => void;
+  toggleEnabled: (name: string) => void;
+  detachAlias: (name: string, alias: string) => void;
+  addPhrases: (phrases: string[]) => Promise<number>;
 }
 
 /**
@@ -43,13 +64,24 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
   const suggest = useSuggestGroups();
 
   const groups = useMemo(() => config?.[mode] ?? [], [config, mode]);
+  /** Автокатегорія пошуку (рядок під заголовком); `null` — ще не визначена. */
+  const category = config?.category ?? null;
+  /** Чи є в пошуку оголошення (вже завантажені для лічильників) — підказка, чому категорії немає. */
+  const hasListings = (listings?.length ?? 0) > 0;
+  /** Власні пункти пошуку: базові (`base`) змінюються лише у вікні «Базові плюси й мінуси». */
+  const ownGroupCount = groups.filter((g) => !g.base).length;
+  /** Обрані рядки без базових (на випадок, якщо обраний пункт став базовим після оновлення списку). */
+  const selectedNames = useMemo(
+    () => [...selected].filter((n) => !groups.find((g) => g.name === n)?.base),
+    [selected, groups],
+  );
 
   // Ключі пунктів кожного оголошення — один раз на режим; далі лічильники категорій і «зачепить N».
   const listingKeys = useMemo(
     () => (listings ?? []).map((l) => new Set(parseBullets(l[mode]).map(phraseKey))),
     [listings, mode],
   );
-  const rows = useMemo(() => {
+  const rows = useMemo((): CriteriaRows => {
     const byName = new Map(groups.map((g) => [g.name, g]));
     const toRow = (name: string): CriterionRowData => {
       const group = byName.get(name) as CriterionGroup;
@@ -120,7 +152,7 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
   /** Вийняти синонім з категорії — стає окремою категорією з тією ж позначкою «в аналізі». */
   function detachAlias(name: string, alias: string) {
     const next = groups.flatMap((g) =>
-      g.name === name
+      g.name === name && !g.base
         ? [{ ...g, aliases: g.aliases.filter((a) => a !== alias) }, { name: alias, aliases: [], enabled: g.enabled }]
         : [g],
     );
@@ -182,9 +214,12 @@ export function useCriteriaManager(searchId: number, initialMode: AnalysisMode) 
   return {
     mode, setMode,
     filter, setFilter,
-    selected, toggleSelected,
+    selected, selectedNames, toggleSelected,
     isLoading,
+    category,
+    hasListings,
     groups,
+    ownGroupCount,
     rows,
     affectedCount: (names: string[]) => countListingsWithAny(listingKeys, keysOf(names)),
     addPhrases,

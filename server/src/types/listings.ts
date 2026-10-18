@@ -23,7 +23,7 @@ export interface RawListing {
   lastRefreshAt?: string;
   city?: string;
   district?: string;
-  /** OLX category.id (числовий id листової категорії); назву резолвимо словником olxCategories.ts. */
+  /** OLX category.id (числовий id листової категорії); назву резолвимо таблицею olx_categories / facet. */
   categoryId?: number | null;
   /** OLX category.type (слаг верхнього рівня, напр. "electronics"). */
   categoryType?: string | null;

@@ -5,6 +5,7 @@ import { ModeToggle } from '../ModeToggle';
 import { CriteriaInputBar } from '../criteria/CriteriaInputBar';
 import { ScopeSelector } from '../ScopeSelector';
 import { Tooltip } from '../../ui/tooltip';
+import { BaseBadge, baseHint } from '../criteria/BaseBadge';
 import { MODE_PALETTE } from '../../../constants';
 import { categoriesFirst } from '../../../utils/criteria';
 import { sortAlpha } from '../../../utils/sort';
@@ -37,6 +38,7 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
     savedGroups,
   } = w;
   const aliasesOf = new Map(savedGroups.map((g) => [g.name, g.aliases]));
+  const baseOf = new Map(savedGroups.map((g) => [g.name, g.base]));
   // Як у вікні «Плюси та мінуси»: спершу категорії (є синоніми), далі окремі.
   const chips = categoriesFirst(available, (c) => (aliasesOf.get(c)?.length ?? 0) > 0).flat();
 
@@ -59,10 +61,12 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
       <Wrap gap={2}>
         {chips.map((c) => {
           const aliases = aliasesOf.get(c) ?? [];
+          const base = baseOf.get(c);
+          const hint = aliases.length > 0 ? `${c} · сюди ж: ${sortAlpha(aliases).join(', ')}` : c;
           return (
             <Tooltip
               key={c}
-              content={aliases.length > 0 ? `${c} · сюди ж: ${sortAlpha(aliases).join(', ')}` : c}
+              content={base ? `${hint} · ${baseHint(base)}` : hint}
               openDelay={300}
             >
               <Button
@@ -80,6 +84,7 @@ export function CriteriaStep({ w, onManageCriteria, portalRef }: Props) {
                     +{aliases.length}
                   </Badge>
                 )}
+                {base && <BaseBadge base={base} size="xs" tooltip={false} />}
               </Button>
             </Tooltip>
           );

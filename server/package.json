@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json && node scripts/copyAssets.mjs",
     "start": "node dist/index.js",
     "scan": "tsx src/scan.ts",
+    "categories:collect": "tsx src/collectCategories.ts",
     "jev:pilot": "tsx src/jevPilot.ts",
     "jev:probe": "tsx src/jevProbe.ts",
     "llm:eval": "tsx src/llmEval.ts",

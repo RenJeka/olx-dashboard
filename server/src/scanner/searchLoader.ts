@@ -8,11 +8,12 @@ export interface SearchRow {
   category_id: number | null;
   api_filters: string;
   query_synonyms: string;
+  base_category_id: number | null;
 }
 
 export async function loadSearch(id: number): Promise<SearchConfig | null> {
   const row = await dbGet<SearchRow>(
-    'SELECT id, name, query, category_id, api_filters, query_synonyms FROM searches WHERE id = ?',
+    'SELECT id, name, query, category_id, api_filters, query_synonyms, base_category_id FROM searches WHERE id = ?',
     [id],
   );
 
@@ -40,6 +41,7 @@ export async function loadSearch(id: number): Promise<SearchConfig | null> {
     categoryId: row.category_id,
     apiFilters,
     querySynonyms,
+    baseCategoryId: row.base_category_id,
   };
 }
 

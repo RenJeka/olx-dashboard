@@ -8,8 +8,8 @@ import type {
   AnalyzeResponse,
   AnalyzedListing,
   CommitItem,
-  CriteriaConfig,
   CriteriaMerge,
+  CriteriaResponse,
   CriterionGroup,
   GroupSuggestion,
   RemapCriteriaResult,
@@ -28,7 +28,7 @@ export function useAnalysisStatus() {
 export function useSavedCriteria(searchId: number | null) {
   return useQuery({
     queryKey: ['criteria', searchId],
-    queryFn: () => api<CriteriaConfig>(`/api/searches/${searchId}/criteria`),
+    queryFn: () => api<CriteriaResponse>(`/api/searches/${searchId}/criteria`),
     enabled: searchId != null,
   });
 }
@@ -102,7 +102,7 @@ export function useSaveCriteria() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ searchId, cons, pros }: { searchId: number; cons?: CriterionGroup[]; pros?: CriterionGroup[] }) =>
-      api<CriteriaConfig>(`/api/searches/${searchId}/criteria`, {
+      api<CriteriaResponse>(`/api/searches/${searchId}/criteria`, {
         method: 'PUT',
         body: JSON.stringify({ cons, pros }),
       }),
@@ -138,7 +138,11 @@ export function useRemapCriteria() {
         body: JSON.stringify({ mode, from, to, listings, merges }),
       }),
     onSuccess: (data, { searchId }) => {
-      qc.setQueryData(['criteria', searchId], data.criteria);
+      // Відповідь remap — без `category`: зберегти її з кешу (інакше рядок категорії зникне до перезапиту).
+      qc.setQueryData<CriteriaResponse>(['criteria', searchId], (prev) => ({
+        ...data.criteria,
+        category: prev?.category ?? null,
+      }));
       qc.invalidateQueries({ queryKey: ['listings', searchId] });
       qc.invalidateQueries({ queryKey: ['filter-options', searchId] });
       qc.invalidateQueries({ queryKey: ['searches'] });

@@ -17,8 +17,9 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній хендоф і реліз — [2026-10-16 docs-audit](handoffs/2026-10-16-docs-audit.md): аудит документації й
-  `npm run db:copy-prod` (копія прод-БД у локальний файл) — на проді, smoke ✅. Модель і рушії AI — [ai-flow](ai-flow.md).
+- Останній реліз — [2026-10-16 docs-audit](handoffs/2026-10-16-docs-audit.md): аудит документації й
+  `npm run db:copy-prod` (копія прод-БД у локальний файл), smoke ✅. Останній хендоф —
+  [2026-10-18 base-criteria-impl](handoffs/2026-10-18-base-criteria-impl.md). Модель і рушії AI — [ai-flow](ai-flow.md).
 - AI на проді — авто-режим з 2026-10-17: `OPENROUTER_API_KEY` в API (окремий ключ з лімітом), кожна AI-кнопка
   платна ([deploy-render-turso](deploy-render-turso.md) → «Фактичний прод»).
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
@@ -36,7 +37,11 @@
 
 ## Активні плани
 
-Немає.
+- [base-criteria](plans/base-criteria.md) — базові плюси й мінуси за деревом категорій OLX ([P-016](parking.md)); реалізовано на гілці
+  `feat/base-criteria`, PR відкрито, CI зелений, не злито. Порядок: людина проходить ручні test-cases L1–L9 локально →
+  реліз (злиття = деплой, лише з «так» людини) → П1–П3 на проді. Разова робота після релізу: заповнити дерево категорій
+  («Налаштування» → «AI-аналіз» → «Базові плюси й мінуси» → «Оновити дерево категорій») і базові набори. Відкладені
+  доробки — [P-019](parking.md); наступна ідея — аналіз «за 1 клік» ([P-018](parking.md)).
 
 ## Що враховувати
 
@@ -49,7 +54,9 @@
   категорії товарів.
 - Браузер агента (wmux): пункти меню «⋮» — лише клавіатурою ([wmux-browser-ark-menu](instructions/wmux-browser-ark-menu.md));
   панель у прихованому workspace — [wmux-browser-hidden-pane](instructions/wmux-browser-hidden-pane.md).
-- Ручні test-cases для людини — [manual-test-cases](instructions/manual-test-cases.md).
+- Ручні test-cases для людини — [manual-test-cases](instructions/manual-test-cases.md); людина проходить їх сама,
+  агент лише пише (рішення людини 2026-10-18).
+- План агентами з рецензентом без комітів — [sdd-without-commits](instructions/sdd-without-commits.md).
 - Діалог поверх іншої модалки з полями вводу — [chakra-nested-dialog-focus](instructions/chakra-nested-dialog-focus.md).
 - Великий пошук `iphone` на проді: таблиця й пошук в описі повільні — переважно очікування даних із Turso,
   не CPU (замір S17 — у [stability-baseline](plans/old/stability-baseline.md)); лагодження — [P-010](parking.md), [P-008](parking.md), ідея кешу — [P-011](parking.md).
@@ -67,7 +74,8 @@
 
 ## Відкриті питання (чекають людину)
 
-- Що робити з точністю пошуку мінусів: точніші назви критеріїв, рушій Jev чи база типових критеріїв ([P-016](parking.md)).
+- Базовий пункт видалили з категорії: колишній власний пункт пошуку з тією ж назвою зараз повертається (у стані, який
+  обрала людина) — лишити так чи прибирати разом із базовим ([base-criteria](plans/base-criteria.md), L7).
 - Ручні перевірки рушія Jev в UI — у примітках архівних планів [jev-model](plans/old/jev-model.md) (крок 2) і
   [jev-threshold-setting](plans/old/jev-threshold-setting.md) (test-case 3, платно).
 - Чи видаляти порожній старий файл `server/data/olx-bak-2026-10-16T12-28-23-237Z.db` (робочий ПК).
@@ -77,5 +85,5 @@
 
 ## Наступний крок
 
-Ручна перевірка людиною на проді — «Згрупувати автоматично» у вікні «Плюси та мінуси» (test-case 3
-[llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md) пройдено 2026-10-17).
+Людина проходить локально ручні test-cases L1–L9 з [base-criteria](plans/base-criteria.md) (перед цим — `npm run dev`),
+агент розбирає результати й лагодить знайдене; далі — реліз за «так» людини.

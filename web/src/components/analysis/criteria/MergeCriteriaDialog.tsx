@@ -11,8 +11,8 @@ interface Props {
   names: string[];
   /** Синоніми обраних категорій — теж перейдуть у нову. */
   aliases: string[];
-  /** Скільки оголошень зачепить (назви + синоніми). */
-  affected: number;
+  /** Скільки оголошень зачепить (назви + синоніми); `null` — невідомо наперед (набір категорії). */
+  affected: number | null;
   pending: boolean;
   onConfirm: (name: string) => void;
 }
@@ -86,9 +86,15 @@ export function MergeCriteriaDialog({ portalRef, onClose, title, names, aliases,
             </Wrap>
           </Stack>
         )}
-        <Text textStyle="sm">
-          Зачепить оголошень: <strong>{affected}</strong> — пункти в них перейменуються, AI не запускається.
-        </Text>
+        {affected === null ? (
+          <Text textStyle="sm">
+            Пункти в оголошеннях пошуків цієї категорії та її підкатегорій перейменуються, AI не запускається.
+          </Text>
+        ) : (
+          <Text textStyle="sm">
+            Зачепить оголошень: <strong>{affected}</strong> — пункти в них перейменуються, AI не запускається.
+          </Text>
+        )}
       </Stack>
     </NestedDialog>
   );

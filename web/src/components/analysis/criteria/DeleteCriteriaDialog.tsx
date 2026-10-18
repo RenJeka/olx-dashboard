@@ -7,13 +7,19 @@ interface Props {
   portalRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   names: string[];
-  /** Скільки оголошень містить ці формулювання (назви + синоніми). */
-  affected: number;
+  /**
+   * Скільки оголошень містить ці формулювання (назви + синоніми); `null` — набір категорії: видалення
+   * оголошень не чіпає, галочки немає.
+   */
+  affected: number | null;
   pending: boolean;
   onConfirm: (withListings: boolean) => void;
 }
 
-/** Підтвердження видалення критеріїв: зі списку пошуку і (за галочкою) з оголошень та локальних фільтрів. */
+/**
+ * Підтвердження видалення критеріїв: зі списку пошуку і (за галочкою) з оголошень та локальних фільтрів;
+ * для набору категорії — лише з набору.
+ */
 export function DeleteCriteriaDialog({ portalRef, onClose, names, affected, pending, onConfirm }: Props) {
   const [withListings, setWithListings] = useState(true);
 
@@ -36,14 +42,20 @@ export function DeleteCriteriaDialog({ portalRef, onClose, names, affected, pend
     >
       <Stack gap={3}>
         <Text textStyle="sm">{names.join(' · ')}</Text>
-        <Checkbox
-          checked={withListings}
-          disabled={affected === 0}
-          onCheckedChange={(d) => setWithListings(d.checked === true)}
-        >
-          Прибрати також з {affected} оголошень і локальних фільтрів
-        </Checkbox>
-        {!withListings && affected > 0 && (
+        {affected === null ? (
+          <Text textStyle="xs" color="fg.muted">
+            Пункт зникне з набору категорії; в уже проаналізованих оголошеннях пункти лишаються.
+          </Text>
+        ) : (
+          <Checkbox
+            checked={withListings}
+            disabled={affected === 0}
+            onCheckedChange={(d) => setWithListings(d.checked === true)}
+          >
+            Прибрати також з {affected} оголошень і локальних фільтрів
+          </Checkbox>
+        )}
+        {!withListings && affected !== null && affected > 0 && (
           <Text textStyle="xs" color="fg.muted">
             В оголошеннях пункти лишаться — у вікні їх буде видно як «лише в оголошеннях».
           </Text>

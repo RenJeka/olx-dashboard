@@ -55,7 +55,7 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
 
   const busy = m.savePending || m.remapPending;
   const apiAvailable = status?.apiAvailable ?? false;
-  const selectedNames = [...m.selected];
+  const selectedNames = m.selectedNames;
   const subAliases = (sub?.names ?? []).flatMap((n) => m.groups.find((g) => g.name === n)?.aliases ?? []);
 
   async function addCustom() {
@@ -91,7 +91,16 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
         <DialogCloseTrigger />
         <DialogHeader>
           <Stack gap={3} w="full">
-            <DialogTitle>Плюси та мінуси — {search.name}</DialogTitle>
+            <Stack gap={0.5}>
+              <DialogTitle>Плюси та мінуси — {search.name}</DialogTitle>
+              <Text textStyle="xs" color="fg.muted">
+                {m.category && m.category.path.length > 0
+                  ? `Категорія: ${m.category.path.join(' → ')}`
+                  : m.hasListings
+                    ? 'Категорію не визначено — оновіть дерево категорій у «Базові плюси й мінуси»'
+                    : "Категорія ще не визначена — з'явиться після скану"}
+              </Text>
+            </Stack>
             <HStack gap={2} wrap="wrap">
               <ModeToggle mode={m.mode} onChange={m.setMode} />
               <HStack flex="1" minW="160px" gap={1}>
@@ -115,7 +124,8 @@ export function CriteriaManagerDialog({ search, onClose, initialMode = 'cons', p
               extraActions={
                 // Автогрупування (docs/plans/old/criteria-auto-group.md): LLM, тож лише з ключем і ≥ 2 критеріями.
                 apiAvailable &&
-                m.groups.length >= 2 && (
+                // Базові пункти не групуються (змінюються у вікні «Базові плюси й мінуси») — рахуємо лише власні.
+                m.ownGroupCount >= 2 && (
                   <Button
                     size="sm"
                     variant="outline"

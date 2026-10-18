@@ -1,6 +1,8 @@
 import { dbRun } from '../db/db.js';
 import { logWarn } from '../logger.js';
-import { fetchCategoryOptions } from '../scraper/olxCategories.js';
+import { refreshBaseCategory, upsertCategories } from '../categories/tree.js';
+import { fetchCategoryFacet } from '../scraper/graphql/categories.js';
+import { facetToNodes, facetToOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
 import { applyScanStatuses } from '../scraper/statusEngine.js';
 import type { SearchConfig, ScanResult, RawListing } from '../types.js';
@@ -8,24 +10,35 @@ import type { ScanPersister } from './scanPersister.js';
 
 /**
  * Best-effort оновлення дерева категорій OLX (facet) для пошуку після успішного скану.
- * Один легкий запит до OLX; результат кешується у searches.category_facet (фільтр категорій
- * читає його без мережі). Помилка/недоступність → лишаємо попереднє дерево, скан не валимо.
+ * Один легкий GraphQL-запит до OLX (facets, olx-api.md §2.11); результат кешується у
+ * searches.category_facet (фільтр категорій читає його без мережі), а вузли дерева — у глобальній
+ * olx_categories (пише лише нові/змінені). Помилка/недоступність → лишаємо попереднє дерево, скан не валимо.
  * Тягнемо лише для основного `query` (синоніми дали б непорівнянні OLX-числа через перетин видач).
  */
 export async function refreshCategoryFacet(searchId: number, query: string): Promise<void> {
   try {
-    const categories = await fetchCategoryOptions(query);
-    if (categories) {
+    const facet = await fetchCategoryFacet(query);
+    if (facet) {
       await dbRun('UPDATE searches SET category_facet = ? WHERE id = ?', [
-        JSON.stringify(categories),
+        JSON.stringify(facetToOptions(facet)),
         searchId,
       ]);
+      await upsertCategories(facetToNodes(facet));
     }
   } catch (err) {
     // best-effort — дерево категорій не критичне для скану; але збій має бути видимим у журналі
     logWarn('scanner', 'category-facet', err instanceof Error ? err.message : String(err), {
       searchId,
     });
+  }
+}
+
+/** Best-effort перерахунок автокатегорії пошуку (базові плюси/мінуси); збій — лише в журнал. */
+async function refreshBaseCategorySafe(searchId: number): Promise<void> {
+  try {
+    await refreshBaseCategory(searchId);
+  } catch (err) {
+    logWarn('scanner', 'base-category', err instanceof Error ? err.message : String(err), { searchId });
   }
 }
 
@@ -66,7 +79,7 @@ const FINALIZE_SUCCESS_SQL = `UPDATE scan_runs SET finished_at = ?, found = ?, n
 
 /**
  * Спільний хвіст фіналізації скану для `runScan` і `runDeepScanFromPlan`:
- * upsert → applyScanStatuses → refreshCategoryFacet → UPDATE scan_runs.
+ * upsert → applyScanStatuses → refreshCategoryFacet → refreshBaseCategory → UPDATE scan_runs.
  */
 export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResult> {
   const {
@@ -109,6 +122,12 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   // Дерево категорій OLX (facet).
   if (!stopped && !skipCategoryRefresh) {
     await refreshCategoryFacet(searchId, search.query);
+  }
+  // Автокатегорія — з оголошень у БД, тож не залежить від facet; рахуємо й після зупиненого скану. Без нових
+  // оголошень і з уже відомою автокатегорією розподіл не змінився — пропускаємо GROUP BY (Turso-економія);
+  // зміну фільтра «Категорії» перераховує сам PATCH пошуку.
+  if (upsertResult.new_count > 0 || search.baseCategoryId == null) {
+    await refreshBaseCategorySafe(searchId);
   }
 
   // Формування warning-ноти.

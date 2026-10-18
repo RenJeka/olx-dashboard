@@ -72,6 +72,10 @@ olx-dashboard/
 │       │   ├── scan.ts       # типи сканування, прогрес, план глибокого скану
 │       │   └── analysis.ts   # AI аналіз, relevance, aiPicks
 │       ├── types.ts          # barrel-файл експорту доменних типів + інтерфейс OlxFetcher
+│       ├── categories/        # глобальне дерево категорій OLX (таблиця olx_categories)
+│       │   ├── tree.ts       # upsertCategories (лише нові/змінені вузли), pickBaseCategory, ancestorIds/descendantIds, refreshBaseCategory
+│       │   ├── collector.ts  # collectCategories(words, {delayMs}): збирач дерева по списку слів (facet → upsert по слову, пауза 1–2 с)
+│       │   └── seedWords.ts  # SEED_WORDS: стартові слова по кореневих розділах OLX
 │       ├── scanner/           # модулі сканування (розбитий scanner.ts)
 │       │   ├── index.ts      # barrel: реекспорт runScan/analyzeScan/runDeepScanFromPlan/runVerify/requestStopScan/isPlanCached/isAnalysisFresh/countVerifyCandidates
 │       │   ├── abortControl.ts # abort-прапорці (Map<searchId, boolean>), requestStopScan
@@ -85,6 +89,7 @@ olx-dashboard/
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
 │       │   └── verifyScan.ts # runVerify (P1+P2 кандидати, probeListingPage), countVerifyCandidates
 │       ├── scan.ts           # CLI: npm run scan -- --search <id>
+│       ├── collectCategories.ts # CLI: npm run categories:collect [-- --words "a,b"] — збір дерева категорій OLX
 │       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/old/llm-haiku-prompt-audit.md)
@@ -97,8 +102,10 @@ olx-dashboard/
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
-│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/getCriteriaConfig/loadListings
+│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/loadListings
 │       │   ├── criteria.ts   # категорії критеріїв (docs/plans/old/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
+│       │   ├── baseCriteria.ts # базові плюси/мінуси категорій (docs/plans/base-criteria.md): mergeBaseCriteria/stripBaseCriteria/applyCriteriaBody/retainAbsorbedOwn/getEffectiveCriteria, парс searches.base_disabled
+│       │   ├── remap.ts      # спільні кроки remap критеріїв: parseRemapOps/planRemapSteps/remapListingStatements/remapBaseDisabled (пошук і категорія)
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
@@ -120,7 +127,8 @@ olx-dashboard/
 │       │   ├── utils.ts        # спільні утиліти (sleep, randomDelayMs, slugify)
 │       │   ├── graphql/        # GraphQL-збирач (основний метод збору)
 │       │   │   ├── index.ts    # реекспорт GraphqlOlxFetcher
-│       │   │   ├── client.ts   # GraphqlClient: HTTP запити та парсинг параметрів
+│       │   │   ├── client.ts   # GraphqlClient: HTTP запити та парсинг параметрів; graphqlHeaders() — спільні заголовки
+│       │   │   ├── categories.ts # fetchCategoryFacet(query): дерево категорій через GraphQL `facets` (olx-api.md §2.11), best-effort
 │       │   │   ├── mapper.ts   # GraphqlListingMapper: перетворення сирих даних GraphQL
 │       │   │   ├── split.ts    # SplitScanner: зондування, бісекція цін, допагінація бакетів
 │       │   │   ├── fetcher.ts  # GraphqlOlxFetcher (Facade): fetchSearch/fetchSearchSplit, оркеструє client та split
@@ -133,7 +141,7 @@ olx-dashboard/
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
 │       │   ├── refilter.ts     # recomputeFilteredOut(): перерахунок filtered_out після зміни local_filters (лише змінені рядки, порціями)
 │       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
-│       │   ├── olxCategories.ts # fetchCategoryOptions(query): дерево категорій OLX (facet метаданих пошуку, olx-api.md §2.11) → CategoryOption[]; тягнеться scanner-ом, кеш у searches.category_facet
+│       │   ├── olxCategories.ts # facetToOptions/facetToNodes: чисті перетворення facet категорій OLX (olx-api.md §2.11) → CategoryOption[] / CategoryNode[]; facet тягне graphql/categories.ts, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/old/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
@@ -142,6 +150,7 @@ olx-dashboard/
 │           ├── listings.ts   # GET /api/searches/:id/listings (легкі рядки) + details/search на вимогу + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
 │           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
+│           ├── categories.ts # GET /api/categories, GET/PUT /api/categories/:id/criteria (базові набори), POST /api/categories/:id/criteria/remap, POST /api/categories/collect (збір дерева; паралельний → 409)
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/old/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import
 │           └── analysis/     # LLM-аналіз (розбитий на файли за призначенням)
 │               ├── index.ts  # реєструє всі роути + GET /api/analysis/status (A1)
@@ -172,12 +181,13 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401)
+        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401; ApiError зі статусом)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/old/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
         │   ├── scanner.ts    # скан, verify, прогрес сканування, useAnalyzeScan/useRunScanPlan (двофазний deep-скан)
         │   ├── analysis.ts   # LLM-аналіз (мінуси/плюси)
+        │   ├── categories.ts # дерево категорій OLX і базові набори (GET/PUT/remap/generate, збір дерева; docs/plans/base-criteria.md)
         │   ├── aiPicks.ts    # AI Вибір
         │   ├── relevance.ts  # семантичний фільтр
         │   └── synonyms.ts   # синоніми пошукового запиту
@@ -231,7 +241,13 @@ olx-dashboard/
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
         │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
+        │   │   ├── base/                   # вікно «Базові плюси й мінуси» — набори категорій OLX (docs/plans/base-criteria.md)
+        │   │   │   ├── BaseCriteriaDialog.tsx # вікно: дерево ліворуч / набір праворуч (мобільний — одне під одним), вхід з «Налаштування» → «AI-аналіз»
+        │   │   │   ├── CategoryTree.tsx     # дерево: пошук за назвою, згортання, позначка «є набір», «Оновити дерево категорій»
+        │   │   │   ├── BaseCriteriaPane.tsx # набір категорії: «Мінуси / Плюси», власні пункти (CriteriaList, CriteriaInputBar, об'єднання/видалення)
+        │   │   │   └── InheritedCriteriaList.tsx # розділ «Успадковано» (пункти предків, лише перегляд)
         │   │   ├── criteria/               # вікно «Плюси та мінуси» + вибір згенерованого (docs/plans/old/criteria-categories.md)
+        │   │   │   ├── BaseBadge.tsx        # бейдж «базовий» + підказка категорії-джерела (рядок вікна, чип майстра, «Успадковано»)
         │   │   │   ├── CriteriaManagerDialog.tsx # вікно: режим, фільтр, «в аналізі», об'єднання/видалення (монтувати лише відкритим)
         │   │   │   ├── CriteriaList.tsx     # розділи: категорії → окремі → «лише в оголошеннях», кожен за алфавітом
         │   │   │   ├── CriterionRow.tsx     # рядок: категорія з синонімами або пункт «лише в оголошеннях»
@@ -254,7 +270,7 @@ olx-dashboard/
         │   │   └── sections/
         │   │       ├── VisualSection.tsx      # секція "Візуальний вигляд" (тема, розширений опис)
         │   │       ├── AutoRefreshSection.tsx # секція "Автооновлення" (перемикач, інтервал)
-        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, рушій LLM/Jev, модель, поріг Jev, reasoning, додаткові критерії)
+        │   │       ├── AnalysisSection.tsx    # секція "AI-аналіз" (статус ключа, рушій LLM/Jev, модель, поріг Jev, reasoning, додаткові критерії, вхід у вікно «Базові плюси й мінуси»)
         │   │       └── ColumnsSection.tsx     # секція "Колонки таблиці" (перевпорядкування drag-and-drop, видимість колонок)
         │   ├── DescriptionDialog.tsx # модалка повного опису оголошення (фото/ціна/опис/посилання)
         │   ├── ConfirmActionDialog.tsx # узагальнена alertdialog-модалка підтвердження (видалення тощо)
@@ -306,8 +322,9 @@ olx-dashboard/
         │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
         │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (чипи = категорії, позначка «в аналізі», поглинання синонімів)
-        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»
+        │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»; useCriteriaCandidates — вибір згенерованого (і для базових наборів)
         │   │   ├── useCriteriaManager.ts # логіка вікна «Плюси та мінуси» (лічильники з кешу, PUT/remap)
+        │   │   ├── useBaseCriteriaManager.ts # логіка набору категорії у вікні «Базові плюси й мінуси» — інтерфейс як у useCriteriaManager
         │   │   ├── useAnalysisMatching.ts # логіка кроку 2 (авто-аналіз, завантаження ZIP, імпорт)
         │   │   ├── useAnalysisReview.ts # логіка кроку 3 (перевірка збігів, overrides, експорт)
         │   │   └── useAnalysisCommit.ts # логіка кроку 4 (режими запису, запис у БД)
@@ -333,6 +350,7 @@ olx-dashboard/
             ├── array.ts          # chunk() — клієнтське чанкування запитів/записів
             ├── download.ts       # downloadBlob()/downloadText() — завантаження файлів (експорт, ручний пакет)
             ├── clipboard.ts      # copyToClipboard() — копіювання + toast «Скопійовано»
+            ├── olxCategoryTree.ts # дерево категорій OLX з плоского списку: індекс, предки, шлях, пошук, плаский показ
             ├── sort.ts           # sortAlpha() — алфавітне сортування (укр. колація, латиниця в кінці) для синонімів і критеріїв AI
             ├── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
             ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
@@ -360,7 +378,7 @@ olx-dashboard/
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
 | Локальні фільтри (`price_range`, `cities`, `sellers`, `categories`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx` (+ `local-filters/CategoryFilter.tsx`), `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
-| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/olxCategories.ts` (facet OLX → дерево назв) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: наших/OLX), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/old/category-counts-and-filter.md` |
+| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/graphql/categories.ts` (GraphQL `facets`) + `server/src/scraper/olxCategories.ts` (facet → дерево назв) + `server/src/categories/tree.ts` (`olx_categories`) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: наших/OLX), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/old/category-counts-and-filter.md` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner/runScan.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
 | Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner/analyzeScan.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/old/two-phase-deep-scan.md` |

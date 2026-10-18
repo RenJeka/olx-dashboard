@@ -17,6 +17,19 @@ const MAX_ATTEMPTS = 3;
 /** HTTP-статуси, які вважаємо тимчасовими й вартими повтору. */
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
+/** Заголовки POST-запиту до OLX GraphQL (спільні для сторінок пошуку й facet категорій). */
+export function graphqlHeaders(referer: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'Accept-Language': 'uk',
+    Origin: 'https://www.olx.ua',
+    Referer: referer,
+    'X-Client': 'DESKTOP',
+    'User-Agent': USER_AGENT,
+  };
+}
+
 export interface BuildParamsOptions {
   sortBy?: string;
   limit?: number;
@@ -116,15 +129,7 @@ export class GraphqlClient {
       try {
         res = await fetch(GRAPHQL_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'Accept-Language': 'uk',
-            Origin: 'https://www.olx.ua',
-            Referer: referer,
-            'X-Client': 'DESKTOP',
-            'User-Agent': USER_AGENT,
-          },
+          headers: graphqlHeaders(referer),
           body,
         });
       } catch (err) {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Badge, Button, Heading, HStack, Input, SegmentGroup, Stack, Text, Textarea } from '@chakra-ui/react';
-import { LuSparkles } from 'react-icons/lu';
+import { LuListTree, LuSparkles } from 'react-icons/lu';
 import { Switch } from '../../ui/switch';
 import { useAnalysisStatus } from '../../../api';
 import { useSettingsStore } from '../../../stores/settingsStore';
@@ -26,8 +26,16 @@ function clampThreshold(raw: string): number {
   return Math.round(clamped * 20) / 20;
 }
 
-/** Секція налаштувань «AI-аналіз»: статус ключа, рушій кроків 1–2, поріг Jev, модель, reasoning, додаткові критерії. */
-export function AnalysisSection() {
+interface Props {
+  /** Відкрити вікно «Базові плюси й мінуси» (панель налаштувань закривається). */
+  onOpenBaseCriteria: () => void;
+}
+
+/**
+ * Секція налаштувань «AI-аналіз»: статус ключа, рушій кроків 1–2, поріг Jev, модель, reasoning, додаткові критерії,
+ * вхід у вікно «Базові плюси й мінуси».
+ */
+export function AnalysisSection({ onOpenBaseCriteria }: Props) {
   const { data: status } = useAnalysisStatus();
   const analysisModel = useSettingsStore((s) => s.analysisModel);
   const setAnalysisModel = useSettingsStore((s) => s.setAnalysisModel);
@@ -150,6 +158,15 @@ export function AnalysisSection() {
           onBlur={() => setAnalysisExtraCriteria(localExtra)}
           placeholder="Напр.: звертай увагу на стан акумулятора, гарантію…"
         />
+      </Stack>
+
+      <Stack gap={1}>
+        <Button size="sm" variant="outline" alignSelf="flex-start" onClick={onOpenBaseCriteria}>
+          <LuListTree /> Базові плюси й мінуси
+        </Button>
+        <Text textStyle="xs" color="fg.subtle">
+          Набори для категорій OLX — їх успадковують усі пошуки категорії.
+        </Text>
       </Stack>
     </Stack>
   );

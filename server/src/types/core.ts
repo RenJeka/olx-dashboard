@@ -62,6 +62,11 @@ export interface SearchConfig {
   apiFilters: ApiFilters;
   /** Синоніми query (docs/plans/old/search-synonyms.md) — скануються разом, видача зливається по olx_id. */
   querySynonyms?: string[];
+  /**
+   * Автокатегорія на момент старту скану (`searches.base_category_id`, базові плюси/мінуси). Відома й скан
+   * не дав нових оголошень → фіналізація не перераховує її (зайвий GROUP BY по всіх оголошеннях у Turso).
+   */
+  baseCategoryId?: number | null;
 }
 
 /** Елемент відповіді GET /api/searches/:id/param-keys — для конструктора діапазонів локальних фільтрів. */
@@ -94,4 +99,23 @@ export interface FilterOptions {
   cons: string[];
   /** Дерево категорій OLX для пошуку (facet з останнього скану): назви + ієрархія + OLX-лічильники. */
   categories: CategoryOption[];
+}
+
+/** Елемент `metadata.facets.category[]` GraphQL OLX (docs/olx-api.md §2.11): `url` — слаг-шлях з повною ієрархією. */
+export interface FacetCategory {
+  id: number;
+  count: number;
+  label: string;
+  url: string;
+}
+
+/**
+ * Вузол глобального дерева категорій OLX (таблиця `olx_categories`).
+ * `slug` — власний слаг (останній сегмент шляху перед `/q-`); `parentId` null — корінь або предка не знайдено.
+ */
+export interface CategoryNode {
+  id: number;
+  parentId: number | null;
+  label: string;
+  slug: string;
 }

@@ -9,6 +9,8 @@ import {
   requestStopScan,
   isAnalysisFresh,
 } from '../scanner/index.js';
+import { refreshBaseCategory } from '../categories/tree.js';
+import { logWarn } from '../logger.js';
 import { recomputeFilteredOut } from '../scraper/refilter.js';
 import { parseBullets } from '../analysis/text.js';
 import type {
@@ -147,7 +149,16 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       if (req.body.local_filters === undefined) return search;
 
       const { filtered_out_count } = await recomputeFilteredOut(id);
-      return { ...(search as object), filtered_out_count };
+
+      // Білий список категорій міг змінитись → перераховуємо автокатегорію (збій не валить PATCH).
+      let freshSearch = search;
+      try {
+        await refreshBaseCategory(id);
+        freshSearch = await dbGet('SELECT * FROM searches WHERE id = ?', [id]);
+      } catch (err) {
+        logWarn('searches', 'base-category', err instanceof Error ? err.message : String(err), { searchId: id });
+      }
+      return { ...(freshSearch as object), filtered_out_count };
     },
   );
 

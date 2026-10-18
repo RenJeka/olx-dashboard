@@ -28,7 +28,8 @@ import {
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
 import { getSearch, loadListings } from '../../analysis/repo.js';
-import { enabledGroups, parseCriteriaConfig } from '../../analysis/criteria.js';
+import { resolveEffectiveCriteria } from '../../analysis/baseCriteria.js';
+import { enabledGroups } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';
 import { buildXlsxBuffer } from '../../export/xlsx.js';
 import { getLogger } from '../../logger.js';
@@ -53,8 +54,8 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    // Лише категорії з позначкою «в аналізі» (docs/plans/old/criteria-categories.md).
-    const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
+    // Лише категорії з позначкою «в аналізі» (docs/plans/old/criteria-categories.md); ефективні — базові + власні.
+    const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, req.body.mode);
     if (criteria.length === 0) {
       return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
     }
@@ -102,7 +103,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
 
-      const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), req.body.mode);
+      const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, req.body.mode);
       if (criteria.length === 0) {
         return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
@@ -140,8 +141,8 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
 
-    // Усі категорії режиму — для зведення синонімів до назви (вимкнені теж не шкодять).
-    const criteria = parseCriteriaConfig(search.analysis_criteria)[req.body.mode];
+    // Усі категорії режиму (базові + власні) — для зведення синонімів до назви (вимкнені теж не шкодять).
+    const criteria = (await resolveEffectiveCriteria(search)).config[req.body.mode];
     const listings = await loadListings(id, []);
     const descriptions = descriptionMap(listings);
 
