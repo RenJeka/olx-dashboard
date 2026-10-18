@@ -7,7 +7,7 @@ import type { InStatement } from '@libsql/client';
 import { dbAll, dbGet } from '../db/db.js';
 import type { AnalysisMode, CriterionGroup, LocalFilters } from '../types.js';
 import type { BaseDisabled } from './baseCriteria.js';
-import { phraseKey, planRemap, remapBullets, remapLocalFilters } from './criteria.js';
+import { cleanCriterion, phraseKey, planRemap, remapBullets, remapLocalFilters } from './criteria.js';
 
 /** Одне об'єднання/перейменування: формулювання `from` → `to` (null — видалити). */
 export interface RemapOp {
@@ -92,19 +92,46 @@ export function planRemapSteps(
 }
 
 /**
- * Власні пункти пошуку після remap базового пункту категорії: пункт, назва чи синонім якого збігається з `keys`
- * кроку перейменування/об'єднання, зливається в `to` (planRemap; стан «в аналізі» зберігається) — інакше він
- * воскрес би під старою назвою, коли базовий зникне. Кроки видалення (`to = null`) власних пунктів не чіпають:
- * пункт пошуку лишається (як і пункти в оголошеннях). Нічого не змінилось → той самий масив.
+ * Власні пункти пошуку після remap базового пункту категорії: пункт, назва якого збігається з `keys` кроку
+ * перейменування/об'єднання, зливається в `to` разом із синонімами (planRemap; стан «в аналізі» зберігається) —
+ * інакше він воскрес би під старою назвою, коли базовий зникне. Збіг лише синоніма перейменовує тільки цей синонім
+ * (сам пункт може бути поглинутий іншим базовим); `to`, що вже є в іншому пункті, синонімом не дублюється.
+ * Кроки видалення (`to = null`) власних пунктів не чіпають: пункт пошуку лишається (як і пункти в оголошеннях).
+ * Нічого не змінилось → той самий масив.
  */
 export function remapOwnGroups(groups: CriterionGroup[], steps: RemapStep[]): CriterionGroup[] {
   let next = groups;
   for (const step of steps) {
     if (step.to === null) continue;
-    const from = next.filter((g) => [g.name, ...g.aliases].some((p) => step.keys.has(phraseKey(p)))).map((g) => g.name);
+    const from = next.filter((g) => step.keys.has(phraseKey(g.name))).map((g) => g.name);
     if (from.length > 0) next = planRemap(next, from, step.to).groups;
+    next = renameAliases(next, step.keys, cleanCriterion(step.to));
   }
   return next;
+}
+
+/**
+ * Синоніми зі `keys` → `target` (один раз на весь список, без дублів у пункті). Пункт із назвою `target` (щойно
+ * злитий planRemap) не чіпається: стара назва лишається його синонімом. Без збігів → той самий масив.
+ */
+function renameAliases(groups: CriterionGroup[], keys: Set<string>, target: string): CriterionGroup[] {
+  const targetKey = phraseKey(target);
+  const isHit = (a: string) => keys.has(phraseKey(a)) && phraseKey(a) !== targetKey;
+  const touches = (g: CriterionGroup) => phraseKey(g.name) !== targetKey && g.aliases.some(isHit);
+  if (!groups.some(touches)) return groups;
+  let targetTaken = groups.some((g) => [g.name, ...g.aliases].some((p) => phraseKey(p) === targetKey));
+  return groups.map((g) => {
+    if (!touches(g)) return g;
+    const aliases: string[] = [];
+    for (const a of g.aliases) {
+      if (!isHit(a)) aliases.push(a);
+      else if (!targetTaken) {
+        aliases.push(target);
+        targetTaken = true;
+      }
+    }
+    return { ...g, aliases };
+  });
 }
 
 /** local_filters (JSON) → об'єкт; битий/порожній → `{}`. */

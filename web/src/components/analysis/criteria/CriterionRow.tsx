@@ -52,7 +52,7 @@ export function CriterionRow({
       <HStack gap={2} align="center">
         {base ? (
           // Місце під чекбокс лишається, щоб назви базових і власних пунктів стояли в одну лінію.
-          <Box w={4} flexShrink={0} />
+          <Box w={5} flexShrink={0} />
         ) : (
           <Checkbox checked={checked} onCheckedChange={onCheck} aria-label={`Обрати «${row.name}»`} />
         )}
