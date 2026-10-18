@@ -11,7 +11,7 @@ import {
   stripBaseCriteria,
 } from './baseCriteria.js';
 
-// Базові плюси/мінуси категорій (docs/plans/base-criteria.md, задача 4): злиття з власними пунктами пошуку.
+// Базові плюси/мінуси категорій (docs/plans/old/base-criteria.md, задача 4): злиття з власними пунктами пошуку.
 
 const group = (name: string, aliases: string[] = [], enabled = true): CriterionGroup => ({ name, aliases, enabled });
 const cfg = (cons: CriterionGroup[], pros: CriterionGroup[] = []): CriteriaConfig => ({ cons, pros });

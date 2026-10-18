@@ -36,7 +36,7 @@ export function CriterionRow({
   onAdd,
 }: Props) {
   const { group } = row;
-  // Базовий пункт (docs/plans/base-criteria.md): лише перемикач «в аналізі»; вибір, перейменування, видалення
+  // Базовий пункт (docs/plans/old/base-criteria.md): лише перемикач «в аналізі»; вибір, перейменування, видалення
   // і зміна синонімів — у вікні «Базові плюси й мінуси».
   const base = group?.base;
   return (

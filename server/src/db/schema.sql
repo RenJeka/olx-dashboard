@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS searches (
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
   project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
   base_category_id INTEGER,          -- автокатегорія пошуку для базових плюсів/мінусів (olx_categories.id); окремо від category_id; server/src/categories/tree.ts
-  base_disabled TEXT DEFAULT '{}',   -- JSON: вимкнені базові пункти пошуку (docs/plans/base-criteria.md)
+  base_disabled TEXT DEFAULT '{}',   -- JSON: вимкнені базові пункти пошуку (docs/plans/old/base-criteria.md)
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   sub_total INTEGER                  -- загальна кількість підпослідовності
 );
 
--- Глобальне дерево категорій OLX (docs/plans/base-criteria.md): накопичується зі скану пошуків
+-- Глобальне дерево категорій OLX (docs/plans/old/base-criteria.md): накопичується зі скану пошуків
 -- (facet GraphQL, docs/olx-api.md §2.11) і збирача. id збігається з listings.category_id.
 CREATE TABLE IF NOT EXISTS olx_categories (
   id INTEGER PRIMARY KEY,            -- OLX category.id
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS olx_categories (
   updated_at TEXT                    -- коли рядок вставлено/востаннє реально змінено
 );
 
--- Базові плюси/мінуси категорії (docs/plans/base-criteria.md): набір у форматі searches.analysis_criteria
+-- Базові плюси/мінуси категорії (docs/plans/old/base-criteria.md): набір у форматі searches.analysis_criteria
 -- (парс — server/src/analysis/criteria.ts). Пошук успадковує набори своєї автокатегорії й усіх її предків
 -- (server/src/analysis/baseCriteria.ts); поле `base` у пунктах сюди не пишеться.
 CREATE TABLE IF NOT EXISTS base_criteria (

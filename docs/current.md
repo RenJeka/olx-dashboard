@@ -17,15 +17,17 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній реліз — [2026-10-16 docs-audit](handoffs/2026-10-16-docs-audit.md): аудит документації й
-  `npm run db:copy-prod` (копія прод-БД у локальний файл), smoke ✅. Останній хендоф —
-  [2026-10-18 base-criteria-impl](handoffs/2026-10-18-base-criteria-impl.md). Модель і рушії AI — [ai-flow](ai-flow.md).
+- Останній реліз — 2026-10-18 базові плюси й мінуси за деревом категорій OLX
+  ([base-criteria](plans/old/base-criteria.md), правила — [business-rules](business-rules.md) §4): ручні тести локально й
+  на проді пройдено, smoke ✅. Останній хендоф — [2026-10-18 base-criteria-release](handoffs/2026-10-18-base-criteria-release.md).
+  Модель і рушії AI — [ai-flow](ai-flow.md).
 - AI на проді — авто-режим з 2026-10-17: `OPENROUTER_API_KEY` в API (окремий ключ з лімітом), кожна AI-кнопка
   платна ([deploy-render-turso](deploy-render-turso.md) → «Фактичний прод»).
 - Деплой обох сервісів — лише після зеленого CI на `main` (Auto-Deploy «After CI Checks Pass»); конфіг Render —
   [`render.yaml`](../render.yaml), еталон без Blueprint ([render-mcp-no-env](instructions/render-mcp-no-env.md)).
 - Бекапи прод-БД (гілки Turso, захищені від видалення): `olx-dashboard-bak-20260930` (+ SQL-дамп у теці ключів агента
-  на домашньому ПК, [secrets-in-sources](instructions/secrets-in-sources.md)) і `olx-dashboard-bak-20261011`.
+  на домашньому ПК, [secrets-in-sources](instructions/secrets-in-sources.md)), `olx-dashboard-bak-20261011` і
+  `olx-dashboard-bak-20261018` (перед релізом base-criteria).
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
   «Прод». GitHub — через `gh` на обох ПК ([github-cli](instructions/github-cli.md)); зливати PR після зеленого CI агент
   може, коли людина це дозволила в діалозі.
@@ -37,11 +39,8 @@
 
 ## Активні плани
 
-- [base-criteria](plans/base-criteria.md) — базові плюси й мінуси за деревом категорій OLX ([P-016](parking.md)); реалізовано на гілці
-  `feat/base-criteria`, PR відкрито, CI зелений, не злито. Порядок: людина проходить ручні test-cases L1–L9 локально →
-  реліз (злиття = деплой, лише з «так» людини) → П1–П3 на проді. Разова робота після релізу: заповнити дерево категорій
-  («Налаштування» → «AI-аналіз» → «Базові плюси й мінуси» → «Оновити дерево категорій») і базові набори. Відкладені
-  доробки — [P-019](parking.md); наступна ідея — аналіз «за 1 клік» ([P-018](parking.md)).
+Немає. Після base-criteria: доробки — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
+наступна ідея — аналіз «за 1 клік» ([P-018](parking.md)).
 
 ## Що враховувати
 
@@ -54,6 +53,8 @@
   категорії товарів.
 - Браузер агента (wmux): пункти меню «⋮» — лише клавіатурою ([wmux-browser-ark-menu](instructions/wmux-browser-ark-menu.md));
   панель у прихованому workspace — [wmux-browser-hidden-pane](instructions/wmux-browser-hidden-pane.md).
+- Автокатегорія пошуку (базові плюси й мінуси) — категорія OLX з найбільшою кількістю оголошень; засмічена видача хибить
+  («mac mini» → планшети Apple). Обхід — фільтр пошуку «Категорії» (категорія перераховується одразу); покращення — [P-020](parking.md).
 - Ручні test-cases для людини — [manual-test-cases](instructions/manual-test-cases.md); людина проходить їх сама,
   агент лише пише (рішення людини 2026-10-18).
 - План агентами з рецензентом без комітів — [sdd-without-commits](instructions/sdd-without-commits.md).
@@ -74,16 +75,14 @@
 
 ## Відкриті питання (чекають людину)
 
-- Базовий пункт видалили з категорії: колишній власний пункт пошуку з тією ж назвою зараз повертається (у стані, який
-  обрала людина) — лишити так чи прибирати разом із базовим ([base-criteria](plans/base-criteria.md), L7).
 - Ручні перевірки рушія Jev в UI — у примітках архівних планів [jev-model](plans/old/jev-model.md) (крок 2) і
   [jev-threshold-setting](plans/old/jev-threshold-setting.md) (test-case 3, платно).
 - Чи видаляти порожній старий файл `server/data/olx-bak-2026-10-16T12-28-23-237Z.db` (робочий ПК).
-- Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930` і `olx-dashboard-bak-20261011`.
+- Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930`, `olx-dashboard-bak-20261011` і `olx-dashboard-bak-20261018`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).
 
 ## Наступний крок
 
-Людина проходить локально ручні test-cases L1–L9 з [base-criteria](plans/base-criteria.md) (перед цим — `npm run dev`),
-агент розбирає результати й лагодить знайдене; далі — реліз за «так» людини.
+Наповнити базові плюси й мінуси основних категорій на проді («Налаштування» → «AI-аналіз» → «Базові плюси й мінуси» →
+категорія → «Згенерувати», платно); далі — P-019 чи P-020, що більше заважатиме.

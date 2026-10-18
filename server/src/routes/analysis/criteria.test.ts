@@ -190,7 +190,7 @@ describe('POST /criteria/group-suggest', () => {
   });
 });
 
-describe('базові плюси/мінуси категорії (docs/plans/base-criteria.md)', () => {
+describe('базові плюси/мінуси категорії (docs/plans/old/base-criteria.md)', () => {
   const BASE_ONLY = 'Базовий пункт змінюється у вікні «Базові плюси й мінуси»';
 
   async function withBase(disabled = '{}'): Promise<void> {

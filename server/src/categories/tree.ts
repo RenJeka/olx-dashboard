@@ -1,6 +1,6 @@
 /**
  * Глобальне дерево категорій OLX (таблиця `olx_categories`), що накопичується зі скану пошуків
- * і збирача (docs/plans/base-criteria.md).
+ * і збирача (docs/plans/old/base-criteria.md).
  */
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
 import type { CategoryNode, LocalFilters } from '../types.js';

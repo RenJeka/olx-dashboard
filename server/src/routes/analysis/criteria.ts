@@ -36,7 +36,7 @@ import type { CriteriaConfig } from '../../types.js';
 
 export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
   // Категорії критеріїв пошуку (docs/plans/old/criteria-categories.md; старий формат нормалізується) —
-  // ефективні: базові набори автокатегорії й предків + власні (docs/plans/base-criteria.md).
+  // ефективні: базові набори автокатегорії й предків + власні (docs/plans/old/base-criteria.md).
   app.get<{ Params: { id: string } }>('/api/searches/:id/criteria', async (req, reply) => {
     const search = await getSearch(Number(req.params.id));
     if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });

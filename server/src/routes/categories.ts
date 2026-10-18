@@ -1,4 +1,4 @@
-// API дерева категорій OLX і базових наборів (docs/plans/base-criteria.md).
+// API дерева категорій OLX і базових наборів (docs/plans/old/base-criteria.md).
 import type { InStatement } from '@libsql/client';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -116,7 +116,7 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
     return own;
   });
 
-  // Чернетка базового набору категорії від LLM (docs/plans/base-criteria.md). НЕ зберігає — людина переглядає й
+  // Чернетка базового набору категорії від LLM (docs/plans/old/base-criteria.md). НЕ зберігає — людина переглядає й
   // зберігає через PUT. У промпті лише шлях категорії та назви пунктів: «вже є» = власні + успадковані режиму,
   // «НЕ включай» = власні + успадковані протилежного. Відповідь: без наявних, без протилежних, ≤ BASE_CRITERIA_DRAFT.
   app.post<{

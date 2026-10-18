@@ -52,7 +52,7 @@ export interface CriterionGroup {
   aliases: string[];
   enabled: boolean;
   /**
-   * Базовий пункт категорії (docs/plans/base-criteria.md): звідки успадковано. Лише у відповідях API —
+   * Базовий пункт категорії (docs/plans/old/base-criteria.md): звідки успадковано. Лише у відповідях API —
    * на сервері не зберігається.
    */
   base?: CriterionBase;
@@ -67,7 +67,7 @@ export interface CriterionBase {
 /** Категорії критеріїв пошуку за режимом (searches.analysis_criteria). */
 export type CriteriaConfig = Record<AnalysisMode, CriterionGroup[]>;
 
-/** Автокатегорія пошуку: id і шлях від кореня (docs/plans/base-criteria.md). */
+/** Автокатегорія пошуку: id і шлях від кореня (docs/plans/old/base-criteria.md). */
 export interface CriteriaCategory {
   id: number;
   path: string[];
@@ -76,7 +76,7 @@ export interface CriteriaCategory {
 /** Відповідь GET/PUT /api/searches/:id/criteria: ефективні набори (базові + власні) + автокатегорія. */
 export type CriteriaResponse = CriteriaConfig & { category: CriteriaCategory | null };
 
-// ── Базові набори категорій OLX (docs/plans/base-criteria.md) ────────────────────
+// ── Базові набори категорій OLX (docs/plans/old/base-criteria.md) ────────────────────
 
 /** Вузол дерева категорій OLX (GET /api/categories) + чи є в нього непорожній базовий набір. */
 export interface OlxCategoryItem {

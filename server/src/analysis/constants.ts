@@ -55,7 +55,7 @@ export const MAX_ANALYZE_IDS = 200;
 export const MANUAL_ZIP_CHUNK_SIZE = 50;
 /** Ліміт критеріїв генерації (узгоджено з промптом): короткий список — менше повторів і перефразувань. */
 export const MAX_CRITERIA = 10;
-/** Скільки пунктів максимум пропонує чернетка базового набору категорії (docs/plans/base-criteria.md). */
+/** Скільки пунктів максимум пропонує чернетка базового набору категорії (docs/plans/old/base-criteria.md). */
 export const BASE_CRITERIA_DRAFT = 7;
 /** Ліміт синонімів пошукового запиту (docs/plans/old/search-synonyms.md, узгоджено з промптом). */
 export const MAX_SYNONYMS = 15;
@@ -151,7 +151,7 @@ export const ANALYSIS_ERRORS = {
   NO_API_KEY: 'Авто-режим недоступний: немає OPENROUTER_API_KEY',
   NO_CRITERIA: 'Спершу збережіть критерії пошуку',
   EMPTY_RESPONSE: 'Порожня відповідь',
-  /** Remap пошуку не чіпає базові пункти категорії (docs/plans/base-criteria.md). */
+  /** Remap пошуку не чіпає базові пункти категорії (docs/plans/old/base-criteria.md). */
   BASE_ITEM_READONLY: 'Базовий пункт змінюється у вікні «Базові плюси й мінуси»',
   /** Remap набору категорії: пункт належить предку — змінювати там. */
   BASE_ITEM_INHERITED: 'Пункт успадковано від батьківської категорії — змінюйте його там',

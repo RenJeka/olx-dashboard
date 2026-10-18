@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CriterionGroup } from '../types.js';
 import { remapOwnGroups } from './remap.js';
 
-// Власні пункти пошуку після remap базового пункту категорії (docs/plans/base-criteria.md, L6).
+// Власні пункти пошуку після remap базового пункту категорії (docs/plans/old/base-criteria.md, L6).
 
 const group = (name: string, aliases: string[] = [], enabled = true): CriterionGroup => ({ name, aliases, enabled });
 
