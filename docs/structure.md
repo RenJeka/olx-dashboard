@@ -140,7 +140,7 @@ olx-dashboard/
 │       │   ├── normalizer.ts   # upsert по olx_id; olx_status auto-disable; filtered_out; postedAt HTML-fallback через parseOlxDate; selectKnownOlxIds (для оцінки ~нових у двофазному deep-скані)
 │       │   ├── statusEngine.ts # applyScanStatuses(): вікно покриття, miss_count, auto-disable/reactivate (Етап 2)
 │       │   ├── refilter.ts     # recomputeFilteredOut(): перерахунок filtered_out після зміни local_filters (лише змінені рядки, порціями)
-│       │   ├── localFilters.ts # evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories local_filters (Етап 2; стоп-слова+ranges по params закомментовано)
+│       │   ├── localFilters.ts # parseLocalFilters() (єдиний парсер searches.local_filters) + evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories (Етап 2; стоп-слова+ranges по params закомментовано)
 │       │   ├── olxCategories.ts # facetToOptions/facetToNodes: чисті перетворення facet категорій OLX (olx-api.md §2.11) → CategoryOption[] / CategoryNode[]; facet тягне graphql/categories.ts, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/

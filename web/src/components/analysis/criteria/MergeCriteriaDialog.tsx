@@ -7,6 +7,8 @@ interface Props {
   onClose: () => void;
   /** «Об'єднати в категорію» (кілька) чи «Перейменувати» (одна). */
   title: string;
+  /** Підпис поля назви: у вікні «Базові плюси й мінуси» «категорія» читається як категорія OLX. */
+  nameLabel?: string;
   /** Обрані формулювання. */
   names: string[];
   /** Синоніми обраних категорій — теж перейдуть у нову. */
@@ -26,7 +28,17 @@ function suggestName(names: string[]): string {
  * Діалог об'єднання/перейменування: назва категорії (можна взяти будь-яку з обраних або ввести нову),
  * решта формулювань стає синонімами; у зачеплених оголошеннях пункти перейменовуються.
  */
-export function MergeCriteriaDialog({ portalRef, onClose, title, names, aliases, affected, pending, onConfirm }: Props) {
+export function MergeCriteriaDialog({
+  portalRef,
+  onClose,
+  title,
+  nameLabel = 'Назва категорії',
+  names,
+  aliases,
+  affected,
+  pending,
+  onConfirm,
+}: Props) {
   const [name, setName] = useState(() => (names.length === 1 ? (names[0] ?? '') : suggestName(names)));
 
   const trimmed = name.trim();
@@ -56,7 +68,7 @@ export function MergeCriteriaDialog({ portalRef, onClose, title, names, aliases,
     >
       <Stack gap={3}>
         <Field.Root>
-          <Field.Label>Назва категорії</Field.Label>
+          <Field.Label>{nameLabel}</Field.Label>
           <Input
             size="sm"
             value={name}

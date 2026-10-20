@@ -37,7 +37,7 @@ import { buildChunkListings, buildMatchingPrompt, type ChunkListing, type Prompt
 import { buildRelevancePrompt, parseRelevanceResponse, prefilterCandidates } from './analysis/relevance.js';
 import { parseBullets } from './analysis/text.js';
 import type { AnalysisMode, CriterionGroup } from './types.js';
-import { enabledGroups, parseCriteriaConfig } from './analysis/criteria.js';
+import { enabledGroups, parseCriteriaConfig, serializeCriteriaConfig } from './analysis/criteria.js';
 
 // ── Вхід ───────────────────────────────────────────────────────────────────────
 
@@ -61,6 +61,7 @@ interface Sample {
     query: string;
     relevance_target: string | null;
     query_synonyms: string | null;
+    /** Ефективний список на момент вивантаження: базові набори автокатегорії + власні (старі вибірки — лише власні). */
     analysis_criteria: string | null;
   };
   listings: SampleListing[];
@@ -248,14 +249,24 @@ function buildDisputes(
  */
 async function exportSample(searchId: number, limit: number, out: string): Promise<void> {
   const { dbAll, dbGet } = await import('./db/db.js');
-  const search = await dbGet<Sample['search']>(
-    'SELECT id, query, relevance_target, query_synonyms, analysis_criteria FROM searches WHERE id = ?',
+  const { resolveEffectiveCriteria } = await import('./analysis/baseCriteria.js');
+  const row = await dbGet<Sample['search'] & { base_category_id: number | null; base_disabled: string | null }>(
+    `SELECT id, query, relevance_target, query_synonyms, analysis_criteria, base_category_id, base_disabled
+       FROM searches WHERE id = ?`,
     [searchId],
   );
-  if (!search) {
+  if (!row) {
     console.error(`Пошук #${searchId} не знайдено`);
     process.exit(1);
   }
+  // У вибірку — ефективний список критеріїв (як в аналізі), а не лише власні пункти пошуку.
+  const search: Sample['search'] = {
+    id: row.id,
+    query: row.query,
+    relevance_target: row.relevance_target,
+    query_synonyms: row.query_synonyms,
+    analysis_criteria: serializeCriteriaConfig((await resolveEffectiveCriteria(row)).config),
+  };
   const listings = await dbAll<SampleListing>(
     `SELECT id, title, description, params, ai_relevant, ai_relevant_source, cons, pros, analysis_source, url
        FROM listings WHERE search_id = ?

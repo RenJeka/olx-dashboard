@@ -25,7 +25,6 @@ import { excludeOppositeCriteria, parseCriteriaResponse } from '../analysis/pars
 import { buildBaseCriteriaPrompt } from '../analysis/prompts.js';
 import {
   filterActive,
-  parseLocalFilters,
   parseRemapOps,
   planRemapSteps,
   remapBaseDisabled,
@@ -37,6 +36,7 @@ import { SEED_WORDS } from '../categories/seedWords.js';
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
 import { logError } from '../logger.js';
 import { isAnyScanRunning } from '../scanner/abortControl.js';
+import { parseLocalFilters } from '../scraper/localFilters.js';
 import { recomputeFilteredOut } from '../scraper/refilter.js';
 import type { CategoryNode, CriteriaConfig, CriterionGroup } from '../types.js';
 
@@ -147,7 +147,8 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
         reasoning: req.body.reasoning,
       });
       const taken = new Set(existing.flatMap((g) => [g.name, ...g.aliases]).map(phraseKey));
-      const fresh = parseCriteriaResponse(raw).filter((c) => !taken.has(phraseKey(c)));
+      // Без ліміту парсера: наявні пункти на початку відповіді не мають скорочувати чернетку.
+      const fresh = parseCriteriaResponse(raw, Infinity).filter((c) => !taken.has(phraseKey(c)));
       return { criteria: excludeOppositeCriteria(fresh, opposite).slice(0, BASE_CRITERIA_DRAFT) };
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : String(err) });

@@ -4,8 +4,10 @@ import {
   excludeOppositeCriteria,
   mergeResults,
   parseGroupSuggestions,
+  parseCriteriaResponse,
   parseMatchingResponse,
 } from './parse.js';
+import { MAX_CRITERIA } from './constants.js';
 import { parseRelevanceResponse, prefilterCandidates } from './relevance.js';
 
 describe('parseMatchingResponse — анти-галюцинація evidence', () => {
@@ -214,5 +216,16 @@ describe('parseGroupSuggestions — групи за аспектом', () => {
     expect(parse({ items: [] })).toEqual([]);
     expect(parse({ items: [null, 'x', { criterion: 1 }, item('б/в стан', 'стан'), item('експлуатований', 'стан')] })).toHaveLength(1);
     expect(() => parseGroupSuggestions('не json', groups)).toThrow();
+  });
+});
+
+describe('parseCriteriaResponse — ліміт пунктів', () => {
+  const many = JSON.stringify(Array.from({ length: MAX_CRITERIA + 5 }, (_, i) => `пункт ${i + 1}`));
+
+  it('типово — не більше MAX_CRITERIA; явний ліміт — свій; дублі й порожні не рахуються', () => {
+    expect(parseCriteriaResponse(many)).toHaveLength(MAX_CRITERIA);
+    expect(parseCriteriaResponse(many, 3)).toEqual(['пункт 1', 'пункт 2', 'пункт 3']);
+    expect(parseCriteriaResponse(many, Infinity)).toHaveLength(MAX_CRITERIA + 5);
+    expect(parseCriteriaResponse('["а", "А", " ", "б"]', 2)).toEqual(['а', 'б']);
   });
 });

@@ -1,7 +1,6 @@
 import type { InStatement } from '@libsql/client';
 import { dbAll, dbBatchChunked, dbGet } from '../db/db.js';
-import { evaluateFilteredOut, type FilterableListing } from './localFilters.js';
-import type { LocalFilters } from '../types.js';
+import { evaluateFilteredOut, parseLocalFilters, type FilterableListing } from './localFilters.js';
 
 type RefilterRow = FilterableListing & { id: number; filtered_out: number };
 
@@ -18,12 +17,7 @@ export async function recomputeFilteredOut(
     'SELECT local_filters FROM searches WHERE id = ?',
     [searchId],
   );
-  let localFilters: LocalFilters = {};
-  try {
-    localFilters = JSON.parse(filtersRow?.local_filters || '{}') as LocalFilters;
-  } catch {
-    localFilters = {};
-  }
+  const localFilters = parseLocalFilters(filtersRow?.local_filters);
 
   const rows = await dbAll<RefilterRow>(
     // Лише поля активних правил: опис/назва/params великого пошуку — десятки МБ із Turso (S16).

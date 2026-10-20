@@ -1,8 +1,8 @@
 import type { InStatement } from '@libsql/client';
 import { dbAll, dbBatchChunked, dbGet } from '../db/db.js';
-import { evaluateFilteredOut } from './localFilters.js';
+import { evaluateFilteredOut, parseLocalFilters } from './localFilters.js';
 import { parseOlxDate } from './dateParser.js';
-import type { RawListing, NormalizedPrice, ScanResult, LocalFilters } from '../types.js';
+import type { RawListing, NormalizedPrice, ScanResult } from '../types.js';
 
 /**
  * Нормалізує сирий рядок ціни OLX.
@@ -280,12 +280,7 @@ export async function upsertListings(
   const localFiltersRow = await dbGet<{ local_filters: string }>(SEARCH_LOCAL_FILTERS_SQL, [
     searchId,
   ]);
-  let localFilters: LocalFilters = {};
-  try {
-    localFilters = JSON.parse(localFiltersRow?.local_filters || '{}') as LocalFilters;
-  } catch {
-    localFilters = {};
-  }
+  const localFilters = parseLocalFilters(localFiltersRow?.local_filters);
 
   const existingMap = await loadExistingByOlxId(raw.map((r) => r.olxId));
 

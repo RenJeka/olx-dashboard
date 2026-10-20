@@ -66,9 +66,9 @@ export function excludeOppositeCriteria(criteria: string[], opposite: CriterionG
 
 /**
  * Парс відповіді генерації критеріїв: приймає масив рядків АБО {criteria:[...]}.
- * Нормалізує, дедуплікує (case-insensitive), відкидає порожні, обрізає до MAX_CRITERIA.
+ * Нормалізує, дедуплікує (case-insensitive), відкидає порожні, обрізає до `limit` (типово MAX_CRITERIA).
  */
-export function parseCriteriaResponse(raw: string): string[] {
+export function parseCriteriaResponse(raw: string, limit = MAX_CRITERIA): string[] {
   let data: unknown;
   try {
     data = JSON.parse(extractJson(raw));
@@ -95,7 +95,7 @@ export function parseCriteriaResponse(raw: string): string[] {
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(norm);
-    if (result.length >= MAX_CRITERIA) break;
+    if (result.length >= limit) break;
   }
   return result;
 }

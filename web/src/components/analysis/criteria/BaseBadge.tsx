@@ -19,7 +19,16 @@ interface Props {
 /** Бейдж «базовий» (docs/plans/old/base-criteria.md): вікно «Плюси та мінуси», крок 1 майстра, базові набори. */
 export function BaseBadge({ base, size = 'sm', tooltip = true, showSource = false }: Props) {
   const badge = (
-    <Badge size={size} colorPalette="accent" variant="subtle" flexShrink={0} maxW="200px">
+    <Badge
+      size={size}
+      colorPalette="accent"
+      variant="subtle"
+      flexShrink={0}
+      maxW="200px"
+      // Фокус з клавіатури (Tab) відкриває підказку; без власної підказки (чип майстра — кнопка) не фокусується.
+      tabIndex={tooltip ? 0 : undefined}
+      focusVisibleRing="outside"
+    >
       <Text as="span" truncate>
         {showSource ? base.label : 'базовий'}
       </Text>

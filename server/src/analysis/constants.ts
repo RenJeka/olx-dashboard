@@ -55,6 +55,8 @@ export const MAX_ANALYZE_IDS = 200;
 export const MANUAL_ZIP_CHUNK_SIZE = 50;
 /** Ліміт критеріїв генерації (узгоджено з промптом): короткий список — менше повторів і перефразувань. */
 export const MAX_CRITERIA = 10;
+/** Запобіжник ручного імпорту критеріїв (`/criteria/import`): вставлену відповідь не обрізаємо до `MAX_CRITERIA`. */
+export const MAX_IMPORTED_CRITERIA = 50;
 /** Скільки пунктів максимум пропонує чернетка базового набору категорії (docs/plans/old/base-criteria.md). */
 export const BASE_CRITERIA_DRAFT = 7;
 /** Ліміт синонімів пошукового запиту (docs/plans/old/search-synonyms.md, узгоджено з промптом). */

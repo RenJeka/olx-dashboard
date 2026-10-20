@@ -3,7 +3,8 @@
  * і збирача (docs/plans/old/base-criteria.md).
  */
 import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
-import type { CategoryNode, LocalFilters } from '../types.js';
+import { parseLocalFilters } from '../scraper/localFilters.js';
+import type { CategoryNode } from '../types.js';
 
 /** Розмір чанка id у `SELECT … WHERE id IN (…)` (ліміт SQLite на змінні). */
 const SELECT_CHUNK = 400;
@@ -119,12 +120,7 @@ export async function refreshBaseCategory(searchId: number): Promise<number | nu
   );
   if (!search) return null;
 
-  let filters: LocalFilters = {};
-  try {
-    filters = JSON.parse(search.local_filters || '{}') as LocalFilters;
-  } catch {
-    filters = {};
-  }
+  const filters = parseLocalFilters(search.local_filters);
   const listed = Array.isArray(filters.categories) ? filters.categories : [];
   const inverted = filters.invert?.categories === true;
 

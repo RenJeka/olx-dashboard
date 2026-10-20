@@ -130,6 +130,7 @@ export function BaseCriteriaPane({ categoryId, initialMode, onModeChange, portal
           portalRef={portalRef}
           onClose={() => setSub(null)}
           title={sub.kind === 'rename' ? 'Перейменувати пункт' : "Об'єднати пункти"}
+          nameLabel="Назва пункту"
           names={sub.names}
           aliases={subAliases}
           affected={m.affectedCount(sub.names)}
