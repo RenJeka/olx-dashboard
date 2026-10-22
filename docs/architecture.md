@@ -406,8 +406,9 @@ flowchart LR
   перемикачі шуму), і в `useAnalysisScope` (обсяг AI-аналізу). Жодного persist (in-memory).
 - `utils/listingVisibility.ts` — ЄДИНЕ джерело правди видимості рядка: `passesNoiseFilters` (перемикачі
   відфільтрованих/нерелевантних), `isAiPickCandidate` (предикат вкладки «Найкращі кандидати»),
-  `isListingVisible` (вкладка + шум). Цим самим предикатом керується і таблиця, і лічильники вкладок,
-  і scope майстра — тому «число в дужках вкладки» завжди = «скільки піде в AI-аналіз».
+  `isListingVisible` (вкладка + шум), `previewHideReason` (прев'ю незбережених локальних фільтрів у
+  шухляді «Локальні фільтри» поверх `passesNoiseFilters`). Цим самим предикатом керується і таблиця,
+  і лічильники вкладок, і scope майстра — тому «число в дужках вкладки» завжди = «скільки піде в AI-аналіз».
 - `stores/analysisWizardStore.ts` — Zustand-стор `useAnalysisWizardStore`: прогрес AI-Flow
   (`mode`, `scope: 'selected'|'all'|'tab'`, `step`, `available`, `selected: Set<string>`,
   `customInput`, `accumulated`, `includedOverrides: Map<string,boolean>`), `boundSearchId`,
@@ -519,6 +520,11 @@ flowchart LR
   - `SearchFiltersDrawer.tsx` — Drawer редактора `local_filters`: діапазон цін (`Input` мін/макс),
     місто і продавець — `NativeSelect` (варіанти з `useFilterOptions`) + `Tag.Root` chips з
     видаленням. «Зберегти» → `useUpdateSearchFilters()` → toast з `filtered_out_count`.
+    Прев'ю незбережених фільтрів — у пам'яті через `previewHideReason` (`utils/listingVisibility.ts`):
+    «Всього» = скільки покаже таблиця (підказка — у базі / приховано нерелевантних / приховано
+    фільтрами); число біля категорії в `local-filters/CategoryFilter.tsx` = скільки покаже таблиця,
+    якщо обрати цю категорію (ті самі фільтри без групи «Категорії», `withoutCategoryFilter`), тож без
+    обраних категорій сума коренів + «Без категорії» + «Інші категорії» = «Всього»; число OLX — у підказці.
     Стоп-слова й діапазони params — закомментовано, заплановано на майбутнє.
   - `SearchVariantsDialog.tsx`, `SearchEditDialog.tsx` — без змін логіки, лише перенесені сюди.
   - Спільні парсери `searches.local_filters`/`query_synonyms` винесено в

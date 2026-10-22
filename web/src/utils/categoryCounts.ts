@@ -3,7 +3,9 @@ import type { CategoryOption, Listing } from '../types';
 /**
  * Лічильники категорій рахуються В ПАМ'ЯТІ з уже завантаженого масиву listings —
  * 0 додаткових запитів до БД (фронт і так тримає всі оголошення пошуку).
- * Див. docs/plans/old/category-counts-and-filter.md (відповідь на питання «скільки зчитувань»).
+ * Масив сюди приходить УЖЕ відфільтрований (видимі в таблиці без урахування фільтра категорій —
+ * `previewHideReason` + `withoutCategoryFilter`), тож без обраних категорій сума коренів +
+ * «Без категорії» + «Інші категорії» = «Всього». Див. docs/plans/category-filter-counts.md.
  */
 
 /** Вузол дерева категорій для фільтра (один сегмент шляху). */
@@ -18,8 +20,8 @@ export interface CategoryTreeNode {
   id: number;
   /** Усі category id, що проходять через цей вузол (сам + нащадки) — для вибору «вся гілка». */
   leafIds: number[];
-  /** Скільки оголошень У НАШІЙ БД у цьому вузлі та підкатегоріях (сума по leafIds). */
-  localCount: number;
+  /** Скільки оголошень покаже таблиця, якщо обрати цей вузол (сума по leafIds з переданого масиву). */
+  shownCount: number;
   /** Лічильник OLX для цього вузла (включно з підкатегоріями — як віддає facet). */
   olxCount: number;
   children: CategoryTreeNode[];
@@ -43,10 +45,21 @@ export function countUncategorized(listings: Listing[]): number {
 }
 
 /**
+ * Скільки оголошень мають категорію, якої немає в дереві фільтра (дерево — кешований facet OLX за
+ * основним запитом). Обрати їх у дереві не можна, але в «Всього» без обраних категорій вони входять.
+ */
+export function countOutsideTree(listings: Listing[], options: CategoryOption[]): number {
+  const treeIds = new Set(options.map((o) => o.id));
+  let n = 0;
+  for (const l of listings) if (l.category_id != null && !treeIds.has(l.category_id)) n++;
+  return n;
+}
+
+/**
  * Будує дерево категорій із facet-списку `CategoryOption` (шлях назв + OLX-лічильник) і
- * локального `countMap` (listings.category_id → к-сть). Для кожного вузла:
+ * `countMap` (listings.category_id → к-сть). Для кожного вузла:
  * - `olxCount` — власний лічильник facet (вже включає підкатегорії, як віддає OLX);
- * - `localCount` — сума наших оголошень у вузлі та всіх підкатегоріях (по `leafIds`).
+ * - `shownCount` — сума оголошень з `countMap` у вузлі та всіх підкатегоріях (по `leafIds`).
  * Дочірні вузли сортуються за спаданням OLX-лічильника, тоді за назвою.
  */
 export function buildCategoryTree(
@@ -64,7 +77,7 @@ export function buildCategoryTree(
       prefix = prefix ? `${prefix} / ${seg}` : seg;
       let node = nodeByKey.get(prefix);
       if (!node) {
-        node = { key: prefix, label: seg, depth, id: 0, leafIds: [], localCount: 0, olxCount: 0, children: [] };
+        node = { key: prefix, label: seg, depth, id: 0, leafIds: [], shownCount: 0, olxCount: 0, children: [] };
         nodeByKey.set(prefix, node);
         siblings.push(node);
       }
@@ -81,7 +94,7 @@ export function buildCategoryTree(
   const finalize = (nodes: CategoryTreeNode[]): void => {
     for (const n of nodes) {
       n.leafIds = [...new Set(n.leafIds)];
-      n.localCount = n.leafIds.reduce((sum, id) => sum + (countMap.get(id) ?? 0), 0);
+      n.shownCount = n.leafIds.reduce((sum, id) => sum + (countMap.get(id) ?? 0), 0);
       finalize(n.children);
     }
   };

@@ -57,6 +57,22 @@ export function evaluateLocalFilters(f: LocalFilters, l: Listing): boolean {
   return false;
 }
 
+/**
+ * Ті самі фільтри без групи «Категорії» — база лічильників дерева категорій: число біля вузла
+ * показує, скільки рядків лишиться, якщо обрати саме його (фільтр категорій сам себе не враховує).
+ */
+export function withoutCategoryFilter(f: LocalFilters): LocalFilters {
+  const rest: LocalFilters = { ...f };
+  delete rest.categories;
+  if (rest.invert) {
+    const invert = { ...rest.invert };
+    delete invert.categories;
+    if (Object.keys(invert).length > 0) rest.invert = invert;
+    else delete rest.invert;
+  }
+  return rest;
+}
+
 /** Чи має пошук активні локальні фільтри (індикатор-крапка у рядку пошуку). */
 export function hasActiveLocalFilters(raw: string): boolean {
   const f = parseLocalFilters(raw);

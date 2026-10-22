@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Stack, Button, HStack, Icon, Text } from '@chakra-ui/react';
 import { LuLayers } from 'react-icons/lu';
 import {
@@ -13,17 +14,17 @@ import {
 import { Tooltip } from '../ui/tooltip';
 import { toaster } from '../ui/toaster';
 import { useFilterOptions, useUpdateSearchFilters, useListings } from '../../api';
-import { buildLocalFiltersPayload, evaluateLocalFilters } from '../../utils/localFilters';
+import { buildLocalFiltersPayload, withoutCategoryFilter } from '../../utils/localFilters';
 import { parsePriceRange, formatPriceRange } from '../../utils/format';
 import { useLocalFiltersForm } from '../../hooks/useLocalFiltersForm';
 import { useListingsUiStore } from '../../stores/listingsUiStore';
-import { passesNoiseFilters } from '../../utils/listingVisibility';
+import { previewHideReason } from '../../utils/listingVisibility';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../constants';
 import { DRAWER_SIZE } from '../../theme';
 import { PriceFilter } from './local-filters/PriceFilter';
 import { TagsFilter } from './local-filters/TagsFilter';
 import { CategoryFilter } from './local-filters/CategoryFilter';
-import type { Search } from '../../types';
+import type { Listing, LocalFilters, Search } from '../../types';
 
 interface Props {
   search: Search;
@@ -57,7 +58,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
     toggleCategories,
   } = useLocalFiltersForm(open ? search.local_filters : '');
 
-  // Контекст для пояснення розриву «наших / OLX» у фільтрі категорій.
+  // Контекст для підказки OLX-числа у фільтрі категорій (чим видача OLX відрізняється від нашої).
   const priceRange = parsePriceRange(search.api_filters);
   const priceFilterLabel = priceRange ? formatPriceRange(priceRange.from, priceRange.to) : null;
   let synonymCount = 0;
@@ -70,20 +71,50 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
 
   // Зведений лічильник «Всього» — скільки оголошень покаже таблиця з ПОТОЧНИМИ (незбереженими)
   // локальними фільтрами + перемикачами «показати приховані/нерелевантні». Вкладка статусу не
-  // враховується (це = майбутнє число вкладки «Всі»). Рахується в пам'яті з завантажених listings.
+  // враховується (це = майбутнє число вкладки «Всі»). Рахується в пам'яті з завантажених listings
+  // тим самим предикатом, що й таблиця (previewHideReason → passesNoiseFilters).
   const { data: listings } = useListings(open ? search.id : null);
   const showFilteredOut = useListingsUiStore((s) => s.showFilteredOut);
   const showIrrelevant = useListingsUiStore((s) => s.showIrrelevant);
-  const previewFilters = buildLocalFiltersPayload(state);
-  const shownTotal = (listings ?? []).reduce((n, l) => {
-    // Прев'ю незбережених фільтрів накладаємо як синтетичний filtered_out, далі — той самий
-    // предикат шуму, що й таблиця (єдине джерело видимості, CLAUDE.md): якщо passesNoiseFilters
-    // зміниться, цей лічильник лишиться узгодженим з реальною таблицею.
-    const previewListing = { ...l, filtered_out: evaluateLocalFilters(previewFilters, l) ? 1 : 0 };
-    return passesNoiseFilters(previewListing, showFilteredOut, showIrrelevant) ? n + 1 : n;
-  }, 0);
-  const totalTooltip =
-    'Скільки оголошень покаже таблиця з цими фільтрами (враховано перемикачі «показати приховані/нерелевантні»). Поточну вкладку статусу не враховано.';
+  // Стан форми — новий об'єкт щорендеру; ключ JSON тримає useMemo стабільним між рендерами.
+  const previewKey = JSON.stringify(buildLocalFiltersPayload(state));
+  const preview = useMemo(() => {
+    const filters = JSON.parse(previewKey) as LocalFilters;
+    const categoryBase = withoutCategoryFilter(filters);
+    const shownIgnoringCategories: Listing[] = [];
+    let shown = 0;
+    let hiddenIrrelevant = 0;
+    let hiddenByFilters = 0;
+    for (const l of listings ?? []) {
+      const reason = previewHideReason(l, filters, showFilteredOut, showIrrelevant);
+      if (reason === null) shown++;
+      else if (reason === 'irrelevant') hiddenIrrelevant++;
+      else hiddenByFilters++;
+      // База дерева категорій: ті самі фільтри без групи «Категорії» (вона сама себе не враховує).
+      if (previewHideReason(l, categoryBase, showFilteredOut, showIrrelevant) === null) {
+        shownIgnoringCategories.push(l);
+      }
+    }
+    return { total: listings?.length ?? 0, shown, hiddenIrrelevant, hiddenByFilters, shownIgnoringCategories };
+  }, [listings, previewKey, showFilteredOut, showIrrelevant]);
+
+  const totalTooltip = (
+    <Stack gap={1} maxW="64">
+      <Text textStyle="xs">Скільки оголошень покаже таблиця з цими фільтрами.</Text>
+      <Stack gap={0.5} fontVariantNumeric="tabular-nums">
+        <Text textStyle="xs">У базі: {preview.total.toLocaleString('uk')}</Text>
+        <Text textStyle="xs">
+          Приховано нерелевантних (AI): {preview.hiddenIrrelevant.toLocaleString('uk')}
+        </Text>
+        <Text textStyle="xs">
+          Приховано локальними фільтрами: {preview.hiddenByFilters.toLocaleString('uk')}
+        </Text>
+      </Stack>
+      <Text textStyle="xs" color="fg.subtle">
+        Враховано перемикачі «показати приховані / нерелевантні»; поточну вкладку статусу — ні.
+      </Text>
+    </Stack>
+  );
 
   function handleSave() {
     const local_filters = buildLocalFiltersPayload(state);
@@ -118,27 +149,28 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
             <Tooltip content={totalTooltip} openDelay={150} closeDelay={80} positioning={{ placement: 'bottom' }}>
               <HStack
                 as="span"
-                gap={1.5}
-                px={2.5}
-                py={1}
-                borderRadius="full"
-                bg="bg.muted"
+                gap={2}
+                px={3}
+                py={1.5}
+                borderRadius="lg"
+                bg="accent.subtle"
                 borderWidth="1px"
-                borderColor="border.subtle"
+                borderColor="accent.muted"
                 cursor="help"
                 flexShrink={0}
               >
-                <Icon as={LuLayers} boxSize={3.5} color="fg.muted" />
-                <Text textStyle="xs" color="fg.muted">
+                <Icon as={LuLayers} boxSize={4} color="accent.fg" />
+                <Text textStyle="sm" color="fg.muted">
                   Всього
                 </Text>
                 <Text
-                  textStyle="sm"
+                  textStyle="xl"
                   fontWeight="bold"
                   color="accent.fg"
+                  lineHeight="1"
                   fontVariantNumeric="tabular-nums"
                 >
-                  {shownTotal.toLocaleString('uk')}
+                  {preview.shown.toLocaleString('uk')}
                 </Text>
               </HStack>
             </Tooltip>
@@ -156,7 +188,7 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
             />
 
             <CategoryFilter
-              searchId={search.id}
+              listings={preview.shownIgnoringCategories}
               categories={filterOptions?.categories ?? []}
               selectedIds={state.categories}
               isInverted={state.categoriesInvert}

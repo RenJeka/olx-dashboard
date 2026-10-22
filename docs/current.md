@@ -40,8 +40,8 @@
 
 ## Активні плани
 
-- [category-filter-counts](plans/category-filter-counts.md) — зрозумілі лічильники у фільтрі «Категорії» (сума = «Всього»,
-  OLX і розбивка — у підказках, «Згорнути / розгорнути все»); рішення людини прийнято, код не почато.
+Немає. [category-filter-counts](plans/old/category-filter-counts.md) ✅ (2026-10-22) — код і ручні test-cases готові,
+гілка `feat/category-filter-counts` → PR у `main` (злиття = деплой).
 
 Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
@@ -90,5 +90,5 @@
 
 ## Наступний крок
 
-Реалізувати [category-filter-counts](plans/category-filter-counts.md) (кроки 1–6) у гілці від `main`; перевірка — пошук
-«mac mini» на локальній копії проду.
+Злити PR [#81](https://github.com/RenJeka/olx-dashboard/pull/81) (доки закриття 2026-10-22), потім PR гілки
+`feat/category-filter-counts` ([category-filter-counts](plans/old/category-filter-counts.md)); після деплою — `npm run smoke`.
