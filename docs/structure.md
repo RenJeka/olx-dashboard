@@ -208,7 +208,7 @@ olx-dashboard/
         │   │   ├── SearchFiltersDrawer.tsx # Drawer "Фільтри пошуку" (обгортка)
         │   │   ├── local-filters/          # компоненти локальних фільтрів
         │   │   │   ├── CollapsibleFilter.tsx # згортувана секція фільтра (шапка + перемикач інверсії)
-        │   │   │   ├── CategoryFilter.tsx  # фільтр категорій (дерево наших/OLX)
+        │   │   │   ├── CategoryFilter.tsx  # фільтр категорій (дерево: скільки покаже таблиця; OLX — у підказці)
         │   │   │   ├── PriceFilter.tsx     # фільтр діапазону цін
         │   │   │   └── TagsFilter.tsx      # універсальний фільтр тегів (міста, продавці, плюси/мінуси)
         │   │   ├── SearchEditDialog.tsx    # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/old/search-row-edit.md)
@@ -343,7 +343,7 @@ olx-dashboard/
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
-            ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
+            ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible/previewHideReason) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
             ├── aiScope.ts        # єдине джерело обсягу AI (AiScope all/tab/selected/candidates, getScopeIds/Counts, getDefaultScope, buildScopeLabel)
             ├── storage.ts        # збереження/завантаження стану сортування та розмірів колонок таблиці у localStorage
             ├── text.ts           # escapeRegExp() — спільне для HighlightText та підсвітки evidence
@@ -353,7 +353,7 @@ olx-dashboard/
             ├── olxCategoryTree.ts # дерево категорій OLX з плоского списку: індекс, предки, шлях, пошук, плаский показ
             ├── sort.ts           # sortAlpha() — алфавітне сортування (укр. колація, латиниця в кінці) для синонімів і критеріїв AI
             ├── search.ts         # локальний пошук зі спецсимволами && / || / ! (matchesQuery/toHighlightQuery)
-            ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters() — парсинг searches.local_filters (SearchFiltersDrawer, SearchRow)
+            ├── localFilters.ts   # parseLocalFilters()/hasActiveLocalFilters()/evaluateLocalFilters()/withoutCategoryFilter() — парсинг і прев'ю searches.local_filters (SearchFiltersDrawer, SearchRow)
             ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
             ├── relevance.ts      # чисті функції для AI-фільтра (getEffectiveRelevanceIds, getRelevanceStats)
             ├── searchStats.ts    # computeListingStats() — клієнтський аналог агрегату /stats (in_db/stale/verify) з масиву listings, щоб не робити 408-рядковий прохід на сервері (docs/plans/old/turso-stats-clientside.md)
@@ -378,7 +378,7 @@ olx-dashboard/
 | Налаштування вигляду (тема, видимість колонок) | `web/src/components/settings/SettingsDrawer.tsx` (із секціями в `settings/sections/`), `web/src/App.tsx` (стан), `web/src/utils/storage.ts` (localStorage), `TOGGLEABLE_COLUMNS` у `web/src/components/table/columns.tsx` |
 | Статуси оголошень (вікно покриття, `miss_count`, `olx_status`-disable, ручний override) | `server/src/scraper/statusEngine.ts`, `server/src/scraper/normalizer.ts`, `docs/olx-monitor-spec.md` §6 |
 | Локальні фільтри (`price_range`, `cities`, `sellers`, `categories`, `filtered_out`) | `server/src/scraper/localFilters.ts`, `web/src/components/searches/SearchFiltersDrawer.tsx` (+ `local-filters/CategoryFilter.tsx`), `web/src/utils/localFilters.ts`, `GET /api/searches/:id/filter-options` |
-| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/graphql/categories.ts` (GraphQL `facets`) + `server/src/scraper/olxCategories.ts` (facet → дерево назв) + `server/src/categories/tree.ts` (`olx_categories`) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: наших/OLX), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/old/category-counts-and-filter.md` |
+| Категорії/підкатегорії з лічильниками + фільтр | `server/src/scraper/graphql/categories.ts` (GraphQL `facets`) + `server/src/scraper/olxCategories.ts` (facet → дерево назв) + `server/src/categories/tree.ts` (`olx_categories`) + `searches.category_facet` (кеш) + `listings.category_id` (локальні лічильники/фільтр), `web/src/utils/categoryCounts.ts` + `web/src/hooks/useCategoryTree.ts` (дерево: скільки покаже таблиця; OLX — у підказці), `web/src/components/searches/local-filters/CategoryFilter.tsx`, `docs/plans/old/category-counts-and-filter.md` |
 | Інлайн-едіт статусу/нотатки/плюсів, масові дії, фільтри таблиці | `web/src/components/table/StatusCell.tsx`, `NoteCell.tsx`, `ProsConsCell.tsx`, `BulkActionBar.tsx`, `ListingsFilterBar.tsx` |
 | Глибокий скан / прогрес сканування | `server/src/scanner/runScan.ts`, `web/src/components/searches/SearchActionPanel.tsx`, `GET /api/searches/:id/scan-status` |
 | Двофазний deep-скан (аналіз → звіт → підтверджений запуск, перевикористання плану) | `server/src/scraper/graphql/fetcher.ts` (`analyzeSplit`/`scanFromPlan`), `server/src/scanner/analyzeScan.ts` (`analyzeScan`/`runDeepScanFromPlan`), `POST /api/searches/:id/scan/analyze`/`/scan/run-plan`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/ScanPlanReportDialog.tsx` + `docs/plans/old/two-phase-deep-scan.md` |

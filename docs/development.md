@@ -73,7 +73,7 @@ curl -s -o /dev/null -w "%{http_code}\n" localhost:3001/api/logs
 - **Копія проду локально** — `npm run db:copy-prod` (план [db-copy-prod](plans/old/db-copy-prod.md)): з Turso лише
   SELECT, кожен рядок читається один раз; пише в `server/data/olx.db`, попередній файл → `olx-bak-<час>.db`.
   Запускає людина: `npm run dev` зупинено, у **новому** вікні PowerShell задати `$env:PROD_DB_URL`
-  (`libsql://…`) і `$env:PROD_DB_TOKEN` (токен лише для читання з дашборду Turso), після копії вікно закрити.
+  (`libsql://…`) і `$env:PROD_DB_TOKEN` (Read-Only токен **бази**, не API-токен акаунта — [turso-db-token-vs-api-token](instructions/turso-db-token-vs-api-token.md)), після копії вікно закрити.
   Окремі імена змінних (не `TURSO_*`) — щоб `npm run dev` у тому ж вікні не пішов у прод.
 - **Turso** — `AGENTS.md` → «Turso-економія»; заміри — скіл `turso-reads-playbook`.
 - Секрети — `AGENTS.md` → «Безпека»; поводження — `docs/instructions/secrets-in-sources.md`.

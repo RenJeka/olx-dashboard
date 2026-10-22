@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { LuChevronDown, LuChevronRight } from 'react-icons/lu';
+import { useState, type ReactNode } from 'react';
+import { Box, Button, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { LuChevronDown, LuChevronRight, LuChevronsDownUp, LuChevronsUpDown } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
@@ -9,47 +9,77 @@ import { useCategoryTree } from '../../../hooks/useCategoryTree';
 import { nodeCheckedState, type CategoryTreeNode } from '../../../utils/categoryCounts';
 import { pluralUk } from '../../../utils/format';
 import { LOCAL_FILTER_DESCRIPTIONS } from '../../../constants';
-import type { CategoryOption } from '../../../types';
+import type { CategoryOption, Listing } from '../../../types';
 
 /** Відступ на рівень вкладеності дерева категорій (rem). */
 const TREE_INDENT_REM = 1.25;
 
 interface Props {
-  searchId: number;
+  /**
+   * Оголошення, які покаже таблиця з поточними фільтрами БЕЗ групи «Категорії» (рахує
+   * SearchFiltersDrawer) — база лічильників дерева.
+   */
+  listings: Listing[];
   categories: CategoryOption[];
   /** Обрані листові category_id. */
   selectedIds: number[];
   isInverted: boolean;
-  /** Підпис фільтра ціни пошуку (для пояснення розриву наших/OLX). null — фільтр не задано. */
+  /** Підпис фільтра ціни пошуку (для підказки OLX-числа). null — фільтр не задано. */
   priceFilterLabel: string | null;
-  /** Кількість синонімів запиту (для пояснення розриву наших/OLX). */
+  /** Кількість синонімів запиту (для підказки OLX-числа). */
   synonymCount: number;
   /** Додати/прибрати набір листових id (вибір цілої гілки чи листа). */
   onToggle: (ids: number[], checked: boolean) => void;
   onInvertChange: (val: boolean) => void;
 }
 
-/** Парний лічильник «наших / OLX» біля вузла — синє число (наших) + приглушене (OLX). */
-function CountChip({ node }: { node: CategoryTreeNode }) {
-  const hasLocal = node.localCount > 0;
+/** Ключі всіх вузлів-гілок дерева (з дітьми) — для «Згорнути все». */
+function collectBranchKeys(nodes: CategoryTreeNode[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.children.length === 0) continue;
+    out.push(n.key);
+    collectBranchKeys(n.children, out);
+  }
+  return out;
+}
+
+/** Лічильник біля вузла: скільки покаже таблиця, якщо обрати вузол; OLX-число — у підказці. */
+function CountChip({ node, olxHint }: { node: CategoryTreeNode; olxHint: ReactNode }) {
+  const content = (
+    <Stack gap={1} maxW="60">
+      {/* Інший колір, ніж у числа рядка (accent), — щоб не плутати число OLX з числом «у таблиці». */}
+      <Text textStyle="xs">
+        На OLX:{' '}
+        <Text as="span" color="orange.fg" fontWeight="bold" fontVariantNumeric="tabular-nums">
+          {node.olxCount.toLocaleString('uk')}
+        </Text>
+      </Text>
+      {olxHint}
+    </Stack>
+  );
   return (
-    <HStack
-      gap={1}
-      flexShrink={0}
-      fontVariantNumeric="tabular-nums"
-      lineHeight="1"
-      alignItems="baseline"
+    <Tooltip
+      content={content}
+      openDelay={150}
+      closeDelay={80}
+      showArrow
+      lazyMount
+      unmountOnExit
+      positioning={{ placement: 'left' }}
     >
-      <Text textStyle="sm" fontWeight="semibold" color={hasLocal ? 'accent.fg' : 'fg.subtle'}>
-        {node.localCount.toLocaleString('uk')}
+      <Text
+        as="span"
+        flexShrink={0}
+        textStyle="sm"
+        fontWeight="semibold"
+        fontVariantNumeric="tabular-nums"
+        lineHeight="1"
+        cursor="help"
+        color={node.shownCount > 0 ? 'accent.fg' : 'fg.subtle'}
+      >
+        {node.shownCount.toLocaleString('uk')}
       </Text>
-      <Text textStyle="xs" color="fg.subtle" aria-hidden>
-        /
-      </Text>
-      <Text textStyle="xs" color="fg.subtle">
-        {node.olxCount.toLocaleString('uk')}
-      </Text>
-    </HStack>
+    </Tooltip>
   );
 }
 
@@ -57,12 +87,13 @@ interface RowProps {
   node: CategoryTreeNode;
   collapsed: Set<string>;
   selected: Set<number>;
+  olxHint: ReactNode;
   onToggleCollapse: (key: string) => void;
   onToggle: (ids: number[], checked: boolean) => void;
 }
 
 /** Рядок дерева категорій: chevron (для гілок) + чекбокс + назва + лічильник; рекурсивно діти. */
-function CategoryRow({ node, collapsed, selected, onToggleCollapse, onToggle }: RowProps) {
+function CategoryRow({ node, collapsed, selected, olxHint, onToggleCollapse, onToggle }: RowProps) {
   const hasChildren = node.children.length > 0;
   const isCollapsed = collapsed.has(node.key);
 
@@ -104,7 +135,7 @@ function CategoryRow({ node, collapsed, selected, onToggleCollapse, onToggle }: 
               </Text>
             </Checkbox>
           </HStack>
-          <CountChip node={node} />
+          <CountChip node={node} olxHint={olxHint} />
         </HStack>
       </Box>
 
@@ -116,6 +147,7 @@ function CategoryRow({ node, collapsed, selected, onToggleCollapse, onToggle }: 
             node={child}
             collapsed={collapsed}
             selected={selected}
+            olxHint={olxHint}
             onToggleCollapse={onToggleCollapse}
             onToggle={onToggle}
           />
@@ -125,12 +157,13 @@ function CategoryRow({ node, collapsed, selected, onToggleCollapse, onToggle }: 
 }
 
 /**
- * Фільтр категорій: згортуване дерево «категорія → підкатегорія» з парним лічильником
- * «наших / OLX» біля кожного вузла. «наших» рахується в пам'яті (useCategoryTree), «OLX» —
- * з кешованого facet. Вибір вузла = вибір усіх category_id під ним; між групами фільтрів — AND.
+ * Фільтр категорій: згортуване дерево «категорія → підкатегорія» з лічильником біля кожного вузла —
+ * скільки оголошень покаже таблиця, якщо обрати цей вузол (решта фільтрів і перемикачі шуму
+ * враховані, фільтр категорій — ні; рахує useCategoryTree). Число OLX (кешований facet) — у підказці.
+ * Вибір вузла = вибір усіх category_id під ним; між групами фільтрів — AND.
  */
 export function CategoryFilter({
-  searchId,
+  listings,
   categories,
   selectedIds,
   isInverted,
@@ -139,7 +172,7 @@ export function CategoryFilter({
   onToggle,
   onInvertChange,
 }: Props) {
-  const { tree, uncategorized } = useCategoryTree(searchId, categories);
+  const { tree, uncategorized, outsideTree } = useCategoryTree(listings, categories);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleCollapse = (key: string) =>
@@ -163,25 +196,28 @@ export function CategoryFilter({
   }
 
   const selected = new Set(selectedIds);
+  const branchKeys = collectBranchKeys(tree);
+  // Хоч одна гілка розгорнута → кнопка згортає все; усі згорнуті → розгортає.
+  const anyExpanded = branchKeys.some((key) => !collapsed.has(key));
+  const toggleAll = () => setCollapsed(anyExpanded ? new Set(branchKeys) : new Set());
 
-  const oursTooltip = (
-    <Stack gap={1} maxW="60">
-      <Text textStyle="xs">
-        Якщо число <b>менше</b> за OLX — це вплив фільтра ціни{' '}
-        {priceFilterLabel ? `(${priceFilterLabel})` : '(не задано)'}.
-      </Text>
-      <Text textStyle="xs">
-        Якщо <b>більше</b> — це вплив синонімів ({synonymCount}{' '}
-        {pluralUk(synonymCount, ['синонім', 'синоніми', 'синонімів'])}).
-      </Text>
-    </Stack>
+  const olxHint = (
+    <Text textStyle="xs" color="fg.subtle">
+      Про число OLX: жива видача за основним запитом — без фільтра ціни пошуку{' '}
+      {priceFilterLabel ? `(${priceFilterLabel})` : '(не задано)'} і без синонімів ({synonymCount}{' '}
+      {pluralUk(synonymCount, ['синонім', 'синоніми', 'синонімів'])}).
+    </Text>
   );
 
-  const olxTooltip = (
-    <Stack gap={1} maxW="60">
-      <Text textStyle="xs">Без фільтра ціни і синонімів.</Text>
+  const countTooltip = (
+    <Stack gap={1} maxW="64">
+      <Text textStyle="xs">
+        Скільки оголошень покаже таблиця, якщо обрати цю категорію: враховано решту фільтрів (ціна, місто,
+        продавець, плюси, мінуси) і перемикачі «показати приховані / нерелевантні».
+      </Text>
+      <Text textStyle="xs">Без обраних категорій сума верхніх рядків = «Всього».</Text>
       <Text textStyle="xs" color="fg.subtle">
-        Жива видача OLX за основним запитом.
+        Число на OLX — у підказці при наведенні на число.
       </Text>
     </Stack>
   );
@@ -206,26 +242,35 @@ export function CategoryFilter({
           : LOCAL_FILTER_DESCRIPTIONS.categories.normal}
       </Text>
 
-      {/* Легенда парного числа біля рядків — вирівняна по правому краю на рівні чисел. */}
+      {/* Легенда над деревом: «Згорнути / розгорнути все» ліворуч, підпис колонки чисел праворуч. */}
       <HStack
-        justify="flex-end"
-        gap={1.5}
+        justify="space-between"
+        gap={3}
         pr={1.5}
         pb={1.5}
-        textStyle="2xs"
-        color="fg.subtle"
         borderBottomWidth="1px"
         borderColor="border.subtle"
       >
-        <Tooltip content={oursTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
-          <Box as="span" color="accent.fg" fontWeight="semibold" cursor="help" textDecoration="underline" textDecorationStyle="dotted" textUnderlineOffset="2px">
-            наших
-          </Box>
-        </Tooltip>
-        <Text aria-hidden>/</Text>
-        <Tooltip content={olxTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
-          <Box as="span" cursor="help" textDecoration="underline" textDecorationStyle="dotted" textUnderlineOffset="2px">
-            на OLX
+        {branchKeys.length > 0 ? (
+          <Button size="2xs" variant="ghost" color="fg.muted" onClick={toggleAll}>
+            <Icon as={anyExpanded ? LuChevronsDownUp : LuChevronsUpDown} boxSize={3.5} />
+            {anyExpanded ? 'Згорнути все' : 'Розгорнути все'}
+          </Button>
+        ) : (
+          <Box />
+        )}
+        <Tooltip content={countTooltip} openDelay={150} closeDelay={80} showArrow positioning={{ placement: 'top' }}>
+          <Box
+            as="span"
+            textStyle="2xs"
+            color="accent.fg"
+            fontWeight="semibold"
+            cursor="help"
+            textDecoration="underline"
+            textDecorationStyle="dotted"
+            textUnderlineOffset="2px"
+          >
+            у таблиці
           </Box>
         </Tooltip>
       </HStack>
@@ -237,6 +282,7 @@ export function CategoryFilter({
             node={node}
             collapsed={collapsed}
             selected={selected}
+            olxHint={olxHint}
             onToggleCollapse={toggleCollapse}
             onToggle={onToggle}
           />
@@ -245,7 +291,13 @@ export function CategoryFilter({
 
       {uncategorized > 0 && (
         <Text textStyle="2xs" color="fg.subtle">
-          Без категорії: {uncategorized} (заповняться при наступному скані).
+          Без категорії: {uncategorized.toLocaleString('uk')} (заповняться при наступному скані).
+        </Text>
+      )}
+      {outsideTree > 0 && (
+        <Text textStyle="2xs" color="fg.subtle">
+          Інші категорії: {outsideTree.toLocaleString('uk')} (їх немає в дереві OLX за основним запитом,
+          тож обрати їх тут не можна).
         </Text>
       )}
       </Stack>
