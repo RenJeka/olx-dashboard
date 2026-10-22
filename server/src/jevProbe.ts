@@ -11,7 +11,8 @@ import { criterionKey, listingState } from './analysis/jev.js';
 import { resolveCriteriaThreshold, runJevMatching } from './analysis/jevEngine.js';
 import { toPromptListing } from './analysis/promptData.js';
 import { buildChunkListings } from './analysis/prompts.js';
-import { aliasMap, enabledGroups, parseCriteriaConfig, phraseKey } from './analysis/criteria.js';
+import { resolveEffectiveCriteria, type SearchCriteriaRow } from './analysis/baseCriteria.js';
+import { aliasMap, enabledGroups, phraseKey } from './analysis/criteria.js';
 import { parseBullets, stripHtml } from './analysis/text.js';
 import { dbAll, dbGet } from './db/db.js';
 
@@ -67,16 +68,17 @@ async function main(): Promise<void> {
     console.error('Немає OPENROUTER_API_KEY у server/.env — Jev недоступний.');
     process.exit(1);
   }
-  const search = await dbGet<{ query: string; analysis_criteria: string | null }>(
-    'SELECT query, analysis_criteria FROM searches WHERE id = ?',
+  const search = await dbGet<SearchCriteriaRow & { query: string }>(
+    'SELECT query, analysis_criteria, base_category_id, base_disabled FROM searches WHERE id = ?',
     [searchId],
   );
   if (!search) {
     console.error(`Пошук #${searchId} не знайдено`);
     process.exit(1);
   }
-  // Категорії «в аналізі»; --no-aliases — питання лише з назвою (порівняння з «назва + приклади»).
-  const criteria = enabledGroups(parseCriteriaConfig(search.analysis_criteria), mode);
+  // Категорії «в аналізі» (базові + власні, як в аналізі); --no-aliases — питання лише з назвою
+  // (порівняння з «назва + приклади»).
+  const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, mode);
   const withAliases = !process.argv.includes('--no-aliases');
   const threshold = resolveCriteriaThreshold(arg('threshold') === undefined ? undefined : Number(arg('threshold')));
   // Пункт збереженого аналізу → назва категорії (старі прогони могли писати синонім).

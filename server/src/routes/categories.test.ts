@@ -329,6 +329,13 @@ describe('POST /api/categories/:id/criteria/generate', () => {
     expect(await dbAll('SELECT category_id, criteria FROM base_criteria ORDER BY category_id')).toEqual(before);
   });
 
+  it('наявні на початку відповіді не скорочують чернетку: обрізання — після фільтра', async () => {
+    const fresh = ['п1', 'п2', 'п3', 'п4', 'п5', 'п6', 'п7', 'п8'];
+    chatMock.mockResolvedValue(reply(['Не працює', 'не вмикається', 'розбитий екран', 'Коробка', ...fresh]));
+    const res = await generate(80, { mode: 'cons' });
+    expect(res.json()).toEqual({ criteria: fresh.slice(0, 7) });
+  });
+
   it('відсіює наявні (власні, успадковані, синоніми) і пункти протилежного режиму', async () => {
     chatMock.mockResolvedValue(reply(['Не працює', 'не вмикається', 'розбитий екран', 'Коробка', 'немає зарядки']));
     const res = await generate(80, { mode: 'cons' });

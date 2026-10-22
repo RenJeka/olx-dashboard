@@ -5,6 +5,7 @@
  */
 import type { InStatement } from '@libsql/client';
 import { dbAll, dbGet } from '../db/db.js';
+import { parseLocalFilters } from '../scraper/localFilters.js';
 import type { AnalysisMode, CriterionGroup, LocalFilters } from '../types.js';
 import type { BaseDisabled } from './baseCriteria.js';
 import { cleanCriterion, phraseKey, planRemap, remapBullets, remapLocalFilters } from './criteria.js';
@@ -132,15 +133,6 @@ function renameAliases(groups: CriterionGroup[], keys: Set<string>, target: stri
     }
     return { ...g, aliases };
   });
-}
-
-/** local_filters (JSON) → об'єкт; битий/порожній → `{}`. */
-export function parseLocalFilters(text: string | null | undefined): LocalFilters {
-  try {
-    return JSON.parse(text || '{}') as LocalFilters;
-  } catch {
-    return {};
-  }
 }
 
 /** Чи є у фільтрі правило режиму «мінуси/плюси» (тоді remap може змінити, кого ховає фільтр). */

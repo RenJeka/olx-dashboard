@@ -5,6 +5,7 @@ import {
   ANALYSIS_ERRORS,
   DEFAULT_MODEL,
   DEFAULT_SAMPLE_SIZE,
+  MAX_IMPORTED_CRITERIA,
   OPPOSITE_MODE,
   isMode,
 } from '../../analysis/constants.js';
@@ -21,16 +22,11 @@ import {
 import { parseCriteriaConfig, phraseKey, serializeCriteriaConfig } from '../../analysis/criteria.js';
 import { chat } from '../../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse, parseGroupSuggestions } from '../../analysis/parse.js';
-import {
-  filterActive,
-  parseLocalFilters,
-  parseRemapOps,
-  planRemapSteps,
-  remapListingStatements,
-} from '../../analysis/remap.js';
+import { filterActive, parseRemapOps, planRemapSteps, remapListingStatements } from '../../analysis/remap.js';
 import { buildCriteriaPrompt, buildGroupingPrompt, pickSample } from '../../analysis/prompts.js';
 import { getSearch, loadListings } from '../../analysis/repo.js';
 import { dbBatchChunked, dbGet, dbRun } from '../../db/db.js';
+import { parseLocalFilters } from '../../scraper/localFilters.js';
 import { recomputeFilteredOut } from '../../scraper/refilter.js';
 import type { CriteriaConfig } from '../../types.js';
 
@@ -137,7 +133,8 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Парс вставленої відповіді LLM з критеріями (ручний). НЕ зберігає.
+  // Парс вставленої відповіді LLM з критеріями (ручний). НЕ зберігає. Ліміт — MAX_IMPORTED_CRITERIA (людина
+  // могла попросити більше, ніж MAX_CRITERIA генерації).
   app.post<{ Params: { id: string }; Body: { mode?: string; raw?: string } }>(
     '/api/searches/:id/criteria/import',
     async (req, reply) => {
@@ -145,7 +142,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
       if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
       if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
       try {
-        return { criteria: parseCriteriaResponse(req.body.raw) };
+        return { criteria: parseCriteriaResponse(req.body.raw, MAX_IMPORTED_CRITERIA) };
       } catch (err) {
         return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
       }

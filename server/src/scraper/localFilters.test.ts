@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateFilteredOut, type FilterableListing } from './localFilters.js';
+import { evaluateFilteredOut, parseLocalFilters, type FilterableListing } from './localFilters.js';
 
 const listing = (overrides: Partial<FilterableListing> = {}): FilterableListing => ({
   title: 'iPhone 13',
@@ -51,5 +51,20 @@ describe('evaluateFilteredOut', () => {
   it('групи комбінуються через AND: достатньо однієї, що ховає', () => {
     const f = { cities: ['Київ'], price_range: { max: 5000 } };
     expect(evaluateFilteredOut(f, listing({ city: 'Київ', price: 10000 }))).toBe(true);
+  });
+});
+
+describe('parseLocalFilters', () => {
+  it('JSON → обʼєкт; порожній, null, битий JSON чи не обʼєкт → {}', () => {
+    expect(parseLocalFilters('{"cons":["подряпини"],"invert":{"cons":true}}')).toEqual({
+      cons: ['подряпини'],
+      invert: { cons: true },
+    });
+    expect(parseLocalFilters('')).toEqual({});
+    expect(parseLocalFilters(null)).toEqual({});
+    expect(parseLocalFilters(undefined)).toEqual({});
+    expect(parseLocalFilters('{битий')).toEqual({});
+    expect(parseLocalFilters('null')).toEqual({});
+    expect(parseLocalFilters('[1,2]')).toEqual({});
   });
 });

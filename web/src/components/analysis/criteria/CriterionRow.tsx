@@ -3,7 +3,7 @@ import { LuPencil, LuPlus, LuTrash2, LuX } from 'react-icons/lu';
 import { Checkbox } from '../../ui/checkbox';
 import { Switch } from '../../ui/switch';
 import { Tooltip } from '../../ui/tooltip';
-import { BaseBadge } from './BaseBadge';
+import { BaseBadge, baseHint } from './BaseBadge';
 import { sortAlpha } from '../../../utils/sort';
 import type { CriterionRowData } from '../../../hooks/analysis/useCriteriaManager';
 
@@ -94,6 +94,18 @@ export function CriterionRow({
           </Tooltip>
         )}
       </HStack>
+      {base && (
+        // Підказку бейджа дотиком не відкрити — на пристроях без наведення миші категорія-джерело видна рядком.
+        <Text
+          textStyle="xs"
+          color="fg.muted"
+          pl={8}
+          display="none"
+          css={{ '@media (hover: none)': { display: 'block' } }}
+        >
+          {baseHint(base)}
+        </Text>
+      )}
       {group && group.aliases.length > 0 && (
         <Wrap gap={1} pl={8}>
           {sortAlpha(group.aliases).map((a) => (

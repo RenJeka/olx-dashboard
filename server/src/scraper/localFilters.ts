@@ -32,6 +32,16 @@ export interface FilterableListing {
 //   return Number.isNaN(value) ? null : value;
 // }
 
+/** `searches.local_filters` (JSON) → об'єкт; порожній, битий чи не об'єкт → `{}` (єдиний парсер сервера). */
+export function parseLocalFilters(text: string | null | undefined): LocalFilters {
+  try {
+    const parsed: unknown = JSON.parse(text || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as LocalFilters) : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Оцінює, чи оголошення підпадає під локальні фільтри пошуку (filtered_out=1).
  *

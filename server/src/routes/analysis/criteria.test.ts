@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, dbAll, dbGet } from '../../db/db.js';
+import { MAX_CRITERIA } from '../../analysis/constants.js';
 import { createSearch, insertListing, resetDb } from '../../test/db.js';
 import { criteriaRoutes } from './criteria.js';
 
@@ -109,6 +110,21 @@ describe('POST /api/searches/:id/criteria/remap', () => {
     expect((await remap({ mode: 'cons', from: [], to: 'x' })).statusCode).toBe(400);
     expect((await remap({ mode: 'cons', from: ['без торгу'], to: '  ' })).statusCode).toBe(400);
     expect((await remap({ mode: 'other', from: ['без торгу'], to: 'x' })).statusCode).toBe(400);
+  });
+});
+
+describe('POST /criteria/import', () => {
+  it('вставлена відповідь довша за MAX_CRITERIA не обрізається; нічого не зберігає', async () => {
+    const items = Array.from({ length: MAX_CRITERIA + 5 }, (_, i) => `пункт ${i + 1}`);
+    const before = await searchRow();
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/searches/${searchId}/criteria/import`,
+      payload: { mode: 'cons', raw: JSON.stringify({ criteria: items }) },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ criteria: items });
+    expect(await searchRow()).toEqual(before);
   });
 });
 

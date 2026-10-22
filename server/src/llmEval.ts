@@ -9,7 +9,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hasApiKey } from './analysis/config.js';
 import { AUTO_CHUNK_SIZE, DEFAULT_MODEL, DEFAULT_SAMPLE_SIZE, OPPOSITE_MODE, isMode } from './analysis/constants.js';
-import { enabledGroups, parseCriteriaConfig } from './analysis/criteria.js';
+import { resolveEffectiveCriteria } from './analysis/baseCriteria.js';
+import { enabledGroups } from './analysis/criteria.js';
 import {
   buildReport,
   contextAround,
@@ -67,7 +68,8 @@ async function run(): Promise<void> {
 
   const search = await getSearch(searchId);
   if (!search) throw new Error(`Пошук ${searchId} не знайдено`);
-  const config = parseCriteriaConfig(search.analysis_criteria);
+  // Ефективний список (базові набори автокатегорії + власні) — як в аналізі.
+  const { config } = await resolveEffectiveCriteria(search);
   const listings = await loadListings(searchId, []);
   const genSample = pickSample(listings, DEFAULT_SAMPLE_SIZE).map((l) => l.description ?? '');
   const matchSample = pickSample(listings, listingsN);
