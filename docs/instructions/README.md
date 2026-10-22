@@ -16,6 +16,7 @@ AI) сюди не дублюється — вона в документах із
 | [render-env-change-redeploys](render-env-change-redeploys.md) | Змінюєш env сервісу на Render |
 | [openrouter-management-key](openrouter-management-key.md) | AI-дія падає з `OpenRouter HTTP 401 User not found` або створюєш новий ключ OpenRouter |
 | [turso-create-branch-timeout](turso-create-branch-timeout.md) | Turso MCP `create_branch` повернув таймаут |
+| [turso-db-token-vs-api-token](turso-db-token-vs-api-token.md) | `npm run db:copy-prod` падає з `401` або людина створює токен для читання прод-БД |
 | [absolute-paths-for-user](absolute-paths-for-user.md) | Даєш людині шлях до файлу в інструкції |
 | [manual-test-cases](manual-test-cases.md) | Пишеш ручні test-cases, які людина проходитиме в UI |
 | [prod-scan-monitoring](prod-scan-monitoring.md) | Людина запустила довгий скан на проді, треба стежити, чи доживає і чим закінчився |

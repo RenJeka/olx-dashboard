@@ -26,6 +26,9 @@ source: хендоф 2026-09-30-stability-harness-access; сесія 2026-10-01 
 
 - Закрити чужий/зайвий PR (`gh pr close`) auto-mode агента блокує як запис у зовнішню систему — дати людині
   команду `! gh pr close <N> --comment "…"` (префікс `!` запускає її в сесії).
+- Злити PR у `main` (`gh pr merge`) auto-mode блокує як «Production Deploy» навіть після «так» людини в діалозі —
+  дати людині `! gh pr merge <N> --merge` (або кнопку «Create a merge commit» на сторінці PR); далі агент сам
+  підтягує `main`, перевіряє деплой Render і запускає `npm run smoke`.
 
 ## Чого не робити
 - Не пробувати GitHub MCP-плагін (`plugin:engineering:github`) через OAuth: «Incompatible auth server:

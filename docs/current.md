@@ -17,9 +17,10 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній реліз — 2026-10-18 базові плюси й мінуси за деревом категорій OLX
-  ([base-criteria](plans/old/base-criteria.md), правила — [business-rules](business-rules.md) §4): ручні тести локально й
-  на проді пройдено, smoke ✅. Останній хендоф — [2026-10-18 base-criteria-release](handoffs/2026-10-18-base-criteria-release.md).
+- Останній реліз — 2026-10-22 технічні доробки базових плюсів і мінусів
+  ([base-criteria-polish](plans/old/base-criteria-polish.md), частина [P-019](parking.md)): ручні тести пройдено, smoke ✅.
+  Базові плюси й мінуси (2026-10-18, [base-criteria](plans/old/base-criteria.md), правила — [business-rules](business-rules.md) §4)
+  на проді наповнено людиною. Останній хендоф — [2026-10-22 base-criteria-polish-release](handoffs/2026-10-22-base-criteria-polish-release.md).
   Модель і рушії AI — [ai-flow](ai-flow.md).
 - AI на проді — авто-режим з 2026-10-17: `OPENROUTER_API_KEY` в API (окремий ключ з лімітом), кожна AI-кнопка
   платна ([deploy-render-turso](deploy-render-turso.md) → «Фактичний прод»).
@@ -39,8 +40,11 @@
 
 ## Активні плани
 
-Немає. Після base-criteria: доробки — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
-наступна ідея — аналіз «за 1 клік» ([P-018](parking.md)).
+- [category-filter-counts](plans/category-filter-counts.md) — зрозумілі лічильники у фільтрі «Категорії» (сума = «Всього»,
+  OLX і розбивка — у підказках, «Згорнути / розгорнути все»); рішення людини прийнято, код не почато.
+
+Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
+аналіз «за 1 клік» — [P-018](parking.md).
 
 ## Що враховувати
 
@@ -68,21 +72,23 @@
 - Jev MCP/skills jevai.org для агента: домашній ПК — встановлено, але MCP відповідає `401` (ключ перевипустити);
   робочий ПК — не встановлено ([jev-agent-setup](instructions/jev-agent-setup.md)).
 - Локально `SQLITE_BUSY` / зайнятий 3001 — старі `tsx watch` ([local-dev-port-busy](instructions/local-dev-port-busy.md)).
-- Локальна БД на робочому ПК — копія проду на 2026-10-16 (`npm run db:copy-prod`, [development](development.md) §4):
-  AI-кнопки локально платні так само, як на проді. Read-only токен Turso, вставлений у чат 2026-10-16, людина
-  вирішила лишити (діє до ≈ 2026-11-15).
+- Локальна БД на робочому ПК — копія проду на 2026-10-22 (`npm run db:copy-prod`, [development](development.md) §4):
+  AI-кнопки локально платні так само, як на проді. Токен для копії — Read-Only токен **бази**, не API-токен акаунта
+  ([turso-db-token-vs-api-token](instructions/turso-db-token-vs-api-token.md)).
 - Turso MCP: SQL-запит → `403 … db:mint-token` — перепідключити ([turso-mcp-scope-403](instructions/turso-mcp-scope-403.md)).
 
 ## Відкриті питання (чекають людину)
 
 - Ручні перевірки рушія Jev в UI — у примітках архівних планів [jev-model](plans/old/jev-model.md) (крок 2) і
   [jev-threshold-setting](plans/old/jev-threshold-setting.md) (test-case 3, платно).
-- Чи видаляти порожній старий файл `server/data/olx-bak-2026-10-16T12-28-23-237Z.db` (робочий ПК).
+- Чи видаляти локальні бекапи `server/data/olx-bak-2026-10-16T12-28-23-237Z.db` (порожній) і
+  `olx-bak-2026-10-22T11-14-29-068Z.db` (БД до копії 2026-10-22), робочий ПК.
+- Чи потрібен API-токен Turso `claude-code-work` (створено 2026-10-22; для копії БД не підходить).
 - Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930`, `olx-dashboard-bak-20261011` і `olx-dashboard-bak-20261018`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).
 
 ## Наступний крок
 
-Наповнити базові плюси й мінуси основних категорій на проді («Налаштування» → «AI-аналіз» → «Базові плюси й мінуси» →
-категорія → «Згенерувати», платно); далі — P-019 чи P-020, що більше заважатиме.
+Реалізувати [category-filter-counts](plans/category-filter-counts.md) (кроки 1–6) у гілці від `main`; перевірка — пошук
+«mac mini» на локальній копії проду.
