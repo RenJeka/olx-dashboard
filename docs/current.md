@@ -17,10 +17,11 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній реліз — 2026-10-22 технічні доробки базових плюсів і мінусів
-  ([base-criteria-polish](plans/old/base-criteria-polish.md), частина [P-019](parking.md)): ручні тести пройдено, smoke ✅.
-  Базові плюси й мінуси (2026-10-18, [base-criteria](plans/old/base-criteria.md), правила — [business-rules](business-rules.md) §4)
-  на проді наповнено людиною. Останній хендоф — [2026-10-22 base-criteria-polish-release](handoffs/2026-10-22-base-criteria-polish-release.md).
+- Останній реліз — 2026-10-22 зрозумілі лічильники у фільтрі «Категорії» ([category-filter-counts](plans/old/category-filter-counts.md),
+  PR [#82](https://github.com/RenJeka/olx-dashboard/pull/82); разом із доками PR #81): ручні тести пройдено людиною
+  локально; стан злиття, деплою й smoke — у хендофі [2026-10-22 category-filter-counts](handoffs/2026-10-22-category-filter-counts.md).
+  Перед тим того ж дня — доробки базових плюсів і мінусів ([base-criteria-polish](plans/old/base-criteria-polish.md),
+  частина [P-019](parking.md)); базові набори (правила — [business-rules](business-rules.md) §4) на проді наповнено людиною.
   Модель і рушії AI — [ai-flow](ai-flow.md).
 - AI на проді — авто-режим з 2026-10-17: `OPENROUTER_API_KEY` в API (окремий ключ з лімітом), кожна AI-кнопка
   платна ([deploy-render-turso](deploy-render-turso.md) → «Фактичний прод»).
@@ -40,8 +41,7 @@
 
 ## Активні плани
 
-Немає. [category-filter-counts](plans/old/category-filter-counts.md) ✅ (2026-10-22) — код і ручні test-cases готові,
-гілка `feat/category-filter-counts` → PR у `main` (злиття = деплой).
+Немає.
 
 Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
@@ -87,8 +87,10 @@
 - Коли видаляти бекап-гілки Turso `olx-dashboard-bak-20260930`, `olx-dashboard-bak-20261011` і `olx-dashboard-bak-20261018`.
 - Чи робити скіл з інструкції `prod-scan-monitoring` (запропоновано 2026-10-03) і скіл `prod-release` з runbook релізу (2026-10-04).
 - Antigravity — коли робити [P-009](parking.md) (знімок скілів на вимогу).
+- Звідки в оголошеннях категорії, яких немає в дереві фільтра (рядок «Інші категорії»; у «mac mini» таких
+  помітна частка): чи з'ясовувати, чи достатньо рядка ([category-filter-counts](plans/old/category-filter-counts.md) → «Знахідка»).
 
 ## Наступний крок
 
-Злити PR [#81](https://github.com/RenJeka/olx-dashboard/pull/81) (доки закриття 2026-10-22), потім PR гілки
-`feat/category-filter-counts` ([category-filter-counts](plans/old/category-filter-counts.md)); після деплою — `npm run smoke`.
+Людина відкриває прод (https://olx-dashboard.onrender.com) і перевіряє фільтр «Категорії» на «mac mini» (числа
+відрізнятимуться від локальної копії); далі — вибір з парковки: решта [P-019](parking.md), [P-020](parking.md) чи [P-018](parking.md).
