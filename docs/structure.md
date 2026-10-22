@@ -102,6 +102,7 @@ olx-dashboard/
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
 │       │   ├── repos/        # SQL по таблицях: searches, projects, listings, scanRuns, logs, analysis (AI: вибірки, записи результатів, критерії), categories (дерево, base_criteria), batch (applyStatements)
+│       │   ├── copyDb.ts     # copyDatabase: схема з sqlite_master + дані keyset-пагінацією за rowid в іншу libSQL-БД (Vitest)
 │       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, dbBatchChunked (batch порціями), initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
