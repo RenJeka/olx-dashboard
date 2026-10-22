@@ -103,7 +103,7 @@ claude -p "Invoke the project skill refactor-plan via the Skill tool. Do NOT cha
 ## 7. Автотести
 
 **Vitest** у `server/` (`npm test`). Тести — поруч із кодом (`*.test.ts`), хелпери — `server/src/test/`
-(`resetDb`, `createSearch`, `insertListing`, `gqlListing`). БД-тести йдуть на тимчасовому файлі
+(`resetDb`, `createSearch`, `insertListing`, `gqlListing`; `testApp()` — Fastify з прод-обробником помилок для тестів роутів). БД-тести йдуть на тимчасовому файлі
 libSQL з тією самою схемою (`initDb()`), послідовно, з очищенням у `beforeEach`; реальна
 `server/data/olx.db` не чіпається. З production-збірки тести виключені (`tsconfig.build.json`).
 

@@ -1,4 +1,5 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import { testApp } from '../test/app.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, dbAll } from '../db/db.js';
 import { resetDb } from '../test/db.js';
@@ -22,7 +23,7 @@ interface LogsResponse {
 const get = async (query = '') => (await app.inject({ url: `/api/logs${query}` })).json() as LogsResponse;
 
 beforeAll(async () => {
-  app = Fastify();
+  app = testApp();
   await app.register(logsRoutes);
 });
 afterAll(() => app.close());

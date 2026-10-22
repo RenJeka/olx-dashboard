@@ -95,15 +95,21 @@ test-cases фази) → оновити `architecture.md`/`structure.md` → PR 
 
 ### Фаза 1. Каркас
 
-- [ ] 1.1 Перенести CLI-скрипти в `server/src/cli/` (`git mv`), виправити імпорти й `server/package.json`.
-- [ ] 1.2 `src/errors.ts` (новий): `NotFoundError`, `BadRequestError`, `ConflictError`, `GoneError` (410 для
-      застарілого плану) з `statusCode`.
-- [ ] 1.3 `setErrorHandler` у `index.ts`: відомі помилки → `{ error: message }` з їхнім кодом; невідомі →
-      `app.log.error` + 500 `{ error: message }` (як зараз). Маршрути поки не чіпати.
-- [ ] 1.4 `check-layers.mjs` (новий, у `scripts/`) у `npm run check`: `routes/`, `scraper/`, `services/` не імпортують `db/db.js`
-      напряму; `scraper/` не імпортує `db/`. Спершу — режим «лише звіт» (поточні порушення — список, не падіння),
-      «строгий» — після фази 6.
-- [ ] Verify: `npm run check`, `npm run build`; `npm run scan -- --search <id>` локально працює з нового шляху.
+- [x] 1.1 Перенести CLI-скрипти в `server/src/cli/` (`git mv`), виправити імпорти й `server/package.json`.
+      Шляхи до `server/data/` у `copyProd`, `jevPilot`, `jevProbe`, `llmEval` — на рівень глибше.
+- [x] 1.2 `server/src/errors.ts`: `HttpError` + `NotFoundError`, `BadRequestError`, `ConflictError`, `GoneError`
+      (410 для застарілого плану) з `statusCode`.
+- [x] 1.3 Глобальний обробник уже був у `index.ts` і відповідав `{ error: message }` з `err.statusCode` (5xx — у
+      журнал `app_logs`). Винесено без змін у `server/src/routes/errorHandler.ts`; тести роутів отримують той самий
+      обробник через `testApp()` (`server/src/test/app.ts`).
+      ⚠ Для фаз 2–4: прибрати `try/catch` з роуту = його 500 почне писатися в журнал `app_logs` (зараз роути пишуть
+      лише `app.log.error` у stdout). Де це небажано — лишати локальний `catch`.
+- [x] 1.4 `scripts/check-layers.mjs` у `npm run check` (`npm run layers:check`): правила для `routes/`, `services/`,
+      `scraper/`, `db/`, `scanner/`, `analysis/`, `categories/`, `cli/`. Режим «лише звіт» на старті показав рівно
+      знахідки A1/A3: 12 файлів у `routes/` і `scraper/` + 9 у доменних модулях. «Строгий» (`--strict`) — після фази 6.
+- [x] Verify: `npm run check`, `npm run build` зелені; `npm run scan` і `npm run llm:eval` стартують з нового шляху
+      (друкують підказку без аргументів); зібраний сервер (`node dist/index.js`) на 404/400 відповідає `{ error }`
+      як раніше.
 
 ### Фаза 2. Пошуки (`searches`) — найбільший маршрут
 

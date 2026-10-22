@@ -1,6 +1,6 @@
 // CLI-скан без UI: npm run scan -- --search <id> [--deep|--verify]
-import { initDb } from './db/db.js';
-import { runScan, runVerify } from './scanner/index.js';
+import { initDb } from '../db/db.js';
+import { runScan, runVerify } from '../scanner/index.js';
 
 function parseSearchId(argv: string[]): number | null {
   const idx = argv.indexOf('--search');

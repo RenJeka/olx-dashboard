@@ -28,7 +28,7 @@ jobs:
 
       - run: npm ci
 
-      # typecheck (server + web) → Vitest (тимчасова БД, без мережі) → docs:check → skills:check
+      # typecheck (server + web) → Vitest (тимчасова БД, без мережі) → docs:check → skills:check → layers:check
       - run: npm run check
 
       - run: npm run build

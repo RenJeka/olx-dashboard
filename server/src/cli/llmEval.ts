@@ -7,10 +7,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hasApiKey } from './analysis/config.js';
-import { AUTO_CHUNK_SIZE, DEFAULT_MODEL, DEFAULT_SAMPLE_SIZE, OPPOSITE_MODE, isMode } from './analysis/constants.js';
-import { resolveEffectiveCriteria } from './analysis/baseCriteria.js';
-import { enabledGroups } from './analysis/criteria.js';
+import { hasApiKey } from '../analysis/config.js';
+import { AUTO_CHUNK_SIZE, DEFAULT_MODEL, DEFAULT_SAMPLE_SIZE, OPPOSITE_MODE, isMode } from '../analysis/constants.js';
+import { resolveEffectiveCriteria } from '../analysis/baseCriteria.js';
+import { enabledGroups } from '../analysis/criteria.js';
 import {
   buildReport,
   contextAround,
@@ -18,15 +18,15 @@ import {
   mergeLabelTodo,
   type EvalFile,
   type LabelEntry,
-} from './analysis/llmEval.js';
-import { chatWithUsage, type ChatUsage } from './analysis/openrouter.js';
-import { excludeOppositeCriteria, parseCriteriaResponse, parseMatchingResponse } from './analysis/parse.js';
-import { chunk, descriptionMap, toPromptListing } from './analysis/promptData.js';
-import { buildCriteriaPrompt, buildMatchingPrompt, pickSample } from './analysis/prompts.js';
-import { getSearch, loadListings } from './analysis/repo.js';
-import type { AnalysisMode } from './types.js';
+} from '../analysis/llmEval.js';
+import { chatWithUsage, type ChatUsage } from '../analysis/openrouter.js';
+import { excludeOppositeCriteria, parseCriteriaResponse, parseMatchingResponse } from '../analysis/parse.js';
+import { chunk, descriptionMap, toPromptListing } from '../analysis/promptData.js';
+import { buildCriteriaPrompt, buildMatchingPrompt, pickSample } from '../analysis/prompts.js';
+import { getSearch, loadListings } from '../analysis/repo.js';
+import type { AnalysisMode } from '../types.js';
 
-const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'llm-eval');
+const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'llm-eval');
 const MODES: AnalysisMode[] = ['cons', 'pros'];
 const HAIKU_MODEL = 'anthropic/claude-haiku-5.5';
 

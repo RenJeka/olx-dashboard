@@ -1,4 +1,5 @@
-import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import { testApp } from '../test/app.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, dbAll, dbGet } from '../db/db.js';
 import { abortFlags } from '../scanner/abortControl.js';
@@ -16,7 +17,7 @@ import { categoriesRoutes } from './categories.js';
 
 describe('POST /api/categories/collect', () => {
   it('повертає результат; паралельний виклик → 409; після завершення прапорець знято', async () => {
-    const app = Fastify();
+    const app = testApp();
     await app.register(categoriesRoutes);
 
     let release!: (v: { requested: number; changed: number; failed: string[] }) => void;
@@ -39,7 +40,7 @@ describe('POST /api/categories/collect', () => {
   });
 
   it('під час скану → 409, збір не запускається', async () => {
-    const app = Fastify();
+    const app = testApp();
     await app.register(categoriesRoutes);
     collect.mockClear();
     abortFlags.set(12345, false); // так позначає активний скан withScanRun
@@ -57,7 +58,7 @@ describe('POST /api/categories/collect', () => {
 
 describe('базові набори категорій', () => {
   const NAMES = (groups: Array<{ name: string }>) => groups.map((g) => g.name);
-  let app: ReturnType<typeof Fastify>;
+  let app: FastifyInstance;
 
   beforeEach(async () => {
     await resetDb();
@@ -72,7 +73,7 @@ describe('базові набори категорій', () => {
       ],
       'write',
     );
-    app = Fastify();
+    app = testApp();
     await app.register(categoriesRoutes);
   });
   afterEach(() => app.close());
@@ -134,7 +135,7 @@ describe('базові набори категорій', () => {
 });
 
 describe('POST /api/categories/:id/criteria/remap', () => {
-  let app: ReturnType<typeof Fastify>;
+  let app: FastifyInstance;
   let searchA: number; // автокатегорія 80 — нащадок 1502
   let searchB: number; // автокатегорія 37 — предок 1502
 
@@ -180,7 +181,7 @@ describe('POST /api/categories/:id/criteria/remap', () => {
     await db.execute({ sql: 'UPDATE searches SET base_category_id = 37 WHERE id = ?', args: [searchB] });
     await addListing(searchA, 1, '• тріснутий екран\n• без торгу');
     await addListing(searchB, 2, '• тріснутий екран');
-    app = Fastify();
+    app = testApp();
     await app.register(categoriesRoutes);
   });
   afterEach(() => app.close());
@@ -273,7 +274,7 @@ describe('POST /api/categories/:id/criteria/remap', () => {
 });
 
 describe('POST /api/categories/:id/criteria/generate', () => {
-  let app: ReturnType<typeof Fastify>;
+  let app: FastifyInstance;
   const generate = (id: number, payload: object) =>
     app.inject({ method: 'POST', url: `/api/categories/${id}/criteria/generate`, payload });
   const reply = (items: string[]) => JSON.stringify({ criteria: items });
@@ -293,7 +294,7 @@ describe('POST /api/categories/:id/criteria/generate', () => {
       ],
       'write',
     );
-    app = Fastify();
+    app = testApp();
     await app.register(categoriesRoutes);
   });
   afterEach(async () => {
@@ -369,7 +370,7 @@ describe('POST /api/categories/:id/criteria/generate', () => {
 });
 
 describe('remap категорії й поглинутий власний пункт пошуку (вимкнений базовий)', () => {
-  let app: ReturnType<typeof Fastify>;
+  let app: FastifyInstance;
   let searchId: number;
   type Item = { name: string; aliases: string[]; enabled: boolean; base?: { categoryId: number } };
 
@@ -396,7 +397,7 @@ describe('remap категорії й поглинутий власний пун
       sql: 'UPDATE searches SET base_category_id = 80, analysis_criteria = ? WHERE id = ?',
       args: [JSON.stringify({ cons: ['тріснутий екран', 'без торгу'], pros: [] }), searchId],
     });
-    app = Fastify();
+    app = testApp();
     await app.register(categoriesRoutes);
     await app.register(criteriaRoutes);
   });

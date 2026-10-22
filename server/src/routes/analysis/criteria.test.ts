@@ -1,4 +1,5 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import { testApp } from '../../test/app.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, dbAll, dbGet } from '../../db/db.js';
 import { MAX_CRITERIA } from '../../analysis/constants.js';
@@ -32,7 +33,7 @@ const remap = (payload: object) =>
   app.inject({ method: 'POST', url: `/api/searches/${searchId}/criteria/remap`, payload });
 
 beforeAll(async () => {
-  app = Fastify();
+  app = testApp();
   await app.register(criteriaRoutes);
 });
 afterAll(() => app.close());

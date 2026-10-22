@@ -5,16 +5,16 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hasApiKey } from './analysis/config.js';
-import { JEV_DECISIONS_URL, MATCHING_DESC_SLICE, isMode } from './analysis/constants.js';
-import { criterionKey, listingState } from './analysis/jev.js';
-import { resolveCriteriaThreshold, runJevMatching } from './analysis/jevEngine.js';
-import { toPromptListing } from './analysis/promptData.js';
-import { buildChunkListings } from './analysis/prompts.js';
-import { resolveEffectiveCriteria, type SearchCriteriaRow } from './analysis/baseCriteria.js';
-import { aliasMap, enabledGroups, phraseKey } from './analysis/criteria.js';
-import { parseBullets, stripHtml } from './analysis/text.js';
-import { dbAll, dbGet } from './db/db.js';
+import { hasApiKey } from '../analysis/config.js';
+import { JEV_DECISIONS_URL, MATCHING_DESC_SLICE, isMode } from '../analysis/constants.js';
+import { criterionKey, listingState } from '../analysis/jev.js';
+import { resolveCriteriaThreshold, runJevMatching } from '../analysis/jevEngine.js';
+import { toPromptListing } from '../analysis/promptData.js';
+import { buildChunkListings } from '../analysis/prompts.js';
+import { resolveEffectiveCriteria, type SearchCriteriaRow } from '../analysis/baseCriteria.js';
+import { aliasMap, enabledGroups, phraseKey } from '../analysis/criteria.js';
+import { parseBullets, stripHtml } from '../analysis/text.js';
+import { dbAll, dbGet } from '../db/db.js';
 
 interface ProbeRow {
   id: number;
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
     };
   });
 
-  const out = arg('out') ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'jev-pilot', `probe-${searchId}-${mode}.json`);
+  const out = arg('out') ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'jev-pilot', `probe-${searchId}-${mode}.json`);
   const report = {
     createdAt: new Date().toISOString(),
     search: { id: searchId, query: search.query },

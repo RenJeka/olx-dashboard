@@ -7,7 +7,7 @@
 
 ```
 olx-dashboard/
-├── package.json              # root workspace: скрипти dev/build/scan/migrate:posted-at/docs:check/typecheck/check/skills:sync/skills:check, deps: concurrently
+├── package.json              # root workspace: скрипти dev/build/scan/migrate:posted-at/docs:check/typecheck/check/skills:sync/skills:check/layers:check, deps: concurrently
 ├── package-lock.json
 ├── tsconfig.base.json        # спільні strict-опції TS (без module/moduleResolution)
 ├── .nvmrc                    # Node 22 LTS (локально, CI, Render); package.json engines: >=22
@@ -19,6 +19,7 @@ olx-dashboard/
 ├── README.md                 # огляд + швидкий старт
 ├── scripts/
 │   ├── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (plans/old і handoffs — лише лінки на доки, заархівований план валідний)
+│   ├── check-layers.mjs      # `npm run layers:check`: напрям залежностей між шарами server/src (без --strict — лише звіт)
 │   ├── smoke.mjs             # `npm run smoke -- [api-url] [web-url]`: smoke-перевірка деплою (за замовчуванням — прод)
 │   └── sync-skills.mjs       # `npm run skills:sync|skills:check`: обгортки скілів з skills/ у .claude/ і .agents/
 ├── skills/                   # ЄДИНЕ джерело скілів (<name>/SKILL.md + references/), skills.json — цілі, README.md
@@ -62,6 +63,7 @@ olx-dashboard/
 │       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
 │       ├── logger.ts         # єдиний сервіс логування (pino): getLogger(scope), logError/logWarn(scope, stage, …) → stdout + app_logs, retention 14 днів
 │       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
+│       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом
 │       ├── auth/             # Google OAuth «ворота» single-user (docs/plans/old/google-oauth-gate.md)
 │       │   ├── config.ts     # env: GOOGLE_CLIENT_ID/ALLOWED_EMAILS/SESSION_SECRET, кукі-флаги, isAuthDisabled, assertAuthConfigured (fail-fast)
 │       │   ├── plugin.ts     # fastify-plugin (non-encapsulated): @fastify/cookie+@fastify/jwt, verifyGoogleIdToken (google-auth-library), глобальний onRequest-замок /api/*
@@ -88,13 +90,14 @@ olx-dashboard/
 │       │   ├── runScan.ts    # runScan (normal/deep): fetchAllQueries → finalizeScanResult
 │       │   ├── analyzeScan.ts # analyzeScan (probe-фаза), runDeepScanFromPlan (запуск за планом), кеш планів (TTL)
 │       │   └── verifyScan.ts # runVerify (P1+P2 кандидати, probeListingPage), countVerifyCandidates
-│       ├── scan.ts           # CLI: npm run scan -- --search <id>
-│       ├── collectCategories.ts # CLI: npm run categories:collect [-- --words "a,b"] — збір дерева категорій OLX
-│       ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
-│       ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
-│       ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/old/llm-haiku-prompt-audit.md)
-│       ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
-│       ├── copyProd.ts       # CLI копія прод-БД (Turso, лише SELECT) у server/data/olx.db, npm run db:copy-prod (docs/plans/old/db-copy-prod.md)
+│       ├── cli/              # точки входу npm-скриптів (CLI); шляхи до server/data — від cli/ на 2 рівні вгору
+│       │   ├── scan.ts           # CLI: npm run scan -- --search <id>
+│       │   ├── collectCategories.ts # CLI: npm run categories:collect [-- --words "a,b"] — збір дерева категорій OLX
+│       │   ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
+│       │   ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
+│       │   ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/old/llm-haiku-prompt-audit.md)
+│       │   ├── migratePostedAt.ts # CLI одноразова міграція: текстовий posted_at (HTML-fallback) → ISO, npm run migrate:posted-at
+│       │   └── copyProd.ts       # CLI копія прод-БД (Turso, лише SELECT) у server/data/olx.db, npm run db:copy-prod (docs/plans/old/db-copy-prod.md)
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
 │       │   ├── copyDb.ts     # copyDatabase: схема з sqlite_master + дані keyset-пагінацією за rowid в іншу libSQL-БД (Vitest)
@@ -144,6 +147,7 @@ olx-dashboard/
 │       │   ├── olxCategories.ts # facetToOptions/facetToNodes: чисті перетворення facet категорій OLX (olx-api.md §2.11) → CategoryOption[] / CategoryNode[]; facet тягне graphql/categories.ts, кеш у searches.category_facet
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
+│           ├── errorHandler.ts # httpErrorHandler: глобальний обробник помилок (index.ts і тести через test/app.ts)
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/old/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/old/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── logs.ts       # GET /api/logs (журнал app_logs: фільтри level/scope) + DELETE /api/logs (очистити)
@@ -385,7 +389,7 @@ olx-dashboard/
 | Зупинка скану + прозорість дедупу + історія аналізу | `server/src/scanner/abortControl.ts` (`requestStopScan`), `server/src/scanner/analyzeScan.ts` (`isPlanCached`, `scan_plan`), `server/src/scraper/graphql/fetcher.ts` + `olxFetcher.ts` (`FetchOptions.shouldAbort`), `POST /api/searches/:id/scan/stop`, `GET /api/searches/:id/last-analysis`, `web/src/hooks/useSearchActionPanel.ts`, `web/src/components/searches/action-panel/{ScanProgressPanel,ScanPlanReportDialog,ActionPanelLastScan}.tsx` + `docs/plans/old/deep-scan-stop-and-history.md` |
 | Попередження vs помилка скану + людино-зрозуміле зведення warning | `scan_runs.warning` (окремо від `error`) — `server/src/scanner/scanFinalize.ts`, `server/src/db/{schema.sql,db.ts}`; UI: `web/src/utils/scanWarning.ts` (парсер), `web/src/components/searches/action-panel/{ScanWarningSummary,ActionPanelLastScan}.tsx` |
 | Verify-прохід (детект неактивних, дозаповнення опису/продавця) | `server/src/scraper/verifier.ts`, `server/src/scanner/verifyScan.ts` (`runVerify`), `POST /api/searches/:id/verify`, `web/src/components/searches/SearchActionPanel.tsx` |
-| Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphql/fetcher.ts`, `server/src/migratePostedAt.ts` |
+| Нормалізація дат HTML-fallback (`posted_at`), вікно пагінації GraphQL | `server/src/scraper/dateParser.ts`, `server/src/scraper/graphql/fetcher.ts`, `server/src/cli/migratePostedAt.ts` |
 | Автооновлення (фон) | `web/src/hooks/useAutoRefresh.ts`, `web/src/components/settings/SettingsDrawer.tsx` (секція `AutoRefreshSection`), `web/src/utils/storage.ts` |
 | LLM-аналіз (мінуси/плюси, OpenRouter + ручний режим) | `server/src/analysis/*`, `server/src/routes/analysis/*`, `server/src/export/xlsx.ts`, `web/src/components/analysis/*`, `web/src/components/settings/sections/AnalysisSection.tsx` + `docs/plans/old/llm-analysis.md` |
 | Синоніми пошукового запиту (мульти-query скан, генерація, alias у AI-фільтрі) | `server/src/scanner/fetchOrchestrator.ts` (`fetchAllQueries`), `server/src/routes/searchSynonyms.ts`, `server/src/analysis/relevance.ts`/`repo.ts` (`getRelevanceAliases`), `web/src/components/searches/SearchVariantsDialog.tsx` + `docs/plans/old/search-synonyms.md` |

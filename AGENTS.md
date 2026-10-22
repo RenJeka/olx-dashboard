@@ -92,7 +92,8 @@ npm run smoke                   # smoke-перевірка проду після
 npm run db:copy-prod            # копія прод-БД у server/data/olx.db (PROD_DB_URL/PROD_DB_TOKEN; development.md §4)
 npm run typecheck               # tsc --noEmit для server і web
 npm test                        # Vitest (server): доменне ядро на тимчасовій БД
-npm run check                   # typecheck + test + docs:check + skills:check — перед комітом
+npm run check                   # typecheck + test + docs:check + skills:check + layers:check — перед комітом
+npm run layers:check            # напрям залежностей між шарами server/src (поки звіт; --strict — блокує)
 npm run skills:sync             # перегенерувати обгортки скілів після зміни skills/
 ```
 

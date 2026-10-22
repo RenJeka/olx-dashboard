@@ -1,4 +1,5 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import { testApp } from '../test/app.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, dbAll, dbGet } from '../db/db.js';
 import { createSearch, resetDb } from '../test/db.js';
@@ -21,7 +22,7 @@ async function create(name: string): Promise<ProjectRow> {
 const names = async () => ((await (await app.inject({ url: '/api/projects' })).json()) as ProjectRow[]).map((p) => p.name);
 
 beforeAll(async () => {
-  app = Fastify();
+  app = testApp();
   await app.register(projectsRoutes);
 });
 afterAll(() => app.close());
