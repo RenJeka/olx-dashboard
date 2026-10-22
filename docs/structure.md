@@ -101,16 +101,15 @@ olx-dashboard/
 │       │   └── copyProd.ts       # CLI копія прод-БД (Turso, лише SELECT) у server/data/olx.db, npm run db:copy-prod (docs/plans/old/db-copy-prod.md)
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
-│       │   ├── repos/        # SQL по таблицях: searches, projects, listings, scanRuns, logs (роути/сервіси — без SQL)
-│       │   ├── copyDb.ts     # copyDatabase: схема з sqlite_master + дані keyset-пагінацією за rowid в іншу libSQL-БД (Vitest)
+│       │   ├── repos/        # SQL по таблицях: searches, projects, listings, scanRuns, logs, analysis (AI: вибірки, записи результатів, критерії), categories (дерево, base_criteria), batch (applyStatements)
 │       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, dbBatchChunked (batch порціями), initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
 │       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
-│       │   ├── repo.ts       # DB-шар: ListingRow, getSearch/loadListings
 │       │   ├── criteria.ts   # категорії критеріїв (docs/plans/old/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
 │       │   ├── baseCriteria.ts # базові плюси/мінуси категорій (docs/plans/old/base-criteria.md): mergeBaseCriteria/stripBaseCriteria/applyCriteriaBody/retainAbsorbedOwn/getEffectiveCriteria, парс searches.base_disabled
 │       │   ├── remap.ts      # спільні кроки remap критеріїв: parseRemapOps/planRemapSteps/remapListingStatements/remapBaseDisabled (пошук і категорія)
+│       │   ├── criteriaRemap.ts # use-cases remap критеріїв без AI: remapSearchCriteria (пошук), remapCategoryCriteria (базовий набір категорії)
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
 │       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)

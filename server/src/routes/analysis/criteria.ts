@@ -1,4 +1,3 @@
-import type { InStatement } from '@libsql/client';
 import type { FastifyInstance } from 'fastify';
 import { hasApiKey } from '../../analysis/config.js';
 import {
@@ -22,13 +21,9 @@ import {
 import { parseCriteriaConfig, phraseKey, serializeCriteriaConfig } from '../../analysis/criteria.js';
 import { chat } from '../../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse, parseGroupSuggestions } from '../../analysis/parse.js';
-import { filterActive, parseRemapOps, planRemapSteps, remapListingStatements } from '../../analysis/remap.js';
+import { remapSearchCriteria } from '../../analysis/criteriaRemap.js';
 import { buildCriteriaPrompt, buildGroupingPrompt, pickSample } from '../../analysis/prompts.js';
-import { getSearch, loadListings } from '../../analysis/repo.js';
-import { dbBatchChunked, dbGet, dbRun } from '../../db/db.js';
-import { parseLocalFilters } from '../../scraper/localFilters.js';
-import { recomputeFilteredOut } from '../../scraper/refilter.js';
-import type { CriteriaConfig } from '../../types.js';
+import { getSearch, loadListings, updateSearchCriteria } from '../../db/repos/analysis.js';
 
 export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
   // Категорії критеріїв пошуку (docs/plans/old/criteria-categories.md; старий формат нормалізується) —
@@ -162,11 +157,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
     const { bases, category } = await loadSearchBases(search.base_category_id);
     const next = applyCriteriaBody(req.body, stored, parseBaseDisabled(search.base_disabled));
     const own = retainAbsorbedOwn(next.own, stored, bases, next.disabled);
-    await dbRun('UPDATE searches SET analysis_criteria = ?, base_disabled = ? WHERE id = ?', [
-      serializeCriteriaConfig(own),
-      serializeBaseDisabled(next.disabled),
-      id,
-    ]);
+    await updateSearchCriteria(id, serializeCriteriaConfig(own), serializeBaseDisabled(next.disabled));
     return { ...mergeBaseCriteria(own, bases, next.disabled), category };
   });
 
@@ -179,57 +170,5 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Params: { id: string };
     Body: { mode?: string; from?: unknown; to?: unknown; listings?: boolean; merges?: unknown };
-  }>('/api/searches/:id/criteria/remap', async (req, reply) => {
-    const id = Number(req.params.id);
-    const mode = req.body.mode;
-    if (!isMode(mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
-
-    const parsed = parseRemapOps(req.body);
-    if ('error' in parsed) return reply.code(400).send({ error: parsed.error });
-    const ops = parsed;
-
-    const search = await dbGet<{
-      analysis_criteria: string;
-      local_filters: string;
-      base_category_id: number | null;
-      base_disabled: string | null;
-    }>('SELECT analysis_criteria, local_filters, base_category_id, base_disabled FROM searches WHERE id = ?', [id]);
-    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
-    // Базові набори читаються один раз: перевірка `from` і ефективний список у відповіді.
-    const config = parseCriteriaConfig(search.analysis_criteria);
-    const { bases } = await loadSearchBases(search.base_category_id);
-    const disabled = parseBaseDisabled(search.base_disabled);
-    const locked = baseKeys(mergeBaseCriteria(config, bases, disabled), mode);
-    if (ops.some((op) => op.from.some((f) => locked.has(phraseKey(f))))) {
-      return reply.code(400).send({ error: ANALYSIS_ERRORS.BASE_ITEM_READONLY });
-    }
-
-    // Об'єднання застосовуються по черзі до списку категорій; ті самі кроки — до пунктів оголошень і фільтрів.
-    const { groups, steps } = planRemapSteps(config[mode], ops);
-    const nextConfig: CriteriaConfig = { ...config, [mode]: groups };
-    const touchListings = ops.some((op) => op.to !== null) || req.body.listings !== false;
-
-    const localFilters = parseLocalFilters(search.local_filters);
-    let statements: InStatement[] = [];
-    let nextFilters = localFilters;
-    if (touchListings) {
-      ({ statements, nextFilters } = await remapListingStatements(id, mode, steps, localFilters));
-    }
-    const updated = statements.length;
-    // Пошук — останнім: після часткового збою чанків той самий remap повторюється з тим самим результатом.
-    statements.push({
-      sql: 'UPDATE searches SET analysis_criteria = ?, local_filters = ? WHERE id = ?',
-      args: [serializeCriteriaConfig(nextConfig), JSON.stringify(nextFilters), id],
-    });
-    await dbBatchChunked(statements);
-
-    // Об'єднання може змінити, кого ховає фільтр «мінуси/плюси» (було чи стало правило режиму) —
-    // перерахувати приховані. Без такого правила перерахунок не потрібен (зайвий прохід по Turso).
-    const { filtered_out_count } =
-      touchListings && (filterActive(localFilters, mode) || filterActive(nextFilters, mode))
-        ? await recomputeFilteredOut(id)
-        : { filtered_out_count: null };
-    // Відповідь — ефективний список (як GET): клієнт кладе його в кеш критеріїв пошуку.
-    return { criteria: mergeBaseCriteria(nextConfig, bases, disabled), updated, filtered_out_count };
-  });
+  }>('/api/searches/:id/criteria/remap', (req) => remapSearchCriteria(Number(req.params.id), req.body));
 }

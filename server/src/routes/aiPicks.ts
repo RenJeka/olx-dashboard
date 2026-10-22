@@ -10,14 +10,14 @@ import {
 } from '../analysis/aiPicks.js';
 import {
   JSON_EXPORT_INDENT,
+  PICK_CANDIDATES_LIMIT,
   MANUAL_PICKS_ZIP_CHUNK_SIZE,
   MIME_ZIP,
   PICK_TOP_N,
   PICKS_NOMINEES_PER_CHUNK,
 } from '../analysis/constants.js';
 import { chunk } from '../analysis/promptData.js';
-import { loadPickCandidates, getSearch } from '../analysis/repo.js';
-import { db } from '../db/db.js';
+import { commitAiPicks, getSearch, loadPickCandidates } from '../db/repos/analysis.js';
 import type { PickItem, PickResult } from '../types.js';
 
 const SEARCH_NOT_FOUND = 'Пошук не знайдено';
@@ -34,7 +34,7 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const candidates = await loadPickCandidates(id, req.body.ids);
+      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       const prompt = buildPickPrompt(candidates);
@@ -52,7 +52,7 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
       const id = Number(req.params.id);
       if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const candidates = await loadPickCandidates(id, req.body.ids);
+      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       const chunks = chunk(candidates, MANUAL_PICKS_ZIP_CHUNK_SIZE);
@@ -89,7 +89,7 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
       if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       if (!hasApiKey()) return reply.code(409).send({ error: NO_API_KEY });
 
-      const candidates = await loadPickCandidates(id, req.body.ids);
+      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       try {
@@ -109,7 +109,7 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
       if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
-      const candidates = await loadPickCandidates(id, req.body.ids);
+      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       const validIds = candidates.map((c) => c.id);
 
       try {
@@ -131,27 +131,8 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
 
       const picks = Array.isArray(req.body.picks) ? req.body.picks : [];
 
-      const CLEAR_SQL = `UPDATE listings SET ai_rank = NULL, ai_pick_reason = NULL, ai_ranked_at = NULL
-         WHERE search_id = ?`;
-      const SET_SQL = `UPDATE listings SET ai_rank = ?, ai_pick_reason = ?, ai_ranked_at = datetime('now')
-         WHERE id = ? AND search_id = ?`;
-
-      // Інтерактивна транзакція: скидання старих результатів + запис нових атомарно.
-      const tx = await db.transaction('write');
-      let committed = 0;
-      try {
-        await tx.execute({ sql: CLEAR_SQL, args: [id] });
-        for (const pick of picks) {
-          const info = await tx.execute({ sql: SET_SQL, args: [pick.rank, pick.reason, pick.id, id] });
-          committed += info.rowsAffected;
-        }
-        await tx.commit();
-      } catch (err) {
-        await tx.rollback();
-        throw err;
-      }
-
-      return { committed };
+      // Скидання старих результатів + запис нових — атомарно (транзакція в репозиторії).
+      return { committed: await commitAiPicks(id, picks) };
     },
   );
 }

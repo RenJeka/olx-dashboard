@@ -52,7 +52,7 @@ errors.ts      NotFoundError / BadRequestError / ConflictError → один об
 | `src/errors.ts` (новий) | створити | блокує фази 2–5 |
 | `server/src/index.ts` | обробник помилок (`setErrorHandler`) | після 1.2 |
 | `server/src/db/repos/*.ts` (`searches`, `projects`, `listings`, `scanRuns`, `categories`, `baseCriteria`, `logs`, `analysis`) | створити | блокує фази 2–6 |
-| `server/src/analysis/repo.ts` | злити в `db/repos/analysis.ts`, видалити | фаза 4 |
+| `analysis/repo.ts` | ✅ перенесено в `server/src/db/repos/analysis.ts` | фаза 4 |
 | `server/src/services/{searches,projects,listings,logs}.ts` | створити | фази 2–3 |
 | `server/src/routes/*.ts`, `routes/analysis/*.ts` | спростити до HTTP | після своїх сервісів |
 | `src/analysis/baseCriteriaRemap.ts` (новий) | створити (use-case з маршруту) | фаза 4 |
@@ -136,13 +136,18 @@ test-cases фази) → оновити `architecture.md`/`structure.md` → PR 
 
 ### Фаза 4. Категорії й AI
 
-- [ ] 4.1 `analysis/baseCriteriaRemap.ts`: перенести use-case з `POST /api/categories/:id/criteria/remap`; маршрут
-      лише валідує й викликає. Unit-тест use-case на тимчасовій БД.
-- [ ] 4.2 SQL з `routes/categories.ts`, `categories/tree.ts`, `analysis/baseCriteria.ts`, `analysis/remap.ts`,
-      `routes/analysis/*`, `routes/aiPicks.ts`, `routes/relevance.ts` → `db/repos/{categories,baseCriteria,analysis}.ts`;
-      `analysis/repo.ts` злити в `db/repos/analysis.ts`.
-- [ ] Verify: `categories.test.ts`, `baseCriteria.test.ts`, `remap.test.ts`, `jevEngine.test.ts` зелені; test-case 6
-      (без платних AI-кнопок).
+- [x] 0.4 (перед фазою 4) Характеризаційні тести записів AI — `server/src/routes/aiCommit.test.ts`: мінуси/плюси (replace,
+      append без дублів), AI Вибір (скидання старих рангів, чужий пошук), релевантність (ручний override не перетирається).
+- [x] 4.1 Use-cases remap → `server/src/analysis/criteriaRemap.ts` (замість окремого `baseCriteriaRemap.ts` — обидва remap
+      разом): `remapCategoryCriteria` (з `routes/categories.ts`) і `remapSearchCriteria` (з `routes/analysis/criteria.ts`);
+      маршрути лише викликають, помилки — `HttpError`. Окремий unit-тест не знадобився: обидва покриті тестами роутів.
+- [x] 4.2 SQL з `routes/categories.ts`, `categories/tree.ts`, `analysis/baseCriteria.ts`, `analysis/remap.ts`,
+      `routes/analysis/*`, `routes/aiPicks.ts`, `routes/relevance.ts` → `db/repos/{categories,analysis}.ts`
+      (`baseCriteria` — у `categories`); `analysis/repo.ts` → `db/repos/analysis.ts` (`git mv`; ліміт кандидатів AI Вибору
+      тепер параметр — `db/` не імпортує `analysis/`). Batch зі statements кількох репозиторіїв — `db/repos/batch.ts`.
+- [x] Verify: усі тести зелені без зміни очікувань; `layers:check` — `routes/`, `analysis/`, `categories/` чисті (лишились
+      сканер і скрейпер — фази 5–6). **Звірка на реальних даних:** 13 GET-відповідей (дерево категорій, набори категорій,
+      ефективні критерії пошуків, 404) до/після — 0 розбіжностей. Test-case 6 (UI) агент не проходив.
 
 ### Фаза 5. Сканер
 

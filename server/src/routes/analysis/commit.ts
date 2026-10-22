@@ -8,8 +8,19 @@ import {
   isMode,
 } from '../../analysis/constants.js';
 import { parseBullets } from '../../analysis/text.js';
-import { db } from '../../db/db.js';
+import { commitListingCriteria } from '../../db/repos/analysis.js';
 import type { CommitItem } from '../../types.js';
+
+/**
+ * Підсумкові пункти поля: replace — нові; append — наявні + нові без дублів (порівняння без регістру),
+ * наявні зберігаються, нічого не затирається.
+ */
+function mergeCriteria(existing: string | null | undefined, criteria: string[], append: boolean): string[] {
+  if (!append) return criteria;
+  const existingItems = parseBullets(existing ?? null);
+  const seen = new Set(existingItems.map((c) => c.toLowerCase()));
+  return [...existingItems, ...criteria.filter((c) => !seen.has(c.toLowerCase()))];
+}
 
 export async function commitRoutes(app: FastifyInstance): Promise<void> {
   // merge='replace' (дефолт) — перезаписати поле; merge='append' — додати нові пункти до
@@ -22,38 +33,11 @@ export async function commitRoutes(app: FastifyInstance): Promise<void> {
     const source = req.body.source === ANALYSIS_SOURCE.API ? ANALYSIS_SOURCE.API : ANALYSIS_SOURCE.IMPORT;
     const model = req.body.model ?? (source === ANALYSIS_SOURCE.IMPORT ? MANUAL_MODEL : DEFAULT_MODEL);
     const append = req.body.merge === 'append';
-    const column = req.body.mode; // 'cons' | 'pros' — безпечно (whitelist через isMode)
 
-    // column — з whitelist (isMode): 'cons' | 'pros', безпечна інтерполяція.
-    const UPDATE_SQL = `UPDATE listings SET ${column} = ?, analysis_at = datetime('now'),
-              analysis_source = ?, analysis_model = ?, analysis_stale = 0
-       WHERE id = ?`;
-    const SELECT_SQL = `SELECT ${column} AS val FROM listings WHERE id = ?`;
-
-    // Інтерактивна транзакція: append-режим читає наявне значення перед записом → атомарність циклу.
-    const tx = await db.transaction('write');
-    let updated = 0;
-    try {
-      for (const row of items) {
-        let criteria = row.criteria;
-        if (append) {
-          const existingRows = await tx.execute({ sql: SELECT_SQL, args: [row.id] });
-          const existing = (existingRows.rows[0] as unknown as { val: string | null } | undefined)?.val ?? null;
-          const existingItems = parseBullets(existing);
-          const seen = new Set(existingItems.map((c) => c.toLowerCase()));
-          const additions = row.criteria.filter((c) => !seen.has(c.toLowerCase()));
-          criteria = [...existingItems, ...additions];
-        }
-        const text = criteria.length > 0 ? criteria.map((c) => `${BULLET_PREFIX}${c}`).join('\n') : '';
-        const info = await tx.execute({ sql: UPDATE_SQL, args: [text, source, model, row.id] });
-        updated += info.rowsAffected;
-      }
-      await tx.commit();
-    } catch (err) {
-      await tx.rollback();
-      throw err;
-    }
-
+    const updated = await commitListingCriteria(req.body.mode, items, { source, model, append }, (existing, criteria) => {
+      const merged = mergeCriteria(existing, criteria, append);
+      return merged.length > 0 ? merged.map((c) => `${BULLET_PREFIX}${c}`).join('\n') : '';
+    });
     return { updated };
   });
 }

@@ -23,7 +23,7 @@ import { chatWithUsage, type ChatUsage } from '../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse, parseMatchingResponse } from '../analysis/parse.js';
 import { chunk, descriptionMap, toPromptListing } from '../analysis/promptData.js';
 import { buildCriteriaPrompt, buildMatchingPrompt, pickSample } from '../analysis/prompts.js';
-import { getSearch, loadListings } from '../analysis/repo.js';
+import { getSearch, loadListings } from '../db/repos/analysis.js';
 import type { AnalysisMode } from '../types.js';
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'llm-eval');
