@@ -174,14 +174,21 @@ test-cases фази) → оновити `architecture.md`/`structure.md` → PR 
 
 ### Фаза 7. Фронтенд — тактичні розрізи
 
-- [ ] 7.1 `ScanPlanReportDialog.tsx` → форматери в `utils/format.ts`, `PriceSpectrum` / `QuerySection` / `StatChip`
-      — окремі файли в `action-panel/scan-plan/`.
-- [ ] 7.2 `CategoryFilter.tsx` → `CategoryRow`, `CountChip` окремо; чиста логіка дерева — в `utils/`.
-- [ ] 7.3 `useSearchActionPanel.ts` → стан запуску скану / стан звіту аналізу — два хуки; `describeScanResult` —
-      в `utils/`.
-- [ ] 7.4 `SearchFiltersDrawer.tsx`, `table/columns.tsx` — лише якщо після 7.1–7.3 лишаються змішані
-      відповідальності (рішення людини).
-- [ ] Verify: `npm run typecheck`, `npm run build`; test-cases 2, 3, 8.
+- [x] 7.1 `ScanPlanReportDialog.tsx` (381 → 138 рядків): `formatNumber`/`formatDuration`/`formatShortDateTime` — у
+      `utils/format.ts`; `ScanPlanSummary`, `QuerySection`, `PriceSpectrum`, `ScanPlanWarnings`, `StatChip`, `InfoTooltip`,
+      `scanPlanText` — у `action-panel/scan-plan/`.
+- [x] 7.2 `CategoryFilter.tsx` (306 → 180): `CategoryRow`, `CountChip` — у `local-filters/category-tree/`;
+      `collectBranchKeys` — у `utils/categoryCounts.ts`.
+- [x] 7.3 `useSearchActionPanel.ts` (285 → 138): двофазний deep-скан — `hooks/useScanPlanReport.ts`; `isUserAbort`,
+      `describeScanResult`, `estimateDeepScan` — `utils/scanRun.ts`. Інтерфейс хука для `SearchActionPanel` не змінився.
+- [ ] 7.4 `SearchFiltersDrawer.tsx`, `table/columns.tsx` — не робили (рішення людини 2026-10-22: фази 4, 7, 8). Обидва
+      файли — переважно розмітка/визначення колонок, змішаних відповідальностей помітно менше; лишити як є, доки не
+      знадобиться правка.
+- [x] Verify: `tsc --noEmit` (+ разово `--noUnusedLocals` для нових файлів), `npm run build`. Браузер агента (wmux,
+      локально, пошук «iphone»): «Сканувати» → «Аналіз перед сканом» — збережений звіт (дата, час, картки, примітка
+      фільтра ціни, спектри синонімів, «Вікно покриття пропущено.», «План застарів», обидві кнопки) без запитів до OLX;
+      «Дії з пошуком» → «Фільтри» — дерево «Категорії» з лічильниками, «Згорнути все» / «Розгорнути все» працюють;
+      помилок у консолі немає. Запуск скану й зміну фільтрів не натискали.
 
 ### Фаза 8. Документація
 

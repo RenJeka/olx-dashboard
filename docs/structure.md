@@ -214,6 +214,7 @@ olx-dashboard/
         │   │   ├── local-filters/          # компоненти локальних фільтрів
         │   │   │   ├── CollapsibleFilter.tsx # згортувана секція фільтра (шапка + перемикач інверсії)
         │   │   │   ├── CategoryFilter.tsx  # фільтр категорій (дерево: скільки покаже таблиця; OLX — у підказці)
+        │   │   │   ├── category-tree/      # рядок дерева (CategoryRow, рекурсивно) і лічильник із підказкою OLX (CountChip)
         │   │   │   ├── PriceFilter.tsx     # фільтр діапазону цін
         │   │   │   └── TagsFilter.tsx      # універсальний фільтр тегів (міста, продавці, плюси/мінуси)
         │   │   ├── SearchEditDialog.tsx    # контрольований діалог «Редагувати пошук»: назва/запит/ціна/синоніми (docs/plans/old/search-row-edit.md)
@@ -225,7 +226,8 @@ olx-dashboard/
         │   │   │   ├── ActionPanelButtons.tsx    # картки-кнопки: швидкий/глибокий скан, аналіз перед сканом, перевірка неактивних
         │   │   │   ├── ScanStatusChip.tsx        # індикатор активного скану в шапці, коли модалку згорнуто
         │   │   │   ├── ScanProgressPanel.tsx     # деталізований прогрес скану (сегментована смуга + ETA + кнопка «Зупинити»)
-        │   │   │   └── ScanPlanReportDialog.tsx  # звіт двофазного deep-скану: ціновий спектр + ETA + розбивка по синонімах; «Зробити новий аналіз», planValid (docs/plans/old/deep-scan-stop-and-history.md)
+        │   │   │   ├── ScanPlanReportDialog.tsx  # звіт двофазного deep-скану: ціновий спектр + ETA + розбивка по синонімах; «Зробити новий аналіз», planValid (docs/plans/old/deep-scan-stop-and-history.md)
+        │   │   │   └── scan-plan/                # частини звіту: ScanPlanSummary (ETA, картки, примітки), QuerySection + PriceSpectrum (варіант запиту), ScanPlanWarnings, StatChip, InfoTooltip, scanPlanText (describeFallback)
         │   │   └── index.ts                # барель: export { Searches }
         │   ├── Header.tsx        # шапка (кнопка бічної панелі, SearchActionPanel-модалка, SettingsDrawer)
         │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
@@ -316,7 +318,8 @@ olx-dashboard/
         ├── hooks/
         │   ├── useListingsTableState.ts # збереження/завантаження стану таблиці (сортування, sizing)
         │   ├── useAutoRefresh.ts # періодичний автоскан усіх пошуків (інтервал з налаштувань, пауза 5-10с між пошуками)
-        │   ├── useSearchActionPanel.ts # стан панелі дій пошуку: швидкий/глибокий скан, verify, двофазний deep-скан (аналіз → звіт → запуск)
+        │   ├── useSearchActionPanel.ts # стан панелі дій пошуку: швидкий/глибокий скан, verify, зупинка; двофазний deep-скан — useScanPlanReport
+        │   ├── useScanPlanReport.ts # двофазний deep-скан: збережений/свіжий аналіз → звіт → запуск за планом (planValid, застарілий план)
         │   ├── useIsMobile.ts    # useBreakpointValue < md — для responsive JS-розгалужень
         │   ├── useDebouncedValue.ts # значення з паузою (серверний пошук в описі)
         │   ├── useListingsMap.ts  # мемоїзована Map<id, Listing> з масиву listings (спільний для AI-діалогів)
@@ -347,6 +350,7 @@ olx-dashboard/
         │   └── index.ts          # barrel-файл експорту типів
         └── utils/
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
+            ├── scanRun.ts        # isUserAbort(), describeScanResult() (тости скану), estimateDeepScan() (оцінка діапазонів/запитів/хвилин)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
             ├── listingVisibility.ts # єдиний предикат видимості рядка (passesNoiseFilters/isAiPickCandidate/isListingVisible/previewHideReason) — спільний для таблиці, лічильників вкладок і обсягу AI-аналізу
             ├── aiScope.ts        # єдине джерело обсягу AI (AiScope all/tab/selected/candidates, getScopeIds/Counts, getDefaultScope, buildScopeLabel)

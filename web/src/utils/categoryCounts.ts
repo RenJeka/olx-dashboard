@@ -119,3 +119,13 @@ export function nodeCheckedState(
   if (node.leafIds.every((id) => selected.has(id))) return true;
   return node.leafIds.some((id) => selected.has(id)) ? 'indeterminate' : false;
 }
+
+/** Ключі всіх вузлів-гілок дерева (з дітьми) — для «Згорнути все». */
+export function collectBranchKeys(nodes: CategoryTreeNode[], out: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.children.length === 0) continue;
+    out.push(n.key);
+    collectBranchKeys(n.children, out);
+  }
+  return out;
+}

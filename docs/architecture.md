@@ -401,7 +401,8 @@ flowchart LR
 - `utils/storage.ts` — хелпери для `localStorage` виключно для специфічного стану таблиці `TABLE_STORAGE_KEY` (сортування, розміри колонок).
 - `utils/format.ts` — хелпери форматування ціни (`formatPrice`), форматування дати
   (`formatDate`), відносного часу (`formatRelativeTime`, напр. «3 год тому» — для рядка
-  стану панелі дій) та чистки HTML-опису (`stripDescriptionHtml`).
+  стану панелі дій), чисел/тривалості/короткої дати звіту аналізу (`formatNumber`, `formatDuration`,
+  `formatShortDateTime`) та чистки HTML-опису (`stripDescriptionHtml`).
 - `utils/status.ts` — `STATUS_LABELS`/`STATUS_COLORS` (Record по `ListingStatus`: `new` blue,
   `interested` green, `contacted` purple, `rejected` gray, `disabled` red) та
   `isMutedStatus(status)` (`disabled`/`rejected` → приглушений рядок).
