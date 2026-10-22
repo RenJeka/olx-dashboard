@@ -64,6 +64,7 @@ olx-dashboard/
 │       ├── logger.ts         # єдиний сервіс логування (pino): getLogger(scope), logError/logWarn(scope, stage, …) → stdout + app_logs, retention 14 днів
 │       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
 │       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом
+│       ├── services/         # use-cases для роутів: searches, projects, listings, logs (валідація → HttpError, без Fastify)
 │       ├── auth/             # Google OAuth «ворота» single-user (docs/plans/old/google-oauth-gate.md)
 │       │   ├── config.ts     # env: GOOGLE_CLIENT_ID/ALLOWED_EMAILS/SESSION_SECRET, кукі-флаги, isAuthDisabled, assertAuthConfigured (fail-fast)
 │       │   ├── plugin.ts     # fastify-plugin (non-encapsulated): @fastify/cookie+@fastify/jwt, verifyGoogleIdToken (google-auth-library), глобальний onRequest-замок /api/*
@@ -100,6 +101,7 @@ olx-dashboard/
 │       │   └── copyProd.ts       # CLI копія прод-БД (Turso, лише SELECT) у server/data/olx.db, npm run db:copy-prod (docs/plans/old/db-copy-prod.md)
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
+│       │   ├── repos/        # SQL по таблицях: searches, projects, listings, scanRuns, logs (роути/сервіси — без SQL)
 │       │   ├── copyDb.ts     # copyDatabase: схема з sqlite_master + дані keyset-пагінацією за rowid в іншу libSQL-БД (Vitest)
 │       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, dbBatchChunked (batch порціями), initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)

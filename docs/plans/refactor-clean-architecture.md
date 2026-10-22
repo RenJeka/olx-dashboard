@@ -113,16 +113,26 @@ test-cases фази) → оновити `architecture.md`/`structure.md` → PR 
 
 ### Фаза 2. Пошуки (`searches`) — найбільший маршрут
 
-- [ ] 2.1 `db/repos/searches.ts` + `db/repos/scanRuns.ts`: перенести SQL з `routes/searches.ts` дослівно.
-- [ ] 2.2 `services/searches.ts`: create (сортування згори), update (+ перерахунок `filtered_out` і автокатегорії),
+- [x] 2.1 `db/repos/searches.ts` + `db/repos/scanRuns.ts` (+ `db/repos/listings.ts` — params і поля фільтрів):
+      SQL з `routes/searches.ts` дослівно.
+- [x] 2.2 `services/searches.ts`: create (сортування згори), update (+ перерахунок `filtered_out` і автокатегорії),
       delete (каскад), move, paramKeys, filterOptions, lastAnalysis, stats.
-- [ ] 2.3 `routes/searches.ts` → лише HTTP; 404/400/410 — через `errors.ts`.
-- [ ] Verify: `routes/searches.test.ts` зелений без зміни очікувань; test-cases 1–3.
+- [x] 2.3 `routes/searches.ts` → лише HTTP; 404/400 — через `errors.ts`. Рішення людини 2026-10-22 — варіант Б
+      (5xx не-скан-роутів ідуть у журнал `app_logs` через глобальний обробник). Виняток — скан-роути (`scan`,
+      `scan/analyze`, `scan/run-plan`, `verify`): лишили власний `catch`, бо збій скану вже пише в журнал `withScanRun`
+      (без подвійного запису); `run-plan` 410 — у фазі 5 (`GoneError` зі сканера).
+- [x] Verify: `routes/searches.test.ts` зелений без зміни очікувань.
 
 ### Фаза 3. Проєкти, оголошення, журнал
 
-- [ ] 3.1 `projects`, `listings`, `logs`: репозиторій + сервіс + тонкий маршрут (як фаза 2).
-- [ ] Verify: тести маршрутів зелені; test-cases 4–5.
+- [x] 3.1 `projects`, `listings`, `logs`: репозиторій + сервіс + тонкий маршрут (як фаза 2). Правило ручного PATCH
+      оголошення (`status_source='manual'`, `miss_count=0`, `ai_relevant_source='manual'`) — у
+      `db/repos/listings.ts` → `applyManualPatch` (SQL-фрагменти з `datetime('now')`), валідація — у сервісі.
+- [x] Verify: тести маршрутів зелені (без зміни очікувань); `layers:check` — у `routes/` лишились лише AI і категорії.
+      **Звірка на реальних даних (2026-10-22):** локальна копія проду, сервер до/після на `:3099`, 52 GET-відповіді
+      (списки, `listings` з сортуванням, `filter-options`, `param-keys`, `stats`, `scan-status`, `last-analysis`,
+      пошук в описі, деталі, журнал, 404) — 0 розбіжностей байт-у-байт.
+      Ручні test-cases 1–5 в UI агент не проходив (замінено звіркою API); людині — за бажанням.
 
 ### Фаза 4. Категорії й AI
 
