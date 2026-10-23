@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "scan": "tsx src/cli/scan.ts",
     "categories:collect": "tsx src/cli/collectCategories.ts",
+    "olx:audit": "tsx src/cli/olxAudit.ts",
     "jev:pilot": "tsx src/cli/jevPilot.ts",
     "jev:probe": "tsx src/cli/jevProbe.ts",
     "llm:eval": "tsx src/cli/llmEval.ts",

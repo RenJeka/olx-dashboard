@@ -16,6 +16,7 @@
     "skill-from-instruction": ["claude", "agents"],
     "docs-audit": ["claude", "agents"],
     "jev-pilot": ["claude", "agents"],
-    "api-equivalence-check": ["claude", "agents"]
+    "api-equivalence-check": ["claude", "agents"],
+    "olx-api-audit": ["claude", "agents"]
   }
 }
