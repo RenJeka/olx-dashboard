@@ -41,7 +41,7 @@
 ## Активні плани
 
 - [refactor-clean-architecture](plans/refactor-clean-architecture.md) — прагматична чиста архітектура: фази 0–4, 7, 8
-  виконано на гілці `refactor/phase-0-tests` (PR відкрито 2026-10-23, у main ще не злито); фази 5–6 (сканер, скрейпер)
+  злито в `main` і задеплоєно 2026-10-23 (`npm run smoke` зелений, логи API чисті); фази 5–6 (сканер, скрейпер)
   і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
 
 Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
@@ -95,5 +95,4 @@
 
 ## Наступний крок
 
-Людина переглядає PR гілки `refactor/phase-0-tests`; після зеленого CI і «так» — злиття (= деплой) і `npm run smoke`;
-далі — фази 5–6 плану [refactor-clean-architecture](plans/refactor-clean-architecture.md) або вибір з парковки (P-019, P-020, P-018).
+Фази 5–6 плану [refactor-clean-architecture](plans/refactor-clean-architecture.md) або вибір з парковки (P-019, P-020, P-018).

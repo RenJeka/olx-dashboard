@@ -15,6 +15,7 @@
     "parking-add": ["claude", "agents"],
     "skill-from-instruction": ["claude", "agents"],
     "docs-audit": ["claude", "agents"],
-    "jev-pilot": ["claude", "agents"]
+    "jev-pilot": ["claude", "agents"],
+    "api-equivalence-check": ["claude", "agents"]
   }
 }
