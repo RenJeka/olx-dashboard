@@ -87,6 +87,7 @@ npm run dev:server | dev:web
 npm run build                   # tsc server + tsc/vite web (перевірка типів)
 npm run scan -- --search <id>   # CLI-скан без UI (--deep, --verify)
 npm run categories:collect      # збір дерева категорій OLX за SEED_WORDS (-- --words "a,b" — свій список; живі запити до OLX)
+npm run olx:audit               # аудит запитів до OLX: живі статуси й структура проти еталону (-- --update — новий еталон; живі запити)
 npm run docs:check              # биті посилання в документації (має бути 0)
 npm run smoke                   # smoke-перевірка проду після деплою (-- <api-url> [web-url])
 npm run db:copy-prod            # копія прод-БД у server/data/olx.db (PROD_DB_URL/PROD_DB_TOKEN; development.md §4)

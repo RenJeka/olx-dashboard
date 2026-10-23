@@ -94,6 +94,7 @@ olx-dashboard/
 │       ├── cli/              # точки входу npm-скриптів (CLI); шляхи до server/data — від cli/ на 2 рівні вгору
 │       │   ├── scan.ts           # CLI: npm run scan -- --search <id>
 │       │   ├── collectCategories.ts # CLI: npm run categories:collect [-- --words "a,b"] — збір дерева категорій OLX
+│       │   ├── olxAudit.ts       # CLI: npm run olx:audit [-- --query "<слово>"] [-- --update] — аудит запитів до OLX (docs/instructions/olx-api-audit.md)
 │       │   ├── jevPilot.ts       # CLI-пілот Jev (npm run jev:pilot): вартість і згода Jev vs LLM на вибірці з JSON, звіт у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       │   ├── jevProbe.ts       # CLI-проба кроку 2 Jev (npm run jev:probe): сирий запит/відповідь і ймовірності по критеріях, JSON у server/data/jev-pilot/ (docs/plans/old/jev-model.md)
 │       │   ├── llmEval.ts        # CLI-замір точності LLM (npm run llm:eval -- run|report): генерація + пошук, бюджет, файли в server/data/llm-eval/ (docs/plans/old/llm-haiku-prompt-audit.md)
@@ -147,6 +148,7 @@ olx-dashboard/
 │       │   ├── refilter.ts     # recomputeFilteredOut(): перерахунок filtered_out після зміни local_filters (лише змінені рядки, порціями)
 │       │   ├── localFilters.ts # parseLocalFilters() (єдиний парсер searches.local_filters) + evaluateFilteredOut(): price_range/cities/sellers/pros/cons/categories (Етап 2; стоп-слова+ranges по params закомментовано)
 │       │   ├── olxCategories.ts # facetToOptions/facetToNodes: чисті перетворення facet категорій OLX (olx-api.md §2.11) → CategoryOption[] / CategoryNode[]; facet тягне graphql/categories.ts, кеш у searches.category_facet
+│       │   ├── audit.ts        # runOlxAudit(): аудит усіх запитів до OLX (статус, тип, шляхи полів / селектори) проти еталону olxAuditEtalon.json (P-017)
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── errorHandler.ts # httpErrorHandler: глобальний обробник помилок (index.ts і тести через test/app.ts)

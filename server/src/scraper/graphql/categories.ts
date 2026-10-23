@@ -25,16 +25,10 @@ interface CategoryFacetResponse {
   errors?: Array<{ message: string }>;
 }
 
-/**
- * Тягне facet категорій для пошукового запиту. Не-200, `ListingError`, помилка схеми, порожній facet,
- * мережевий збій → `logWarn('scanner', 'category-facet', …)` і `null` (виклик лишає старе дерево).
- */
-export async function fetchCategoryFacet(query: string): Promise<FacetCategory[] | null> {
-  const q = query.trim();
-  if (!q) return null;
-
-  const searchParameters: SearchParameter[] = [
-    { key: 'query', value: q },
+/** `searchParameters` запиту facet категорій (спільні для `fetchCategoryFacet` і аудиту OLX). */
+export function buildCategoryFacetParams(query: string): SearchParameter[] {
+  return [
+    { key: 'query', value: query },
     { key: 'offset', value: '0' },
     { key: 'limit', value: '1' },
     {
@@ -44,6 +38,17 @@ export async function fetchCategoryFacet(query: string): Promise<FacetCategory[]
       ]),
     },
   ];
+}
+
+/**
+ * Тягне facet категорій для пошукового запиту. Не-200, `ListingError`, помилка схеми, порожній facet,
+ * мережевий збій → `logWarn('scanner', 'category-facet', …)` і `null` (виклик лишає старе дерево).
+ */
+export async function fetchCategoryFacet(query: string): Promise<FacetCategory[] | null> {
+  const q = query.trim();
+  if (!q) return null;
+
+  const searchParameters = buildCategoryFacetParams(q);
 
   try {
     const res = await fetch(GRAPHQL_URL, {
