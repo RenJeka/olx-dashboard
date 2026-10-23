@@ -2,6 +2,7 @@
 name: api-equivalence-check
 created: 2026-10-23
 source: сесія 2026-10-22 (рефакторинг, фази 2–4 плану refactor-clean-architecture)
+skill: api-equivalence-check
 ---
 # Звірка API до/після рефакторингу на реальних даних
 
