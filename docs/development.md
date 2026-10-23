@@ -27,7 +27,7 @@
 | 1 | Типи (strict) | `npm run typecheck` (server `tsc --noEmit` + web `tsc -b --noEmit`) | завжди |
 | 1a | Автотести (Vitest, server) | `npm test` (`npm -w server run test:watch` — у режимі спостереження) | завжди; зміна доменної логіки — разом із тестом |
 | 2 | Посилання в документації | `npm run docs:check` | завжди (0 битих) |
-| 1–2 | Разом (typecheck + test + docs + skills) | `npm run check` | перед комітом |
+| 1–2 | Разом (typecheck + test + docs + skills + шари) | `npm run check` (у т.ч. `layers:check`) | перед комітом |
 | CI | `npm ci` → `npm run check` → `npm run build` на Node з `.nvmrc` | GitHub Actions, `.github/workflows/ci.yml` | автоматично на кожен push; червоний — не зливати |
 | Deps | PR оновлень залежностей (npm — лише minor/patch, групою; major — вручну, [P-012](parking.md)) і дій CI | Dependabot, `.github/dependabot.yml` | 1-го і 15-го числа (≈ раз на 2 тижні); злиття = деплой — лише з «так» людини |
 | Прод | `npm run smoke` (API, гейт `401`, CORS, фронт) | `scripts/smoke.mjs` | після кожного деплою; повний чекліст релізу й відкат — [deploy-render-turso](deploy-render-turso.md) → «Реліз, відкат, бекап» |
