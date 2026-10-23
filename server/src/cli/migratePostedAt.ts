@@ -1,7 +1,7 @@
 // Одноразова міграція: текстові posted_at з HTML-fallback («30 травня 2026 р.»,
 // «Сьогодні о 14:30») → ISO. Запуск: npm run migrate:posted-at
-import { db, dbAll, initDb } from './db/db.js';
-import { parseOlxDate } from './scraper/dateParser.js';
+import { db, dbAll, initDb } from '../db/db.js';
+import { parseOlxDate } from '../scraper/dateParser.js';
 
 interface Row {
   id: number;

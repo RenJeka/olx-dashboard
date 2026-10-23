@@ -1,7 +1,7 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PromptListing } from './prompts.js';
-import type { ListingRow } from './repo.js';
+import type { ListingRow } from '../db/repos/analysis.js';
 import { stripHtml } from './text.js';
 
 // Python-асети ZIP-пакетів лежать поряд із цим файлом у analysis/ — шлях прямий, без '../'.

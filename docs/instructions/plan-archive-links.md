@@ -1,7 +1,7 @@
 ---
 name: plan-archive-links
 created: 2026-10-11
-source: сесія 2026-10-11 (перенесення criteria-auto-group в `old/`, зайвий коміт `666d450`)
+source: сесія 2026-10-11 (перенесення criteria-auto-group в `old/`, зайвий коміт)
 ---
 # Посилання після перенесення плану в `old/`
 

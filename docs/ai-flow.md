@@ -104,7 +104,7 @@ reduce — теж судження, яке агент робить сам, чи�
 (базові + власні, як в аналізі; так само `jev:probe` і вибірка `jev:pilot --export`), запобіжник `--budget` зупиняє
 за фактичним `usage.cost`; `report` дописує нерозмічене у файл міток (server/data/llm-eval/labels.json), суддя
 (людина чи агент) ставить `label`, повторний `report` рахує хибну полярність генерації й precision пошуку. Метрики —
-`server/src/analysis/llmEval.ts`, CLI — `server/src/llmEval.ts`; результати замірів — [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md).
+`server/src/analysis/llmEval.ts`, CLI — `server/src/cli/llmEval.ts`; результати замірів — [llm-haiku-prompt-audit](plans/old/llm-haiku-prompt-audit.md).
 
 ## Майстер «Мінуси/плюси» (крок 2) — 4 кроки UI
 

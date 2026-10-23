@@ -2,7 +2,14 @@
  * Глобальне дерево категорій OLX (таблиця `olx_categories`), що накопичується зі скану пошуків
  * і збирача (docs/plans/old/base-criteria.md).
  */
-import { dbAll, dbBatchChunked, dbGet, dbRun } from '../db/db.js';
+import {
+  countListingsByCategory,
+  getSearchCategoryState,
+  listCategoryRowsByIds,
+  setSearchBaseCategory,
+  upsertCategoryRows,
+  type CategoryRow,
+} from '../db/repos/categories.js';
 import { parseLocalFilters } from '../scraper/localFilters.js';
 import type { CategoryNode } from '../types.js';
 
@@ -19,14 +26,9 @@ export async function upsertCategories(nodes: CategoryNode[]): Promise<number> {
 
   // Turso-економія: читаємо лише рядки, чиї id є у вхідному наборі (а не всю таблицю).
   const ids = [...new Set(nodes.map((n) => n.id))];
-  const before = new Map<number, { id: number; parent_id: number | null; label: string; slug: string }>();
+  const before = new Map<number, CategoryRow>();
   for (let i = 0; i < ids.length; i += SELECT_CHUNK) {
-    const chunk = ids.slice(i, i + SELECT_CHUNK);
-    const rows = await dbAll<{ id: number; parent_id: number | null; label: string; slug: string }>(
-      `SELECT id, parent_id, label, slug FROM olx_categories WHERE id IN (${chunk.map(() => '?').join(',')})`,
-      chunk,
-    );
-    for (const r of rows) before.set(r.id, r);
+    for (const r of await listCategoryRowsByIds(ids.slice(i, i + SELECT_CHUNK))) before.set(r.id, r);
   }
 
   // Вхідний parentId=null (facet без предка) не затирає збережений непорожній parent_id.
@@ -38,18 +40,7 @@ export async function upsertCategories(nodes: CategoryNode[]): Promise<number> {
   });
   if (changed.length === 0) return 0;
 
-  await dbBatchChunked(
-    changed.map((n) => ({
-      sql: `INSERT INTO olx_categories (id, parent_id, label, slug, updated_at)
-            VALUES (?, ?, ?, ?, datetime('now'))
-            ON CONFLICT(id) DO UPDATE SET
-              parent_id = COALESCE(excluded.parent_id, olx_categories.parent_id),
-              label = excluded.label, slug = excluded.slug, updated_at = excluded.updated_at
-            WHERE (excluded.parent_id IS NOT NULL AND parent_id IS NOT excluded.parent_id)
-               OR label != excluded.label OR slug != excluded.slug`,
-      args: [n.id, n.parentId, n.label, n.slug],
-    })),
-  );
+  await upsertCategoryRows(changed);
   return changed.length;
 }
 
@@ -114,21 +105,14 @@ export function descendantIds(rows: CategoryNode[], id: number): number[] {
  * (з `invert.categories` — навпаки, виключення). `searches.category_id` (категорія скану) не чіпає.
  */
 export async function refreshBaseCategory(searchId: number): Promise<number | null> {
-  const search = await dbGet<{ local_filters: string | null; base_category_id: number | null }>(
-    'SELECT local_filters, base_category_id FROM searches WHERE id = ?',
-    [searchId],
-  );
+  const search = await getSearchCategoryState(searchId);
   if (!search) return null;
 
   const filters = parseLocalFilters(search.local_filters);
   const listed = Array.isArray(filters.categories) ? filters.categories : [];
   const inverted = filters.invert?.categories === true;
 
-  const rows = await dbAll<{ category_id: number; n: number }>(
-    `SELECT category_id, COUNT(*) AS n FROM listings
-      WHERE search_id = ? AND category_id IS NOT NULL GROUP BY category_id`,
-    [searchId],
-  );
+  const rows = await countListingsByCategory(searchId);
   const excluded = new Set(inverted ? listed : []);
   const counts = rows
     .filter((r) => !excluded.has(r.category_id))
@@ -136,7 +120,7 @@ export async function refreshBaseCategory(searchId: number): Promise<number | nu
 
   const picked = pickBaseCategory(counts, inverted ? [] : listed);
   if (picked !== search.base_category_id) {
-    await dbRun('UPDATE searches SET base_category_id = ? WHERE id = ?', [picked, searchId]);
+    await setSearchBaseCategory(searchId, picked);
   }
   return picked;
 }

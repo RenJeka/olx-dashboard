@@ -98,6 +98,27 @@ export function formatRelativeTime(iso: string): string {
   return `${diffDay} дн тому`;
 }
 
+/** Число з розділювачами розрядів (uk-UA). */
+export function formatNumber(n: number): string {
+  return n.toLocaleString('uk-UA');
+}
+
+/** Орієнтовна тривалість: «~N с» до хвилини, далі «~N хв». */
+export function formatDuration(sec: number): string {
+  if (sec < 60) return `~${Math.max(1, Math.round(sec))} с`;
+  return `~${Math.round(sec / 60)} хв`;
+}
+
+/** Коротка дата й час (напр. «22 жовт., 17:30») — коли зроблено аналіз. */
+export function formatShortDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('uk-UA', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /**
  * Рахує кількість пунктів у тексті «Плюси»/«Мінуси» (формат `• criterion\n• …`,
  * сумісний з ручним едітом). Один непорожній рядок = один пункт; маркер `•` і

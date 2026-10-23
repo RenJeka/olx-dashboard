@@ -6,10 +6,10 @@ import { createClient } from '@libsql/client';
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { copyDatabase } from './db/copyDb.js';
+import { copyDatabase } from '../db/copyDb.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, '..', 'data');
+const DATA_DIR = join(__dirname, '..', '..', 'data');
 const TARGET = join(DATA_DIR, 'olx.db');
 
 function fail(message: string): never {

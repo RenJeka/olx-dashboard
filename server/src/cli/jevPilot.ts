@@ -7,7 +7,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hasApiKey } from './analysis/config.js';
+import { hasApiKey } from '../analysis/config.js';
 import {
   AUTO_CHUNK_SIZE,
   DEFAULT_MODEL,
@@ -16,7 +16,7 @@ import {
   JEV_RELEVANCE_THRESHOLD,
   JEV_SHORT_DESC_SLICE,
   MATCHING_DESC_SLICE,
-} from './analysis/constants.js';
+} from '../analysis/constants.js';
 import {
   RELEVANT_KEY,
   criteriaAbove,
@@ -29,15 +29,15 @@ import {
   type JevLang,
   type JevQuestion,
   type JevResult,
-} from './analysis/jev.js';
-import { chatWithUsage } from './analysis/openrouter.js';
-import { parseMatchingResponse } from './analysis/parse.js';
-import { descriptionMap, chunk } from './analysis/promptData.js';
-import { buildChunkListings, buildMatchingPrompt, type ChunkListing, type PromptListing } from './analysis/prompts.js';
-import { buildRelevancePrompt, parseRelevanceResponse, prefilterCandidates } from './analysis/relevance.js';
-import { parseBullets } from './analysis/text.js';
-import type { AnalysisMode, CriterionGroup } from './types.js';
-import { enabledGroups, parseCriteriaConfig, serializeCriteriaConfig } from './analysis/criteria.js';
+} from '../analysis/jev.js';
+import { chatWithUsage } from '../analysis/openrouter.js';
+import { parseMatchingResponse } from '../analysis/parse.js';
+import { descriptionMap, chunk } from '../analysis/promptData.js';
+import { buildChunkListings, buildMatchingPrompt, type ChunkListing, type PromptListing } from '../analysis/prompts.js';
+import { buildRelevancePrompt, parseRelevanceResponse, prefilterCandidates } from '../analysis/relevance.js';
+import { parseBullets } from '../analysis/text.js';
+import type { AnalysisMode, CriterionGroup } from '../types.js';
+import { enabledGroups, parseCriteriaConfig, serializeCriteriaConfig } from '../analysis/criteria.js';
 
 // ── Вхід ───────────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ interface Sample {
   listings: SampleListing[];
 }
 
-const PILOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'jev-pilot');
+const PILOT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'jev-pilot');
 const THRESHOLDS = [0.3, 0.5, 0.7, 0.9];
 const ALL_VARIANTS = ['L', 'A1s', 'A1f', 'A2', 'B', 'UK'] as const;
 type Variant = (typeof ALL_VARIANTS)[number];
@@ -248,8 +248,8 @@ function buildDisputes(
  * sample.json. Пріоритет — уже проаналізовані й розмічені оголошення (є з чим порівнювати).
  */
 async function exportSample(searchId: number, limit: number, out: string): Promise<void> {
-  const { dbAll, dbGet } = await import('./db/db.js');
-  const { resolveEffectiveCriteria } = await import('./analysis/baseCriteria.js');
+  const { dbAll, dbGet } = await import('../db/db.js');
+  const { resolveEffectiveCriteria } = await import('../analysis/baseCriteria.js');
   const row = await dbGet<Sample['search'] & { base_category_id: number | null; base_disabled: string | null }>(
     `SELECT id, query, relevance_target, query_synonyms, analysis_criteria, base_category_id, base_disabled
        FROM searches WHERE id = ?`,

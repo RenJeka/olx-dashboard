@@ -1,5 +1,5 @@
 import './env.js'; // завантажити server/.env у process.env ДО читання auth/БД конфігів
-import Fastify, { type FastifyError } from 'fastify';
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { initDb } from './db/db.js';
 import { rootLogger, logError, logWarn, cleanupOldLogs } from './logger.js';
@@ -16,6 +16,7 @@ import { relevanceRoutes } from './routes/relevance.js';
 import { searchSynonymsRoutes } from './routes/searchSynonyms.js';
 import { logsRoutes } from './routes/logs.js';
 import { categoriesRoutes } from './routes/categories.js';
+import { httpErrorHandler } from './routes/errorHandler.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -26,16 +27,7 @@ assertAuthConfigured();
 // HTTP-логи Fastify і записи logError/logWarn ідуть одним потоком/форматом.
 const app = Fastify({ loggerInstance: rootLogger });
 
-// Глобальний перехоплювач невпійманих помилок роутів: у журнал app_logs зі stage=метод+URL,
-// відповідь — той самий формат {error}, що й у ручних reply.code(500) по роутах.
-app.setErrorHandler((err: FastifyError, req, reply) => {
-  const status = err.statusCode ?? 500;
-  // 4xx (валідація/404 від Fastify) — очікувані, у журнал не пишемо; 5xx — пишемо зі stack.
-  if (status >= 500) {
-    logError('http', `${req.method} ${req.url}`, err);
-  }
-  reply.code(status).send({ error: err.message });
-});
+app.setErrorHandler(httpErrorHandler);
 
 // Аварії process-рівня: у журнал (fire-and-forget встигає, бо процес живе далі / коротка пауза).
 process.on('unhandledRejection', (reason) => {

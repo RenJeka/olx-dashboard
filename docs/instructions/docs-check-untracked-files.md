@@ -1,7 +1,7 @@
 ---
 name: docs-check-untracked-files
 created: 2026-10-01
-source: сесія 2026-10-01 (CI PR #34 впав на `docs:check`, локально зелений)
+source: сесія 2026-10-01 (CI впав на `docs:check`, локально зелений)
 ---
 # `docs:check` локально бачить незакомічені файли, CI — ні
 

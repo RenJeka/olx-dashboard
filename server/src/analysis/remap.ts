@@ -4,7 +4,7 @@
  * Використовують `POST /api/searches/:id/criteria/remap` і `POST /api/categories/:id/criteria/remap`.
  */
 import type { InStatement } from '@libsql/client';
-import { dbAll, dbGet } from '../db/db.js';
+import { getSearchLocalFilters, listListingCriteria, listingCriteriaStatement } from '../db/repos/analysis.js';
 import { parseLocalFilters } from '../scraper/localFilters.js';
 import type { AnalysisMode, CriterionGroup, LocalFilters } from '../types.js';
 import type { BaseDisabled } from './baseCriteria.js';
@@ -151,25 +151,13 @@ export async function remapListingStatements(
   steps: RemapStep[],
   localFilters?: LocalFilters,
 ): Promise<{ statements: InStatement[]; filtersChanged: boolean; nextFilters: LocalFilters }> {
-  const filters =
-    localFilters ??
-    parseLocalFilters(
-      (await dbGet<{ local_filters: string | null }>('SELECT local_filters FROM searches WHERE id = ?', [searchId]))
-        ?.local_filters,
-    );
+  const filters = localFilters ?? parseLocalFilters(await getSearchLocalFilters(searchId));
   const nextFilters = steps.reduce((f, step) => remapLocalFilters(f, mode, step.keys, step.to), filters);
 
   const statements: InStatement[] = [];
-  // mode — з whitelist (isMode): 'cons' | 'pros', безпечна інтерполяція.
-  const rows = await dbAll<{ id: number; val: string | null }>(
-    `SELECT id, ${mode} AS val FROM listings WHERE search_id = ? AND ${mode} <> ''`,
-    [searchId],
-  );
-  for (const row of rows) {
+  for (const row of await listListingCriteria(searchId, mode)) {
     const next = steps.reduce((text, step) => remapBullets(text, step.keys, step.to), row.val);
-    if (next !== row.val) {
-      statements.push({ sql: `UPDATE listings SET ${mode} = ? WHERE id = ?`, args: [next, row.id] });
-    }
+    if (next !== row.val) statements.push(listingCriteriaStatement(mode, row.id, next));
   }
   return { statements, filtersChanged: nextFilters !== filters, nextFilters };
 }

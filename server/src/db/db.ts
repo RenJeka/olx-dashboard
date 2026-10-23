@@ -163,8 +163,8 @@ async function planColumnMigrations(schema: string): Promise<string[]> {
 
 /**
  * Застосовує канонічну схему (server/src/db/schema.sql) і додає в наявні таблиці колонки,
- * яких бракує (ідемпотентно). Викликати на старті КОЖНОЇ точки входу (index.ts, scan.ts,
- * migratePostedAt.ts) ДО першого доступу до БД. Повертає застосовані `ALTER TABLE` —
+ * яких бракує (ідемпотентно). Викликати на старті КОЖНОЇ точки входу (index.ts, cli/scan.ts,
+ * cli/migratePostedAt.ts) ДО першого доступу до БД. Повертає застосовані `ALTER TABLE` —
  * логує викликач (logger.ts імпортує db.ts, тож тут логера немає).
  */
 export async function initDb(): Promise<string[]> {

@@ -1,7 +1,7 @@
 // CLI збирача дерева категорій: npm run categories:collect [-- --words "ноутбук,телефон"]
-import { initDb } from './db/db.js';
-import { collectCategories } from './categories/collector.js';
-import { SEED_WORDS } from './categories/seedWords.js';
+import { initDb } from '../db/db.js';
+import { collectCategories } from '../categories/collector.js';
+import { SEED_WORDS } from '../categories/seedWords.js';
 
 function parseWords(argv: string[]): string[] | null {
   const idx = argv.indexOf('--words');

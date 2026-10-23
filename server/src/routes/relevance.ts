@@ -29,8 +29,8 @@ import {
   getSearch,
   loadListings,
   setRelevanceTarget,
-} from '../analysis/repo.js';
-import { db } from '../db/db.js';
+  commitRelevance,
+} from '../db/repos/analysis.js';
 import { getLogger } from '../logger.js';
 import type { RelevanceItem, RelevanceResponse } from '../types.js';
 
@@ -202,27 +202,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const source = req.body.source === 'import' ? 'import' : 'api';
 
-    const SET_SQL = `UPDATE listings
-       SET ai_relevant = ?, ai_relevant_reason = ?, ai_relevant_at = datetime('now'), ai_relevant_source = ?
-       WHERE id = ? AND search_id = ? AND (ai_relevant_source IS NULL OR ai_relevant_source != 'manual')`;
-
-    // Інтерактивна транзакція: пакет UPDATE-ів; ручні override (source='manual') не перетираємо (WHERE).
-    const tx = await db.transaction('write');
-    let committed = 0;
-    try {
-      for (const item of items) {
-        const info = await tx.execute({
-          sql: SET_SQL,
-          args: [item.relevant ? 1 : 0, item.reason, source, item.id, id],
-        });
-        committed += info.rowsAffected;
-      }
-      await tx.commit();
-    } catch (err) {
-      await tx.rollback();
-      throw err;
-    }
-
-    return { committed };
+    // Транзакція в репозиторії; ручні override (source='manual') не перетираються.
+    return { committed: await commitRelevance(id, items, source) };
   });
 }

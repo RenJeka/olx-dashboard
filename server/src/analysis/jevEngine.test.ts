@@ -1,4 +1,5 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import { testApp } from '../test/app.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSearch, insertListing, resetDb } from '../test/db.js';
 import { relevanceRoutes } from '../routes/relevance.js';
@@ -122,7 +123,7 @@ describe('маршрути з engine=jev', () => {
   const savedKey = process.env.OPENROUTER_API_KEY;
 
   beforeAll(async () => {
-    app = Fastify();
+    app = testApp();
     await app.register(relevanceRoutes);
     await app.register(matchingRoutes);
   });

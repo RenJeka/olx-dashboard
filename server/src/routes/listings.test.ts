@@ -1,6 +1,7 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import { testApp } from '../test/app.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { db } from '../db/db.js';
+import { db, dbGet } from '../db/db.js';
 import { createSearch, resetDb } from '../test/db.js';
 import { listingsRoutes } from './listings.js';
 
@@ -19,7 +20,7 @@ async function insert(olxId: number, title: string, description: string | null):
 }
 
 beforeAll(async () => {
-  app = Fastify();
+  app = testApp();
   await app.register(listingsRoutes);
 });
 afterAll(() => app.close());
@@ -79,5 +80,55 @@ describe('GET /api/searches/:id/listings/search', () => {
     expect(await search('iphone && !розбитий')).toEqual([a]);
     expect(await search('батарея', '&description=0')).toEqual([]);
     expect(await search('12', '&description=0')).toEqual([b]);
+  });
+});
+
+// Характеризаційні тести (docs/plans/refactor-clean-architecture.md, фаза 0): фіксують поточну поведінку.
+describe('PATCH /api/listings/:id', () => {
+  const patch = (id: number, payload: object) => app.inject({ method: 'PATCH', url: `/api/listings/${id}`, payload });
+  const row = (id: number) =>
+    dbGet<Record<string, unknown>>(
+      'SELECT status, status_source, miss_count, note, ai_relevant, ai_relevant_source, ai_relevant_at, olx_status FROM listings WHERE id = ?',
+      [id],
+    );
+
+  it('статус → manual, miss_count = 0; відповідь — легкий рядок', async () => {
+    const id = await insert(1, 'iPhone', LONG);
+    await db.execute({ sql: 'UPDATE listings SET miss_count = 3 WHERE id = ?', args: [id] });
+    const res = await patch(id, { status: 'interested', note: 'дзвонити' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ id, status: 'interested', note: 'дзвонити', has_description: true });
+    expect(body).not.toHaveProperty('description');
+    expect(await row(id)).toMatchObject({ status: 'interested', status_source: 'manual', miss_count: 0 });
+  });
+
+  it('нотатка без статусу не робить статус ручним', async () => {
+    const id = await insert(1, 'iPhone', null);
+    await patch(id, { note: 'x' });
+    expect(await row(id)).toMatchObject({ status: 'new', status_source: 'auto', note: 'x' });
+  });
+
+  it('ai_relevant → manual з часом; null — «невідоме»; olx_status — без source', async () => {
+    const id = await insert(1, 'iPhone', null);
+    await patch(id, { ai_relevant: false, olx_status: 'removed' });
+    const after = await row(id);
+    expect(after).toMatchObject({ ai_relevant: 0, ai_relevant_source: 'manual', olx_status: 'removed' });
+    expect(after?.ai_relevant_at).not.toBeNull();
+
+    await patch(id, { ai_relevant: null, olx_status: null });
+    expect(await row(id)).toMatchObject({ ai_relevant: null, olx_status: null });
+  });
+
+  it('невідомий статус / olx_status → 400; невідоме оголошення → 404', async () => {
+    const id = await insert(1, 'iPhone', null);
+    const badStatus = await patch(id, { status: 'sold' });
+    expect(badStatus.statusCode).toBe(400);
+    expect(badStatus.json()).toEqual({ error: 'Невідомий статус: sold' });
+    const badOlx = await patch(id, { olx_status: 'gone' });
+    expect(badOlx.json()).toEqual({ error: 'Невідоме значення olx_status: gone' });
+    const missing = await patch(999, { note: 'x' });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ error: 'Оголошення не знайдено' });
   });
 });

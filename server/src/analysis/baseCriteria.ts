@@ -4,7 +4,8 @@
  * Вимкнені пошуком базові пункти — `searches.base_disabled` (парс/серіалізація — лише тут).
  */
 import { ancestorIds } from '../categories/tree.js';
-import { dbAll, dbGet } from '../db/db.js';
+import { getSearchCriteriaRow } from '../db/repos/analysis.js';
+import { listBaseCriteria, listCategoryChainRows } from '../db/repos/categories.js';
 import type { AnalysisMode, CategoryNode, CriteriaConfig, CriterionBase, CriterionGroup } from '../types.js';
 import { cleanCriterion, normalizeGroups, parseCriteriaConfig, phraseKey } from './criteria.js';
 
@@ -218,17 +219,7 @@ function isBaseItem(item: unknown): item is { name?: unknown; enabled?: unknown;
  * дерева; Turso-економія). Категорії немає в `olx_categories` → `[]`.
  */
 export async function loadCategoryChain(id: number): Promise<CategoryNode[]> {
-  const rows = await dbAll<{ id: number; parent_id: number | null; label: string; slug: string }>(
-    `WITH RECURSIVE chain(id, parent_id, label, slug, depth) AS (
-       SELECT id, parent_id, label, slug, 0 FROM olx_categories WHERE id = ?
-       UNION ALL
-       SELECT c.id, c.parent_id, c.label, c.slug, chain.depth + 1
-         FROM olx_categories c JOIN chain ON c.id = chain.parent_id
-        WHERE chain.depth < ?
-     )
-     SELECT id, parent_id, label, slug FROM chain`,
-    [id, MAX_CHAIN_DEPTH],
-  );
+  const rows = await listCategoryChainRows(id, MAX_CHAIN_DEPTH);
   if (rows.length === 0) return [];
   const nodes: CategoryNode[] = rows.map((r) => ({ id: r.id, parentId: r.parent_id, label: r.label, slug: r.slug }));
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -240,10 +231,7 @@ export async function loadCategoryChain(id: number): Promise<CategoryNode[]> {
 /** Набори `base_criteria` для вузлів ланцюжка — одним `SELECT … WHERE category_id IN (…)`, порядок ланцюжка. */
 export async function loadBaseSets(chain: CategoryNode[]): Promise<BaseSet[]> {
   if (chain.length === 0) return [];
-  const rows = await dbAll<{ category_id: number; criteria: string | null }>(
-    `SELECT category_id, criteria FROM base_criteria WHERE category_id IN (${chain.map(() => '?').join(',')})`,
-    chain.map((n) => n.id),
-  );
+  const rows = await listBaseCriteria(chain.map((n) => n.id));
   const byId = new Map(rows.map((r) => [r.category_id, r.criteria]));
   return chain
     .filter((n) => byId.has(n.id))
@@ -273,10 +261,7 @@ export async function resolveEffectiveCriteria(search: SearchCriteriaRow): Promi
 
 /** Ефективні критерії пошуку за id (пошуку немає → порожньо, `category: null`). */
 export async function getEffectiveCriteria(searchId: number): Promise<EffectiveCriteria> {
-  const search = await dbGet<SearchCriteriaRow>(
-    'SELECT analysis_criteria, base_category_id, base_disabled FROM searches WHERE id = ?',
-    [searchId],
-  );
+  const search: SearchCriteriaRow | undefined = await getSearchCriteriaRow(searchId);
   if (!search) return { config: { cons: [], pros: [] }, category: null };
   return resolveEffectiveCriteria(search);
 }

@@ -12,7 +12,7 @@ import type { CategoryOption, Listing } from '../types';
  * Будує вкладене дерево категорій + лічильники В ПАМ'ЯТІ (0 додаткових запитів до БД).
  * `listings` — уже відфільтровані: ті, що покаже таблиця з поточними (незбереженими) фільтрами без
  * групи «Категорії» й з перемикачами шуму (рахує SearchFiltersDrawer). Тож число біля вузла = скільки
- * покаже таблиця, якщо обрати саме його. Див. docs/plans/category-filter-counts.md.
+ * покаже таблиця, якщо обрати саме його. Див. docs/plans/old/category-filter-counts.md.
  */
 export function useCategoryTree(
   listings: Listing[],

@@ -92,7 +92,8 @@ npm run smoke                   # smoke-перевірка проду після
 npm run db:copy-prod            # копія прод-БД у server/data/olx.db (PROD_DB_URL/PROD_DB_TOKEN; development.md §4)
 npm run typecheck               # tsc --noEmit для server і web
 npm test                        # Vitest (server): доменне ядро на тимчасовій БД
-npm run check                   # typecheck + test + docs:check + skills:check — перед комітом
+npm run check                   # typecheck + test + docs:check + skills:check + layers:check — перед комітом
+npm run layers:check            # напрям залежностей між шарами server/src (поки звіт; --strict — блокує)
 npm run skills:sync             # перегенерувати обгортки скілів після зміни skills/
 ```
 
@@ -116,6 +117,9 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 
 - Без `any` у доменних типах (scraper/db/logic). Доменні типи — `server/src/types/` (реекспорт — `types.ts`),
   фронтенду — `web/src/types/`; DTO між беком і фронтом дублюються (без build-зчеплень).
+- **Шари сервера:** `routes/` — лише HTTP (без SQL; помилки — `HttpError` з `server/src/errors.ts`) → `services/` і
+  доменні модулі → `db/repos/` — єдине місце SQL. Напрям перевіряє `npm run layers:check`; сканер і скрейпер ще
+  пишуть SQL самі (фази 5–6 [плану](docs/plans/refactor-clean-architecture.md)) — новий SQL туди не додавати.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
 - Git, коміти й PR — `docs/rules.md` → «Git».
 - **Плани:** перед правками коду нової фічі/задачі — ПЕРШИМ кроком файл `docs/plans/<назва>.md`

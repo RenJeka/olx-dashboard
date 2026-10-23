@@ -69,8 +69,7 @@ Content-Type: application/json
 | `X-Client` | `DESKTOP` | внутрішній заголовок OLX |
 | `User-Agent` | реалістичний Chrome (див. дамп нижче) | |
 
-UA з верифікованого дампа:
-`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36`
+UA з верифікованого дампа — константа в `server/src/scraper/constants.ts`.
 
 ### 2.4 Тіло запиту
 

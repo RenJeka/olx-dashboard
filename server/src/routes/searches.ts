@@ -1,233 +1,48 @@
 import type { FastifyInstance } from 'fastify';
-import type { InValue } from '@libsql/client';
-import { db, dbAll, dbGet, dbRun } from '../db/db.js';
 import {
   runScan,
   runVerify,
   analyzeScan,
   runDeepScanFromPlan,
   requestStopScan,
-  isAnalysisFresh,
 } from '../scanner/index.js';
-import { refreshBaseCategory } from '../categories/tree.js';
-import { logWarn } from '../logger.js';
-import { recomputeFilteredOut } from '../scraper/refilter.js';
-import { parseBullets } from '../analysis/text.js';
-import type {
-  CategoryOption,
-  FilterOptions,
-  LocalFilters,
-  ParamKeyInfo,
-  ScanPlan,
-  LastScanResponse,
-} from '../types.js';
+import {
+  assertSearchExists,
+  createSearch,
+  deleteSearch,
+  getFilterOptions,
+  getLastAnalysis,
+  getParamKeys,
+  getScanStatus,
+  getSearch,
+  getSearchStats,
+  listAllSearches,
+  moveSearch,
+  updateSearch,
+  type SearchInput,
+} from '../services/searches.js';
 
-interface SearchBody {
-  name?: string;
-  query?: string;
-  category_id?: number | null;
-  api_filters?: unknown;
-  local_filters?: unknown;
-  cron_enabled?: number;
-  /** Синоніми query (docs/plans/old/search-synonyms.md). */
-  query_synonyms?: string[];
-  /** Архів пошуку (docs/plans/old/archive-searches.md): 1 — в архіві. */
-  archived?: number;
-  /** Проект (docs/plans/old/projects.md): id проекту або null — «Без проекту». */
-  project_id?: number | null;
-}
-
-/** api_filters/local_filters приймаємо як обʼєкт або рядок → зберігаємо як JSON-рядок. */
-function toJsonText(value: unknown, fallback = '{}'): string {
-  if (value == null) return fallback;
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value);
-}
-
+// Помилки сервісу (404/400) відповідає глобальний обробник (routes/errorHandler.ts). Скан-роути
+// мають власний catch: збій скану вже записано в журнал у withScanRun — без подвійного запису.
 export async function searchesRoutes(app: FastifyInstance): Promise<void> {
-  // Список пошуків
-  app.get('/api/searches', async () => {
-    return dbAll('SELECT * FROM searches ORDER BY sort_order ASC, created_at DESC, id DESC');
+  app.get('/api/searches', () => listAllSearches());
+
+  app.get<{ Params: { id: string } }>('/api/searches/:id', (req) => getSearch(Number(req.params.id)));
+
+  app.post<{ Body: SearchInput }>('/api/searches', async (req, reply) => {
+    return reply.code(201).send(await createSearch(req.body));
   });
 
-  // Один пошук
-  app.get<{ Params: { id: string } }>('/api/searches/:id', async (req, reply) => {
-    const row = await dbGet('SELECT * FROM searches WHERE id = ?', [Number(req.params.id)]);
-    if (!row) return reply.code(404).send({ error: 'Пошук не знайдено' });
-    return row;
-  });
-
-  // Створення
-  app.post<{ Body: SearchBody }>('/api/searches', async (req, reply) => {
-    const { name, query } = req.body;
-    if (!name || !query) {
-      return reply.code(400).send({ error: 'Поля name і query обовʼязкові' });
-    }
-
-    // Новий пошук з'являється згори списку.
-    const minRow = await dbGet<{ min: number | null }>('SELECT MIN(sort_order) AS min FROM searches');
-    const sortOrder = (minRow?.min ?? 0) - 1;
-
-    const info = await dbRun(
-      `INSERT INTO searches (name, query, category_id, api_filters, local_filters, cron_enabled, sort_order, query_synonyms, archived, project_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name,
-        query,
-        req.body.category_id ?? null,
-        toJsonText(req.body.api_filters),
-        toJsonText(req.body.local_filters),
-        req.body.cron_enabled ?? 0,
-        sortOrder,
-        toJsonText(req.body.query_synonyms, '[]'),
-        req.body.archived ? 1 : 0,
-        req.body.project_id ?? null,
-      ],
-    );
-
-    return reply
-      .code(201)
-      .send(await dbGet('SELECT * FROM searches WHERE id = ?', [Number(info.lastInsertRowid)]));
-  });
-
-  // Оновлення
-  app.patch<{ Params: { id: string }; Body: SearchBody }>(
-    '/api/searches/:id',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      const existing = await dbGet('SELECT * FROM searches WHERE id = ?', [id]);
-      if (!existing) return reply.code(404).send({ error: 'Пошук не знайдено' });
-
-      const fields: string[] = [];
-      const values: InValue[] = [];
-
-      if (req.body.name != null) {
-        fields.push('name = ?');
-        values.push(req.body.name);
-      }
-      if (req.body.query != null) {
-        fields.push('query = ?');
-        values.push(req.body.query);
-      }
-      if (req.body.category_id !== undefined) {
-        fields.push('category_id = ?');
-        values.push(req.body.category_id);
-      }
-      if (req.body.api_filters !== undefined) {
-        fields.push('api_filters = ?');
-        values.push(toJsonText(req.body.api_filters));
-      }
-      if (req.body.local_filters !== undefined) {
-        fields.push('local_filters = ?');
-        values.push(toJsonText(req.body.local_filters));
-      }
-      if (req.body.cron_enabled !== undefined) {
-        fields.push('cron_enabled = ?');
-        values.push(req.body.cron_enabled);
-      }
-      if (req.body.query_synonyms !== undefined) {
-        fields.push('query_synonyms = ?');
-        values.push(toJsonText(req.body.query_synonyms, '[]'));
-      }
-      if (req.body.archived !== undefined) {
-        fields.push('archived = ?');
-        values.push(req.body.archived ? 1 : 0);
-      }
-      if (req.body.project_id !== undefined) {
-        fields.push('project_id = ?');
-        values.push(req.body.project_id ?? null);
-      }
-
-      if (fields.length > 0) {
-        values.push(id);
-        await dbRun(`UPDATE searches SET ${fields.join(', ')} WHERE id = ?`, values);
-      }
-
-      const search = await dbGet('SELECT * FROM searches WHERE id = ?', [id]);
-
-      // Зміна local_filters → ретроактивний перерахунок filtered_out для всіх рядків пошуку.
-      if (req.body.local_filters === undefined) return search;
-
-      const { filtered_out_count } = await recomputeFilteredOut(id);
-
-      // Білий список категорій міг змінитись → перераховуємо автокатегорію (збій не валить PATCH).
-      let freshSearch = search;
-      try {
-        await refreshBaseCategory(id);
-        freshSearch = await dbGet('SELECT * FROM searches WHERE id = ?', [id]);
-      } catch (err) {
-        logWarn('searches', 'base-category', err instanceof Error ? err.message : String(err), { searchId: id });
-      }
-      return { ...(freshSearch as object), filtered_out_count };
-    },
+  app.patch<{ Params: { id: string }; Body: SearchInput }>('/api/searches/:id', (req) =>
+    updateSearch(Number(req.params.id), req.body),
   );
 
   // Видалення (каскадне: price_history → scan_runs → listings → searches)
-  app.delete<{ Params: { id: string } }>(
-    '/api/searches/:id',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      const existing = await dbGet('SELECT id FROM searches WHERE id = ?', [id]);
-      if (!existing) {
-        return reply.code(404).send({ error: 'Пошук не знайдено' });
-      }
-
-      // Чисті DELETE без проміжних рішень → batch у неявній транзакції (порядок: FK-залежні спершу).
-      await db.batch(
-        [
-          {
-            sql: `DELETE FROM price_history WHERE listing_id IN (SELECT id FROM listings WHERE search_id = ?)`,
-            args: [id],
-          },
-          { sql: 'DELETE FROM scan_runs WHERE search_id = ?', args: [id] },
-          { sql: 'DELETE FROM listings WHERE search_id = ?', args: [id] },
-          { sql: 'DELETE FROM searches WHERE id = ?', args: [id] },
-        ],
-        'write',
-      );
-
-      return { deleted: true };
-    },
-  );
+  app.delete<{ Params: { id: string } }>('/api/searches/:id', (req) => deleteSearch(Number(req.params.id)));
 
   // Ручне сортування (стрілки ↑/↓): міняє sort_order із сусідом за поточним порядком.
-  app.post<{ Params: { id: string }; Body: { direction?: 'up' | 'down' } }>(
-    '/api/searches/:id/move',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      const direction = req.body.direction;
-      if (direction !== 'up' && direction !== 'down') {
-        return reply.code(400).send({ error: 'direction має бути "up" або "down"' });
-      }
-
-      const current = await dbGet<{ id: number; sort_order: number; project_id: number | null }>(
-        'SELECT id, sort_order, project_id FROM searches WHERE id = ?',
-        [id],
-      );
-      if (!current) return reply.code(404).send({ error: 'Пошук не знайдено' });
-
-      // Реордер лише серед активних (не архівних) у межах ТІЄЇ Ж групи-проекту
-      // (project_id збігається; NULL = група «Без проекту»).
-      const sameProject = '(project_id = ? OR (? IS NULL AND project_id IS NULL))';
-      const neighbor = await dbGet<{ id: number; sort_order: number }>(
-        direction === 'up'
-          ? `SELECT id, sort_order FROM searches WHERE sort_order < ? AND archived = 0 AND ${sameProject} ORDER BY sort_order DESC LIMIT 1`
-          : `SELECT id, sort_order FROM searches WHERE sort_order > ? AND archived = 0 AND ${sameProject} ORDER BY sort_order ASC LIMIT 1`,
-        [current.sort_order, current.project_id, current.project_id],
-      );
-
-      if (neighbor) {
-        await db.batch(
-          [
-            { sql: 'UPDATE searches SET sort_order = ? WHERE id = ?', args: [neighbor.sort_order, current.id] },
-            { sql: 'UPDATE searches SET sort_order = ? WHERE id = ?', args: [current.sort_order, neighbor.id] },
-          ],
-          'write',
-        );
-      }
-
-      return dbGet('SELECT * FROM searches WHERE id = ?', [id]);
-    },
+  app.post<{ Params: { id: string }; Body: { direction?: 'up' | 'down' } }>('/api/searches/:id/move', (req) =>
+    moveSearch(Number(req.params.id), req.body.direction),
   );
 
   // Сканування. ?deep=true — глибокий скан (батчі з паузами, до ~50 запитів).
@@ -295,8 +110,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
   // Verify-прохід (A3): перевірка живості давно не бачених + дозаповнення опису/продавця.
   app.post<{ Params: { id: string } }>('/api/searches/:id/verify', async (req, reply) => {
     const id = Number(req.params.id);
-    const search = await dbGet('SELECT id FROM searches WHERE id = ?', [id]);
-    if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
+    await assertSearchExists(id);
     try {
       const result = await runVerify(id);
       return result;
@@ -308,149 +122,23 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Статус останнього скану — для поллінгу прогресу глибокого скану.
-  app.get<{ Params: { id: string } }>(
-    '/api/searches/:id/scan-status',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      const row = await dbGet(
-        `SELECT id, started_at, finished_at, found, new_count, raw_found, error, requests_done, requests_total,
-                  fetch_method, kind, stage, sub_done, sub_total
-           FROM scan_runs WHERE search_id = ? ORDER BY id DESC LIMIT 1`,
-        [id],
-      );
-      if (!row) return reply.code(404).send({ error: 'Сканів ще не було' });
-      return row;
-    },
+  app.get<{ Params: { id: string } }>('/api/searches/:id/scan-status', (req) =>
+    getScanStatus(Number(req.params.id)),
   );
 
-  // Останній збережений аналіз (kind='analyze') — для перегляду без повторного зондування
-  // (docs/plans/old/deep-scan-stop-and-history.md). planValid — часова валідність (у межах TTL за
-  // finished_at): true → звіт ще запускний (за потреби runDeepScanFromPlan перезондує);
-  // false → аналіз протермінований, потрібен новий.
-  app.get<{ Params: { id: string } }>(
-    '/api/searches/:id/last-analysis',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      const row = await dbGet<{ finished_at: string | null; scan_plan: string }>(
-        `SELECT finished_at, scan_plan FROM scan_runs
-           WHERE search_id = ? AND kind = 'analyze' AND scan_plan IS NOT NULL
-           ORDER BY id DESC LIMIT 1`,
-        [id],
-      );
-
-      if (!row) return reply.code(404).send({ error: 'Аналізів ще не було' });
-
-      let plan: ScanPlan;
-      try {
-        plan = JSON.parse(row.scan_plan) as ScanPlan;
-      } catch {
-        return reply.code(404).send({ error: 'Збережений аналіз пошкоджено' });
-      }
-
-      return {
-        plan,
-        analyzedAt: row.finished_at,
-        // Валідність — часова (у межах TTL за finished_at), НЕ прив'язана до in-memory кешу:
-        // звіт лишається запускним протягом TTL навіть після закриття діалогу/перезапуску
-        // сервера (runDeepScanFromPlan за потреби перезондує).
-        planValid: isAnalysisFresh(row.finished_at),
-      };
-    },
+  // Останній збережений аналіз (kind='analyze') — для перегляду без повторного зондування.
+  app.get<{ Params: { id: string } }>('/api/searches/:id/last-analysis', (req) =>
+    getLastAnalysis(Number(req.params.id)),
   );
 
   // Розподіл усіх ключів params цього пошуку (для дропдауна конструктора діапазонів).
-  app.get<{ Params: { id: string } }>('/api/searches/:id/param-keys', async (req) => {
-    const id = Number(req.params.id);
-    const rows = await dbAll<{ params: string }>(
-      "SELECT params FROM listings WHERE search_id = ? AND params IS NOT NULL AND params != '{}'",
-      [id],
-    );
+  app.get<{ Params: { id: string } }>('/api/searches/:id/param-keys', (req) => getParamKeys(Number(req.params.id)));
 
-    const samplesByKey = new Map<string, string[]>();
-    for (const row of rows) {
-      let params: Record<string, string>;
-      try {
-        params = JSON.parse(row.params) as Record<string, string>;
-      } catch {
-        continue;
-      }
-      for (const [key, value] of Object.entries(params)) {
-        if (!samplesByKey.has(key)) samplesByKey.set(key, []);
-        const samples = samplesByKey.get(key) as string[];
-        if (samples.length < 3 && !samples.includes(value)) samples.push(value);
-      }
-    }
+  // Варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси"/"Категорії" (Drawer локальних фільтрів).
+  app.get<{ Params: { id: string } }>('/api/searches/:id/filter-options', (req) =>
+    getFilterOptions(Number(req.params.id)),
+  );
 
-    const result: ParamKeyInfo[] = Array.from(samplesByKey.entries())
-      .map(([key, samples]) => ({ key, samples }))
-      .sort((a, b) => a.key.localeCompare(b.key));
-
-    return result;
-  });
-
-  // Варіанти для фільтрів "Місто"/"Продавець"/"Плюси"/"Мінуси" (Drawer локальних фільтрів).
-  // Плюси/мінуси — DISTINCT критерії з реальних рядків (враховує ручний едіт, не лише analysis_criteria).
-  app.get<{ Params: { id: string } }>('/api/searches/:id/filter-options', async (req) => {
-    const id = Number(req.params.id);
-
-    // Один прохід по рядках пошуку замість 4 окремих сканів (city/seller/pros/cons) —
-    // дедуп і парсинг bullet-тексту в JS (на Turso кожен скан = +N прочитаних рядків).
-    const rows = await dbAll<{
-      city: string | null;
-      seller_name: string | null;
-      pros: string | null;
-      cons: string | null;
-    }>('SELECT city, seller_name, pros, cons FROM listings WHERE search_id = ?', [id]);
-
-    const citySet = new Set<string>();
-    const sellerSet = new Set<string>();
-    const prosSet = new Set<string>();
-    const consSet = new Set<string>();
-    for (const row of rows) {
-      if (row.city) citySet.add(row.city);
-      if (row.seller_name) sellerSet.add(row.seller_name);
-      if (row.pros) parseBullets(row.pros).forEach((c) => prosSet.add(c));
-      if (row.cons) parseBullets(row.cons).forEach((c) => consSet.add(c));
-    }
-
-    // Дерево категорій OLX — кешований facet з останнього скану (searches.category_facet).
-    // Назви/ієрархія/OLX-лічильники готові; локальні лічильники накладає фронт із listings.
-    const facetRow = await dbGet<{ category_facet: string | null }>(
-      'SELECT category_facet FROM searches WHERE id = ?',
-      [id],
-    );
-    let categories: CategoryOption[] = [];
-    try {
-      categories = facetRow?.category_facet ? (JSON.parse(facetRow.category_facet) as CategoryOption[]) : [];
-    } catch {
-      categories = [];
-    }
-
-    const result: FilterOptions = {
-      cities: [...citySet].sort(),
-      sellers: [...sellerSet].sort(),
-      pros: [...prosSet].sort(),
-      cons: [...consSet].sort(),
-      categories,
-    };
-    return result;
-  });
-
-  // Останній скан для панелі дій. Агрегати in_db/stale_count/verify_candidates НЕ рахуємо тут:
-  // фронт виводить їх із уже завантаженого масиву listings, щоб не робити зайвий 408-рядковий
-  // SUM(CASE…)-прохід на кожен вибір пошуку (Turso reads, docs/plans/old/turso-stats-clientside.md).
-  app.get<{ Params: { id: string } }>('/api/searches/:id/stats', async (req, reply) => {
-    const id = Number(req.params.id);
-    const search = await dbGet('SELECT id FROM searches WHERE id = ?', [id]);
-    if (!search) return reply.code(404).send({ error: 'Пошук не знайдено' });
-
-    const lastScan = await dbGet<NonNullable<LastScanResponse['last_scan']>>(
-      `SELECT kind, started_at, finished_at, found, new_count, raw_found, disabled_count, error, warning
-         FROM scan_runs WHERE search_id = ? AND kind != 'analyze' ORDER BY id DESC LIMIT 1`,
-      [id],
-    );
-
-    const response: LastScanResponse = { last_scan: lastScan ?? null };
-    return response;
-  });
+  // Останній скан для панелі дій (агрегати рахує фронт — див. getSearchStats).
+  app.get<{ Params: { id: string } }>('/api/searches/:id/stats', (req) => getSearchStats(Number(req.params.id)));
 }

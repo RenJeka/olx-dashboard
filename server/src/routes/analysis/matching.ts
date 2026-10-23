@@ -27,7 +27,7 @@ import {
   buildMatchingPrompt,
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
-import { getSearch, loadListings } from '../../analysis/repo.js';
+import { getSearch, loadListings } from '../../db/repos/analysis.js';
 import { resolveEffectiveCriteria } from '../../analysis/baseCriteria.js';
 import { enabledGroups } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';

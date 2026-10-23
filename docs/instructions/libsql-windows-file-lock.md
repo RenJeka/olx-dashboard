@@ -12,7 +12,7 @@ source: план docs/plans/old/db-copy-prod.md (CLI db:copy-prod)
 ## Що робити
 - Вважати файл зайнятим до кінця процесу (перевірено 2026-10-16: `close()` + повтори `renameSync` 2 с — не допомагає).
 - Перейменування/бекап робити **до** відкриття клієнта, а писати одразу у фінальний шлях (так зроблено в
-  `server/src/copyProd.ts`).
+  `server/src/cli/copyProd.ts`).
 - Тимчасові БД тестів — з префіксом `olx-dashboard-test-` у `tmpdir()`: залишки старші за годину прибирає
   `server/src/test/globalSetup.ts`; збій `rmSync` в `afterEach` ковтати.
 
