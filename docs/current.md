@@ -17,9 +17,8 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній реліз — 2026-10-22 зрозумілі лічильники у фільтрі «Категорії» ([category-filter-counts](plans/old/category-filter-counts.md),
-  PR [#82](https://github.com/RenJeka/olx-dashboard/pull/82); разом із доками PR #81): ручні тести пройдено людиною
-  локально; стан злиття, деплою й smoke — у хендофі [2026-10-22 category-filter-counts](handoffs/2026-10-22-category-filter-counts.md).
+- Останній реліз — 2026-10-22 зрозумілі лічильники у фільтрі «Категорії» ([category-filter-counts](plans/old/category-filter-counts.md)):
+  злито й задеплоєно, деталі — у хендофі [2026-10-22 category-filter-counts](handoffs/2026-10-22-category-filter-counts.md).
   Перед тим того ж дня — доробки базових плюсів і мінусів ([base-criteria-polish](plans/old/base-criteria-polish.md),
   частина [P-019](parking.md)); базові набори (правила — [business-rules](business-rules.md) §4) на проді наповнено людиною.
   Модель і рушії AI — [ai-flow](ai-flow.md).
@@ -41,7 +40,9 @@
 
 ## Активні плани
 
-Немає.
+- [refactor-clean-architecture](plans/refactor-clean-architecture.md) — прагматична чиста архітектура: фази 0–4, 7, 8
+  виконано на гілці `refactor/phase-0-tests` (PR відкрито 2026-10-23, у main ще не злито); фази 5–6 (сканер, скрейпер)
+  і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
 
 Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
@@ -65,6 +66,8 @@
 - Діалог поверх іншої модалки з полями вводу — [chakra-nested-dialog-focus](instructions/chakra-nested-dialog-focus.md).
 - Великий пошук `iphone` на проді: таблиця й пошук в описі повільні — переважно очікування даних із Turso,
   не CPU (замір S17 — у [stability-baseline](plans/old/stability-baseline.md)); лагодження — [P-010](parking.md), [P-008](parking.md), ідея кешу — [P-011](parking.md).
+- Рефакторинг сервера «без зміни поведінки» — звірка GET-відповідей до/після на копії проду
+  ([api-equivalence-check](instructions/api-equivalence-check.md)); шари й `layers:check` — `AGENTS.md` → «Конвенції».
 - Нові задачі з документацією — правило «жодних кількостей» ([rules](rules.md) п. 2); аудит — скіл `docs-audit`.
 - Моніторинг скану на проді — [prod-scan-monitoring](instructions/prod-scan-monitoring.md).
 - Рядки з прод-БД агенту — лише через Turso MCP або команду людини; читання ключів блокує auto-mode
@@ -92,5 +95,5 @@
 
 ## Наступний крок
 
-Людина відкриває прод (https://olx-dashboard.onrender.com) і перевіряє фільтр «Категорії» на «mac mini» (числа
-відрізнятимуться від локальної копії); далі — вибір з парковки: решта [P-019](parking.md), [P-020](parking.md) чи [P-018](parking.md).
+Людина переглядає PR гілки `refactor/phase-0-tests`; після зеленого CI і «так» — злиття (= деплой) і `npm run smoke`;
+далі — фази 5–6 плану [refactor-clean-architecture](plans/refactor-clean-architecture.md) або вибір з парковки (P-019, P-020, P-018).
