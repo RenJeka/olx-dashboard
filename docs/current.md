@@ -43,9 +43,6 @@
 - [refactor-clean-architecture](plans/refactor-clean-architecture.md) — прагматична чиста архітектура: фази 0–4, 7, 8
   злито в `main` і задеплоєно 2026-10-23 (`npm run smoke` зелений, логи API чисті); фази 5–6 (сканер, скрейпер)
   і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
-- [notes-enter-pros-cons-chips](plans/notes-enter-pros-cons-chips.md) (P-003) і [olx-api-audit](plans/olx-api-audit.md)
-  (P-017) — код готовий, закомічено в гілці `feat/p003-notes-enter-chips` (не запушено); чекають ручних test-cases
-  людини, потім PR. Стан — у [хендофі](handoffs/2026-10-23-p003-chips-olx-audit.md).
 
 Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
@@ -55,6 +52,7 @@
 - Запасного каналу збору немає: HTML-fallback вимкнено (OLX відповідає `403`), ідея обходу — [P-005](parking.md).
 - Чи OLX щось змінив у запитах — скіл `olx-api-audit` / `npm run olx:audit` ([olx-api-audit](instructions/olx-api-audit.md)).
   Сторінку OLX у `iframe` вбудувати не можна ([olx-api](olx-api.md) §3.4).
+- Курсор у UI: клікабельне — `pointer`, з tooltip — `help`, обидва — `pointer` ([styles](styles.md) → «Курсор»).
 - Verify-проба («Перевірити неактивні») теж отримує `403`: кнопку вимкнено, прохід зупиняється після серії `403`
   ([verify-403-guard](plans/old/verify-403-guard.md)); обхід — P-005.
 - Точність пошуку мінусів LLM низька й від моделі не залежить: заважають розмиті назви критеріїв («сервісна батарея»,
@@ -100,7 +98,6 @@
 
 ## Наступний крок
 
-Людина проходить ручні test-cases планів [notes-enter-pros-cons-chips](plans/notes-enter-pros-cons-chips.md) і
-[olx-api-audit](plans/olx-api-audit.md) (локально, гілка `feat/p003-notes-enter-chips`) → push, PR у `main`, злиття
-з «так» людини. Далі — фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка
-(P-019, P-020, P-018).
+PR гілки `feat/p003-notes-enter-chips` (P-003 нотатки по Enter і чипи плюсів/мінусів; P-017 аудит OLX; P-002 закрито) — ручні test-cases пройдено
+людиною 2026-10-25, плани в [plans/old/](plans/old/README.md) → зелений CI → злиття з «так» людини → `npm run smoke`.
+Далі — фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка (P-019, P-020, P-018).

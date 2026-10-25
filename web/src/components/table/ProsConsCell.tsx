@@ -172,6 +172,7 @@ export function ProsConsCell({ listing, field }: Props) {
                       <Tag.Label>{item}</Tag.Label>
                       <Tag.EndElement>
                         <Tag.CloseTrigger
+                          cursor="pointer"
                           aria-label={`Видалити «${item}»`}
                           onClick={() => saveItems(items.filter((existing) => existing !== item))}
                         />
