@@ -12,13 +12,14 @@ export interface ScanResult {
   stopped?: boolean;
 }
 
-/** Результат verify-проходу (POST /api/searches/:id/verify, Етап 2 A3). */
+/** Результат verify-проходу (POST /api/searches/:id/verify; GraphQL-видача, docs/plans/verify-graphql.md). */
 export interface VerifyResult {
   checked: number;
   alive: number;
   dead: number;
+  /** Не знайдено за назвою — промах (вимкнення після кількох поспіль). */
+  missed: number;
   unknown: number;
-  reactivated: number;
   disabled_count: number;
   backfilled: number;
 }

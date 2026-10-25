@@ -83,7 +83,7 @@ export function useSearchActionPanel(search: Search) {
         toaster.create({
           type: 'success',
           title: 'Перевірку завершено',
-          description: `Перевірено ${r.checked} · живих ${r.alive} · мертвих ${r.dead} · реактивовано ${r.reactivated} · вимкнено ${r.disabled_count} · дозаповнено ${r.backfilled}`,
+          description: `Перевірено ${r.checked} · живих ${r.alive} · зникли в продавця ${r.dead} · промахів ${r.missed} · вимкнено ${r.disabled_count} · дозаповнено ${r.backfilled}`,
         });
       },
       onError: (err) =>

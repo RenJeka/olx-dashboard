@@ -10,4 +10,4 @@ export function describeFallback(reason: string): string {
 }
 
 /** Внутрішній маркер у тексті серверного warning — рендериться скорочено з повним поясненням у тултіпі. */
-export const COVERAGE_WARNING_PREFIX = 'вікно покриття буде пропущено';
+export const COVERAGE_WARNING_PREFIX = 'повне покриття потрібне';

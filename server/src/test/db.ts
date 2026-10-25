@@ -33,7 +33,10 @@ export interface ListingRow {
   olx_status: string | null;
   filtered_out: number;
   price: number | null;
+  currency: string;
   city: string | null;
+  seller_id: number | null;
+  last_seen_at: string | null;
   title: string | null;
   description: string | null;
   last_refresh_at: string | null;

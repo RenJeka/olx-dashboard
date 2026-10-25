@@ -1,8 +1,9 @@
 import { memo, type ReactNode } from 'react';
 import { HStack, Table } from '@chakra-ui/react';
 import { flexRender, type Row } from '@tanstack/react-table';
-import { LuFilter, LuScanSearch } from 'react-icons/lu';
+import { LuFilter, LuScanSearch, LuSearchX } from 'react-icons/lu';
 import type { Listing } from '../../types';
+import { MISS_DISABLE_THRESHOLD } from '../../constants';
 import { DescriptionTooltip } from './DescriptionTooltip';
 import { Tooltip } from '../ui/tooltip';
 import { isMutedStatus } from '../../utils/status';
@@ -27,9 +28,11 @@ function ListingsTableRowImpl({
   searchQuery,
 }: ListingsTableRowProps) {
   const updateListing = useUpdateListing();
+  // Промах: оголошення не знайшлося в останньому повному скані — ще не неактивне, але під підозрою.
+  const isMissed = row.original.status !== 'disabled' && row.original.miss_count > 0;
   return (
     <Table.Row
-      opacity={isMutedStatus(row.original.status) ? 0.5 : undefined}
+      opacity={isMutedStatus(row.original.status) ? 0.5 : isMissed ? 0.7 : undefined}
       bg={isSelected ? 'accent.50/60' : undefined}
       _dark={isSelected ? { bg: 'accent.950/40' } : undefined}
     >
@@ -60,6 +63,21 @@ function ListingsTableRowImpl({
               <Tooltip content="Приховано локальним фільтром">
                 <span>
                   <LuFilter color="var(--chakra-colors-warning-500)" />
+                </span>
+              </Tooltip>
+              {content}
+            </HStack>
+          );
+        }
+
+        if (cell.column.id === 'title' && isMissed) {
+          content = (
+            <HStack gap={1}>
+              <Tooltip
+                content={`Промах ${row.original.miss_count} з ${MISS_DISABLE_THRESHOLD}: не знайдено в останньому повному скані. Ще промах — і оголошення стане неактивним. Перевірити зараз — «Перевірити неактивні».`}
+              >
+                <span style={{ display: 'inline-flex' }}>
+                  <LuSearchX color="var(--chakra-colors-orange-500)" />
                 </span>
               </Tooltip>
               {content}

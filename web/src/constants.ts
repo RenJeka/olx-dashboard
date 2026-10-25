@@ -91,11 +91,12 @@ export const SCAN_KIND_LABELS: Record<string, string> = {
 
 export const DEEP_SCAN_SECONDS_PER_REQUEST = 3;
 /**
- * Verify-прохід («Перевірити неактивні») доступний. Вимкнено: OLX відповідає 403 на сторінки оголошень —
- * дзеркало HTML_FALLBACK_ENABLED сервера (той самий HTML-канал); повернути true при закритті P-005
- * (docs/plans/old/verify-403-guard.md).
+ * Скільки промахів поспіль (скан повного покриття / пошук за назвою у verify) роблять оголошення неактивним —
+ * дзеркало FULL_COVERAGE_MISS_THRESHOLD і VERIFY_MISS_THRESHOLD сервера (docs/plans/verify-graphql.md).
  */
-export const VERIFY_PROBE_AVAILABLE = false;
+export const MISS_DISABLE_THRESHOLD = 2;
+/** GraphQL-запитів за один verify-прохід — дзеркало VERIFY_REQUEST_CAP сервера. */
+export const VERIFY_REQUEST_CAP = 50;
 /** Скільки хвилин живе закешований план аналізу скану (дзеркалить PLAN_TTL_MIN у server/src/scanner.ts). */
 export const SCAN_PLAN_TTL_MIN = 30;
 export const DEEP_SCAN_PAGE_LIMIT = 40;

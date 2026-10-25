@@ -92,7 +92,7 @@
 | Поле | Приклад | Опис |
 | --- | --- | --- |
 | `business` | `true/false` | → `listings.seller_type` (`true`→`business`, `false`→`private`) |
-| `user.id` / `.uuid` | число / uuid | Внутрішні ID продавця |
+| `user.id` / `.uuid` | число / uuid | Внутрішні ID продавця; `user.id` → `listings.seller_id`, фільтр видачі `searchParameters` `user_id=<id>` (verify, [`olx-api.md`](./olx-api.md) §2.12) |
 | `user.name` | рядок | Імʼя/назва продавця |
 | `user.created` | ISO дата | Дата реєстрації на OLX |
 | `user.last_seen` | ISO дата | Остання активність |

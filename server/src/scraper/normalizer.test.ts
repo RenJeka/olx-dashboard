@@ -72,6 +72,19 @@ describe('upsertListings', () => {
     expect((await getListing(2))?.status).toBe('disabled');
   });
 
+  it('seller_id: пишеться з GraphQL, порожнє значення наступного скану не затирає (COALESCE)', async () => {
+    await upsertListings(searchId, [gqlListing(1, { sellerId: 312402193 })]);
+    expect((await getListing(1))?.seller_id).toBe(312402193);
+    await upsertListings(searchId, [gqlListing(1, { price: 9000 })]);
+    expect(await getListing(1)).toMatchObject({ seller_id: 312402193, price: 9000 });
+  });
+
+  it('seller_id дозаповнюється існуючому рядку без інших змін (не дешевий touch)', async () => {
+    await upsertListings(searchId, [gqlListing(1)]);
+    await upsertListings(searchId, [gqlListing(1, { sellerId: 42 })]);
+    expect((await getListing(1))?.seller_id).toBe(42);
+  });
+
   it('HTML-fallback (без createdAt) не затирає зібрані GraphQL-поля', async () => {
     await upsertListings(searchId, [gqlListing(1, { description: 'повний опис' })]);
     await upsertListings(searchId, [

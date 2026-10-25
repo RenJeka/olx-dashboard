@@ -1,6 +1,6 @@
 import { Badge, Box, Button, HStack, Stack, Text } from '@chakra-ui/react';
 import { LuChartNoAxesCombined, LuLayers, LuRefreshCw, LuStethoscope } from 'react-icons/lu';
-import { DEEP_SCAN_MAX_PAGES, VERIFY_PROBE_AVAILABLE } from '../../../constants';
+import { DEEP_SCAN_MAX_PAGES, VERIFY_REQUEST_CAP } from '../../../constants';
 
 interface Props {
   isScanning: boolean;
@@ -30,8 +30,7 @@ export function ActionPanelButtons({
   onRunVerifyPass,
   onStartAnalysis,
 }: Props) {
-  // Verify вимкнено, поки OLX відповідає 403 на сторінки оголошень (P-005, docs/plans/old/verify-403-guard.md).
-  const canVerify = VERIFY_PROBE_AVAILABLE && verifyCandidates > 0;
+  const canVerify = verifyCandidates > 0;
 
   return (
     <Stack gap={3}>
@@ -203,14 +202,12 @@ export function ActionPanelButtons({
               <Text textStyle="sm" fontWeight="bold" color="fg.default">
                 Перевірити неактивні
               </Text>
-              <Badge size="sm" colorPalette={VERIFY_PROBE_AVAILABLE ? 'teal' : 'gray'} variant="subtle">
-                {VERIFY_PROBE_AVAILABLE ? '~2–3 хв' : 'недоступно'}
+              <Badge size="sm" colorPalette="teal" variant="subtle">
+                до ~3 хв
               </Badge>
             </HStack>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-              {VERIFY_PROBE_AVAILABLE
-                ? `Перевіряє сторінки давно не бачених оголошень і дозаповнює опис/продавця (${verifyCandidates}, до 50 сторінок за прохід).`
-                : `Тимчасово недоступно: OLX блокує відкриття сторінок оголошень (HTTP 403). Кандидатів на перевірку: ${verifyCandidates}. Обхід — P-005.`}
+              {`Шукає промахи (бліді рядки) і давно не бачені оголошення серед усіх оголошень продавця або за назвою на OLX, дозаповнює опис (${verifyCandidates}, до ${VERIFY_REQUEST_CAP} запитів за прохід).`}
             </Text>
           </Stack>
         </HStack>

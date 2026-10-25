@@ -6,7 +6,8 @@
  *
  * Джерела фрагментів (тримати синхронно з бекендом):
  * - `multi-query: N варіантів запиту змерджено` + `вікно покриття пропущено (union кількох видач)`
- * - `«variant»: split: K price buckets; coverage window skipped`
+ * - `«variant»: split: K price buckets; coverage window skipped` (без `; coverage window skipped` — повне покриття)
+ * - `повне покриття: зниклі отримали промах (вимкнення після N поспіль)`
  * - `some buckets hit pagination/request cap`
  * - `graphql window cap hit at offset=N`
  * - `split skipped: no upper price bound`
@@ -15,6 +16,7 @@
 
 export type ScanNoteKind =
   | 'coverage-skipped'
+  | 'full-coverage'
   | 'cap-hit'
   | 'html-fallback'
   | 'window-cap'
@@ -62,6 +64,7 @@ export function parseScanWarning(raw: string, context: ScanWarningContext = {}):
 
   const coverageSkipped =
     lower.includes('coverage window skipped') || lower.includes('вікно покриття пропущено');
+  const fullCoverage = lower.includes('повне покриття:');
   const capHit = lower.includes('pagination/request cap');
   const windowCap = lower.includes('window cap hit');
   // Лише успішний HTML-fallback; «graphql failed» без нього (S4: fallback вимкнено) — це збій варіанта.
@@ -82,8 +85,8 @@ export function parseScanWarning(raw: string, context: ScanWarningContext = {}):
       tone: 'attention',
       title: 'Авто-вимкнення зниклих пропущено',
       detail: hasCandidates
-        ? 'Цей скан об’єднав кілька видач, які не можна порівняти між собою, тож статуси «зникло» не оновлювались. Щоб підтвердити, що ще активне, запустіть «Перевірити неактивні».'
-        : 'Цей скан об’єднав кілька видач, які не можна порівняти між собою, тож статуси «зникло» не оновлювались. Кнопка «Перевірити неактивні» поки порожня — кандидати з’являться самі, коли якісь оголошення не потраплять у видачу кілька днів поспіль.',
+        ? 'Скан пройшов не всі варіанти запиту чи цінові діапазони до кінця, тож відсутність оголошень нічого не доводить і промахи не рахувались. Щоб підтвердити, що ще активне, запустіть «Перевірити неактивні».'
+        : 'Скан пройшов не всі варіанти запиту чи цінові діапазони до кінця, тож відсутність оголошень нічого не доводить і промахи не рахувались. Кнопка «Перевірити неактивні» поки порожня — кандидати з’являться самі, коли якісь оголошення не потраплять у видачу кілька днів поспіль.',
     });
   }
   if (capHit) {
@@ -106,6 +109,15 @@ export function parseScanWarning(raw: string, context: ScanWarningContext = {}):
   }
 
   // Інформаційні — пояснюють поведінку, дії не потребують.
+  if (fullCoverage) {
+    notes.push({
+      kind: 'full-coverage',
+      tone: 'info',
+      title: 'Повна видача: зниклі отримали промах',
+      detail:
+        'Скан пройшов усі варіанти запиту й цінові діапазони до кінця. Оголошення, яких немає у видачі, стали блідими в таблиці; після другого такого скану поспіль вони стануть неактивними. Перевірити одразу — «Перевірити неактивні».',
+    });
+  }
   if (windowCap && !splitUsed) {
     notes.push({
       kind: 'window-cap',

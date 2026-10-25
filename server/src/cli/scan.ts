@@ -31,7 +31,7 @@ try {
     const result = await runVerify(searchId);
     console.log(
       `Verify #${searchId} завершено: перевірено ${result.checked}, живих ${result.alive}, ` +
-        `мертвих ${result.dead}, невідомо ${result.unknown}, реактивовано ${result.reactivated}, ` +
+        `мертвих ${result.dead}, промахів ${result.missed}, невідомо ${result.unknown}, ` +
         `вимкнено ${result.disabled_count}, дозаповнено ${result.backfilled}`,
     );
   } else {

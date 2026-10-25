@@ -34,6 +34,8 @@ export interface RawListing {
   description?: string;
   /** Імʼя/назва продавця (GraphQL: data[].user.name). */
   sellerName?: string;
+  /** Внутрішній id продавця (GraphQL: data[].user.id) — для verify через видачу продавця. */
+  sellerId?: number;
   /** Імʼя контактної особи (GraphQL: data[].contact.name). */
   contactName?: string;
   /** Статус оголошення на OLX, напр. "active" (GraphQL: data[].status). НЕ плутати з listings.status. */

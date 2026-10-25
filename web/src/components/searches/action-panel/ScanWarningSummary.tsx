@@ -9,6 +9,7 @@ import {
   LuLayers,
   LuListEnd,
   LuPowerOff,
+  LuSearchX,
   LuSplit,
   LuTags,
   LuTriangleAlert,
@@ -23,6 +24,7 @@ interface Props {
 
 const NOTE_ICON: Record<ScanNoteKind, IconType> = {
   'coverage-skipped': LuPowerOff,
+  'full-coverage': LuSearchX,
   'cap-hit': LuTriangleAlert,
   'html-fallback': LuGlobe,
   'window-cap': LuListEnd,

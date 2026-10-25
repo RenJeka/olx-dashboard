@@ -470,6 +470,27 @@ GraphQL-запитом (той самий `POST /apigateway/graphql`, §2.1) з 
 (раніше працював, верифіковано 2026-06-23); `…/api/v1/categories/` → deprecated / access denied;
 `…/api/v1/offers/metadata/search-categories/` → лише `{id, count}` без назв (параметр `facets` там ігнорується).
 
+### 2.12 Перевірка оголошення без сторінки (verify) — верифіковано live 2026-10-25
+
+> Сторінки оголошень віддають `403` (§3.4), тож verify-прохід дивиться в ту саму GraphQL-видачу
+> (`LISTING_SEARCH_QUERY`, лише інші `searchParameters`). Реалізація — `server/src/scraper/graphql/verifyProbe.ts`,
+> механіка — [`business-rules.md`](business-rules.md) §3, рішення — [`plans/verify-graphql.md`](plans/verify-graphql.md).
+
+| Запит (`searchParameters`) | Відповідь (live 2026-10-25) | Як використовуємо |
+| --- | --- | --- |
+| `user_id=<user.id>`, `offset`, `limit=40`, `sort_by=created_at:desc` | `200`, лише оголошення цього продавця (`visible_total_count` — їх кількість) | видача продавця: є → живе; вичерпана без нього → неактивне |
+| `query=<точна назва>`, `offset=0`, `limit=40` | `200`, живе оголошення знаходиться (у пробі — єдиний результат); давно зникле — 0 результатів | для рядків без `seller_id`: знайдено → живе (+`user.id`); вичерпано без нього → промах |
+
+- Видача містить лише активні оголошення (`status: active`) — «неактивне» = «відсутнє в повній видачі».
+- `user.id` тепер у запиті скану (`user { id name }`) → `listings.seller_id`.
+- **Запобіжник:** невідомий ключ OLX мовчки ігнорує (видача — вся OLX). `verifyProbe` кидає помилку, якщо у видачі
+  продавця є чужий `user.id` або `visible_total_count` нереально великий — прохід зупиняється.
+
+**Що НЕ працює (перевірено live 2026-10-25):** окремого запиту оголошення за id у схемі немає (`ad`, `offer`,
+`listing`, `adById`, `listingById`, `clientCompatibleListing` → `GRAPHQL_VALIDATION_FAILED`; підказки полів
+приховані, ліміт аліасів у запиті — 5); ключі `ids`, `ad_id` ігноруються; сторінка оголошення через `curl`
+(Schannel, інший TLS-стек) — теж `403`. Обхід бот-захисту (браузерний TLS-відбиток) не робимо — рішення людини.
+
 ---
 
 ## 3. HTML-сторінка пошуку (fallback №1)
@@ -477,7 +498,7 @@ GraphQL-запитом (той самий `POST /apigateway/graphql`, §2.1) з 
 > ⛔ **Вимкнено з 2026-10-03** (`HTML_FALLBACK_ENABLED = false` у `scraper/constants.ts`): OLX за
 > CloudFront відповідає `403` на будь-яку HTML-сторінку з Node (пошук, головна, оголошення) — заголовки
 > й адреса не допомагають. Скан при збої GraphQL падає з `graphql failed: …; html fallback вимкнено`.
-> Опис нижче — для повернення (ідея обходу — [P-005](parking.md)). До 2026-06 був основним методом.
+> Опис нижче — історичний (обхід бот-захисту не робимо — §2.12). До 2026-06 був основним методом.
 
 ### 3.1 Запит
 
@@ -526,9 +547,9 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 
 ### 3.4 Сторінка оголошення: детект неактивності (verify-прохід, A3)
 
-> Верифіковано живими запитами **2026-06-12** (4 проби з паузами 1.5 с, включно з 2
-> реальними зниклими оголошеннями). Реалізація — `server/src/scraper/verifier.ts`
-> (`probeListingPage`), `docs/plans/old/verify-pass.md`.
+> ⛔ **Історичне.** З 2026-10-03 сторінка оголошення віддає `403` (CloudFront, як §3); з 2026-10-25 verify
+> працює через GraphQL-видачу (§2.12), а HTML-пробу (`scraper/verifier.ts`) видалено. Нижче — як було
+> (верифіковано 2026-06-12, `docs/plans/old/verify-pass.md`).
 
 **Запит:**
 
@@ -536,10 +557,7 @@ https://www.olx.ua/d/uk/list/q-iphone-13/?currency=UAH&search[order]=created_at:
 GET <listing.url>
 ```
 
-> ⚠️ З 2026-10-03 сторінка оголошення теж віддає `403` (CloudFront, як §3) → проба завжди `unknown`;
-> REST `api/v1/offers/<id>/` — теж `403` (2026-10-10). Тому кнопка «Перевірити неактивні» вимкнена
-> (`VERIFY_PROBE_AVAILABLE` у `web/src/constants.ts`), а прохід зупиняється після серії `403`
-> (`VERIFY_BLOCK_STREAK` у `scanner/verifyScan.ts`) — [verify-403-guard](plans/old/verify-403-guard.md).
+> REST `api/v1/offers/<id>/` — теж `403` (2026-10-10).
 
 > 🚫 Вбудувати сторінку OLX у `iframe` на нашому сайті не можна: OLX віддає `X-Frame-Options: SAMEORIGIN`
 > (перевірено 2026-10-23), браузер покаже порожній фрейм.
@@ -639,7 +657,7 @@ DOM-селектори простіші й достатні).
 | 2026-06-10 | Додано до query `description`, `user { name }`, `contact { name }`; `status`/`visible_total_count` тепер мапляться в БД | нові колонки `listings.description/seller_name/contact_name/olx_status`, `searches.visible_total_count` (UI: колонки «Опис»/«Продавець»/«Статус OLX», «Результатів: N» у шапці) |
 | 2026-06-11 | Знято повний dataflow фронтенду OLX через Chrome DevTools: перше завантаження — SSR без GraphQL; GraphQL — лише при клієнтських діях; `friendly-links`/`offers/metadata` — косметика UI, не дані | задокументовано в §2.10; підтверджено: наш мінімальний запит коректний, змін у коді не потрібно |
 | 2026-06-12 | Виявлено вікно пагінації GraphQL `offset ≤ 1000` (`offset=1040` → `ListingError 400 "Data validation error occurred"`); глибокий скан для видач >1040 падав на цьому offset, втрачав уже зібране й робив повний HTML-fallback → 911/1184 рядків без `description`/`seller_name` і з текстовим `posted_at` | `MAX_PAGES=26` кап цілі глибокого скану + частковий успіх при `ListingError` на `offset>0` (`graphqlOlxFetcher.ts`); нормалізація `posted_at` HTML-fallback через `dateParser.parseOlxDate` + одноразова міграція `migratePostedAt.ts` (`npm run migrate:posted-at`) — `docs/plans/old/graphql-offset-window.md` |
-| 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `server/src/scraper/verifier.ts` (`probeListingPage`) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/old/verify-pass.md` |
+| 2026-06-12 | Знято маркер неактивності detail-сторінки (4 проби з паузами): `410 Gone` (2 реальних зниклих) / `404` (неіснуючий URL) → `dead`; `200` + `[data-testid="ad_description"]` → `alive`; текстові маркери ненадійні (трапляються і в JS-бандлах живої сторінки) | verify-прохід (A3): `probeListingPage` (`scraper/verifier.ts`, видалено 2026-10-25 — §2.12) + `runVerify` у `scanner.ts`, `POST /api/searches/:id/verify`, кнопка «Перевірити неактивні» — `docs/plans/old/verify-pass.md` |
 | 2026-06-12 | Знято сортування GraphQL (3 проби): default = релевантність; `order` ігнорується; `sort_by=created_at:desc` працює, але сортує за `last_refresh_time` DESC (підняття), промо поза порядком зверху. Через відсутність сортування + вісь `posted_at`(=created) вікно покриття хибно вимкнуло 395 живих оголошень | `sort_by=created_at:desc` у `buildSearchParameters`; вікно покриття переведено на `listings.last_refresh_at` (нова колонка), windowFloor = refresh останнього отриманого; часткові скани statusEngine не запускають; note-маркер `auto-disabled: coverage miss_count=2`; одноразове відновлення 395 рядків — `docs/plans/old/coverage-window-fix.md` |
 | 2026-06-30 | Глибокий скан після «Аналізу перед скануванням» падав із оманливою HTML-помилкою «Карток не знайдено… рендериться через JS». Наживо підтверджено: GraphQL і HTML працюють (200, 50 карток; `__NEXT_DATA__` зник, але `[data-cy="l-card"]` є). Реальна причина — ОДИН транзієнтний GraphQL-збій (429/5xx/не-JSON) посеред пагінації валив увесь скан (`fetchPage` без ретраю), а `runDeepScanFromPlan` ковтав причину GraphQL (inline HTML-fallback без try/catch) | ретрай транзієнтних збоїв у `client.fetchPage` (3 спроби, бекоф; детерміновані 4xx/схема/ListingError — без ретраю); об'єднана помилка `graphql failed:…; html fallback failed:…` у `runDeepScanFromPlan`; частковий успіх при транзієнтному винятку посеред пагінації (`fetchSearch`/`scanSingleBucket`) замість обвалу — §2.8/§2.9 |
 | 2026-10-03 | OLX (CloudFront) відповідає `403` на будь-яку HTML-сторінку з Node: пошук (`/d/uk/list/`, `/uk/list/`, `/list/`), головна, сторінка оголошення; заголовки Firefox 91 і сучасного Chrome — без різниці. GraphQL з того ж IP працює. Гіпотеза (середня впевненість): блок за TLS-відбитком Node | HTML-fallback вимкнено (`HTML_FALLBACK_ENABLED`), скан падає з причиною GraphQL; ідея обходу — [P-005](parking.md); verify-проба §3.4 теж дає `unknown` |
@@ -647,3 +665,4 @@ DOM-селектори простіші й достатні).
 | 2026-10-17 | REST facet категорій `GET /api/v1/offers/metadata/search/?facets=…` (працював 2026-06-23) відповідає `403`; фільтр «Категорії» не отримував дерево. GraphQL `facets` у `searchParameters` (`facets=[{"field":"category",…,"limit":150}]`, `metadata { facets { category { id count label url } } }`) працює: 200, ~180 категорій для запиту «ноутбук»; OLX приймає лише `limit` < 200 | `fetchCategoryFacet` (`scraper/graphql/categories.ts`) замість REST; перетворення `facetToOptions`/`facetToNodes`; вузли дерева — в `olx_categories` (`categories/tree.ts`) — §2.11, `docs/plans/old/base-criteria.md` |
 | 2026-10-23 | Перевірено вбудовування сторінок OLX (головна, оголошення): `X-Frame-Options: SAMEORIGIN`, у CSP немає `frame-ancestors` — у `iframe` на чужому домені браузер сторінку не покаже | ідею «оголошення в iframe» закрито ([P-002](parking.md) прибрано) — §3.4 |
 | 2026-10-23 | Аудит запитів (`npm run olx:audit`, запит «iphone»): GraphQL пошук і facet категорій — `200`, HTML пошуку й сторінка оголошення — `403` (як з 2026-10-03) | перший еталон `server/src/scraper/olxAuditEtalon.json` — [olx-api-audit](instructions/olx-api-audit.md) |
+| 2026-10-25 | Пошук способу verify без сторінок: окремого запиту оголошення за id у GraphQL немає (поля приховані, ліміт аліасів 5), ключі `ids`/`ad_id` ігноруються; `curl` (Schannel) на сторінку — `403`. Працюють `searchParameters` `user_id=<user.id>` (лише оголошення продавця) і `query=<точна назва>` | verify через видачу продавця й пошук за назвою (`graphql/verifyProbe.ts`), `user { id name }` у query скану → `listings.seller_id` — §2.12, `docs/plans/verify-graphql.md` |

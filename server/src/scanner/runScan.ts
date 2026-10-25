@@ -27,7 +27,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
     // наприкінці довгого проходу не втрачав усе (docs/plans/old/scan-failure-recovery.md).
     const persister = new ScanPersister(searchId);
 
-    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed, rawCount, aborted } =
+    const { raw, visibleTotalCount, note, requestsUsed, exhausted, usedGraphql, partial, bucketsUsed, rawCount, aborted, priceCoverage } =
       await fetchAllQueries(search, {
         deep: options?.deep,
         onProgress: ctx.onProgress,
@@ -48,6 +48,7 @@ export async function runScan(searchId: number, options?: { deep?: boolean }): P
       partial,
       bucketsUsed,
       aborted,
+      priceCoverage,
       notes: note ? [note] : [],
       missThreshold: options?.deep ? 1 : 2,
       skipCategoryRefresh: !usedGraphql,

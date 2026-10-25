@@ -44,8 +44,9 @@
 
 **Збір з OLX** (деталі — `docs/olx-api.md`):
 - Основний метод — **GraphQL** `POST https://www.olx.ua/apigateway/graphql` (без кукі/auth/токенів),
-  `sort_by=created_at:desc`. **Fallback — HTML + cheerio — вимкнено** (`HTML_FALLBACK_ENABLED`: OLX відповідає 403,
-  [P-005](docs/parking.md)); код і селектори лишаються, селектори — лише в `server/src/scraper/selectors.ts`. Усі стратегії — за інтерфейсом `OlxFetcher`.
+  `sort_by=created_at:desc`. **Fallback — HTML + cheerio — вимкнено** (`HTML_FALLBACK_ENABLED`: OLX відповідає 403;
+  обхід бот-захисту не робимо — рішення людини 2026-10-25, [verify-graphql](docs/plans/verify-graphql.md)); код і
+  селектори лишаються, селектори — лише в `server/src/scraper/selectors.ts`. Усі стратегії — за інтерфейсом `OlxFetcher`.
 - **Ввічливість:** звичайний скан ≤3 запити з паузою 1–2 с; глибокий — батчі по 3 з паузою 3–6 с
   і жорсткими запобіжниками (вікно пагінації OLX `offset ≤ 1000`).
 - Наступні fallback (`__NEXT_DATA__` → headed Playwright) — **лише за рішенням людини**.
@@ -58,9 +59,10 @@
   (виняток — `rejected → disabled`); manual-disabled не реактивується автоматично; ручні
   `ai_relevant` / ранги не перетирає AI-прогін.
 - **Auto-disable** — лише з доказом: вікно покриття на осі **`last_refresh_at`** (не `posted_at`,
-  інцидент 395 хибних disable) і лише після **повного** GraphQL-скану (split-, синонімні, зупинені,
-  HTML-скани його пропускають); `olx_status ≠ active`; verify-проба `410/404`. Кожен auto-disable
-  пише причину в `note`.
+  інцидент 395 хибних disable) і лише після **повного** GraphQL-скану (зупинені й HTML-скани його пропускають;
+  split-/синонімні — лише коли пройдено всі варіанти й цінові діапазони, у їхніх межах цін і після 2 промахів
+  поспіль); `olx_status ≠ active`; verify — відсутність у вичерпаній видачі продавця або 2 промахи поспіль.
+  Кожен auto-disable пише причину в `note`.
 - `local_filters` лише ставлять `filtered_out`, **ніколи не видаляють** рядки.
 - Помилки скрейпінгу не валять процес: лог у `scan_runs.error` / журнал, попередні дані лишаються;
   зібране під час упалого чи зупиненого скану зберігається.

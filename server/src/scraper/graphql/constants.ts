@@ -85,7 +85,7 @@ export const LISTING_SEARCH_QUERY = `query ListingSearchQuery($searchParameters:
           }
         }
         description
-        user { name }
+        user { id name }
         contact { name }
       }
       metadata { total_elements visible_total_count }

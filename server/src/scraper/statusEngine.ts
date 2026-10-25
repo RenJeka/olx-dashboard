@@ -1,6 +1,6 @@
 import type { InValue } from '@libsql/client';
 import { db, dbAll } from '../db/db.js';
-import type { RawListing } from '../types.js';
+import type { PriceCoverage, RawListing } from '../types.js';
 
 interface CandidateRow {
   id: number;
@@ -33,6 +33,26 @@ function appendCoverageNote(note: string | null, threshold: number): string {
 }
 
 /**
+ * SQL-умова «ціна рядка в межах повного покриття». Межі — у гривнях фільтра OLX, тож рядки в
+ * іншій валюті покриті лише діапазоном без меж; без ціни — лише якщо видача їх містить.
+ */
+function priceCoverageClause(coverage: PriceCoverage): { sql: string; args: number[] } {
+  const priced: string[] = ['price IS NOT NULL'];
+  const args: number[] = [];
+  if (coverage.from != null || coverage.to != null) priced.push("currency = 'UAH'");
+  if (coverage.from != null) {
+    priced.push('price >= ?');
+    args.push(coverage.from);
+  }
+  if (coverage.to != null) {
+    priced.push('price <= ?');
+    args.push(coverage.to);
+  }
+  const pricedSql = `(${priced.join(' AND ')})`;
+  return { sql: coverage.includesNull ? `(price IS NULL OR ${pricedSql})` : pricedSql, args };
+}
+
+/**
  * Вікно покриття (CLAUDE.md / docs/plans/old/coverage-window-fix.md). Викликається ПІСЛЯ
  * upsertListings, лише для ПОВНИХ успішних GraphQL-сканів (не fallback, не часткових).
  *
@@ -57,12 +77,16 @@ function appendCoverageNote(note: string | null, threshold: number): string {
  * (прозорість причини). `threshold` залежить від глибини скану: глибокий скан бачить усю
  * видачу, тож 1 промах — достатній доказ смерті; звичайний (≤3 запити) бачить лише верхівку,
  * тож дефолт 2 як буфер проти дрижання видачі (scanner.ts передає deep?1:2).
+ *
+ * `priceCoverage` — повне покриття split-/синонімного скану (scanFinalize, поріг 2): кандидати
+ * додатково обмежуються ціною, яку видача справді пройшла (docs/plans/verify-graphql.md).
  */
 export async function applyScanStatuses(
   searchId: number,
   fetched: RawListing[],
   exhausted: boolean,
   threshold = 2,
+  priceCoverage?: PriceCoverage,
 ): Promise<{ disabled_count: number }> {
   let windowFloor: string | null = null;
 
@@ -96,6 +120,12 @@ export async function applyScanStatuses(
            WHERE search_id = ? AND status != 'disabled' AND olx_id NOT IN (${placeholders}) AND last_refresh_at >= ?`;
     candidatesArgs =
       windowFloor === null ? [searchId, ...fetchedIds] : [searchId, ...fetchedIds, windowFloor];
+  }
+
+  if (priceCoverage) {
+    const price = priceCoverageClause(priceCoverage);
+    candidatesSql += ` AND ${price.sql}`;
+    candidatesArgs.push(...price.args);
   }
 
   // Кандидати читаються одним SELECT; усі UPDATE-и збираються в JS і пишуться ОДНИМ

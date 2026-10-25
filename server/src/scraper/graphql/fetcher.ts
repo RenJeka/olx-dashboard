@@ -24,6 +24,7 @@ import {
 } from '../constants.js';
 import { PAGE_LIMIT, MAX_PAGES } from './constants.js';
 import type { SplitPlan } from './types.js';
+import { coverageFromPriceFilter, coverageFromSplit } from '../priceCoverage.js';
 
 import { GraphqlClient } from './client.js';
 import type { PageResult } from './client.js';
@@ -106,12 +107,27 @@ export class GraphqlOlxFetcher implements OlxFetcher {
         break;
       }
 
+      // Deep пройшов усі сторінки, які обіцяв visible_total_count (остання — повна, бо count
+      // кратний PAGE_LIMIT): видачу теж вичерпано, інакше повне покриття губилось би на ~1/40 пошуків.
+      if (deep && requestsUsed === target && visibleTotalCount != null && target * PAGE_LIMIT >= visibleTotalCount) {
+        exhausted = true;
+        break;
+      }
+
       if (i < target - 1) {
         await this.applySmartPause(requestsUsed, deep, undefined, options?.shouldAbort);
       }
     }
 
-    return { listings: all, visibleTotalCount, requestsUsed, exhausted, warning, aborted };
+    return {
+      listings: all,
+      visibleTotalCount,
+      requestsUsed,
+      exhausted,
+      warning,
+      aborted,
+      priceCoverage: exhausted && !aborted ? coverageFromPriceFilter(search) : undefined,
+    };
   }
 
   async probeRootCount(search: SearchConfig): Promise<number | null> {
@@ -155,7 +171,21 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       options?.shouldAbort, options?.onListings,
     );
 
-    const warnings = [`split: ${plan.buckets.length} price buckets; coverage window skipped`];
+    // Повне покриття split: усі бакети вичерпано, бісекція не обірвана, ліміт не досягнуто, не зупинено —
+    // тоді об'єднання бакетів = уся видача в межах [priceFrom; priceTo] (docs/plans/verify-graphql.md).
+    const exhausted = scanResult.allExhausted && !scanResult.capHit;
+    const priceCoverage =
+      exhausted && !scanResult.aborted && !plan.probeWarning && plan.priceFrom != null && plan.priceTo != null
+        ? coverageFromSplit(plan.priceFrom, plan.priceTo)
+        : undefined;
+
+    // «split: …» лишається завжди: за ним fetchWithFallback позначає скан частковим (вікно покриття
+    // однієї видачі тут непридатне), а повне покриття finalize застосовує окремо з порогом 2.
+    const warnings = [
+      priceCoverage
+        ? `split: ${plan.buckets.length} price buckets`
+        : `split: ${plan.buckets.length} price buckets; coverage window skipped`,
+    ];
     if (plan.probeWarning) warnings.push(plan.probeWarning);
     if (scanResult.capHit) {
       warnings.push('деякі діапазони вперлися в ліміт запитів — дані можуть бути неповними');
@@ -165,10 +195,11 @@ export class GraphqlOlxFetcher implements OlxFetcher {
       listings: scanResult.listings,
       visibleTotalCount: plan.rootCount,
       requestsUsed: scanResult.requestsUsed,
-      exhausted: scanResult.allExhausted && !scanResult.capHit,
+      exhausted,
       warning: warnings.join('; '),
       bucketsUsed: plan.buckets.length,
       aborted: scanResult.aborted,
+      priceCoverage,
     };
   }
 

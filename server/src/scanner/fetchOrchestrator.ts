@@ -12,7 +12,9 @@ import type {
   RawListing,
   FetchOptions,
   ScanProgress,
+  PriceCoverage,
 } from '../types.js';
+import { intersectCoverage } from '../scraper/priceCoverage.js';
 import { dedupeQueries } from './searchLoader.js';
 
 export const graphqlFetcher = new GraphqlOlxFetcher();
@@ -56,6 +58,8 @@ export async function fetchWithFallback(
   rawCount: number;
   /** Скан перервано через FetchOptions.shouldAbort (кнопка «Зупинити»). */
   aborted: boolean;
+  /** Повне покриття видачі (усі варіанти й бакети вичерпано, лише GraphQL) — FetchSearchResult.priceCoverage. */
+  priceCoverage?: PriceCoverage;
 }> {
   try {
     // Глибокий скан — оркестратор із авто-розбиттям по ціні (docs/plans/old/price-range-split.md);
@@ -77,6 +81,7 @@ export async function fetchWithFallback(
       bucketsUsed: result.bucketsUsed,
       rawCount: result.listings.length,
       aborted: result.aborted ?? false,
+      priceCoverage: result.priceCoverage,
     };
   } catch (graphqlErr) {
     const graphqlMessage =
@@ -117,7 +122,9 @@ export async function fetchWithFallback(
  * olxId. 1 query (без синонімів) — без змін поведінки, делегує fetchWithFallback напряму.
  * >1 query — завжди partial=true: union кількох незалежних видач не відсортований глобально
  * за last_refresh, тож вікно покриття statusEngine (CLAUDE.md) застосовувати небезпечно —
- * той самий принцип, що й у split-скані (graphqlOlxFetcher.fetchSearchSplit).
+ * той самий принцип, що й у split-скані (graphqlOlxFetcher.fetchSearchSplit). Якщо ж УСІ варіанти
+ * вичерпано, об'єднання — повна видача: `priceCoverage` (перетин покриттів варіантів) вмикає
+ * вимкнення зниклих у finalize з порогом 2 (docs/plans/verify-graphql.md).
  */
 export async function fetchAllQueries(
   search: SearchConfig,
@@ -136,6 +143,9 @@ export async function fetchAllQueries(
   let bucketsUsed = 0;
   let rawTotal = 0;
   let aborted = false;
+  // Повне покриття об'єднання — перетин покриттів усіх варіантів; хоч один неповний → немає.
+  let coverage: PriceCoverage | undefined;
+  let coverageBroken = false;
   const notes: string[] = [`multi-query: ${variants.length} варіантів запиту змерджено`];
 
   // Прогрес — кумулятивний офсет (точний total невідомий до завершення всіх варіантів).
@@ -183,8 +193,12 @@ export async function fetchAllQueries(
         collectedSoFar: merged.size,
       });
       notes.push(variantFailureNote(variant, message));
+      coverageBroken = true;
       break;
     }
+
+    if (!result.priceCoverage) coverageBroken = true;
+    else coverage = coverage ? intersectCoverage(coverage, result.priceCoverage) : result.priceCoverage;
 
     for (const item of result.raw) merged.set(item.olxId, item);
     // Інкрементальне збереження після кожного варіанта (покриває HTML-fallback і звичайні
@@ -203,6 +217,7 @@ export async function fetchAllQueries(
     // Зупинено користувачем — решту синонімів не скануємо, повертаємо вже зібране.
     if (result.aborted) {
       aborted = true;
+      coverageBroken = true;
       break;
     }
 
@@ -219,7 +234,8 @@ export async function fetchAllQueries(
     }
   }
 
-  notes.push('вікно покриття пропущено (union кількох видач)');
+  const priceCoverage = coverageBroken ? undefined : coverage;
+  if (!priceCoverage) notes.push('вікно покриття пропущено (union кількох видач)');
 
   return {
     raw: [...merged.values()],
@@ -234,5 +250,6 @@ export async function fetchAllQueries(
     bucketsUsed: bucketsUsed > 0 ? bucketsUsed : undefined,
     rawCount: rawTotal,
     aborted,
+    priceCoverage,
   };
 }

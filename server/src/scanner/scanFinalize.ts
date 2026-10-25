@@ -5,8 +5,11 @@ import { fetchCategoryFacet } from '../scraper/graphql/categories.js';
 import { facetToNodes, facetToOptions } from '../scraper/olxCategories.js';
 import { upsertListings } from '../scraper/normalizer.js';
 import { applyScanStatuses } from '../scraper/statusEngine.js';
-import type { SearchConfig, ScanResult, RawListing } from '../types.js';
+import type { SearchConfig, ScanResult, RawListing, PriceCoverage } from '../types.js';
 import type { ScanPersister } from './scanPersister.js';
+
+/** Поріг промахів для повного покриття split-/синонімного скану (рішення людини 2026-10-25). */
+export const FULL_COVERAGE_MISS_THRESHOLD = 2;
 
 /**
  * Best-effort оновлення дерева категорій OLX (facet) для пошуку після успішного скану.
@@ -62,6 +65,12 @@ export interface FinalizeInput {
   notes: string[];
   /** Поріг miss_count для auto-disable: 1 для deep, 2 для normal (docs/plans/old/honest-olx-status.md). */
   missThreshold: number;
+  /**
+   * Повне покриття split- чи синонімного скану (усі варіанти й бакети вичерпано): часткова
+   * для вікна покриття видача все одно доводить відсутність у межах цих цін — вимкнення зниклих
+   * з порогом FULL_COVERAGE_MISS_THRESHOLD (docs/plans/verify-graphql.md).
+   */
+  priceCoverage?: PriceCoverage;
   /** Пропустити оновлення category_facet (напр. якщо був HTML-fallback без GraphQL). */
   skipCategoryRefresh?: boolean;
   /**
@@ -99,11 +108,17 @@ export async function finalizeScanResult(input: FinalizeInput): Promise<ScanResu
   const stopped = aborted;
   const effectivePartial = partial || stopped;
 
-  // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів — не fallback,
-  // не часткових, не split. Поріг disable пропорційний надійності скану.
-  const { disabled_count } = usedGraphql && !effectivePartial
-    ? await applyScanStatuses(searchId, raw, exhausted, missThreshold)
-    : { disabled_count: 0 };
+  // Вікно покриття (CLAUDE.md): лише для ПОВНИХ успішних GraphQL-сканів однієї видачі — не fallback,
+  // не часткових. Поріг disable пропорційний надійності скану. Split-/синонімний скан — лише за повного
+  // покриття, у його ціновому діапазоні й з порогом 2: ціна могла змінитись посеред скану й перенести
+  // оголошення в уже пройдений бакет (docs/plans/verify-graphql.md).
+  let disabled_count = 0;
+  if (usedGraphql && !effectivePartial) {
+    ({ disabled_count } = await applyScanStatuses(searchId, raw, exhausted, missThreshold));
+  } else if (usedGraphql && !stopped && input.priceCoverage) {
+    ({ disabled_count } = await applyScanStatuses(searchId, raw, true, FULL_COVERAGE_MISS_THRESHOLD, input.priceCoverage));
+    notes.push(`повне покриття: зниклі отримали промах (вимкнення після ${FULL_COVERAGE_MISS_THRESHOLD} поспіль)`);
+  }
 
   const result: ScanResult = {
     ...upsertResult,

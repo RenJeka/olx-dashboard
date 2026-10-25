@@ -94,6 +94,8 @@ export class SplitScanner {
       rootItems: rootPage.items,
       requestsUsed: bisection.requestsUsed,
       noSplit: false,
+      priceFrom: lo,
+      priceTo: hi.upperBound,
       probeWarning: bisection.probeError
         ? `бісекцію цін перервано (${bisection.probeError}) — покриття часткове`
         : undefined,
@@ -142,6 +144,8 @@ export class SplitScanner {
       const bucket = buckets[bi]!;
       for (const item of bucket.page0) merged.set(item.olxId, item);
       await onListings?.(bucket.page0);
+      // Бакет-ListingError (count=0 без даних) нічого не доводить — повного покриття немає.
+      if (bucket.failed) allExhausted = false;
 
       if (bucket.count <= PAGE_LIMIT || bucket.page0.length < PAGE_LIMIT) {
         continue;
@@ -285,7 +289,13 @@ export class SplitScanner {
         buckets.length + queue.length + 1 >= MAX_BUCKETS;
 
       if (isLeaf) {
-        buckets.push({ from: interval.from, to: interval.to, count, page0: page.items });
+        buckets.push({
+          from: interval.from,
+          to: interval.to,
+          count,
+          page0: page.items,
+          ...(page.listingError != null ? { failed: true } : {}),
+        });
         onProgress?.({
           done: requestsUsed,
           stage: `Розбиття діапазону (знайдено ${buckets.length})`,
@@ -295,6 +305,11 @@ export class SplitScanner {
         queue.push({ from: interval.from, to: mid });
         queue.push({ from: mid + 1, to: interval.to });
       }
+    }
+
+    // Ліміт запитів чи зупинка лишили неперевірені інтервали — бакети покривають не весь діапазон.
+    if (!probeError && queue.length > 0) {
+      probeError = 'ліміт запитів або зупинка до завершення розбиття';
     }
 
     return { buckets, requestsUsed, probeError };
@@ -368,6 +383,12 @@ export class SplitScanner {
       items.push(...page.items);
 
       if (page.items.length < PAGE_LIMIT) {
+        bucketExhausted = true;
+        break;
+      }
+
+      // Остання обіцяна сторінка повна (count кратний PAGE_LIMIT) — бакет теж вичерпано.
+      if (p === pages - 1 && pages * PAGE_LIMIT >= opts.bucket.count) {
         bucketExhausted = true;
         break;
       }

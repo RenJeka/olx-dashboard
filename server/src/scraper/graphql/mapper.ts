@@ -30,6 +30,7 @@ export class GraphqlListingMapper {
       params,
       description: item.description ?? undefined,
       sellerName: item.user?.name ?? undefined,
+      sellerId: this.parseSellerId(item.user?.id),
       contactName: item.contact?.name ?? undefined,
       olxStatus: item.status,
     };
@@ -58,6 +59,13 @@ export class GraphqlListingMapper {
     }
 
     return { price, currency, params };
+  }
+
+  /** `user.id` продавця — число (OLX віддає числом або рядком цифр); інше → undefined. */
+  private parseSellerId(raw: number | string | null | undefined): number | undefined {
+    if (raw == null) return undefined;
+    const id = Number(raw);
+    return Number.isSafeInteger(id) && id > 0 ? id : undefined;
   }
 
   private parseListingPhotos(photos: GraphqlListing['photos']) {

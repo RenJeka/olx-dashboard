@@ -18,8 +18,10 @@ import type {
   ScanPlan,
   ScanPlanQuery,
   PriceBucketSummary,
+  PriceCoverage,
   RawListing,
 } from '../types.js';
+import { intersectCoverage } from '../scraper/priceCoverage.js';
 import { loadSearch, dedupeQueries } from './searchLoader.js';
 import {
   graphqlFetcher,
@@ -309,7 +311,9 @@ export async function analyzeScan(searchId: number, options?: { deep?: boolean }
       variants.length > 1 ||
       totalBuckets > 0 ||
       perQuery.some((q) => q.fallbackReason != null);
-    if (variants.length > 1) warnings.push('вікно покриття буде пропущено (union кількох видач)');
+    if (variants.length > 1) {
+      warnings.push('повне покриття потрібне для вимкнення зниклих: усі варіанти до кінця, вимкнення після 2 промахів поспіль');
+    }
 
     const scanPlan: ScanPlan = {
       planToken,
@@ -405,6 +409,9 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
     let aborted = false;
     let visibleTotalCount: number | null = null;
     let partial = variants.length > 1;
+    // Повне покриття — перетин покриттів усіх варіантів (як fetchAllQueries); хоч один неповний → немає.
+    let coverage: PriceCoverage | undefined;
+    let coverageBroken = false;
     const notes: string[] = variants.length > 1
       ? [`multi-query: ${variants.length} варіантів запиту змерджено`]
       : [];
@@ -443,7 +450,15 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       };
 
       let raw: RawListing[];
-      let result: { visibleTotalCount: number | null; requestsUsed: number; exhausted: boolean; warning?: string; bucketsUsed?: number; aborted?: boolean };
+      let result: {
+        visibleTotalCount: number | null;
+        requestsUsed: number;
+        exhausted: boolean;
+        warning?: string;
+        bucketsUsed?: number;
+        aborted?: boolean;
+        priceCoverage?: PriceCoverage;
+      };
       try {
         // `deep: true` обов'язковий: noSplit-варіанти делегуються fetchSearch, і без нього
         // той працював би у звичайному режимі (3 сторінки замість повної допагінації).
@@ -483,6 +498,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
             });
             notes.push(variantFailureNote(variant, combined));
             partial = true;
+            coverageBroken = true;
             break;
           }
           throw new Error(combined);
@@ -501,9 +517,13 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
         if (variants.length === 1) partial = true;
       }
       if (variants.length === 1) visibleTotalCount = result.visibleTotalCount;
+      // HTML-результат priceCoverage не має — покриття теж ламається.
+      if (!result.priceCoverage) coverageBroken = true;
+      else coverage = coverage ? intersectCoverage(coverage, result.priceCoverage) : result.priceCoverage;
 
       if (result.aborted) {
         aborted = true;
+        coverageBroken = true;
         break;
       }
 
@@ -519,7 +539,10 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       }
     }
 
-    if (variants.length > 1) notes.push('вікно покриття пропущено (union кількох видач)');
+    // Зупинка між варіантами (перевірка на початку ітерації) теж лишає варіанти непройденими.
+    if (aborted) coverageBroken = true;
+    const priceCoverage = coverageBroken ? undefined : coverage;
+    if (variants.length > 1 && !priceCoverage) notes.push('вікно покриття пропущено (union кількох видач)');
 
     return finalizeScanResult({
       searchId,
@@ -533,6 +556,7 @@ export async function runDeepScanFromPlan(searchId: number, planToken: string): 
       partial,
       bucketsUsed,
       aborted,
+      priceCoverage,
       visibleTotalCount,
       notes,
       missThreshold: 1, // план завжди походить від глибокого скану

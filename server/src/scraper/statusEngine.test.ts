@@ -104,3 +104,43 @@ describe('applyScanStatuses — ручні статуси', () => {
     expect(note.match(/coverage miss_count/g)).toHaveLength(1);
   });
 });
+
+describe('applyScanStatuses — повне покриття split/синонімів (priceCoverage)', () => {
+  // docs/plans/verify-graphql.md, частина 1: кандидати лише в межах цін, які видача справді пройшла.
+  const fullScan = (coverage: { from: number | null; to: number | null; includesNull: boolean }) =>
+    applyScanStatuses(searchId, [gqlListing(1)], true, 2, coverage);
+
+  it('у діапазоні: 1-й скан — промах, 2-й — disabled з позначкою coverage', async () => {
+    await insertListing(searchId, 2, { price: 15000 });
+    await fullScan({ from: 0, to: 50000, includesNull: true });
+    expect(await getListing(2)).toMatchObject({ status: 'new', miss_count: 1 });
+    expect(await fullScan({ from: 0, to: 50000, includesNull: true })).toEqual({ disabled_count: 1 });
+    const row = await getListing(2);
+    expect(row).toMatchObject({ status: 'disabled', olx_status: 'inactive' });
+    expect(row?.note).toContain('auto-disabled: coverage miss_count=2');
+  });
+
+  it('ціна поза діапазоном (дорожче за верхню межу, дешевше за нижню) — не кандидат', async () => {
+    await insertListing(searchId, 2, { price: 60000 });
+    await insertListing(searchId, 3, { price: 500 });
+    await fullScan({ from: 1000, to: 50000, includesNull: false });
+    expect((await getListing(2))?.miss_count).toBe(0);
+    expect((await getListing(3))?.miss_count).toBe(0);
+  });
+
+  it('без ціни — кандидат лише коли діапазон від 0 (includesNull)', async () => {
+    await insertListing(searchId, 2, { price: null });
+    await fullScan({ from: 1000, to: 50000, includesNull: false });
+    expect((await getListing(2))?.miss_count).toBe(0);
+    await fullScan({ from: 0, to: 50000, includesNull: true });
+    expect((await getListing(2))?.miss_count).toBe(1);
+  });
+
+  it('інша валюта — не кандидат при обмеженому діапазоні, кандидат без меж', async () => {
+    await insertListing(searchId, 2, { price: 500, currency: 'USD' });
+    await fullScan({ from: 0, to: 50000, includesNull: true });
+    expect((await getListing(2))?.miss_count).toBe(0);
+    await fullScan({ from: null, to: null, includesNull: true });
+    expect((await getListing(2))?.miss_count).toBe(1);
+  });
+});

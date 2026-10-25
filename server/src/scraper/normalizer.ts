@@ -53,13 +53,13 @@ const SEARCH_LOCAL_FILTERS_SQL = 'SELECT local_filters FROM searches WHERE id = 
 // `id` НЕ потрібен — filtered_out пишеться у тому ж UPSERT (не окремим UPDATE by id).
 const SELECT_EXISTING_FIELDS =
   'olx_id, title, url, price, currency, city, district, seller_type, params, category_id, ' +
-  'category_type, photo_url, photo_urls, description, seller_name, contact_name, olx_status, ' +
+  'category_type, photo_url, photo_urls, description, seller_name, seller_id, contact_name, olx_status, ' +
   'posted_at, last_refresh_at, status, status_source, filtered_out, pros, cons';
 
 /** Розмір чанка для IN-списку (ліміт змінних SQLite — 999). */
 const IN_CHUNK = 500;
 
-// district/seller_type/params/description/seller_name/contact_name/olx_status: COALESCE
+// district/seller_type/params/description/seller_name/seller_id/contact_name/olx_status: COALESCE
 // на оновленні — якщо новий скан (HTML-fallback) не приносить ці поля (null), не затираємо
 // вже зібрані GraphQL-дані.
 //
@@ -74,13 +74,13 @@ const UPSERT_SQL = `
   INSERT INTO listings (
     olx_id, search_id, title, url, price, currency, city, district, seller_type, params,
     category_id, category_type,
-    photo_url, photo_urls, description, seller_name, contact_name, olx_status, posted_at, last_refresh_at,
+    photo_url, photo_urls, description, seller_name, seller_id, contact_name, olx_status, posted_at, last_refresh_at,
     last_seen_at, status, note, filtered_out
   )
   VALUES (
     @olx_id, @search_id, @title, @url, @price, @currency, @city, @district, @seller_type,
     COALESCE(@params, '{}'), @category_id, @category_type,
-    @photo_url, @photo_urls, @description, @seller_name, @contact_name, @olx_status,
+    @photo_url, @photo_urls, @description, @seller_name, @seller_id, @contact_name, @olx_status,
     @posted_at, @last_refresh_at, datetime('now'),
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN 'disabled' ELSE 'new' END,
     CASE WHEN @is_graphql = 1 AND @olx_status_inactive = 1 THEN @status_note ELSE '' END,
@@ -101,6 +101,7 @@ const UPSERT_SQL = `
     photo_urls    = COALESCE(excluded.photo_urls, photo_urls),
     description   = COALESCE(excluded.description, description),
     seller_name   = COALESCE(excluded.seller_name, seller_name),
+    seller_id     = COALESCE(excluded.seller_id, seller_id),
     contact_name  = COALESCE(excluded.contact_name, contact_name),
     olx_status    = COALESCE(excluded.olx_status, olx_status),
     posted_at     = CASE WHEN @is_graphql = 1 THEN excluded.posted_at ELSE posted_at END,
@@ -162,6 +163,7 @@ interface ExistingFields {
   photo_urls: string | null;
   description: string | null;
   seller_name: string | null;
+  seller_id: number | null;
   contact_name: string | null;
   olx_status: string | null;
   posted_at: string | null;
@@ -189,6 +191,7 @@ interface ComputedFields {
   photoUrls: string | null;
   description: string | null;
   sellerName: string | null;
+  sellerId: number | null;
   contactName: string | null;
   olxStatus: string | null;
   postedAt: string | null;
@@ -221,6 +224,7 @@ function hasBusinessChange(e: ExistingFields, c: ComputedFields): boolean {
   if (c.olxStatus !== null && c.olxStatus !== e.olx_status) return true;
   if (c.description !== null && c.description !== e.description) return true;
   if (c.sellerName !== null && c.sellerName !== e.seller_name) return true;
+  if (c.sellerId !== null && c.sellerId !== e.seller_id) return true;
   if (c.contactName !== null && c.contactName !== e.contact_name) return true;
   if (c.district !== null && c.district !== e.district) return true;
   if (c.sellerType !== null && c.sellerType !== e.seller_type) return true;
@@ -311,6 +315,7 @@ export async function upsertListings(
     let params: string | null = null;
     let description: string | null = null;
     let sellerName: string | null = null;
+    let sellerId: number | null = null;
     let contactName: string | null = null;
     let olxStatus: string | null = null;
 
@@ -324,6 +329,7 @@ export async function upsertListings(
       params = item.params ? JSON.stringify(item.params) : null;
       description = item.description ?? null;
       sellerName = item.sellerName ?? null;
+      sellerId = item.sellerId ?? null;
       contactName = item.contactName ?? null;
       olxStatus = item.olxStatus ?? null;
     } else {
@@ -381,6 +387,7 @@ export async function upsertListings(
         photoUrls,
         description,
         sellerName,
+        sellerId,
         contactName,
         olxStatus,
         postedAt,
@@ -413,6 +420,7 @@ export async function upsertListings(
         photo_urls: photoUrls,
         description,
         seller_name: sellerName,
+        seller_id: sellerId,
         contact_name: contactName,
         olx_status: olxStatus,
         posted_at: postedAt,

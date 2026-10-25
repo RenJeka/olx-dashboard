@@ -42,10 +42,12 @@ export function computeListingStats(listings: Listing[] | undefined): ListingSta
     // stale_count: status_source='auto' AND last_seen_at старше 3 днів.
     if (l.status_source === 'auto' && isOld) stale_count++;
 
-    // P1: url != null AND давно не бачене AND (auto OR rejected).
-    const p1 = l.url != null && isOld && (l.status_source === 'auto' || l.status === 'rejected');
-    // P2: url != null AND без опису AND не disabled AND NOT P1 (взаємовиключні).
-    const p2 = l.url != null && !l.has_description && l.status !== 'disabled' && !p1;
+    // P1: не disabled AND (промах OR давно не бачене auto/rejected).
+    const p1 =
+      l.status !== 'disabled' &&
+      (l.miss_count > 0 || (isOld && (l.status_source === 'auto' || l.status === 'rejected')));
+    // P2: без опису AND не disabled AND NOT P1 (взаємовиключні).
+    const p2 = !l.has_description && l.status !== 'disabled' && !p1;
     if (p1 || p2) verify_candidates++;
   }
 

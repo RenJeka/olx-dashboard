@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS listings (
   seller_type TEXT,                  -- private | business
   description TEXT,                  -- HTML-опис з OLX (з <br /> тегами)
   seller_name TEXT,                  -- user.name з GraphQL
+  seller_id INTEGER,                 -- user.id з GraphQL: verify через видачу продавця (docs/plans/verify-graphql.md); без індексу
   contact_name TEXT,                 -- contact.name з GraphQL
   olx_status TEXT,                   -- статус оголошення на OLX (напр. "active"); НЕ плутати з полем status нижче
   posted_at TEXT,

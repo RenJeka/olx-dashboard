@@ -1,17 +1,19 @@
 import type { RawListing } from './listings.js';
 import type { SearchConfig } from './core.js';
 
-/** Результат verify-проходу (повертається з /verify та CLI, Етап 2 A3). */
+/** Результат verify-проходу (повертається з /verify та CLI; GraphQL-видача — docs/plans/verify-graphql.md). */
 export interface VerifyResult {
-  /** Скільки сторінок оголошень перевірено. */
+  /** Скільки оголошень перевірено. */
   checked: number;
+  /** Знайдено у видачі продавця чи за назвою. */
   alive: number;
+  /** Видача продавця пройдена до кінця без оголошення. */
   dead: number;
-  /** Невизначений вердикт (JS-only сторінка, мережева помилка, неочікуваний код) — статус не змінено. */
+  /** Не знайдено за назвою (вичерпана видача) — промах, вимкнення після кількох поспіль. */
+  missed: number;
+  /** Без вердикту (немає назви або пошук за назвою дав більше сторінки) — статус не змінено. */
   unknown: number;
-  /** auto-disabled оголошення, що повернулись у 'new' після підтвердження живості. */
-  reactivated: number;
-  /** Скільки оголошень переведено в disabled (вердикт dead, auto/rejected). */
+  /** Скільки оголошень переведено в disabled (dead або промахи до порогу; auto/rejected). */
   disabled_count: number;
   /** Скільки рядків отримали description/seller_name, яких раніше не було (NULL → значення). */
   backfilled: number;
@@ -116,6 +118,23 @@ export interface FetchSearchResult {
    * містить частково зібране, яке все одно треба зберегти (docs/plans/old/deep-scan-stop-and-history.md).
    */
   aborted?: boolean;
+  /**
+   * Ціновий діапазон, який видача покрила ПОВНІСТЮ (усі сторінки / усі бакети вичерпано) —
+   * лише для вичерпаної GraphQL-видачі; відсутнє — покриття неповне. Основа «повного покриття»
+   * для split- і синонімних сканів (docs/plans/verify-graphql.md).
+   */
+  priceCoverage?: PriceCoverage;
+}
+
+/**
+ * Ціновий діапазон повного покриття видачі. `from`/`to` = null — без межі з цього боку.
+ * `includesNull` — чи потрапляють у видачу оголошення без ціни («Безкоштовно», «Обмін»): OLX
+ * віддає їх лише в діапазоні, що починається з 0 (або без нижньої межі).
+ */
+export interface PriceCoverage {
+  from: number | null;
+  to: number | null;
+  includesNull: boolean;
 }
 
 /**

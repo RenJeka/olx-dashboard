@@ -46,7 +46,7 @@ export interface GraphqlListing {
   photos?: Array<{ link: string }>;
   params?: GraphqlParam[];
   description?: string | null;
-  user?: { name?: string | null } | null;
+  user?: { id?: number | string | null; name?: string | null } | null;
   contact?: { name?: string | null } | null;
 }
 
@@ -79,6 +79,8 @@ export interface PriceBucket {
   count: number;
   /** Оголошення з 0-ї сторінки бакету (вже завантажені під час бісекції). */
   page0: import('../../types.js').RawListing[];
+  /** Зондування бакету повернуло ListingError — його вміст невідомий (повного покриття немає). */
+  failed?: boolean;
 }
 
 /**
@@ -105,4 +107,7 @@ export interface SplitPlan {
    * (скан стає частковим), аналітичний звіт показує як попередження.
    */
   probeWarning?: string;
+  /** Межі бісекції цін (лише split): нижня — фільтр пошуку або 0, верхня — фільтр або зондована максимальна ціна. */
+  priceFrom?: number;
+  priceTo?: number;
 }

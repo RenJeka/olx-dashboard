@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, dbGet } from '../db/db.js';
-import { createSearch, resetDb } from '../test/db.js';
+import { createSearch, getListing, gqlListing, insertListing, resetDb } from '../test/db.js';
 import type { SearchConfig } from '../types.js';
 
 // Хвіст скану: facet категорій і автокатегорія — best-effort; мережі немає (facet замокано).
@@ -80,5 +80,44 @@ describe('finalizeScanResult — автокатегорія', () => {
   it('автокатегорії ще немає — перераховується навіть без нових оголошень', async () => {
     await finalize(config(null));
     expect(refreshBase).toHaveBeenCalledWith(searchId);
+  });
+});
+
+describe('finalizeScanResult — повне покриття split/синонімів', () => {
+  // docs/plans/verify-graphql.md: частковий для вікна покриття скан із priceCoverage рахує промахи з порогом 2.
+  const search: SearchConfig = { id: 0, name: 'test', query: 'iphone 13', apiFilters: {}, baseCategoryId: 80 };
+  const finalize = (overrides: Partial<Parameters<typeof finalizeScanResult>[0]>) =>
+    finalizeScanResult({
+      searchId,
+      runId: 0,
+      search: { ...search, id: searchId },
+      raw: [gqlListing(1)],
+      rawTotal: 1,
+      requestsUsed: 1,
+      usedGraphql: true,
+      exhausted: true,
+      partial: true,
+      aborted: false,
+      notes: [],
+      missThreshold: 1,
+      skipCategoryRefresh: true,
+      ...overrides,
+    });
+  const coverage = { from: 0, to: 50000, includesNull: true };
+
+  it('є priceCoverage → зниклий отримує промах, другий такий скан вимикає', async () => {
+    await insertListing(searchId, 2, { price: 15000 });
+    await finalize({ priceCoverage: coverage });
+    expect(await getListing(2)).toMatchObject({ status: 'new', miss_count: 1 });
+    const result = await finalize({ priceCoverage: coverage });
+    expect(result.disabled_count).toBe(1);
+    expect((await getListing(2))?.status).toBe('disabled');
+  });
+
+  it('без priceCoverage або зупинений скан — промахи не рахуються', async () => {
+    await insertListing(searchId, 2, { price: 15000 });
+    await finalize({});
+    await finalize({ priceCoverage: coverage, aborted: true });
+    expect((await getListing(2))?.miss_count).toBe(0);
   });
 });
