@@ -8,7 +8,7 @@ interface Props {
 }
 
 /**
- * Нотатка: обрізаний текст у комірці, клік відкриває Popover з Textarea.
+ * Нотатка: обрізаний текст у комірці, клік відкриває Popover з Textarea (Enter — зберегти).
  * Popover рендериться через Portal — не обмежується overflow таблиці.
  */
 export function NoteCell({ listing }: Props) {
@@ -76,7 +76,14 @@ export function NoteCell({ listing }: Props) {
               <Textarea
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="Нотатка..."
+                onKeyDown={(e) => {
+                  // Enter — зберегти; Shift+Enter — новий рядок; під час IME-набору Enter не чіпаємо.
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    handleSave();
+                  }
+                }}
+                placeholder="Нотатка... (Enter — зберегти, Shift+Enter — новий рядок)"
                 rows={4}
                 autoFocus
               />

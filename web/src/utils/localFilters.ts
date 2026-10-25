@@ -18,6 +18,11 @@ export function parseBullets(text: string | null): string[] {
     .filter(Boolean);
 }
 
+/** Пункти ['a','b'] → bullet-текст «• a\n• b» (дзеркало серверного `BULLET_PREFIX`). */
+export function joinBullets(items: string[]): string {
+  return items.map((item) => `• ${item}`).join('\n');
+}
+
 /** Прямий режим ховає невідповідні; інвертований — відповідні; вимкнена група нічого не ховає. */
 function hides(active: boolean, matched: boolean, inverted?: boolean): boolean {
   return active && (inverted ? matched : !matched);

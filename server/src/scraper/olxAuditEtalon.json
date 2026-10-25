@@ -1,0 +1,74 @@
+{
+  "graphql-search": {
+    "status": 200,
+    "contentType": "application/json",
+    "shape": [
+      "data",
+      "data.clientCompatibleListings",
+      "data.clientCompatibleListings.__typename",
+      "data.clientCompatibleListings.data",
+      "data.clientCompatibleListings.data[].business",
+      "data.clientCompatibleListings.data[].category",
+      "data.clientCompatibleListings.data[].category.id",
+      "data.clientCompatibleListings.data[].category.type",
+      "data.clientCompatibleListings.data[].contact",
+      "data.clientCompatibleListings.data[].contact.name",
+      "data.clientCompatibleListings.data[].created_time",
+      "data.clientCompatibleListings.data[].description",
+      "data.clientCompatibleListings.data[].id",
+      "data.clientCompatibleListings.data[].last_refresh_time",
+      "data.clientCompatibleListings.data[].location",
+      "data.clientCompatibleListings.data[].location.city",
+      "data.clientCompatibleListings.data[].location.city.name",
+      "data.clientCompatibleListings.data[].location.district",
+      "data.clientCompatibleListings.data[].location.district.name",
+      "data.clientCompatibleListings.data[].params",
+      "data.clientCompatibleListings.data[].params[].key",
+      "data.clientCompatibleListings.data[].params[].name",
+      "data.clientCompatibleListings.data[].params[].type",
+      "data.clientCompatibleListings.data[].params[].value",
+      "data.clientCompatibleListings.data[].params[].value.__typename",
+      "data.clientCompatibleListings.data[].params[].value.currency",
+      "data.clientCompatibleListings.data[].params[].value.key",
+      "data.clientCompatibleListings.data[].params[].value.label",
+      "data.clientCompatibleListings.data[].params[].value.negotiable",
+      "data.clientCompatibleListings.data[].params[].value.value",
+      "data.clientCompatibleListings.data[].photos",
+      "data.clientCompatibleListings.data[].photos[].link",
+      "data.clientCompatibleListings.data[].status",
+      "data.clientCompatibleListings.data[].title",
+      "data.clientCompatibleListings.data[].url",
+      "data.clientCompatibleListings.data[].user",
+      "data.clientCompatibleListings.data[].user.name",
+      "data.clientCompatibleListings.metadata",
+      "data.clientCompatibleListings.metadata.total_elements",
+      "data.clientCompatibleListings.metadata.visible_total_count"
+    ]
+  },
+  "graphql-facets": {
+    "status": 200,
+    "contentType": "application/json",
+    "shape": [
+      "data",
+      "data.clientCompatibleListings",
+      "data.clientCompatibleListings.__typename",
+      "data.clientCompatibleListings.metadata",
+      "data.clientCompatibleListings.metadata.facets",
+      "data.clientCompatibleListings.metadata.facets.category",
+      "data.clientCompatibleListings.metadata.facets.category[].count",
+      "data.clientCompatibleListings.metadata.facets.category[].id",
+      "data.clientCompatibleListings.metadata.facets.category[].label",
+      "data.clientCompatibleListings.metadata.facets.category[].url"
+    ]
+  },
+  "html-search": {
+    "status": 403,
+    "contentType": "text/html",
+    "shape": []
+  },
+  "html-listing": {
+    "status": 403,
+    "contentType": "text/html",
+    "shape": []
+  }
+}

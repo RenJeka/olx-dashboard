@@ -50,6 +50,9 @@
 ## Що враховувати
 
 - Запасного каналу збору немає: HTML-fallback вимкнено (OLX відповідає `403`), ідея обходу — [P-005](parking.md).
+- Чи OLX щось змінив у запитах — скіл `olx-api-audit` / `npm run olx:audit` ([olx-api-audit](instructions/olx-api-audit.md)).
+  Сторінку OLX у `iframe` вбудувати не можна ([olx-api](olx-api.md) §3.4).
+- Курсор у UI: клікабельне — `pointer`, з tooltip — `help`, обидва — `pointer` ([styles](styles.md) → «Курсор»).
 - Verify-проба («Перевірити неактивні») теж отримує `403`: кнопку вимкнено, прохід зупиняється після серії `403`
   ([verify-403-guard](plans/old/verify-403-guard.md)); обхід — P-005.
 - Точність пошуку мінусів LLM низька й від моделі не залежить: заважають розмиті назви критеріїв («сервісна батарея»,
@@ -95,4 +98,6 @@
 
 ## Наступний крок
 
-Фази 5–6 плану [refactor-clean-architecture](plans/refactor-clean-architecture.md) або вибір з парковки (P-019, P-020, P-018).
+PR гілки `feat/p003-notes-enter-chips` (P-003 нотатки по Enter і чипи плюсів/мінусів; P-017 аудит OLX; P-002 закрито) — ручні test-cases пройдено
+людиною 2026-10-25, плани в [plans/old/](plans/old/README.md) → зелений CI → злиття з «так» людини → `npm run smoke`.
+Далі — фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка (P-019, P-020, P-018).

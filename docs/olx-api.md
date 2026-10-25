@@ -541,6 +541,9 @@ GET <listing.url>
 > (`VERIFY_PROBE_AVAILABLE` у `web/src/constants.ts`), а прохід зупиняється після серії `403`
 > (`VERIFY_BLOCK_STREAK` у `scanner/verifyScan.ts`) — [verify-403-guard](plans/old/verify-403-guard.md).
 
+> 🚫 Вбудувати сторінку OLX у `iframe` на нашому сайті не можна: OLX віддає `X-Frame-Options: SAMEORIGIN`
+> (перевірено 2026-10-23), браузер покаже порожній фрейм.
+
 Заголовки — `REQUEST_HEADERS` з `selectors.ts` (ті самі, що для HTML-fallback пошуку),
 `redirect: 'manual'` (НЕ йдемо за 3xx-редіректами — opaque-redirect трактуємо як `unknown`).
 
@@ -601,6 +604,7 @@ DOM-селектори простіші й достатні).
 
 ## 5. Чекліст «OLX щось поміняв»
 
+0. Спершу — `npm run olx:audit` ([olx-api-audit](instructions/olx-api-audit.md)): який із запитів застосунку змінився (статус, тип, зниклі/нові поля).
 1. Скан упав → дивись `scan_runs.error`:
    - `graphql failed: ...; fallback html OK` — GraphQL зламався, HTML витягнув. Розбери
      повідомлення: `ListingError` (помінялись параметри?) чи `errors[]` (помінялась схема —
@@ -641,3 +645,5 @@ DOM-селектори простіші й достатні).
 | 2026-10-03 | OLX (CloudFront) відповідає `403` на будь-яку HTML-сторінку з Node: пошук (`/d/uk/list/`, `/uk/list/`, `/list/`), головна, сторінка оголошення; заголовки Firefox 91 і сучасного Chrome — без різниці. GraphQL з того ж IP працює. Гіпотеза (середня впевненість): блок за TLS-відбитком Node | HTML-fallback вимкнено (`HTML_FALLBACK_ENABLED`), скан падає з причиною GraphQL; ідея обходу — [P-005](parking.md); verify-проба §3.4 теж дає `unknown` |
 | 2026-06-15 | Авто-розбиття глибокого скану по цінових діапазонах для пошуків `>1000` (вікно пагінації). ⚠️ Сортування за ціною (`probeMaxPrice` для відкритої верхньої межі) **не верифіковане live** — мережа build-середовища до OLX заблокована; probe самоперевіряється у рантаймі (повертає ціну лише якщо сторінка реально впорядкована за ціною, інакше `null` → fallback на звичайний deep) | `fetchSearchSplit`/`fetchPage`/`probeMaxPrice` у `graphqlOlxFetcher.ts`; адаптивна бісекція, запобіжники `MAX_BUCKETS=40`/`MAX_TOTAL_REQUESTS=200`; split-скан не запускає вікно покриття (`warning`→`partial`); `bucketsUsed` у `ScanResult` — `docs/plans/old/price-range-split.md`, §2.9 |
 | 2026-10-17 | REST facet категорій `GET /api/v1/offers/metadata/search/?facets=…` (працював 2026-06-23) відповідає `403`; фільтр «Категорії» не отримував дерево. GraphQL `facets` у `searchParameters` (`facets=[{"field":"category",…,"limit":150}]`, `metadata { facets { category { id count label url } } }`) працює: 200, ~180 категорій для запиту «ноутбук»; OLX приймає лише `limit` < 200 | `fetchCategoryFacet` (`scraper/graphql/categories.ts`) замість REST; перетворення `facetToOptions`/`facetToNodes`; вузли дерева — в `olx_categories` (`categories/tree.ts`) — §2.11, `docs/plans/old/base-criteria.md` |
+| 2026-10-23 | Перевірено вбудовування сторінок OLX (головна, оголошення): `X-Frame-Options: SAMEORIGIN`, у CSP немає `frame-ancestors` — у `iframe` на чужому домені браузер сторінку не покаже | ідею «оголошення в iframe» закрито ([P-002](parking.md) прибрано) — §3.4 |
+| 2026-10-23 | Аудит запитів (`npm run olx:audit`, запит «iphone»): GraphQL пошук і facet категорій — `200`, HTML пошуку й сторінка оголошення — `403` (як з 2026-10-03) | перший еталон `server/src/scraper/olxAuditEtalon.json` — [olx-api-audit](instructions/olx-api-audit.md) |
