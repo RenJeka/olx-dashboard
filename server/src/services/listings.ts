@@ -1,4 +1,6 @@
 import { BadRequestError, NotFoundError } from '../errors.js';
+import { getCorpus, type TextCorpus } from '../cache/textCorpus.js';
+import { getLogger } from '../logger.js';
 import { descriptionPreview, matchesQuery, stripHtml } from '../analysis/text.js';
 import {
   LISTING_SORTABLE,
@@ -17,9 +19,12 @@ const LISTING_NOT_FOUND = 'Оголошення не знайдено';
 const DESCRIPTION_PREVIEW_CHARS = 240;
 /** Максимум id в одному запиті деталей (AI-майстер просить описи пакетом). */
 const DETAILS_MAX_IDS = 500;
-/** Пошук в описі читає рядки порціями — повні описи пошуку не тримаються в пам'яті разом. */
+/** Корпус пошуку в описі читається з Turso порціями (кеш — cache/textCorpus.ts). */
 const SEARCH_CHUNK = 1000;
 const OLX_STATUS_OVERRIDES = ['active', 'inactive', 'removed'];
+
+/** Ліниво: тести з `vi.mock('../logger.js')` без getLogger не падають на імпорті. */
+const log = () => getLogger('cache');
 
 /** `description_head` → `description_preview` + `has_description`. */
 function toLightRow({ description_head, ...row }: LightRowRaw) {
@@ -49,9 +54,27 @@ export async function getDetailsBatch(searchId: number, rawIds: unknown): Promis
   return listListingDetails(searchId, ids);
 }
 
+/** Назви й описи пошуку з Turso (порціями за id) — уже очищені від HTML і в нижньому регістрі. */
+async function loadTextCorpus(searchId: number): Promise<TextCorpus> {
+  const corpus: TextCorpus = { ids: [], titles: [], descriptions: [] };
+  let lastId = 0;
+  for (;;) {
+    const chunk = await listTextChunk(searchId, lastId, SEARCH_CHUNK);
+    for (const row of chunk) {
+      corpus.ids.push(row.id);
+      corpus.titles.push((row.title ?? '').toLowerCase());
+      corpus.descriptions.push(stripHtml(row.description).toLowerCase());
+    }
+    const last = chunk.at(-1);
+    if (!last || chunk.length < SEARCH_CHUNK) break;
+    lastId = last.id;
+  }
+  return corpus;
+}
+
 /**
  * Пошук у назві та/або описі (булевий запит, як у таблиці) → id збігів. Опис не віддається
- * на клієнт, тож пошук в описі — тут; рядки читаються порціями за id.
+ * на клієнт, тож пошук в описі — тут, по закешованому корпусу пошуку.
  */
 export async function searchListingIds(
   searchId: number,
@@ -62,20 +85,16 @@ export async function searchListingIds(
   const query = (rawQuery ?? '').trim();
   if (!query || (!inTitle && !inDescription)) return { ids: [] };
 
+  const started = performance.now();
+  const { corpus, source } = await getCorpus(searchId, () => loadTextCorpus(searchId));
   const ids: number[] = [];
-  let lastId = 0;
-  for (;;) {
-    const chunk = await listTextChunk(searchId, lastId, SEARCH_CHUNK);
-    for (const row of chunk) {
-      const parts: string[] = [];
-      if (inTitle) parts.push((row.title ?? '').toLowerCase());
-      if (inDescription) parts.push(stripHtml(row.description).toLowerCase());
-      if (matchesQuery(parts.join('\n'), query)) ids.push(row.id);
-    }
-    const last = chunk.at(-1);
-    if (!last || chunk.length < SEARCH_CHUNK) break;
-    lastId = last.id;
-  }
+  corpus.ids.forEach((id, i) => {
+    const parts: string[] = [];
+    if (inTitle) parts.push(corpus.titles[i] ?? '');
+    if (inDescription) parts.push(corpus.descriptions[i] ?? '');
+    if (matchesQuery(parts.join('\n'), query)) ids.push(id);
+  });
+  log().info({ searchId, source, ms: Math.round(performance.now() - started), matches: ids.length }, 'пошук в описі');
   return { ids };
 }
 

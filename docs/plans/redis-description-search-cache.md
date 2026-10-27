@@ -1,6 +1,6 @@
 # План: Redis-кеш для пошуку в описі (тест без ліміту, з логуванням)
 
-> **Статус:** 🟢 активний · [P-011](../parking.md) · новий сервіс у стеку — реалізація лише після «так» людини (крок 0)
+> **Статус:** 🟢 активний · [P-011](../parking.md) · код готовий (кроки 0, 2–4); далі — PR, Redis Cloud і тест на проді
 
 ## Контекст
 
@@ -76,20 +76,25 @@ OOM — і ми бачимо момент і розмір. Кожна опера
 | `cache/textCorpus.test.ts` (новий) | Vitest: промах → побудова, влучання L1, зміна версії → перебудова, Redis недоступний → Turso |
 | `server/src/services/listings.ts` | `searchListingIds` — бере корпус (готовий текст) замість порційного читання й `stripHtml` |
 | `server/src/db/repos/listings.ts` | читання для побудови корпусу (`id, title, description` пошуку; наявний `listTextChunk`) |
-| `server/src/scraper/normalizer.ts` | після `upsertListings` — `invalidateCorpus(searchId, 'upsert')` |
+| `server/src/scraper/normalizer.ts` | після `upsertListings` — `invalidateCorpus(searchId, 'upsert')`, лише якщо є нові/змінені рядки (самі touch кеш не скидають); також після часткового запису |
 | `server/src/services/searches.ts` | після видалення пошуку — `invalidateCorpus(searchId, 'delete')` |
 | `AGENTS.md` → «Стек», `docs/architecture.md`, `docs/structure.md`, `docs/deploy-render-turso.md` (env `REDIS_URL`) | документація |
 
 ## Кроки
 
-- [ ] **0. Рішення людини:** «так» на новий сервіс у стеку (Redis Cloud Free) і залежність `redis`.
+- [x] **0. Рішення людини:** «так» на новий сервіс у стеку (Redis Cloud Free) і залежність `redis`.
 - [ ] **1. Людина створює БД** Redis Cloud → Essentials **Free**, хмара **AWS**, регіон **eu-central-1 (Frankfurt)**
       — там Render; не `us-east-1` за замовчуванням. Копіює рядок підключення (`redis://default:…@…:порт`) —
       **у чат не вставляти**, лише в env Render (крок 6) і локальний `server/.env`.
-- [ ] 2. `cache/redis.ts` + `cache/textCorpus.ts` + тести (Vitest без справжнього Redis — підмінений клієнт).
-- [ ] 3. Підключити в `searchListingIds`, `upsertListings`, видалення пошуку.
-- [ ] 4. Локально: `npm run check` + `npm run build`; smoke без `REDIS_URL` (лише L1) і з `REDIS_URL` (L1 + L2):
+- [x] 2. `cache/redis.ts` + `cache/textCorpus.ts` + тести (Vitest без справжнього Redis — підмінений клієнт).
+- [x] 3. Підключити в `searchListingIds`, `upsertListings`, видалення пошуку.
+- [x] 4. Локально: `npm run check` + `npm run build`; smoke без `REDIS_URL` (лише L1) і з `REDIS_URL` (L1 + L2):
       пошук в описі дає ті самі id, що до змін (порівняти відповіді на кількох запитах).
+      Зроблено 2026-10-27 на локальному `redis-server` з `maxmemory 3mb` і тимчасовій БД зі згенерованими
+      оголошеннями (1 841 / 1 254 / 139): холодний запит → `turso`, повторний → `L1`; новий процес → `L2`;
+      `upsertListings` → версія +1 і перебудова (новий рядок знаходиться); переповнення → `redis-oom` у журналі,
+      пошук працює; Redis вимкнено → `redis-connect` (одна пауза до 3 с, далі без Redis 60 с), пошук працює.
+      Наявні тести пошуку (`routes/listings.test.ts`) — без змін і зелені.
 - [ ] 5. PR → зелений CI → «так» людини на злиття (= деплой).
 - [ ] 6. Людина додає `REDIS_URL` в env сервісу API на Render (зміна env = рестарт).
 - [ ] 7. **Тест на проді** (test-cases нижче) → агент читає логи Render (`"scope":"cache"`) і Redis `INFO`.

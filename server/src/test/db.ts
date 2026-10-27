@@ -1,5 +1,6 @@
 // Хелпери для тестів, що працюють з БД (тимчасовий файл libSQL — див. vitest.config.ts).
 import { db, dbAll, dbGet, initDb } from '../db/db.js';
+import { resetCorpusCacheForTests } from '../cache/textCorpus.js';
 import type { RawListing } from '../types.js';
 
 // Порядок — від залежних до батьківських (FK).
@@ -8,6 +9,7 @@ const TABLES = ['base_criteria', 'olx_categories', 'price_history', 'scan_runs',
 /** Застосувати схему (один раз на файл) і очистити всі таблиці. */
 export async function resetDb(): Promise<void> {
   await initDb();
+  resetCorpusCacheForTests();
   await db.batch(
     TABLES.map((t) => `DELETE FROM ${t}`),
     'write',

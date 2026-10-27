@@ -1,5 +1,6 @@
 import type { InStatement } from '@libsql/client';
 import { dbAll, dbBatchChunked, dbGet } from '../db/db.js';
+import { invalidateCorpus } from '../cache/textCorpus.js';
 import { evaluateFilteredOut, parseLocalFilters } from './localFilters.js';
 import { parseOlxDate } from './dateParser.js';
 import type { RawListing, NormalizedPrice, ScanResult } from '../types.js';
@@ -425,6 +426,9 @@ export async function upsertListings(
     });
   }
 
+  // Нові/змінені рядки (без touch) — лише вони можуть змінити назву чи опис у кеші пошуку в описі.
+  const upsertCount = statements.length;
+
   // Дешевий touch незмінних рядків — чанками (ліміт IN). WHERE у TOUCH_SUFFIX додатково
   // відсіює рядки, ще «свіжі» за last_seen_at (throttle once/day) — для них write не виконується.
   for (let i = 0; i < touchOlxIds.length; i += IN_CHUNK) {
@@ -434,8 +438,12 @@ export async function upsertListings(
   }
 
   // UPSERT-и + touch — чанками (dbBatchChunked): upsert по olx_id ідемпотентний, тож частково
-  // записаний скан безпечний і кращий за втрачений.
-  await dbBatchChunked(statements);
+  // записаний скан безпечний і кращий за втрачений. Кеш тексту скидається й після часткового запису.
+  try {
+    await dbBatchChunked(statements);
+  } finally {
+    if (upsertCount > 0) await invalidateCorpus(searchId, 'upsert');
+  }
 
   return { found: raw.length, new_count: newCount };
 }

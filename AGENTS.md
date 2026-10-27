@@ -34,6 +34,8 @@
   CVE + платна модель); ZIP ручного режиму — `archiver`. `.env` — `process.loadEnvFile`, без dotenv.
 - **Логування:** pino (той самий, що у Fastify) + `pino-pretty` (dev); єдиний сервіс
   `server/src/logger.ts` → stdout + таблиця `app_logs` (лише warn/error), діалог «Журнал» в UI.
+- **Кеш:** Redis Cloud Free через офіційний клієнт `redis` (`server/src/cache/`) — лише текст для пошуку в описі
+  (пам'ять процесу + Redis); порожній `REDIS_URL` → лише пам'ять процесу. Redis best-effort: збій не валить запит.
 - **Notion:** `@notionhq/client` (етап 4).
 - **Тести:** **Vitest** (`server/`, dev), БД-тести — на тимчасовому файлі libSQL (не `server/data/olx.db`).
 - **НЕ використовувати:** Express, Prisma/ORM, PostgreSQL, Redux, Playwright/браузер для збору.

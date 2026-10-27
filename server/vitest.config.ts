@@ -12,7 +12,8 @@ export default defineConfig({
   test: {
     globalSetup: ['src/test/globalSetup.ts'],
     include: ['src/**/*.test.ts'],
-    env: { TURSO_DATABASE_URL: `file:${testDb}`, TURSO_AUTH_TOKEN: '' },
+    // REDIS_URL порожній — тести ніколи не ходять у справжній Redis (кеш — фейкове сховище).
+    env: { TURSO_DATABASE_URL: `file:${testDb}`, TURSO_AUTH_TOKEN: '', REDIS_URL: '' },
     fileParallelism: false,
   },
 });
