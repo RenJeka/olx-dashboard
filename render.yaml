@@ -39,6 +39,8 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      - key: REDIS_URL # опційно: кеш пошуку в описі (Redis Cloud Free, Frankfurt)
+        sync: false
       - key: AUTH_COOKIE_SECURE
         sync: false
       - key: AUTH_DISABLED # заданий, але не `true` (smoke: API без сесії → 401); на проді не потрібен

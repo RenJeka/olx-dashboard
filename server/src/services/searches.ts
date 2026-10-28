@@ -1,5 +1,6 @@
 import { BadRequestError, NotFoundError } from '../errors.js';
 import { logWarn } from '../logger.js';
+import { invalidateCorpus } from '../cache/textCorpus.js';
 import { refreshBaseCategory } from '../categories/tree.js';
 import { recomputeFilteredOut } from '../scraper/refilter.js';
 import { parseBullets } from '../analysis/text.js';
@@ -128,6 +129,7 @@ export async function updateSearch(
 export async function deleteSearch(id: number): Promise<{ deleted: true }> {
   await assertSearchExists(id);
   await deleteSearchCascade(id);
+  await invalidateCorpus(id, 'delete');
   return { deleted: true };
 }
 
