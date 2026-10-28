@@ -27,7 +27,8 @@ export interface TextCorpus {
   descriptions: string[];
 }
 
-export type CorpusSource = 'L1' | 'L2' | 'turso';
+/** `shared` — запит дочекався побудови, яку вже почав паралельний запит того самого пошуку. */
+export type CorpusSource = 'L1' | 'L2' | 'turso' | 'shared';
 
 interface L1Entry {
   /** Локальний лічильник на момент побудови — скидання в цьому процесі робить запис застарілим. */
@@ -35,11 +36,16 @@ interface L1Entry {
   /** Версія з Redis на момент побудови (null — Redis не було). */
   remoteVersion: number | null;
   corpus: TextCorpus;
-  rawBytes: number;
+  /** Символів у назвах і описах — дешева оцінка розміру L1 (без серіалізації). */
+  textChars: number;
 }
 
 const l1 = new Map<number, L1Entry>();
 const localGens = new Map<number, number>();
+/** Побудова/завантаження в процесі: паралельні запити пошуку чекають на неї, а не читають Turso вдруге. */
+const inflight = new Map<number, Promise<{ corpus: TextCorpus; source: CorpusSource }>>();
+/** Фонові записи в Redis (тести чекають на них через flushCacheWritesForTests). */
+const pendingWrites = new Set<Promise<void>>();
 
 const versionKey = (searchId: number) => `${keyPrefix()}corpus:${searchId}:v`;
 const blobKey = (searchId: number) => `${keyPrefix()}corpus:${searchId}`;
@@ -58,15 +64,25 @@ async function attempt<T>(stage: string, fn: () => Promise<T>, details: Record<s
 
 /** Розмір L1 і пам'ять процесу — у кожен рядок логу про побудову/завантаження. */
 function memoryStats() {
-  let l1Bytes = 0;
-  for (const entry of l1.values()) l1Bytes += entry.rawBytes;
+  let l1Chars = 0;
+  for (const entry of l1.values()) l1Chars += entry.textChars;
   const { rss, heapUsed } = process.memoryUsage();
-  return { l1Searches: l1.size, l1Bytes, rss, heapUsed };
+  return { l1Searches: l1.size, l1Chars, rss, heapUsed };
 }
 
-/** Записати корпус у Redis і залогувати, скільки він там займає і скільки пам'яті Redis зайнято. */
-async function writeL2(store: CacheStore, searchId: number, blob: Buffer): Promise<void> {
+const countChars = (corpus: TextCorpus) =>
+  corpus.titles.reduce((n, t) => n + t.length, 0) + corpus.descriptions.reduce((n, d) => n + d.length, 0);
+
+/**
+ * Серіалізувати, стиснути й записати корпус у Redis і залогувати, скільки він там займає і скільки
+ * пам'яті Redis зайнято. Іде у фоні — відповідь на пошук не чекає на gzip і завантаження.
+ */
+async function writeL2(store: CacheStore, searchId: number, version: number, corpus: TextCorpus): Promise<void> {
   const key = blobKey(searchId);
+  const started = performance.now();
+  const json = JSON.stringify({ version, ...corpus });
+  const rawBytes = Buffer.byteLength(json);
+  const blob = await gzipAsync(json);
   try {
     await store.setBuffer(key, blob);
   } catch (err) {
@@ -74,13 +90,13 @@ async function writeL2(store: CacheStore, searchId: number, blob: Buffer): Promi
     const info = await store.info().catch(() => ({}));
     // OOM — Redis заповнений (без TTL політика volatile-lru не витісняє) — головне, що шукає тест.
     const stage = message.includes('OOM') ? 'redis-oom' : 'redis-write';
-    logWarn('cache', stage, `Redis: ${message}`, { searchId, bytes: blob.length, ...info });
+    logWarn('cache', stage, `Redis: ${message}`, { searchId, rawBytes, gzipBytes: blob.length, ...info });
     return;
   }
   const memoryUsage = await store.memoryUsage(key).catch(() => null);
   const info = await store.info().catch(() => ({}));
   log().info(
-    { searchId, key, bytes: blob.length, memoryUsage, ...info, ...store.traffic() },
+    { searchId, key, rawBytes, gzipBytes: blob.length, memoryUsage, writeMs: elapsed(started), ...info, ...store.traffic() },
     'корпус записано в Redis',
   );
 }
@@ -94,9 +110,9 @@ async function readL2(store: CacheStore, searchId: number, version: number): Pro
     const parsed = JSON.parse(json) as TextCorpus & { version: number };
     if (parsed.version !== version) return null;
     const corpus = { ids: parsed.ids, titles: parsed.titles, descriptions: parsed.descriptions };
-    const entry = { localGen: 0, remoteVersion: version, corpus, rawBytes: Buffer.byteLength(json) };
+    const entry = { localGen: 0, remoteVersion: version, corpus, textChars: countChars(corpus) };
     log().info(
-      { searchId, source: 'L2', gzipBytes: blob.length, rawBytes: entry.rawBytes, ms: elapsed(started), ...store.traffic() },
+      { searchId, source: 'L2', gzipBytes: blob.length, rawBytes: Buffer.byteLength(json), ms: elapsed(started), ...store.traffic() },
       'корпус узято з Redis',
     );
     return entry;
@@ -108,9 +124,25 @@ async function readL2(store: CacheStore, searchId: number, version: number): Pro
 
 /**
  * Корпус пошуку: L1 → L2 (Redis) → `load()` (Turso). Ніколи не падає через Redis — у гіршому
- * разі читає Turso, як без кешу.
+ * разі читає Turso, як без кешу. Паралельні запити того самого пошуку ділять одну побудову
+ * (на проді пошук у процесі набору слав два запити — і корпус iphone будувався з Turso двічі).
  */
 export async function getCorpus(
+  searchId: number,
+  load: () => Promise<TextCorpus>,
+): Promise<{ corpus: TextCorpus; source: CorpusSource }> {
+  const running = inflight.get(searchId);
+  if (running) return { ...(await running), source: 'shared' };
+  const job = resolveCorpus(searchId, load);
+  inflight.set(searchId, job);
+  try {
+    return await job;
+  } finally {
+    if (inflight.get(searchId) === job) inflight.delete(searchId);
+  }
+}
+
+async function resolveCorpus(
   searchId: number,
   load: () => Promise<TextCorpus>,
 ): Promise<{ corpus: TextCorpus; source: CorpusSource }> {
@@ -136,22 +168,19 @@ export async function getCorpus(
 
   const started = performance.now();
   const corpus = await load();
-  const loadMs = elapsed(started);
-  const json = JSON.stringify({ version: remoteVersion, ...corpus });
-  const rawBytes = Buffer.byteLength(json);
   // Скидання під час читання → localGen уже інший, і наступний запит перебудує корпус.
-  l1.set(searchId, { localGen, remoteVersion, corpus, rawBytes });
-
-  let gzipBytes: number | null = null;
-  if (store && remoteVersion !== null) {
-    const blob = await gzipAsync(json);
-    gzipBytes = blob.length;
-    await writeL2(store, searchId, blob);
-  }
+  l1.set(searchId, { localGen, remoteVersion, corpus, textChars: countChars(corpus) });
   log().info(
-    { searchId, source: 'turso', rows: corpus.ids.length, rawBytes, gzipBytes, loadMs, buildMs: elapsed(started), ...memoryStats() },
+    { searchId, source: 'turso', rows: corpus.ids.length, loadMs: elapsed(started), ...memoryStats() },
     'корпус побудовано',
   );
+
+  if (store && remoteVersion !== null) {
+    const write = writeL2(store, searchId, remoteVersion, corpus)
+      .catch((err: unknown) => logWarn('cache', 'redis-write', `Redis: ${errorText(err)}`, { searchId }))
+      .finally(() => pendingWrites.delete(write));
+    pendingWrites.add(write);
+  }
   return { corpus, source: 'turso' };
 }
 
@@ -162,6 +191,8 @@ export async function getCorpus(
 export async function invalidateCorpus(searchId: number, reason: 'upsert' | 'delete'): Promise<void> {
   localGens.set(searchId, (localGens.get(searchId) ?? 0) + 1);
   l1.delete(searchId);
+  // Побудова, що вже йде, — зі старих даних: нові запити не повинні до неї приєднуватись.
+  inflight.delete(searchId);
   const store = await getCacheStore();
   if (!store) return;
   const version = await attempt('redis-invalidate', () => store.incr(versionKey(searchId)), { searchId, reason });
@@ -173,4 +204,10 @@ export async function invalidateCorpus(searchId: number, reason: 'upsert' | 'del
 export function resetCorpusCacheForTests(): void {
   l1.clear();
   localGens.clear();
+  inflight.clear();
+}
+
+/** Лише для тестів: дочекатися фонових записів у Redis. */
+export async function flushCacheWritesForTests(): Promise<void> {
+  await Promise.all([...pendingWrites]);
 }
