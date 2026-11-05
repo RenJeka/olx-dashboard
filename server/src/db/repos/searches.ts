@@ -106,8 +106,8 @@ export function getSearchPosition(id: number): Promise<SearchPosition | undefine
 }
 
 /**
- * Сусід за ручним порядком — лише серед активних (не архівних) у межах ТІЄЇ Ж групи-проекту
- * (project_id збігається; NULL = група «Без проекту»).
+ * Сусід за ручним порядком — лише серед активних (не архівних) у межах ТІЄЇ Ж групи-проєкту
+ * (project_id збігається; NULL = група «Без проєкту»).
  */
 export function findSearchNeighbor(
   current: SearchPosition,

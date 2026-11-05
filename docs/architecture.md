@@ -215,7 +215,7 @@ flowchart LR
 
 ## 4. Модулі бекенду
 
-**Шари** (рефакторинг — [`plans/refactor-clean-architecture.md`](./plans/refactor-clean-architecture.md)): `routes/` — лише HTTP (розбір запиту, виклик сервісу; помилки — `HttpError` з `errors.ts` → `routes/errorHandler.ts`) → `services/` — use-cases CRUD-сутностей → `db/repos/` — SQL. Напрям залежностей перевіряє `npm run layers:check`. Переведено: пошуки, проекти, оголошення, журнал, AI-роути (`routes/analysis/*`, `aiPicks`, `relevance`), категорії (`routes/categories.ts`, `categories/tree.ts`, `analysis/baseCriteria.ts`, `analysis/remap.ts`); сканер і скрейпер ще пишуть SQL самі — кроки плану.
+**Шари** (рефакторинг — [`plans/refactor-clean-architecture.md`](./plans/refactor-clean-architecture.md)): `routes/` — лише HTTP (розбір запиту, виклик сервісу; помилки — `HttpError` з `errors.ts` → `routes/errorHandler.ts`) → `services/` — use-cases CRUD-сутностей → `db/repos/` — SQL. Напрям залежностей перевіряє `npm run layers:check`. Переведено: пошуки, проєкти, оголошення, журнал, AI-роути (`routes/analysis/*`, `aiPicks`, `relevance`), категорії (`routes/categories.ts`, `categories/tree.ts`, `analysis/baseCriteria.ts`, `analysis/remap.ts`); сканер і скрейпер ще пишуть SQL самі — кроки плану.
 
 | Модуль | Відповідальність |
 | --- | --- |
@@ -241,7 +241,7 @@ flowchart LR
 | `scraper/audit.ts` | **Аудит запитів до OLX** (P-017): `runOlxAudit(query, etalon)` по черзі шле запити застосунку — GraphQL пошук, GraphQL facet категорій, HTML пошуку, HTML оголошення (URL — з відповіді пошуку) — тими самими побудовниками, що й скан, з паузами звичайного скану; знімок `{status, contentType, shape}` (JSON — шляхи полів, HTML — знайдені `SELECTORS`) звіряється з `scraper/olxAuditEtalon.json`. Процедура — `instructions/olx-api-audit.md`. |
 | `scraper/verifier.ts` | `probeListingPage(url)` (Етап 2, A3) — пряма проба сторінки оголошення: `fetch` з `redirect:'manual'`; `404`/`410` → `dead`; `200` + `[data-testid="ad_description"]` → `alive` (опис/продавець для backfill); інше → `unknown`. Маркер верифіковано live 2026-06-12 (`olx-api.md` §3.4). |
 | `scanner/` | Модулі сканування (розбитий `scanner.ts`): **`abortControl.ts`** — `Map<searchId, boolean>` abort-прапорці, `requestStopScan`; **`searchLoader.ts`** — `loadSearch` (SQLite → `SearchConfig`), `dedupeQueries`; **`fetchOrchestrator.ts`** — `fetchWithFallback` (GraphQL→HTML; HTML лише при `HTML_FALLBACK_ENABLED`, зараз вимкнено), `fetchAllQueries` (мульти-query з синонімами + злиття по `olxId`); **`scanRunLifecycle.ts`** — `withScanRun<T>(searchId, kind, body)` — спільний lifecycle `scan_runs` (insert/`onProgress`/error-handling/abort cleanup/keep-alive), `closeInterruptedScanRuns()` — закриття обірваних сканів на старті сервера (`index.ts`); **`keepAlive.ts`** — `acquireKeepAlive()`: поки йде скан, самопінг публічного `/health` раз на 5 хв (`RENDER_EXTERNAL_URL`), щоб free-інстанс Render не заснув (`business-rules.md`); **`scanFinalize.ts`** — `finalizeScanResult` (спільний хвіст `runScan` і `runDeepScanFromPlan`: `upsertListings` → `applyScanStatuses` → `refreshCategoryFacet` → `refreshBaseCategory` (лише коли є нові оголошення або автокатегорії ще немає) → `UPDATE scan_runs`); **`runScan.ts`** — `runScan(searchId, {deep?})` — спільна логіка для HTTP-роута і CLI; GraphQL→HTML fallback; `scan_runs.kind` (`normal`/`deep`); **`analyzeScan.ts`** — двофазний deep-скан: `analyzeScan` (probe-фаза, кеш планів TTL 30 хв), `runDeepScanFromPlan` (допагінація за планом), `isPlanCached`/`isAnalysisFresh`; **`verifyScan.ts`** — `runVerify` (P1+P2, проба сторінок, батчі), `countVerifyCandidates`; **`index.ts`** — barrel реекспорт усіх публічних функцій. |
-| `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`; PATCH `archived` → архів/розархів, `plans/archive-searches.md`; PATCH `project_id` → призначення/відв'язування проекту, `plans/projects.md`) + `POST /:id/move` (сусід серед `archived = 0` ТА того ж `project_id`) + `POST /:id/scan` (`?deep=true`) + `POST /:id/scan/analyze` + `POST /:id/scan/run-plan` + `POST /:id/scan/stop` (зупинка, `docs/plans/old/deep-scan-stop-and-history.md`) + `GET /:id/scan-status` + `GET /:id/last-analysis` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
+| `routes/searches.ts` | CRUD `/api/searches[/:id]` (PATCH з `local_filters` → ретроактивний перерахунок `filtered_out`; PATCH `archived` → архів/розархів, `plans/archive-searches.md`; PATCH `project_id` → призначення/відв'язування проєкту, `plans/projects.md`) + `POST /:id/move` (сусід серед `archived = 0` ТА того ж `project_id`) + `POST /:id/scan` (`?deep=true`) + `POST /:id/scan/analyze` + `POST /:id/scan/run-plan` + `POST /:id/scan/stop` (зупинка, `docs/plans/old/deep-scan-stop-and-history.md`) + `GET /:id/scan-status` + `GET /:id/last-analysis` + `GET /:id/param-keys` + `GET /:id/filter-options` + `GET /:id/stats`. |
 | `routes/projects.ts` | CRUD `/api/projects[/:id]` (групування пошуків в акордеони, `docs/plans/old/projects.md`): `GET` (сорт `sort_order ASC`), `POST` (нова згори), `PATCH` (перейменування), `DELETE` (відв'язує пошуки `project_id=NULL`, НЕ видаляє), `POST /:id/move` (реордер сусідом). |
 | `cache/` | **Кеш пошуку в описі** (`plans/redis-description-search-cache.md`, P-011): `redis.ts` — клієнт за `REDIS_URL` (порожній → без Redis), таймаут команд, префікс ключів за базою, `INFO`/`MEMORY USAGE`, лічильник трафіку; `textCorpus.ts` — корпус пошуку (назви й описи без HTML, нижній регістр): пам'ять процесу (L1) → Redis gzip (L2) → Turso; версія пошуку в Redis (`INCR` в `upsertListings` при нових/змінених рядках і при видаленні пошуку). Збій Redis (недоступний, таймаут, OOM) → `logWarn` і Turso. Логи `scope: "cache"` (розміри, пам'ять Redis, трафік, джерело відповіді) — лише stdout |
 | `routes/listings.ts` | `GET /api/searches/:id/listings` (легкі рядки, фрагмент опису) з білим списком колонок для сортування + деталі на вимогу (`/details`) і пошук у назві/описі (`/listings/search`) + `PATCH /api/listings/:id` (`{status?, note?, pros?, cons?, ai_relevant?, olx_status?}`, валідація `LISTING_STATUSES`, зміна статусу → `status_source='manual'`, `miss_count=0`; `ai_relevant` → `ai_relevant_source='manual'`, ручний override семантичного фільтра; `olx_status` (`active`/`inactive`/`removed`/`null`) — ручна «Активність», разова підказка без source-захисту). |
@@ -280,7 +280,7 @@ flowchart LR
   (`plans/turso-write-optimization.md`): він перезаписувався на кожному скані (бо `last_seen_at`
   оновлюється завжди) і множив Turso "rows written"; verify-прохід P1 обходиться scan+sort.
   DROP наявного — у `initDb` (`db.ts`).
-- `searches.project_id` — FK на `projects.id` (NULL = «Без проекту»); видалення проекту відв'язує
+- `searches.project_id` — FK на `projects.id` (NULL = «Без проєкту»); видалення проєкту відв'язує
   пошуки (`project_id=NULL`), не видаляє їх (`docs/plans/old/projects.md`).
 - `searches.sort_order` — ручний порядок у списку (менше → вище); нові пошуки отримують
   `MIN(sort_order) - 1` (з'являються згори). Історичний одноразовий бекфіл у `db.ts` прибрано
@@ -308,8 +308,8 @@ flowchart LR
 | `POST` | `/api/auth/logout` | ✅ — чистить сесійну кукі |
 | `GET/POST/PATCH/DELETE` | `/api/searches[/:id]` | ✅ Етап 1/2 — `GET` сортує за `sort_order ASC, created_at DESC, id DESC`; `DELETE` каскадний (`price_history` → `scan_runs` → `listings` → `searches`, у транзакції); `PATCH` з `local_filters` (Етап 2) → зберігає + синхронно перераховує `filtered_out` для всіх рядків пошуку, повертає `filtered_out_count` |
 | `POST` | `/api/searches/:id/move` | ✅ — `{direction: 'up'\|'down'}`, міняє `sort_order` із сусідом (серед `archived=0` ТА того ж `project_id`, для кнопок ↑/↓ у sidebar) |
-| `GET/POST/PATCH/DELETE` | `/api/projects[/:id]` | ✅ Проекти (`docs/plans/old/projects.md`) — групування пошуків в акордеони; `GET` сорт `sort_order ASC, created_at DESC, id DESC`; `POST {name}` (нова згори); `PATCH {name}` (перейменування); `DELETE` відв'язує пошуки (`project_id=NULL`), пошуки НЕ видаляє |
-| `POST` | `/api/projects/:id/move` | ✅ — `{direction: 'up'\|'down'}`, реордер проектів сусідом (кнопки ↑/↓ у заголовку акордеону) |
+| `GET/POST/PATCH/DELETE` | `/api/projects[/:id]` | ✅ Проєкти (`docs/plans/old/projects.md`) — групування пошуків в акордеони; `GET` сорт `sort_order ASC, created_at DESC, id DESC`; `POST {name}` (нова згори); `PATCH {name}` (перейменування); `DELETE` відв'язує пошуки (`project_id=NULL`), пошуки НЕ видаляє |
+| `POST` | `/api/projects/:id/move` | ✅ — `{direction: 'up'\|'down'}`, реордер проєктів сусідом (кнопки ↑/↓ у заголовку акордеону) |
 | `POST` | `/api/searches/:id/scan?deep=true` | ✅ Етап 1/2 — повертає `{found, new_count, rawFound?, requestsUsed, disabled_count, stopped?}`; `deep=true` — глибокий скан (§2.9 `olx-api.md`); `rawFound` — сирих до дедупу між синонімами (`rawFound-found`=злито дублів); `disabled_count` — результат `statusEngine` (Етап 2, лише GraphQL-скани) |
 | `POST` | `/api/searches/:id/scan/analyze?deep=true` | ✅ — двофазний deep-скан (`docs/plans/old/two-phase-deep-scan.md`): лише probe-фаза (root + цінові бакети, без допагінації), повертає `ScanPlan` (розбивка по синонімах, ETA, `estimatedNew`); план кешується сервером (TTL 30 хв) під `planToken` + зберігається у `scan_runs.scan_plan` (історія) |
 | `POST` | `/api/searches/:id/scan/run-plan` | ✅ — body `{planToken}`, перевикористовує кешований план (без повторного зондування) → повертає `ScanResult` як звичайний deep-скан; прострочений/невідомий токен → 410 |
@@ -502,20 +502,20 @@ flowchart LR
     `visible`/`onVisibleChange` з `App.tsx`); на desktop — постійна панель. Тримає
     `useNewSearchForm()` і рендерить його `SearchVariantsDialog` окремо від акордеону (Dialog
     через Portal, незалежно від Drawer/aside-обгортки).
-  - `SearchesPanel.tsx` — `Accordion.Root`: секції-проекти (`ProjectAccordionItem` на кожен
-    проект із `useProjects()`) + «Без проекту»/«Архів» (`SearchGroupAccordionItem`, спільний) +
-    кнопки «Новий проект» (`LuFolderPlus` → `ProjectCreateDialog`) і «Новий пошук». Активні пошуки
+  - `SearchesPanel.tsx` — `Accordion.Root`: секції-проєкти (`ProjectAccordionItem` на кожен
+    проєкт із `useProjects()`) + «Без проєкту»/«Архів» (`SearchGroupAccordionItem`, спільний) +
+    кнопки «Новий проєкт» (`LuFolderPlus` → `ProjectCreateDialog`) і «Новий пошук». Активні пошуки
     групуються за `project_id`; усі секції розкриті за замовчуванням (`docs/plans/old/projects.md`).
   - `SearchGroupAccordionItem.tsx` — список `SearchRow` з `isFirst`/`isLast` за індексом
     (стрілки реордеру `LuChevronUp`/`LuChevronDown`, `useReorderSearches`, disabled на краях —
     лише для активних, архівні їх не показують).
-  - `ProjectAccordionItem.tsx` — секція-акордеон одного проекту: заголовок із меню проекту
+  - `ProjectAccordionItem.tsx` — секція-акордеон одного проєкту: заголовок із меню проєкту
     (`LuEllipsisVertical` → «Перейменувати»/«Видалити», `ProjectEditDialog`/`ProjectDeleteDialog`)
-    і стрілками реордеру проекту (`useReorderProjects`) ПОЗА тригером (тригер — `<button>`),
-    усередині — список `SearchRow` цього проекту.
+    і стрілками реордеру проєкту (`useReorderProjects`) ПОЗА тригером (тригер — `<button>`),
+    усередині — список `SearchRow` цього проєкту.
   - `ProjectCreateDialog.tsx`/`ProjectEditDialog.tsx`/`ProjectDeleteDialog.tsx` — діалоги
     створення/перейменування (поле «Назва») та підтвердження видалення (пошуки переходять у
-    «Без проекту», не видаляються).
+    «Без проєкту», не видаляються).
   - `SearchCreateDialog.tsx` — модалка створення пошуку (назва/запит/ціна/варіанти), відкривається кнопкою
     «Новий пошук» у `SearchesPanel`; стан і `submit` — у хуку `hooks/useNewSearchForm.ts`.
   - `SearchRow.tsx` — назва/запит/ціна, бейдж синонімів (тултіп зі списком), крапка-індикатор
@@ -523,7 +523,7 @@ flowchart LR
     `hooks/useSearchRowActions.ts`.
   - `SearchRowMenu.tsx` — 3-dot меню (`Menu.Root`, іконка `LuEllipsisVertical`) — «Редагувати»/
     «Фільтри» (`LuFilter`, відкриває `SearchFiltersDrawer`)/«Варіанти пошуку»/«Перемістити в
-    проект» (вкладене підменю `Menu.TriggerItem` зі списком проектів + «Без проекту»,
+    проєкт» (вкладене підменю `Menu.TriggerItem` зі списком проєктів + «Без проєкту»,
     `useAssignSearchToProject`)/«Архівувати»/«Видалити» (`LuTrash2`, `color="fg.error"`).
   - `SearchDeleteDialog.tsx` — `DialogRoot role="alertdialog"` підтвердження видалення (каскадно
     через `useDeleteSearch`; якщо видалено активний пошук — `onSelect(null)`).

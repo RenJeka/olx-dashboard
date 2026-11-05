@@ -21,7 +21,7 @@ interface Props {
   project: Project;
 }
 
-/** Модалка перейменування проекту. */
+/** Модалка перейменування проєкту. */
 export function ProjectEditDialog({ open, onOpenChange, project }: Props) {
   const [name, setName] = useState('');
   const updateProject = useUpdateProject();
@@ -39,7 +39,7 @@ export function ProjectEditDialog({ open, onOpenChange, project }: Props) {
       {
         onSuccess: () => {
           onOpenChange(false);
-          toaster.create({ type: 'success', title: 'Проект оновлено', description: trimmed });
+          toaster.create({ type: 'success', title: 'Проєкт оновлено', description: trimmed });
         },
         onError: (err) =>
           toaster.create({
@@ -62,7 +62,7 @@ export function ProjectEditDialog({ open, onOpenChange, project }: Props) {
       <DialogContent>
         <DialogCloseTrigger />
         <DialogHeader>
-          <DialogTitle>Перейменувати проект</DialogTitle>
+          <DialogTitle>Перейменувати проєкт</DialogTitle>
         </DialogHeader>
         <Box as="form" onSubmit={submit}>
           <DialogBody>

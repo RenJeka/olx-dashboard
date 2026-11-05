@@ -39,7 +39,7 @@ export interface SearchInput {
   query_synonyms?: string[];
   /** Архів пошуку (docs/plans/old/archive-searches.md): 1 — в архіві. */
   archived?: number;
-  /** Проект (docs/plans/old/projects.md): id проекту або null — «Без проекту». */
+  /** Проєкт (docs/plans/old/projects.md): id проєкту або null — «Без проєкту». */
   project_id?: number | null;
 }
 
@@ -133,7 +133,7 @@ export async function deleteSearch(id: number): Promise<{ deleted: true }> {
   return { deleted: true };
 }
 
-/** Ручне сортування (стрілки ↑/↓): міняє sort_order із сусідом у межах групи-проекту. */
+/** Ручне сортування (стрілки ↑/↓): міняє sort_order із сусідом у межах групи-проєкту. */
 export async function moveSearch(id: number, direction: unknown): Promise<SearchRecord | undefined> {
   if (direction !== 'up' && direction !== 'down') {
     throw new BadRequestError('direction має бути "up" або "down"');

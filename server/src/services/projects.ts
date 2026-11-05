@@ -13,16 +13,16 @@ import {
 } from '../db/repos/projects.js';
 import type { Project } from '../types.js';
 
-const PROJECT_NOT_FOUND = 'Проект не знайдено';
+const PROJECT_NOT_FOUND = 'Проєкт не знайдено';
 
-/** Усі проекти за ручним порядком. */
+/** Усі проєкти за ручним порядком. */
 export const listAllProjects = listProjects;
 
 async function assertProjectExists(id: number): Promise<void> {
   if (!(await projectExists(id))) throw new NotFoundError(PROJECT_NOT_FOUND);
 }
 
-/** Новий проект з'являється згори списку. */
+/** Новий проєкт з'являється згори списку. */
 export async function createProject(rawName: string | undefined): Promise<Project | undefined> {
   const name = rawName?.trim();
   if (!name) throw new BadRequestError('Поле name обовʼязкове');

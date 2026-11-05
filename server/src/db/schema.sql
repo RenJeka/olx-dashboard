@@ -2,7 +2,7 @@
 -- Застосовується при старті через db.ts (CREATE TABLE IF NOT EXISTS).
 -- НЕ дублювати визначення таблиць у коді — джерело істини тут.
 
--- Проекти — групування пошуків в акордеони (docs/plans/old/projects.md).
+-- Проєкти — групування пошуків в акордеони (docs/plans/old/projects.md).
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS searches (
   query_synonyms TEXT DEFAULT '[]', -- JSON-масив альтернативних пошукових запитів (синоніми query)
   category_facet TEXT,               -- JSON CategoryOption[] (дерево категорій OLX: id+назва+ієрархія+OLX-лічильник) з останнього скану; docs/plans/old/category-counts-and-filter.md
   archived INTEGER DEFAULT 0,        -- 1 — пошук в архіві (прихований зі списку активних)
-  project_id INTEGER REFERENCES projects(id), -- проект, до якого віднесено пошук (NULL — «Без проекту»)
+  project_id INTEGER REFERENCES projects(id), -- проєкт, до якого віднесено пошук (NULL — «Без проєкту»)
   base_category_id INTEGER,          -- автокатегорія пошуку для базових плюсів/мінусів (olx_categories.id); окремо від category_id; server/src/categories/tree.ts
   base_disabled TEXT DEFAULT '{}',   -- JSON: вимкнені базові пункти пошуку (docs/plans/old/base-criteria.md)
   created_at TEXT DEFAULT (datetime('now'))
