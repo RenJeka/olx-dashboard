@@ -239,7 +239,7 @@ olx-dashboard/
         │   ├── analysis/        # AI-workflow діалоги (кожен workflow — окрема директорія)
         │   │   ├── index.ts                 # барель-експорт головних діалогів (AnalysisWizardDialog, AiPicksDialog, RelevanceFilterDialog)
         │   │   ├── ManualAssistant.tsx      # спільна панель-помічник ручного режиму (копіювати/завантажити промпт(и) + вставити відповідь)
-        │   │   ├── AiRankCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
+        │   │   ├── AiPickCard.tsx           # спільна картка AI-обраного оголошення (rank/reason)
         │   │   ├── ScopeSelector.tsx        # спільний селектор «Обсяг» (all/tab/selected/candidates) — однаковий на всіх 3 етапах AI
         │   │   ├── ModeToggle.tsx           # перемикач «Мінуси / Плюси» (крок 1 майстра, вікно «Плюси та мінуси»)
         │   │   ├── hub/                     # хаб AI: кнопка «AI» у шапці → картки кроків workflow
@@ -253,7 +253,7 @@ olx-dashboard/
         │   │   ├── ai-picks/               # workflow «AI Вибір» (план docs/plans/old/AI-auto-top.md)
         │   │   │   ├── AiPicksDialog.tsx    # оболонка діалогу (DialogRoot + trigger)
         │   │   │   ├── AiPicksIdleStep.tsx  # UI кроку idle (кнопка запуску, ManualAssistant)
-        │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiRankCard, збереження)
+        │   │   │   └── AiPicksResultStep.tsx # UI кроку done (картки AiPickCard, збереження)
         │   │   ├── base/                   # вікно «Базові плюси й мінуси» — набори категорій OLX (docs/plans/old/base-criteria.md)
         │   │   │   ├── BaseCriteriaDialog.tsx # вікно: дерево ліворуч / набір праворуч (мобільний — одне під одним), вхід з «Налаштування» → «AI-аналіз»
         │   │   │   ├── CategoryTree.tsx     # дерево: пошук за назвою, згортання, позначка «є набір», «Оновити дерево категорій»

@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Stack, Text } from '@chakra-ui/react';
-import { AiRankCard } from '../AiRankCard';
+import { AiPickCard } from '../AiPickCard';
 import type { useAiPicksFlow } from '../../../hooks/useAiPicksFlow';
 
 type Flow = ReturnType<typeof useAiPicksFlow>;
@@ -37,7 +37,7 @@ export function AiPicksResultStep({ flow, onCommit }: Props) {
         <Box overflowX="auto">
           <HStack gap={3} align="stretch" pb={2}>
             {pendingPicks.map((pick) => (
-              <AiRankCard
+              <AiPickCard
                 key={pick.id}
                 pick={pick}
                 listing={listingsMap.get(pick.id)}
