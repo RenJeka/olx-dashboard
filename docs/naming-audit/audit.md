@@ -1,6 +1,6 @@
 # Аудит найменування — 2026-11-05
 
-Знімок стану за скілом `naming-consistency-audit`. План виправлень — [`plans/naming-consistency.md`](../plans/naming-consistency.md).
+Знімок стану за скілом `naming-consistency-audit`. План виправлень — [`plans/old/naming-consistency.md`](../plans/old/naming-consistency.md).
 
 Обсяг: `server/src`, `web/src`, `scripts`, `server/src/db/schema.sql`, підписи UI. Виключено: `node_modules`,
 згенеровані обгортки скілів, `docs/plans/old/`, хендофи, lock-файли.
@@ -62,7 +62,7 @@
 
 ## Відкриті питання
 
-1. **«проект» чи «проєкт»?** UI і коментарі пишуть «проект»; чинний правопис — «проєкт». Зміна торкнеться
-   багатьох підписів.
-2. **Очищення журналу:** репо `clearLogs`, сервіс `deleteAllLogs`, UI-хук `useClearLogs` — одна дія двома дієсловами.
-   Уніфікувати на `clear`?
+Вирішено людиною 2026-11-05:
+
+1. «проект» → «проєкт» (чинний правопис) — в UI, коментарях і живих документах.
+2. Очищення журналу — дієслово `clear`: сервіс `deleteAllLogs` → `clearLogs`, репо `clearLogs` → `clearLogRows`.

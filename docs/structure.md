@@ -36,6 +36,8 @@ olx-dashboard/
 │   ├── business-rules.md             # доменна механіка: скани, вікно покриття, verify, override, синоніми
 │   ├── ai-flow.md                    # AI-кроки (фільтр, мінуси/плюси, AI Вибір) + детальні AI-інваріанти
 │   ├── styles.md                     # семантичні токени Chakra UI v3
+│   ├── naming.md                     # правила найменування й словник понять (скіл naming-consistency-audit)
+│   ├── naming-audit/audit.md         # знімок аудиту найменування (історія рішень для naming.md)
 │   ├── deploy-render-turso.md        # покроковий деплой Render + Turso
 │   ├── google-oauth-setup.md         # налаштування Google OAuth
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
