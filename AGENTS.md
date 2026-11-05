@@ -149,6 +149,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 | Що таке Jev (decision-модель), ціна, обмеження, як писати питання? | [`docs/jev.md`](docs/jev.md) |
 | Як вести задачу, чим перевіряти, коли «готово», як безпечно з OLX і БД? | [`docs/development.md`](docs/development.md) |
 | Кольори/токени UI (світла/темна тема)? | [`docs/styles.md`](docs/styles.md) |
+| Як називати змінні, функції, файли, поняття, кнопки? | [`docs/naming.md`](docs/naming.md) |
 | Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
 | Деплой, реліз, відкат, бекап Turso / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
 | Що зараз: мета, стан, відкриті питання, наступний крок? | [`docs/current.md`](docs/current.md) |

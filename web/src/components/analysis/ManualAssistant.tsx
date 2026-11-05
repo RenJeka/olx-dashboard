@@ -51,7 +51,7 @@ export function ManualAssistant({ title, parts, pasteLabel, onSubmit, submitting
                 {part.name}
               </Text>
               <Button size="xs" variant="outline" onClick={() => copyToClipboard(part.content)}>
-                <LuCopy /> Копіювати
+                <LuCopy /> Скопіювати
               </Button>
               {multiPart && (
                 <Button size="xs" variant="ghost" onClick={() => downloadText(part.content, part.name)}>

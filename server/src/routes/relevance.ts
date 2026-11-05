@@ -26,8 +26,8 @@ import {
 import {
   getRelevanceAliases,
   getRelevanceTarget,
-  getSearch,
-  loadListings,
+  getSearchAnalysisRow,
+  listAnalysisListings,
   setRelevanceTarget,
   commitRelevance,
 } from '../db/repos/analysis.js';
@@ -49,7 +49,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   // Цільовий товар (передзаповнюється query, якщо ще не збережений).
   app.get<{ Params: { id: string } }>('/api/searches/:id/relevance/target', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
     return { target: await getRelevanceTarget(id) };
   });
 
@@ -57,7 +57,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/relevance/target',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       await setRelevanceTarget(id, (req.body.target ?? '').trim());
       return { target: await getRelevanceTarget(id) };
     },
@@ -68,11 +68,11 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/relevance/preview',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       const target = await resolveTarget(id, req.body.target);
       const aliases = await getRelevanceAliases(id);
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-      const listings = await loadListings(id, ids);
+      const listings = await listAnalysisListings(id, ids);
       const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
       return { total: listings.length, candidates: candidates.length, autoRejected: rejected.length };
     },
@@ -84,7 +84,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Body: { target?: string; ids?: number[]; model?: string; engine?: string };
   }>('/api/searches/:id/relevance/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
     if (!hasApiKey()) return reply.code(409).send({ error: NO_API_KEY });
 
     const target = await resolveTarget(id, req.body.target);
@@ -96,7 +96,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
     }
 
-    const listings = await loadListings(id, ids);
+    const listings = await listAnalysisListings(id, ids);
     try {
       if (req.body.engine === 'jev') {
         const result = await runJevRelevance(target, listings.map(toPromptListing), aliases);
@@ -120,14 +120,14 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/relevance/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
       const target = await resolveTarget(id, req.body.target);
       if (!target) return reply.code(400).send({ error: NO_TARGET });
       const aliases = await getRelevanceAliases(id);
 
       const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-      const listings = await loadListings(id, ids);
+      const listings = await listAnalysisListings(id, ids);
       // У ZIP кладемо лише кандидатів (відсіяні евристикою додаються при import).
       const { candidates } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
 
@@ -162,13 +162,13 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Body: { raw?: string; accumulated?: RelevanceItem[]; ids?: number[]; target?: string };
   }>('/api/searches/:id/relevance/import', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
     if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
     const target = await resolveTarget(id, req.body.target);
     const aliases = await getRelevanceAliases(id);
     const scopeIds = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-    const listings = await loadListings(id, scopeIds);
+    const listings = await listAnalysisListings(id, scopeIds);
     const { rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
     const validIds = listings.map((l) => l.id);
 
@@ -197,7 +197,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Body: { items?: RelevanceItem[]; source?: string };
   }>('/api/searches/:id/relevance/commit', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const source = req.body.source === 'import' ? 'import' : 'api';

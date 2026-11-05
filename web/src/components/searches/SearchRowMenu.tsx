@@ -27,7 +27,7 @@ interface Props {
   onDeleteRequest: () => void;
 }
 
-/** Меню дій рядка пошуку (3-dot): редагувати/фільтри/варіанти/проект/архів/видалення. */
+/** Меню дій рядка пошуку (3-dot): редагувати/фільтри/варіанти/проєкт/архів/видалення. */
 export function SearchRowMenu({
   isArchived,
   synonymsCount,
@@ -80,7 +80,7 @@ export function SearchRowMenu({
             <Menu.Root positioning={{ placement: 'right-start', gutter: 4 }}>
               <Menu.TriggerItem>
                 <HStack gap={2} flex="1">
-                  <LuFolderInput /> <Text>Перемістити в проект</Text>
+                  <LuFolderInput /> <Text>Перемістити в проєкт</Text>
                 </HStack>
               </Menu.TriggerItem>
               <Portal>
@@ -92,7 +92,7 @@ export function SearchRowMenu({
                       disabled={currentProjectId == null}
                     >
                       <HStack gap={2} flex="1" justify="space-between">
-                        <Text>Без проекту</Text>
+                        <Text>Без проєкту</Text>
                         {currentProjectId == null && <LuCheck />}
                       </HStack>
                     </Menu.Item>

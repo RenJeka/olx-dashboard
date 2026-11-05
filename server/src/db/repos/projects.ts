@@ -19,7 +19,7 @@ export async function minProjectSortOrder(): Promise<number | null> {
   return (await dbGet<{ min: number | null }>('SELECT MIN(sort_order) AS min FROM projects'))?.min ?? null;
 }
 
-/** INSERT → id нового проекту. */
+/** INSERT → id нового проєкту. */
 export async function insertProject(name: string, sortOrder: number): Promise<number> {
   const info = await dbRun('INSERT INTO projects (name, sort_order) VALUES (?, ?)', [name, sortOrder]);
   return Number(info.lastInsertRowid);
@@ -29,7 +29,7 @@ export async function renameProject(id: number, name: string): Promise<void> {
   await dbRun('UPDATE projects SET name = ? WHERE id = ?', [name, id]);
 }
 
-/** Видалення проекту: пошуки відв'язуються (project_id = NULL), не видаляються. */
+/** Видалення проєкту: пошуки відв'язуються (project_id = NULL), не видаляються. */
 export async function deleteProjectUnlinkSearches(id: number): Promise<void> {
   // Чисті записи (відв'язування + видалення) → batch у неявній транзакції.
   await db.batch(
@@ -55,7 +55,7 @@ export function findProjectNeighbor(current: Position, direction: 'up' | 'down')
   );
 }
 
-/** Обмін sort_order двох проектів одним batch. */
+/** Обмін sort_order двох проєктів одним batch. */
 export async function swapProjectSortOrder(a: Position, b: Position): Promise<void> {
   await db.batch(
     [

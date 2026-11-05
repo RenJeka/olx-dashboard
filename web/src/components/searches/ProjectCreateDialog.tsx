@@ -20,7 +20,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Модалка створення нового проекту (лише назва). */
+/** Модалка створення нового проєкту (лише назва). */
 export function ProjectCreateDialog({ open, onOpenChange }: Props) {
   const [name, setName] = useState('');
   const createProject = useCreateProject();
@@ -36,7 +36,7 @@ export function ProjectCreateDialog({ open, onOpenChange }: Props) {
     createProject.mutate(trimmed, {
       onSuccess: () => {
         onOpenChange(false);
-        toaster.create({ type: 'success', title: 'Проект створено', description: trimmed });
+        toaster.create({ type: 'success', title: 'Проєкт створено', description: trimmed });
       },
       onError: (err) =>
         toaster.create({
@@ -58,7 +58,7 @@ export function ProjectCreateDialog({ open, onOpenChange }: Props) {
       <DialogContent>
         <DialogCloseTrigger />
         <DialogHeader>
-          <DialogTitle>Новий проект</DialogTitle>
+          <DialogTitle>Новий проєкт</DialogTitle>
         </DialogHeader>
         <Box as="form" onSubmit={submit}>
           <DialogBody>
