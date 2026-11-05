@@ -159,7 +159,7 @@ olx-dashboard/
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/old/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── logs.ts       # GET /api/logs (журнал app_logs: фільтри level/scope) + DELETE /api/logs (очистити)
 │           ├── listings.ts   # GET /api/searches/:id/listings (легкі рядки) + details/search на вимогу + PATCH /api/listings/:id (статус/нотатка/плюси-мінуси/ai_relevant override)
-│           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (loadPickCandidates(id, ids?))
+│           ├── aiPicks.ts    # AI Вибір: POST .../ai-picks/prompt + .../package.zip (ZIP map-reduce, пули >50) + .../rank(авто)/import(ручний)/commit; усі приймають опц. ids обсягу (listPickCandidates(id, ids?))
 │           ├── relevance.ts  # Семантичний фільтр: GET/PUT .../relevance/target, POST .../analyze/.../package.zip/.../import/.../commit (aliases з query_synonyms)
 │           ├── categories.ts # GET /api/categories, GET/PUT /api/categories/:id/criteria (базові набори), POST /api/categories/:id/criteria/remap, POST /api/categories/collect (збір дерева; паралельний → 409)
 │           ├── searchSynonyms.ts # Синоніми пошукового запиту (docs/plans/old/search-synonyms.md), stateless: POST .../prompt/.../generate/.../import

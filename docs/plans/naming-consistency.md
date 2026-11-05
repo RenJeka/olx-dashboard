@@ -14,10 +14,10 @@
 
 ## Порція 2 — середній (функції репозиторіїв)
 
-- [ ] `getSearch` (repos/analysis) → `getSearchAnalysisRow` · 33 згадки · ризик: сплутати з `services/searches.getSearch` — міняти лише імпорти з `db/repos/analysis`
-- [ ] `loadListings` → `listAnalysisListings` · 16 згадок
-- [ ] `loadPickCandidates` → `listPickCandidates` · 6 згадок + `ai-flow.md`, `architecture.md`, `structure.md`
-- [ ] `getLatestScanStatus` → `getLastScanStatus`, `getLatestAnalysis` → `getLastAnalysisRun` · 6 згадок
+- [x] `getSearch` (repos/analysis) → `getSearchAnalysisRow` · 33 згадки · ризик: сплутати з `services/searches.getSearch` — міняти лише імпорти з `db/repos/analysis`
+- [x] `loadListings` → `listAnalysisListings` · 16 згадок
+- [x] `loadPickCandidates` → `listPickCandidates` · 6 згадок + `ai-flow.md`, `architecture.md`, `structure.md`
+- [x] `getLatestScanStatus` → `getLastScanStatus`, `getLatestAnalysis` → `getLastAnalysisRun` · 6 згадок
 
 ## Порція 3 — вищий (файли й підписи UI)
 

@@ -21,7 +21,7 @@ import {
   type SearchRecord,
   type SearchValue,
 } from '../db/repos/searches.js';
-import { getLastScanSummary, getLatestAnalysis, getLatestScanStatus } from '../db/repos/scanRuns.js';
+import { getLastScanSummary, getLastAnalysisRun, getLastScanStatus } from '../db/repos/scanRuns.js';
 import { listFilterSourceRows, listListingParams } from '../db/repos/listings.js';
 import type { CategoryOption, FilterOptions, LastScanResponse, ParamKeyInfo, ScanPlan } from '../types.js';
 
@@ -148,7 +148,7 @@ export async function moveSearch(id: number, direction: unknown): Promise<Search
 
 /** Статус останнього скану — для поллінгу прогресу глибокого скану. */
 export async function getScanStatus(searchId: number): Promise<Record<string, unknown>> {
-  const row = await getLatestScanStatus(searchId);
+  const row = await getLastScanStatus(searchId);
   if (!row) throw new NotFoundError('Сканів ще не було');
   return row;
 }
@@ -162,7 +162,7 @@ export async function getScanStatus(searchId: number): Promise<Record<string, un
 export async function getLastAnalysis(
   searchId: number,
 ): Promise<{ plan: ScanPlan; analyzedAt: string | null; planValid: boolean }> {
-  const row = await getLatestAnalysis(searchId);
+  const row = await getLastAnalysisRun(searchId);
   if (!row) throw new NotFoundError('Аналізів ще не було');
 
   let plan: ScanPlan;

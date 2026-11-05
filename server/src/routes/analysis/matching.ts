@@ -27,7 +27,7 @@ import {
   buildMatchingPrompt,
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
-import { getSearch, loadListings } from '../../db/repos/analysis.js';
+import { getSearchAnalysisRow, listAnalysisListings } from '../../db/repos/analysis.js';
 import { resolveEffectiveCriteria } from '../../analysis/baseCriteria.js';
 import { enabledGroups } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';
@@ -42,7 +42,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string; threshold?: number };
   }>('/api/searches/:id/analyze', async (req, reply) => {
     const id = Number(req.params.id);
-    const search = await getSearch(id);
+    const search = await getSearchAnalysisRow(id);
     if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!hasApiKey()) {
@@ -60,7 +60,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
     }
 
-    const listings = await loadListings(id, ids);
+    const listings = await listAnalysisListings(id, ids);
     if (req.body.engine === 'jev') {
       const threshold = resolveCriteriaThreshold(req.body.threshold);
       const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing), { threshold });
@@ -97,7 +97,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      const search = await getSearch(id);
+      const search = await getSearchAnalysisRow(id);
       if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
       if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
 
@@ -108,7 +108,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
       }
 
-      const listings = await loadListings(id, ids);
+      const listings = await listAnalysisListings(id, ids);
       const mode = req.body.mode;
 
       const archive = new ZipArchive();
@@ -136,14 +136,14 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { mode?: string; raw?: string; accumulated?: AnalyzedListing[] };
   }>('/api/searches/:id/analyze/import', async (req, reply) => {
     const id = Number(req.params.id);
-    const search = await getSearch(id);
+    const search = await getSearchAnalysisRow(id);
     if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
     if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
 
     // Усі категорії режиму (базові + власні) — для зведення синонімів до назви (вимкнені теж не шкодять).
     const criteria = (await resolveEffectiveCriteria(search)).config[req.body.mode];
-    const listings = await loadListings(id, []);
+    const listings = await listAnalysisListings(id, []);
     const descriptions = descriptionMap(listings);
 
     let parsed: AnalyzedListing[];
@@ -166,14 +166,14 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Body: { format?: string; mode?: string; rows?: { id?: number; criteria?: string[] }[] };
   }>('/api/searches/:id/analyze/export', async (req, reply) => {
     const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
     const mode: AnalysisMode = isMode(req.body.mode) ? req.body.mode : 'cons';
     const reqRows = Array.isArray(req.body.rows) ? req.body.rows : [];
     const label = MODE_LABEL[mode];
 
     // Підтягуємо назву/опис з БД за id (зберігаючи порядок та критерії з запиту).
     const ids = reqRows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
-    const byId = new Map((await loadListings(id, ids)).map((l) => [l.id, l]));
+    const byId = new Map((await listAnalysisListings(id, ids)).map((l) => [l.id, l]));
     const rows = reqRows.map((r) => {
       const l = byId.get(Number(r.id));
       return {
