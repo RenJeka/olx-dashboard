@@ -31,8 +31,8 @@ export function computeListingStats(listings: Listing[] | undefined): ListingSta
   if (!listings) return { in_db: 0, stale_count: 0, verify_candidates: 0 };
 
   const staleThreshold = Date.now() - THREE_DAYS_MS;
-  let stale_count = 0;
-  let verify_candidates = 0;
+  let staleCount = 0;
+  let verifyCandidates = 0;
 
   for (const l of listings) {
     const lastSeenMs = parseUtcMs(l.last_seen_at);
@@ -40,14 +40,14 @@ export function computeListingStats(listings: Listing[] | undefined): ListingSta
     const isOld = lastSeenMs != null && lastSeenMs < staleThreshold;
 
     // stale_count: status_source='auto' AND last_seen_at старше 3 днів.
-    if (l.status_source === 'auto' && isOld) stale_count++;
+    if (l.status_source === 'auto' && isOld) staleCount++;
 
     // P1: url != null AND давно не бачене AND (auto OR rejected).
     const p1 = l.url != null && isOld && (l.status_source === 'auto' || l.status === 'rejected');
     // P2: url != null AND без опису AND не disabled AND NOT P1 (взаємовиключні).
     const p2 = l.url != null && !l.has_description && l.status !== 'disabled' && !p1;
-    if (p1 || p2) verify_candidates++;
+    if (p1 || p2) verifyCandidates++;
   }
 
-  return { in_db: listings.length, stale_count, verify_candidates };
+  return { in_db: listings.length, stale_count: staleCount, verify_candidates: verifyCandidates };
 }

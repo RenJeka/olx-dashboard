@@ -8,9 +8,9 @@
 
 ## Порція 1 — низький ризик (локальні змінні)
 
-- [ ] `description_preview` → `descriptionPreview` · `server/src/services/listings.ts` · назовні нічого
-- [ ] `local_filters` → `localFilters` · `web/src/utils/localFilters.ts`, `SearchFiltersDrawer.tsx` · поле DTO лишається `local_filters`
-- [ ] `stale_count`, `verify_candidates` → `staleCount`, `verifyCandidates` · `web/src/utils/searchStats.ts` · поля DTO лишаються
+- [x] `description_preview` → `preview` (ім'я `descriptionPreview` зайняте функцією) · `server/src/services/listings.ts` · назовні нічого
+- [x] `local_filters` → `localFilters` / `filters` · `web/src/utils/localFilters.ts`, `SearchFiltersDrawer.tsx` · поле DTO лишається `local_filters`
+- [x] `stale_count`, `verify_candidates` → `staleCount`, `verifyCandidates` · `web/src/utils/searchStats.ts` · поля DTO лишаються
 
 ## Порція 2 — середній (функції репозиторіїв)
 
