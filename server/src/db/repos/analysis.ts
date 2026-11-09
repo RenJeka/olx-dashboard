@@ -18,7 +18,7 @@ export interface SearchRow {
   base_disabled: string | null;
 }
 
-export async function getSearch(id: number): Promise<SearchRow | undefined> {
+export async function getSearchAnalysisRow(id: number): Promise<SearchRow | undefined> {
   return dbGet<SearchRow>(
     'SELECT id, name, analysis_criteria, base_category_id, base_disabled FROM searches WHERE id = ?',
     [id],
@@ -62,7 +62,7 @@ export async function getRelevanceAliases(searchId: number): Promise<string[]> {
 }
 
 /** Завантажує оголошення за id (або всі пошуку, якщо ids порожній). */
-export async function loadListings(searchId: number, ids: number[]): Promise<ListingRow[]> {
+export async function listAnalysisListings(searchId: number, ids: number[]): Promise<ListingRow[]> {
   if (ids.length === 0) {
     return dbAll<ListingRow>('SELECT id, title, description, params FROM listings WHERE search_id = ?', [
       searchId,
@@ -85,7 +85,7 @@ export async function loadListings(searchId: number, ids: number[]): Promise<Lis
  * без дефолтного предиката (користувач свідомо обрав інший обсяг); сортування за ціною
  * й ліміт лишаються.
  */
-export async function loadPickCandidates(searchId: number, limit: number, ids?: number[]): Promise<PickCandidate[]> {
+export async function listPickCandidates(searchId: number, limit: number, ids?: number[]): Promise<PickCandidate[]> {
   if (ids && ids.length > 0) {
     const placeholders = ids.map(() => '?').join(',');
     return dbAll<PickCandidate>(

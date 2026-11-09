@@ -28,8 +28,8 @@ const log = () => getLogger('cache');
 
 /** `description_head` → `description_preview` + `has_description`. */
 function toLightRow({ description_head, ...row }: LightRowRaw) {
-  const description_preview = descriptionPreview(description_head, DESCRIPTION_PREVIEW_CHARS);
-  return { ...row, description_preview, has_description: description_preview != null };
+  const preview = descriptionPreview(description_head, DESCRIPTION_PREVIEW_CHARS);
+  return { ...row, description_preview: preview, has_description: preview != null };
 }
 
 /** Легкі рядки таблиці; невідомий sort → first_seen_at, order — DESC, якщо не asc. */

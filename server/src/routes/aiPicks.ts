@@ -17,7 +17,7 @@ import {
   PICKS_NOMINEES_PER_CHUNK,
 } from '../analysis/constants.js';
 import { chunk } from '../analysis/promptData.js';
-import { commitAiPicks, getSearch, loadPickCandidates } from '../db/repos/analysis.js';
+import { commitAiPicks, getSearchAnalysisRow, listPickCandidates } from '../db/repos/analysis.js';
 import type { PickItem, PickResult } from '../types.js';
 
 const SEARCH_NOT_FOUND = 'Пошук не знайдено';
@@ -32,9 +32,9 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/prompt',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
+      const candidates = await listPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       const prompt = buildPickPrompt(candidates);
@@ -50,9 +50,9 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/package.zip',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
-      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
+      const candidates = await listPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       const chunks = chunk(candidates, MANUAL_PICKS_ZIP_CHUNK_SIZE);
@@ -86,10 +86,10 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/rank',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       if (!hasApiKey()) return reply.code(409).send({ error: NO_API_KEY });
 
-      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
+      const candidates = await listPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       if (candidates.length === 0) return reply.code(400).send({ error: NO_CANDIDATES });
 
       try {
@@ -106,10 +106,10 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/import',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
       if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
 
-      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
+      const candidates = await listPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       const validIds = candidates.map((c) => c.id);
 
       try {
@@ -127,7 +127,7 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
     '/api/searches/:id/ai-picks/commit',
     async (req, reply) => {
       const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      if (!(await getSearchAnalysisRow(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
 
       const picks = Array.isArray(req.body.picks) ? req.body.picks : [];
 

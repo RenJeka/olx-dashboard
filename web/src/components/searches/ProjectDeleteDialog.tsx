@@ -18,7 +18,7 @@ interface Props {
   onConfirm: () => void;
 }
 
-/** Alert-діалог підтвердження видалення проекту. Пошуки НЕ видаляються — переходять у «Без проекту». */
+/** Alert-діалог підтвердження видалення проєкту. Пошуки НЕ видаляються — переходять у «Без проєкту». */
 export function ProjectDeleteDialog({
   open,
   onOpenChange,
@@ -38,11 +38,11 @@ export function ProjectDeleteDialog({
       <DialogContent>
         <DialogCloseTrigger />
         <DialogHeader>
-          <DialogTitle>Видалити проект «{projectName}»?</DialogTitle>
+          <DialogTitle>Видалити проєкт «{projectName}»?</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <Text>
-            Пошуки цього проекту НЕ будуть видалені — вони повернуться до групи «Без проекту».
+            Пошуки цього проєкту НЕ будуть видалені — вони повернуться до групи «Без проєкту».
           </Text>
         </DialogBody>
         <DialogFooter>

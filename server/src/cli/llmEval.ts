@@ -23,7 +23,7 @@ import { chatWithUsage, type ChatUsage } from '../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse, parseMatchingResponse } from '../analysis/parse.js';
 import { chunk, descriptionMap, toPromptListing } from '../analysis/promptData.js';
 import { buildCriteriaPrompt, buildMatchingPrompt, pickSample } from '../analysis/prompts.js';
-import { getSearch, loadListings } from '../db/repos/analysis.js';
+import { getSearchAnalysisRow, listAnalysisListings } from '../db/repos/analysis.js';
 import type { AnalysisMode } from '../types.js';
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'llm-eval');
@@ -66,11 +66,11 @@ async function run(): Promise<void> {
   const only = arg('only');
   const modes = (arg('modes')?.split(',') ?? MODES).filter(isMode);
 
-  const search = await getSearch(searchId);
+  const search = await getSearchAnalysisRow(searchId);
   if (!search) throw new Error(`Пошук ${searchId} не знайдено`);
   // Ефективний список (базові набори автокатегорії + власні) — як в аналізі.
   const { config } = await resolveEffectiveCriteria(search);
-  const listings = await loadListings(searchId, []);
+  const listings = await listAnalysisListings(searchId, []);
   const genSample = pickSample(listings, DEFAULT_SAMPLE_SIZE).map((l) => l.description ?? '');
   const matchSample = pickSample(listings, listingsN);
   const descriptions = descriptionMap(matchSample);

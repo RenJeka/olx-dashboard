@@ -40,7 +40,7 @@ export function useDeleteProject() {
       api<{ deleted: boolean }>(`/api/projects/${projectId}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] });
-      // Видалення проекту відв'язує пошуки → список пошуків теж міг змінитись.
+      // Видалення проєкту відв'язує пошуки → список пошуків теж міг змінитись.
       qc.invalidateQueries({ queryKey: ['searches'] });
     },
   });
@@ -58,7 +58,7 @@ export function useReorderProjects() {
   });
 }
 
-/** Призначення пошуку до проекту (або відв'язування при projectId=null). */
+/** Призначення пошуку до проєкту (або відв'язування при projectId=null). */
 export function useAssignSearchToProject() {
   const qc = useQueryClient();
   return useMutation({

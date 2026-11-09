@@ -20,8 +20,8 @@ interface Props {
 }
 
 /**
- * Вміст бічної панелі: кнопки «Новий пошук»/«Новий проект» + акордеон проектів,
- * групи «Без проекту» та «Архів» (опц.).
+ * Вміст бічної панелі: кнопки «Новий пошук»/«Новий проєкт» + акордеон проєктів,
+ * групи «Без проєкту» та «Архів» (опц.).
  */
 export function SearchesPanel({
   isLoading,
@@ -57,7 +57,7 @@ export function SearchesPanel({
   const accordionValue = useMemo(() => {
     if (expandedGroups !== null) return expandedGroups;
     
-    // За замовчуванням (до першої взаємодії) розгортаємо ТІЛЬКИ той проект, до якого належить вибраний пошук.
+    // За замовчуванням (до першої взаємодії) розгортаємо ТІЛЬКИ той проєкт, до якого належить вибраний пошук.
     if (selectedId != null) {
       const selectedSearch =
         activeSearches.find((s) => s.id === selectedId) ||
@@ -80,7 +80,7 @@ export function SearchesPanel({
   // Авто-розгортання групи обраного пошуку — ТІЛЬКИ коли selectedId реально змінився (вибрано
   // інший пошук у згорнутій групі). Без цієї перевірки на «зміну» ефект спрацьовував би й після
   // ручного згортання (selectedId той самий) і миттєво розгортав групу назад — користувач не міг
-  // згорнути проект із відкритим пошуком. Дефолт «до першої взаємодії» вже дає accordionValue.
+  // згорнути проєкт із відкритим пошуком. Дефолт «до першої взаємодії» вже дає accordionValue.
   const prevSelectedId = useRef(selectedId);
   useEffect(() => {
     if (selectedId === prevSelectedId.current) return;
@@ -109,9 +109,9 @@ export function SearchesPanel({
   return (
     <>
       <HStack justify="flex-end" px={4} py={3} gap={2}>
-        <Tooltip content="Новий проект">
+        <Tooltip content="Новий проєкт">
           <IconButton
-            aria-label="Новий проект"
+            aria-label="Новий проєкт"
             rounded="full"
             size="lg"
             colorPalette="purple"
@@ -159,7 +159,7 @@ export function SearchesPanel({
         <SearchGroupAccordionItem
           value="ungrouped"
           icon={<LuListChecks />}
-          label={projects.length > 0 ? 'Без проекту' : 'Пошуки'}
+          label={projects.length > 0 ? 'Без проєкту' : 'Пошуки'}
           badgeColorPalette="accent"
           items={ungrouped}
           selectedId={selectedId}
