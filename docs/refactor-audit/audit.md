@@ -1,6 +1,6 @@
 # Аудит універсальності модулів — 2026-11-09
 
-Знімок за скілом `somewhat-general-purpose-refactor`. План — [`plans/manual-order-refactor.md`](../plans/manual-order-refactor.md).
+Знімок за скілом `somewhat-general-purpose-refactor`. План — [`plans/old/manual-order-refactor.md`](../plans/old/manual-order-refactor.md).
 
 ## Обсяг і домовленості
 
@@ -56,4 +56,4 @@
 
 ## Відкриті питання
 
-Немає: людина попросила виконати без зупинки.
+Немає: людина попросила вибрати модуль і виконати рефакторинг без окремого підтвердження плану.

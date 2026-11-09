@@ -38,6 +38,8 @@ olx-dashboard/
 │   ├── styles.md                     # семантичні токени Chakra UI v3
 │   ├── naming.md                     # правила найменування й словник понять (скіл naming-consistency-audit)
 │   ├── naming-audit/audit.md         # знімок аудиту найменування (історія рішень для naming.md)
+│   ├── module-design.md              # примітиви перероблених модулів, механізм vs політика, чотири питання
+│   ├── refactor-audit/audit.md       # знімок аудиту універсальності модулів (історія рішень для module-design.md)
 │   ├── deploy-render-turso.md        # покроковий деплой Render + Turso
 │   ├── google-oauth-setup.md         # налаштування Google OAuth
 │   ├── olx-graphql-fields-reference.md # довідник усіх полів GraphQL-відповіді (introspection вимкнено)
@@ -107,7 +109,7 @@ olx-dashboard/
 │       │   └── copyProd.ts       # CLI копія прод-БД (Turso, лише SELECT) у server/data/olx.db, npm run db:copy-prod (docs/plans/old/db-copy-prod.md)
 │       ├── db/
 │       │   ├── schema.sql    # КАНОН схеми БД — джерело істини
-│       │   ├── repos/        # SQL по таблицях: searches, projects, listings, scanRuns, logs, analysis (AI: вибірки, записи результатів, критерії), categories (дерево, base_criteria), batch (applyStatements)
+│       │   ├── repos/        # SQL по таблицях: searches, projects, listings, scanRuns, logs, analysis (AI: вибірки, записи результатів, критерії), categories (дерево, base_criteria), batch (applyStatements), manualOrder (ручний порядок ↑/↓ і «нове — згори» для будь-якого списку)
 │       │   ├── copyDb.ts     # copyDatabase: схема з sqlite_master + дані keyset-пагінацією за rowid в іншу libSQL-БД (Vitest)
 │       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, dbBatchChunked (batch порціями), initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)

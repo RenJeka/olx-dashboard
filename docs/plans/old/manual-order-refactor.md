@@ -1,8 +1,8 @@
 # Ручний порядок: один механізм замість близнюків
 
-> **Статус:** 🟢 активний
+> **Статус:** ✅ виконано (2026-11-09) · ручні UI test-cases пройдено локально через Playwright на тестовій БД
 
-**Контекст.** Аудит — [`refactor-audit/audit.md`](../refactor-audit/audit.md). Рефакторинг без зміни поведінки:
+**Контекст.** Аудит — [`refactor-audit/audit.md`](../../refactor-audit/audit.md). Рефакторинг без зміни поведінки:
 ручний порядок проєктів і пошуків переходить на спільний модуль `server/src/db/repos/manualOrder.ts`.
 
 **Файли:** `server/src/db/repos/manualOrder.ts` (новий), `server/src/db/repos/projects.ts`,
@@ -21,9 +21,9 @@
 
 ## Завершення
 
-- [ ] `docs/module-design.md` (скіл просить `MODULE-DESIGN.md`; ім'я в нижньому регістрі за `rules.md`), посилання з `AGENTS.md`
-- [ ] `docs/architecture.md`, `docs/structure.md` — новий файл репозиторію
-- [ ] Статус ✅, `git mv` у `docs/plans/old/`
+- [x] `docs/module-design.md` (скіл просить `MODULE-DESIGN.md`; ім'я в нижньому регістрі за `rules.md`), посилання з `AGENTS.md`
+- [x] `docs/architecture.md`, `docs/structure.md` — новий файл репозиторію
+- [x] Статус ✅, `git mv` у `docs/plans/old/`
 
 ## Test-cases
 
