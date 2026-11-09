@@ -15,9 +15,9 @@
 
 ## Порція 1 — середній ризик (експортовані функції репозиторіїв)
 
-- [ ] Додати `manualOrder.ts`: `ManualOrderList`, `isDirection`, `nextTopSortOrder`, `moveOneStep` + юніт-тести
-- [ ] `PROJECT_ORDER` / `SEARCH_ORDER` у репозиторіях сутностей; сервіси `createProject`, `moveProject`, `createSearch`, `moveSearch` — на нові примітиви
-- [ ] Видалити `min*SortOrder`, `get*Position`, `find*Neighbor`, `swap*SortOrder`, тип `SearchPosition` · викликачів поза сервісами немає
+- [x] Додати `manualOrder.ts`: `ManualOrderList`, `isDirection`, `nextTopSortOrder`, `moveOneStep` + юніт-тести
+- [x] `PROJECT_ORDER` / `SEARCH_ORDER` у репозиторіях сутностей; сервіси `createProject`, `moveProject`, `createSearch`, `moveSearch` — на нові примітиви
+- [x] Видалити `min*SortOrder`, `get*Position`, `find*Neighbor`, `swap*SortOrder`, тип `SearchPosition` · викликачів поза сервісами немає
 
 ## Завершення
 

@@ -7,20 +7,18 @@ import { parseBullets } from '../analysis/text.js';
 import { isAnalysisFresh } from '../scanner/index.js';
 import {
   deleteSearchCascade,
-  findSearchNeighbor,
   getCategoryFacet,
-  getSearchPosition,
   getSearchRecord,
   insertSearch,
   listSearches,
-  minSearchSortOrder,
+  SEARCH_ORDER,
   searchExists,
-  swapSearchSortOrder,
   updateSearchColumns,
   type SearchColumn,
   type SearchRecord,
   type SearchValue,
 } from '../db/repos/searches.js';
+import { isDirection, moveOneStep, nextTopSortOrder } from '../db/repos/manualOrder.js';
 import { getLastScanSummary, getLastAnalysisRun, getLastScanStatus } from '../db/repos/scanRuns.js';
 import { listFilterSourceRows, listListingParams } from '../db/repos/listings.js';
 import type { CategoryOption, FilterOptions, LastScanResponse, ParamKeyInfo, ScanPlan } from '../types.js';
@@ -70,7 +68,7 @@ export async function createSearch(input: SearchInput): Promise<SearchRecord> {
   if (!name || !query) throw new BadRequestError('Поля name і query обовʼязкові');
 
   // Новий пошук з'являється згори списку.
-  const sortOrder = ((await minSearchSortOrder()) ?? 0) - 1;
+  const sortOrder = await nextTopSortOrder(SEARCH_ORDER);
   const id = await insertSearch({
     name,
     query,
@@ -135,14 +133,8 @@ export async function deleteSearch(id: number): Promise<{ deleted: true }> {
 
 /** Ручне сортування (стрілки ↑/↓): міняє sort_order із сусідом у межах групи-проєкту. */
 export async function moveSearch(id: number, direction: unknown): Promise<SearchRecord | undefined> {
-  if (direction !== 'up' && direction !== 'down') {
-    throw new BadRequestError('direction має бути "up" або "down"');
-  }
-  const current = await getSearchPosition(id);
-  if (!current) throw new NotFoundError(SEARCH_NOT_FOUND);
-
-  const neighbor = await findSearchNeighbor(current, direction);
-  if (neighbor) await swapSearchSortOrder(current, neighbor);
+  if (!isDirection(direction)) throw new BadRequestError('direction має бути "up" або "down"');
+  if (!(await moveOneStep(SEARCH_ORDER, id, direction))) throw new NotFoundError(SEARCH_NOT_FOUND);
   return getSearchRecord(id);
 }
 
