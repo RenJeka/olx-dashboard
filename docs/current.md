@@ -43,6 +43,9 @@
 - [refactor-clean-architecture](plans/refactor-clean-architecture.md) — прагматична чиста архітектура: фази 0–4, 7, 8
   злито в `main` і задеплоєно 2026-10-23 (`npm run smoke` зелений, логи API чисті); фази 5–6 (сканер, скрейпер)
   і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
+- Рефакторинг «дещо універсальні модулі» ([refactor-general-modules](plans/old/refactor-general-modules.md)) виконано
+  в окремій гілці: чернетка PR чекає рішення людини про злиття (= деплой); ручні test-cases плану людина не проходила.
+  Стан — у [хендофі](handoffs/2026-11-10-refactor-general-modules.md).
 
 Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
@@ -69,8 +72,10 @@
 - Діалог поверх іншої модалки з полями вводу — [chakra-nested-dialog-focus](instructions/chakra-nested-dialog-focus.md).
 - Великий пошук `iphone` на проді: таблиця й пошук в описі повільні — переважно очікування даних із Turso,
   не CPU (замір S17 — у [stability-baseline](plans/old/stability-baseline.md)); лагодження — [P-010](parking.md), [P-008](parking.md), ідея кешу — [P-011](parking.md).
-- Рефакторинг сервера «без зміни поведінки» — звірка GET-відповідей до/після на копії проду
+- Рефакторинг сервера «без зміни поведінки» — звірка GET-відповідей і ZIP-пакетів до/після
   ([api-equivalence-check](instructions/api-equivalence-check.md)); шари й `layers:check` — `AGENTS.md` → «Конвенції».
+- Новий модуль, функція чи константа — за [development](development.md) §8 «Як проєктувати модуль»; залишки дублів у
+  сканері, скрейпері й CLI — [P-021](parking.md).
 - Нові задачі з документацією — правило «жодних кількостей» ([rules](rules.md) п. 2); аудит — скіл `docs-audit`.
 - Моніторинг скану на проді — [prod-scan-monitoring](instructions/prod-scan-monitoring.md).
 - Рядки з прод-БД агенту — лише через Turso MCP або команду людини; читання ключів блокує auto-mode

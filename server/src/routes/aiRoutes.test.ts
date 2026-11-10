@@ -10,7 +10,7 @@ import { aiPicksRoutes } from './aiPicks.js';
 import { relevanceRoutes } from './relevance.js';
 import { searchSynonymsRoutes } from './searchSynonyms.js';
 
-// Характеризаційні тести AI-маршрутів (docs/plans/refactor-general-modules.md, порція 3): коди й тексти
+// Характеризаційні тести AI-маршрутів (docs/plans/old/refactor-general-modules.md, порція 3): коди й тексти
 // помилок, склад ZIP-пакетів ручного режиму. Без LLM — авто-ендпойнти перевіряються лише до виклику моделі.
 let app: FastifyInstance;
 let searchId: number;
