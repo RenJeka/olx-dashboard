@@ -13,6 +13,11 @@ export class HttpError extends Error {
   }
 }
 
+/** Текст будь-якого кинутого значення (не лише `Error`) — для відповіді чи журналу. */
+export function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 /** 400 — невалідний запит (поле, режим, напрям). */
 export class BadRequestError extends HttpError {
   constructor(message: string) {

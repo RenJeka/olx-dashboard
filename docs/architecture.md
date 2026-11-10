@@ -215,7 +215,7 @@ flowchart LR
 
 ## 4. Модулі бекенду
 
-**Шари** (рефакторинг — [`plans/refactor-clean-architecture.md`](./plans/refactor-clean-architecture.md)): `routes/` — лише HTTP (розбір запиту, виклик сервісу; помилки — `HttpError` з `errors.ts` → `routes/errorHandler.ts`) → `services/` — use-cases CRUD-сутностей → `db/repos/` — SQL. Напрям залежностей перевіряє `npm run layers:check`. Переведено: пошуки, проекти, оголошення, журнал, AI-роути (`routes/analysis/*`, `aiPicks`, `relevance`), категорії (`routes/categories.ts`, `categories/tree.ts`, `analysis/baseCriteria.ts`, `analysis/remap.ts`); сканер і скрейпер ще пишуть SQL самі — кроки плану.
+**Шари** (рефакторинг — [`plans/refactor-clean-architecture.md`](./plans/refactor-clean-architecture.md)): `routes/` — лише HTTP (розбір запиту, виклик сервісу; помилки — `HttpError` з `errors.ts` → `routes/errorHandler.ts`; типові передумови AI-запитів — `analysis/guards.ts`, розбір `ids` і відповідь ZIP — `routes/http.ts`) → `services/` — use-cases CRUD-сутностей → `db/repos/` — SQL. Напрям залежностей перевіряє `npm run layers:check`. Переведено: пошуки, проекти, оголошення, журнал, AI-роути (`routes/analysis/*`, `aiPicks`, `relevance`), категорії (`routes/categories.ts`, `categories/tree.ts`, `analysis/baseCriteria.ts`, `analysis/remap.ts`); сканер і скрейпер ще пишуть SQL самі — кроки плану.
 
 | Модуль | Відповідальність |
 | --- | --- |

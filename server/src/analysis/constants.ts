@@ -99,7 +99,6 @@ export const MANUAL_MODEL = 'manual';
 export const JSON_EXPORT_INDENT = 2;
 export const MIME_JSON = 'application/json';
 export const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-export const MIME_ZIP = 'application/zip';
 /** Ширини колонок Excel-експорту превʼю. */
 export const PREVIEW_XLSX_WIDTHS = { title: 40, description: 60, criteria: 40 } as const;
 
@@ -146,13 +145,20 @@ export const SIGNAL_TOKENS = [
   'тріщин',
 ];
 
-// ── Повідомлення про помилки (повторювані в routes/analysis.ts) ────────────────
+// ── Повідомлення про помилки AI-маршрутів (єдине джерело текстів) ──────────────
 export const ANALYSIS_ERRORS = {
   SEARCH_NOT_FOUND: 'Пошук не знайдено',
   BAD_MODE: 'mode має бути cons|pros',
   NO_API_KEY: 'Авто-режим недоступний: немає OPENROUTER_API_KEY',
   NO_CRITERIA: 'Спершу збережіть критерії пошуку',
   EMPTY_RESPONSE: 'Порожня відповідь',
+  TOO_MANY_IDS: `Максимум ${MAX_ANALYZE_IDS} id за виклик`,
+  /** Фільтр релевантності: немає ні цілі в запиті, ні збереженої. */
+  NO_TARGET: 'Вкажіть цільовий товар',
+  /** AI Вибір: пул кандидатів порожній. */
+  NO_CANDIDATES: 'Немає кандидатів для ранжування (додайте оголошення без мінусів)',
+  /** Синоніми запиту. */
+  EMPTY_QUERY: 'Поле query обовʼязкове',
   /** Remap пошуку не чіпає базові пункти категорії (docs/plans/old/base-criteria.md). */
   BASE_ITEM_READONLY: 'Базовий пункт змінюється у вікні «Базові плюси й мінуси»',
   /** Remap набору категорії: пункт належить предку — змінювати там. */

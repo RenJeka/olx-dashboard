@@ -14,6 +14,7 @@ import {
   OPENROUTER_TITLE,
 } from './constants.js';
 import type { ChunkListing } from './prompts.js';
+import { errorMessage } from '../errors.js';
 
 // ── Типи запиту/відповіді ──────────────────────────────────────────────────────
 
@@ -168,7 +169,7 @@ async function decideOnce(state: JevState, questions: Record<string, JevQuestion
     });
     text = await res.text();
   } catch (err) {
-    throw new JevRetryableError(`Jev: мережа — ${err instanceof Error ? err.message : String(err)}`, undefined);
+    throw new JevRetryableError(`Jev: мережа — ${errorMessage(err)}`, undefined);
   }
 
   if (!res.ok) {
@@ -225,7 +226,7 @@ export async function runPool<T, R>(
         try {
           out[index] = { ok: true, value: await worker(items[index] as T) };
         } catch (err) {
-          out[index] = { ok: false, error: err instanceof Error ? err.message : String(err) };
+          out[index] = { ok: false, error: errorMessage(err) };
         }
       }
     }),

@@ -1,16 +1,10 @@
 // API дерева категорій OLX і базових наборів (docs/plans/old/base-criteria.md).
 import type { FastifyInstance } from 'fastify';
 import { applyCriteriaBody, loadBaseSets, loadCategoryChain, mergeBaseCriteria } from '../analysis/baseCriteria.js';
-import { hasApiKey } from '../analysis/config.js';
-import {
-  ANALYSIS_ERRORS,
-  BASE_CRITERIA_DRAFT,
-  DEFAULT_MODEL,
-  OPPOSITE_MODE,
-  isMode,
-} from '../analysis/constants.js';
+import { BASE_CRITERIA_DRAFT, DEFAULT_MODEL, OPPOSITE_MODE } from '../analysis/constants.js';
 import { parseCriteriaConfig, phraseKey, serializeCriteriaConfig } from '../analysis/criteria.js';
 import { CATEGORY_NOT_FOUND, remapCategoryCriteria } from '../analysis/criteriaRemap.js';
+import { requireApiKey, requireMode } from '../analysis/guards.js';
 import { chat } from '../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse } from '../analysis/parse.js';
 import { buildBaseCriteriaPrompt } from '../analysis/prompts.js';
@@ -23,6 +17,7 @@ import {
   listCategoryRows,
   upsertBaseCriteria,
 } from '../db/repos/categories.js';
+import { errorMessage } from '../errors.js';
 import { logError } from '../logger.js';
 import { isAnyScanRunning } from '../scanner/abortControl.js';
 import type { CategoryNode, CriteriaConfig, CriterionGroup } from '../types.js';
@@ -99,9 +94,8 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
     const id = Number(req.params.id);
     const chain = await loadCategoryChain(id);
     if (chain.length === 0) return reply.code(404).send({ error: CATEGORY_NOT_FOUND });
-    const mode = req.body?.mode;
-    if (!isMode(mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
-    if (!hasApiKey()) return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
+    const mode = requireMode(req.body?.mode);
+    requireApiKey();
 
     const { own, inherited } = await loadOwnAndInherited(chain, id);
     const both = (m: typeof mode): CriterionGroup[] => [...inherited[m], ...own[m]];
@@ -124,7 +118,7 @@ export async function categoriesRoutes(app: FastifyInstance): Promise<void> {
       const fresh = parseCriteriaResponse(raw, Infinity).filter((c) => !taken.has(phraseKey(c)));
       return { criteria: excludeOppositeCriteria(fresh, opposite).slice(0, BASE_CRITERIA_DRAFT) };
     } catch (err) {
-      return reply.code(502).send({ error: err instanceof Error ? err.message : String(err) });
+      return reply.code(502).send({ error: errorMessage(err) });
     }
   });
 

@@ -63,7 +63,7 @@ olx-dashboard/
 │       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
 │       ├── logger.ts         # єдиний сервіс логування (pino): getLogger(scope), logError/logWarn(scope, stage, …) → stdout + app_logs, retention 14 днів
 │       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
-│       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом
+│       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом; errorMessage(err) — текст кинутого значення
 │       ├── services/         # use-cases для роутів: searches, projects, listings, logs (валідація → HttpError, без Fastify)
 │       ├── cache/            # кеш пошуку в описі (docs/plans/redis-description-search-cache.md)
 │       │   ├── redis.ts      # клієнт Redis за REDIS_URL (best-effort, таймаут, префікс ключів, INFO/трафік); setCacheStoreForTests
@@ -117,7 +117,8 @@ olx-dashboard/
 │       │   ├── criteriaRemap.ts # use-cases remap критеріїв без AI: remapSearchCriteria (пошук), remapCategoryCriteria (базовий набір категорії)
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
-│       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
+│       │   ├── guards.ts     # передумови AI-запитів: requireSearch (404) / requireApiKey (409) / requireMode (400) — кидають HttpError
+│       │   ├── manualZip.ts  # імена файлів ZIP-пакета (ZIP_FILES, numberedFile) + спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat()/chatWithUsage() — POST /chat/completions (json_object, ретрай, зняття code-fence; usage.cost для замірів)
 │       │   ├── jev.ts        # Jev через OpenRouter Decisions API (docs/jev.md): decide (ретраї, спільна пауза на 429), runPool, listingState, relevanceQuestion/criteriaQuestions/criteriaAbove
@@ -155,6 +156,7 @@ olx-dashboard/
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── errorHandler.ts # httpErrorHandler: глобальний обробник помилок (index.ts і тести через test/app.ts)
+│           ├── http.ts       # спільна HTTP-механіка маршрутів: parseIds (ids із тіла), sendZip (відповідь ZIP-архівом зі списку файлів)
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/old/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/old/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── logs.ts       # GET /api/logs (журнал app_logs: фільтри level/scope) + DELETE /api/logs (очистити)

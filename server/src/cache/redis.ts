@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import { RESP_TYPES, createClient } from 'redis';
 import { getLogger, logWarn } from '../logger.js';
+import { errorMessage } from '../errors.js';
 
 /** Скільки чекати на одну команду, перш ніж піти в Turso. */
 const COMMAND_TIMEOUT_MS = 3000;
@@ -153,7 +154,7 @@ export async function getCacheStore(): Promise<CacheStore | null> {
         return true;
       },
       (err: unknown) => {
-        logWarn('cache', 'redis-connect', `Redis недоступний: ${err instanceof Error ? err.message : String(err)}`);
+        logWarn('cache', 'redis-connect', `Redis недоступний: ${errorMessage(err)}`);
         lastFailureAt = Date.now();
         connected = null;
         redis?.destroy();

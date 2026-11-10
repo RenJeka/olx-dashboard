@@ -126,12 +126,12 @@
 
 ### Порція 3 — середній ризик: AI-маршрути сервера (знахідка 1)
 
-- [ ] 3.1 Характеризаційні тести на те, чого ще не покрито: 404/400/409 і склад ZIP для `relevance`, `ai-picks`,
+- [x] 3.1 Характеризаційні тести на те, чого ще не покрито: 404/400/409 і склад ZIP для `relevance`, `ai-picks`,
       `analyze/package.zip`, `search-synonyms`
-- [ ] 3.2 `guards.ts`, `errorMessage`, `routes/http.ts` (`parseIds`, `sendZip`, `numberedName`) + тести
-- [ ] 3.3 Перевести `relevance.ts`, `aiPicks.ts`, `searchSynonyms.ts`
-- [ ] 3.4 Перевести `routes/analysis/matching.ts`, `criteria.ts`, `routes/categories.ts` (ключ AI)
-- [ ] 3.5 Тексти помилок → `ANALYSIS_ERRORS`; імена файлів ZIP → `analysis/manualZip.ts`
+- [x] 3.2 `guards.ts`, `errorMessage`, `routes/http.ts` (`parseIds`, `sendZip`), `numberedFile` у `analysis/manualZip.ts`, `requireMode` + тести
+- [x] 3.3 Перевести `relevance.ts`, `aiPicks.ts`, `searchSynonyms.ts`
+- [x] 3.4 Перевести `routes/analysis/matching.ts`, `criteria.ts`, `routes/categories.ts` (ключ AI)
+- [x] 3.5 Тексти помилок → `ANALYSIS_ERRORS`; імена файлів ZIP → `analysis/manualZip.ts`
 
 ### Порція 4 — низький ризик: конфігурація (знахідка 4)
 
