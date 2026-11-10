@@ -1,6 +1,7 @@
 import type { InValue } from '@libsql/client';
 import { dbAll, dbGet, dbRun } from '../db.js';
 import type { ListingPatch } from '../../types.js';
+import { DESCRIPTION_HEAD_CHARS } from '../../constants.js';
 
 // Білий список колонок для сортування (захист від SQL-інʼєкцій).
 export const LISTING_SORTABLE = new Set(['price', 'title', 'city', 'posted_at', 'first_seen_at', 'last_seen_at']);
@@ -8,8 +9,6 @@ export const LISTING_SORTABLE = new Set(['price', 'title', 'city', 'posted_at', 
 // Легкий рядок таблиці (docs/plans/old/listings-light-payload.md): без повного опису й галереї — вони
 // найважчі у відповіді великого пошуку (пам'ять API, S14). Опис — лише початок (`description_head`),
 // з якого сервіс робить фрагмент для колонки; повний опис і `photo_urls` — `/details` на вимогу.
-const DESCRIPTION_HEAD_CHARS = 600;
-
 const LISTING_COLUMNS = `id, olx_id, search_id, title, url, price, currency, city, district,
                 category_id, category_type,
                 photo_url, substr(description, 1, ${DESCRIPTION_HEAD_CHARS}) AS description_head,

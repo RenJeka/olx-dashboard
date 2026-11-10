@@ -1,10 +1,8 @@
 import { Badge, Box, Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
 import { LuCircleStop, LuInfo, LuPause } from 'react-icons/lu';
-import { SCAN_KIND_LABELS } from '../../../constants';
+import { SCAN_KIND_LABELS, SCAN_PROGRESS_MAX_SEGMENTS } from '../../../constants';
 import { Tooltip } from '../../ui/tooltip';
 import type { ScanStatus } from '../../../types';
-/** Сегменти показуємо лише до цієї кількості — більше (напр. до 40 цінових бакетів) злилося б у кашу. */
-const MAX_SEGMENTS = 16;
 
 /**
  * Безпечний відсоток для Progress.Root: `total<=0` (зокрема 0, не лише null) або
@@ -38,7 +36,7 @@ interface Props {
  */
 export function ScanProgressPanel({ scanKind, status, secondsPerRequest, onStop, isStopping }: Props) {
   const showSegments = status.sub_total != null && status.sub_total > 1;
-  const segmented = showSegments && status.sub_total! <= MAX_SEGMENTS;
+  const segmented = showSegments && status.sub_total! <= SCAN_PROGRESS_MAX_SEGMENTS;
 
   return (
     <Stack gap={1.5} p={3} rounded="lg" bg="accent.subtle/10" borderWidth="1px" borderColor="accent.subtle" colorPalette="accent">

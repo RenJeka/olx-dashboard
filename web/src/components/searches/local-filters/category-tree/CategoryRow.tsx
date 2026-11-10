@@ -4,9 +4,8 @@ import { LuChevronDown, LuChevronRight } from 'react-icons/lu';
 import { Checkbox } from '../../../ui/checkbox';
 import { nodeCheckedState, type CategoryTreeNode } from '../../../../utils/categoryCounts';
 import { CountChip } from './CountChip';
+import { TREE_INDENT_REM } from '../../../../theme/layout';
 
-/** Відступ на рівень вкладеності дерева категорій (rem). */
-const TREE_INDENT_REM = 1.25;
 
 interface RowProps {
   node: CategoryTreeNode;

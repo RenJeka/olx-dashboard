@@ -10,11 +10,8 @@ import { createHash } from 'node:crypto';
 import { RESP_TYPES, createClient } from 'redis';
 import { getLogger, logWarn } from '../logger.js';
 import { errorMessage } from '../errors.js';
+import { REDIS_COMMAND_TIMEOUT_MS, REDIS_RECONNECT_COOLDOWN_MS } from '../constants.js';
 
-/** Скільки чекати на одну команду, перш ніж піти в Turso. */
-const COMMAND_TIMEOUT_MS = 3000;
-/** Пауза перед новою спробою підключитися після невдачі (не смикати Redis на кожен пошук). */
-const RECONNECT_COOLDOWN_MS = 60_000;
 
 /** Ліниво: тести з `vi.mock('../logger.js')` без getLogger не падають на імпорті. */
 const log = () => getLogger('cache');
@@ -49,7 +46,7 @@ export function keyPrefix(): string {
 function withTimeout<T>(promise: Promise<T>, what: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Redis: таймаут ${COMMAND_TIMEOUT_MS} мс (${what})`)), COMMAND_TIMEOUT_MS);
+    timer = setTimeout(() => reject(new Error(`Redis: таймаут ${REDIS_COMMAND_TIMEOUT_MS} мс (${what})`)), REDIS_COMMAND_TIMEOUT_MS);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -76,7 +73,7 @@ function createRedisStore(url: string): RedisConnection {
     url,
     // Без черги офлайн-команд: поки з'єднання немає, команда одразу падає → пошук іде в Turso.
     disableOfflineQueue: true,
-    socket: { connectTimeout: COMMAND_TIMEOUT_MS },
+    socket: { connectTimeout: REDIS_COMMAND_TIMEOUT_MS },
   });
   // Без обробника 'error' node-redis валить процес; самі помилки команд ловить кеш-шар.
   client.on('error', (err: Error) => log().warn({ err: err.message }, 'Redis: помилка з’єднання'));
@@ -139,14 +136,14 @@ let testStore: CacheStore | null | undefined;
 
 /**
  * Сховище Redis або null (немає `REDIS_URL` / не вдалося підключитися — нова спроба не частіше
- * RECONNECT_COOLDOWN_MS). Після першого підключення перепідключенням займається сам node-redis.
+ * REDIS_RECONNECT_COOLDOWN_MS). Після першого підключення перепідключенням займається сам node-redis.
  */
 export async function getCacheStore(): Promise<CacheStore | null> {
   if (testStore !== undefined) return testStore;
   const url = process.env.REDIS_URL?.trim();
   if (!url) return null;
   if (!connected) {
-    if (Date.now() - lastFailureAt < RECONNECT_COOLDOWN_MS) return null;
+    if (Date.now() - lastFailureAt < REDIS_RECONNECT_COOLDOWN_MS) return null;
     redis ??= createRedisStore(url);
     connected = redis.connect().then(
       () => {

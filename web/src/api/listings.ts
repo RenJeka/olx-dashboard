@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './base';
 import type { Listing, ListingDetails, ListingPatch, FilterOptions } from '../types';
+import { LISTING_DETAILS_CHUNK } from '../constants';
 
 export function useListings(searchId: number | null) {
   return useQuery({
@@ -20,8 +21,6 @@ export function useListingDetails(id: number | null) {
   });
 }
 
-/** Скільки id в одному запиті деталей (ліміт сервера — DETAILS_MAX_IDS). */
-const DETAILS_CHUNK = 500;
 
 /** Те саме пакетом (крок перегляду AI-майстра) → Map id → деталі; великий набір — кількома запитами. */
 export function useListingsDetails(searchId: number | null, ids: number[]) {
@@ -29,7 +28,7 @@ export function useListingsDetails(searchId: number | null, ids: number[]) {
     queryKey: ['listings-details', searchId, ids],
     queryFn: async () => {
       const chunks: number[][] = [];
-      for (let i = 0; i < ids.length; i += DETAILS_CHUNK) chunks.push(ids.slice(i, i + DETAILS_CHUNK));
+      for (let i = 0; i < ids.length; i += LISTING_DETAILS_CHUNK) chunks.push(ids.slice(i, i + LISTING_DETAILS_CHUNK));
       const parts = await Promise.all(
         chunks.map((chunk) =>
           api<ListingDetails[]>(`/api/searches/${searchId}/listings/details`, {

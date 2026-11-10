@@ -3,9 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useScan, useSearches } from '../api';
 import { toaster } from '../components/ui/toaster';
 import { useSettingsStore } from '../stores/settingsStore';
-
-const MIN_PAUSE_MS = 5000;
-const MAX_PAUSE_MS = 10000;
+import { AUTO_REFRESH_PAUSE_MAX_MS, AUTO_REFRESH_PAUSE_MIN_MS } from '../constants';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,7 +51,7 @@ export function useAutoRefresh(): void {
           // Помилку конкретного пошуку показує його панель дій — тут продовжуємо.
         }
         if (i < list.length - 1) {
-          await sleep(MIN_PAUSE_MS + Math.random() * (MAX_PAUSE_MS - MIN_PAUSE_MS));
+          await sleep(AUTO_REFRESH_PAUSE_MIN_MS + Math.random() * (AUTO_REFRESH_PAUSE_MAX_MS - AUTO_REFRESH_PAUSE_MIN_MS));
         }
       }
 
