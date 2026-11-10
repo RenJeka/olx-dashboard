@@ -1,4 +1,5 @@
 import type { Listing } from '../types';
+import { DISPLAY_LOCALE, DISPLAY_TIME_ZONE } from '../constants';
 
 /**
  * Форматує ціну оголошення у локалізований вигляд з валютою.
@@ -53,8 +54,6 @@ export function pluralUk(n: number, forms: [string, string, string]): string {
   return forms[2];
 }
 
-const KY_LOCALE = 'uk-UA';
-const KY_TZ = 'Europe/Kyiv';
 
 /**
  * Форматує ISO дату у читабельну коротку дату (київський час).
@@ -66,19 +65,19 @@ export function formatDate(value: string | null): { short: string; full: string 
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return { short: value, full: value };
-  const short = date.toLocaleDateString(KY_LOCALE, {
+  const short = date.toLocaleDateString(DISPLAY_LOCALE, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    timeZone: KY_TZ,
+    timeZone: DISPLAY_TIME_ZONE,
   });
-  const full = date.toLocaleString(KY_LOCALE, {
+  const full = date.toLocaleString(DISPLAY_LOCALE, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: KY_TZ,
+    timeZone: DISPLAY_TIME_ZONE,
   });
   return { short, full };
 }

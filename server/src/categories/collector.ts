@@ -7,6 +7,7 @@ import { facetToNodes } from '../scraper/olxCategories.js';
 import { fetchCategoryFacet } from '../scraper/graphql/categories.js';
 import { randomDelayMs, sleep } from '../scraper/utils.js';
 import { upsertCategories } from './tree.js';
+import { errorMessage } from '../errors.js';
 
 /** Пауза між запитами збирача: 1–2 с. */
 const DEFAULT_DELAY_MIN_MS = 1000;
@@ -49,7 +50,7 @@ export async function collectCategories(
       }
     } catch (err) {
       failed.push(word);
-      logWarn('scanner', 'category-collect', err instanceof Error ? err.message : String(err), {
+      logWarn('scanner', 'category-collect', errorMessage(err), {
         word,
       });
     }

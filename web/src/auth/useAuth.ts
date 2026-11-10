@@ -40,7 +40,7 @@ export function useLogin() {
     mutationFn: (credential) =>
       api<Session>('/api/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ credential }),
+        json: { credential },
       }),
     onSuccess: (session) => {
       qc.setQueryData(ME_KEY, session);

@@ -1,4 +1,4 @@
-import { BadRequestError, NotFoundError } from '../errors.js';
+import { BadRequestError, errorMessage, NotFoundError } from '../errors.js';
 import { logWarn } from '../logger.js';
 import { invalidateCorpus } from '../cache/textCorpus.js';
 import { refreshBaseCategory } from '../categories/tree.js';
@@ -121,7 +121,7 @@ export async function updateSearch(
     await refreshBaseCategory(id);
     freshSearch = (await getSearchRecord(id)) as SearchRecord;
   } catch (err) {
-    logWarn('searches', 'base-category', err instanceof Error ? err.message : String(err), { searchId: id });
+    logWarn('searches', 'base-category', errorMessage(err), { searchId: id });
   }
   return { ...freshSearch, filtered_out_count };
 }

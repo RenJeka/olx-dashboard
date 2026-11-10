@@ -1,7 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { ZipArchive } from 'archiver';
 import type { FastifyInstance } from 'fastify';
-import { hasApiKey } from '../../analysis/config.js';
 import {
   ANALYSIS_ERRORS,
   AUTO_CHUNK_SIZE,
@@ -12,12 +10,13 @@ import {
   MAX_ANALYZE_IDS,
   MIME_JSON,
   MIME_XLSX,
-  MIME_ZIP,
   MODE_LABEL,
   PREVIEW_XLSX_WIDTHS,
   isMode,
 } from '../../analysis/constants.js';
+import { requireApiKey, requireMode, requireSearch } from '../../analysis/guards.js';
 import { resolveCriteriaThreshold, runJevMatching } from '../../analysis/jevEngine.js';
+import { ZIP_FILES, numberedFile } from '../../analysis/manualZip.js';
 import { chat } from '../../analysis/openrouter.js';
 import { mergeResults, parseMatchingResponse } from '../../analysis/parse.js';
 import {
@@ -27,44 +26,39 @@ import {
   buildMatchingPrompt,
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
-import { getSearch, loadListings } from '../../db/repos/analysis.js';
+import { loadListings } from '../../db/repos/analysis.js';
 import { resolveEffectiveCriteria } from '../../analysis/baseCriteria.js';
 import { enabledGroups } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';
+import { BadRequestError, errorMessage } from '../../errors.js';
 import { buildXlsxBuffer } from '../../export/xlsx.js';
 import { getLogger } from '../../logger.js';
 import type { AnalysisMode, AnalyzeResponse, AnalyzedListing } from '../../types.js';
+import { parseIds, sendZip, type ZipEntry } from '../http.js';
 
 export async function matchingRoutes(app: FastifyInstance): Promise<void> {
   // Авто matching (LLM — чанки по AUTO_CHUNK_SIZE; Jev — пул по оголошенню). НЕ пише в БД.
   app.post<{
     Params: { id: string };
     Body: { mode?: string; ids?: number[]; model?: string; reasoning?: boolean; engine?: string; threshold?: number };
-  }>('/api/searches/:id/analyze', async (req, reply) => {
-    const id = Number(req.params.id);
-    const search = await getSearch(id);
-    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
-    if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
-    if (!hasApiKey()) {
-      return reply.code(409).send({ error: ANALYSIS_ERRORS.NO_API_KEY });
-    }
+  }>('/api/searches/:id/analyze', async (req) => {
+    const search = await requireSearch(Number(req.params.id));
+    const { id } = search;
+    const mode = requireMode(req.body.mode);
+    requireApiKey();
 
-    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-    if (ids.length > MAX_ANALYZE_IDS) {
-      return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
-    }
+    const ids = parseIds(req.body.ids);
+    if (ids.length > MAX_ANALYZE_IDS) throw new BadRequestError(ANALYSIS_ERRORS.TOO_MANY_IDS);
 
     // Лише категорії з позначкою «в аналізі» (docs/plans/old/criteria-categories.md); ефективні — базові + власні.
-    const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, req.body.mode);
-    if (criteria.length === 0) {
-      return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
-    }
+    const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, mode);
+    if (criteria.length === 0) throw new BadRequestError(ANALYSIS_ERRORS.NO_CRITERIA);
 
     const listings = await loadListings(id, ids);
     if (req.body.engine === 'jev') {
       const threshold = resolveCriteriaThreshold(req.body.threshold);
-      const response = await runJevMatching(criteria, req.body.mode, listings.map(toPromptListing), { threshold });
-      getLogger('analysis').info({ searchId: id, mode: req.body.mode, threshold, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
+      const response = await runJevMatching(criteria, mode, listings.map(toPromptListing), { threshold });
+      getLogger('analysis').info({ searchId: id, mode, threshold, model: response.model, usage: response.usage }, 'Jev: прогін мінусів/плюсів');
       return response;
     }
     const descriptions = descriptionMap(listings);
@@ -74,7 +68,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     const errors: string[] = [];
 
     for (const batch of chunk(listings, AUTO_CHUNK_SIZE)) {
-      const prompt = buildMatchingPrompt(criteria, batch.map(toPromptListing), req.body.mode);
+      const prompt = buildMatchingPrompt(criteria, batch.map(toPromptListing), mode);
       try {
         const raw = await chat([{ role: 'user', content: prompt }], {
           model,
@@ -82,7 +76,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
         });
         results.push(...parseMatchingResponse(raw, descriptions, criteria));
       } catch (err) {
-        errors.push(err instanceof Error ? err.message : String(err));
+        errors.push(errorMessage(err));
       }
     }
 
@@ -96,37 +90,25 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: { mode?: string; ids?: number[] } }>(
     '/api/searches/:id/analyze/package.zip',
     async (req, reply) => {
-      const id = Number(req.params.id);
-      const search = await getSearch(id);
-      if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
-      if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
+      const search = await requireSearch(Number(req.params.id));
+      const { id } = search;
+      const mode = requireMode(req.body.mode);
 
-      const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
+      const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, mode);
+      if (criteria.length === 0) throw new BadRequestError(ANALYSIS_ERRORS.NO_CRITERIA);
 
-      const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, req.body.mode);
-      if (criteria.length === 0) {
-        return reply.code(400).send({ error: ANALYSIS_ERRORS.NO_CRITERIA });
-      }
+      const listings = await loadListings(id, parseIds(req.body.ids));
 
-      const listings = await loadListings(id, ids);
-      const mode = req.body.mode;
-
-      const archive = new ZipArchive();
-      archive.on('error', (err: Error) => req.log.error(err));
-
-      archive.append(buildManualZipInstructions(criteria, mode), { name: 'prompt.txt' });
-      archive.append(readFileSync(ANALYZE_PY_PATH), { name: 'analyze.py' });
-      archive.append(PATTERNS_EXAMPLE_JSON, { name: 'patterns.example.json' });
-      chunk(listings, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
-        const name = `descriptions/chunk-${String(idx + 1).padStart(3, '0')}.json`;
-        const content = JSON.stringify(buildChunkListings(group.map(toPromptListing)), null, JSON_EXPORT_INDENT);
-        archive.append(content, { name });
-      });
-      void archive.finalize();
-
-      reply.header('Content-Disposition', `attachment; filename="analysis-${mode}-search-${id}.zip"`);
-      reply.type(MIME_ZIP);
-      return reply.send(archive);
+      const entries: ZipEntry[] = [
+        { name: ZIP_FILES.PROMPT, content: buildManualZipInstructions(criteria, mode) },
+        { name: ZIP_FILES.ANALYZE_PY, content: readFileSync(ANALYZE_PY_PATH) },
+        { name: ZIP_FILES.PATTERNS_EXAMPLE, content: PATTERNS_EXAMPLE_JSON },
+        ...chunk(listings, MANUAL_ZIP_CHUNK_SIZE).map((group, idx) => ({
+          name: numberedFile(ZIP_FILES.DESCRIPTIONS, idx),
+          content: JSON.stringify(buildChunkListings(group.map(toPromptListing)), null, JSON_EXPORT_INDENT),
+        })),
+      ];
+      return sendZip(req, reply, `analysis-${mode}-search-${id}.zip`, entries);
     },
   );
 
@@ -135,22 +117,20 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: { mode?: string; raw?: string; accumulated?: AnalyzedListing[] };
   }>('/api/searches/:id/analyze/import', async (req, reply) => {
-    const id = Number(req.params.id);
-    const search = await getSearch(id);
-    if (!search) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
-    if (!isMode(req.body.mode)) return reply.code(400).send({ error: ANALYSIS_ERRORS.BAD_MODE });
-    if (!req.body.raw) return reply.code(400).send({ error: ANALYSIS_ERRORS.EMPTY_RESPONSE });
+    const search = await requireSearch(Number(req.params.id));
+    const mode = requireMode(req.body.mode);
+    if (!req.body.raw) throw new BadRequestError(ANALYSIS_ERRORS.EMPTY_RESPONSE);
 
     // Усі категорії режиму (базові + власні) — для зведення синонімів до назви (вимкнені теж не шкодять).
-    const criteria = (await resolveEffectiveCriteria(search)).config[req.body.mode];
-    const listings = await loadListings(id, []);
+    const criteria = (await resolveEffectiveCriteria(search)).config[mode];
+    const listings = await loadListings(search.id, []);
     const descriptions = descriptionMap(listings);
 
     let parsed: AnalyzedListing[];
     try {
       parsed = parseMatchingResponse(req.body.raw, descriptions, criteria);
     } catch (err) {
-      return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
+      return reply.code(400).send({ error: errorMessage(err) });
     }
 
     const accumulated = Array.isArray(req.body.accumulated) ? req.body.accumulated : [];
@@ -165,8 +145,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: { format?: string; mode?: string; rows?: { id?: number; criteria?: string[] }[] };
   }>('/api/searches/:id/analyze/export', async (req, reply) => {
-    const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
+    const { id } = await requireSearch(Number(req.params.id));
     const mode: AnalysisMode = isMode(req.body.mode) ? req.body.mode : 'cons';
     const reqRows = Array.isArray(req.body.rows) ? req.body.rows : [];
     const label = MODE_LABEL[mode];

@@ -16,6 +16,7 @@ import {
   packageContents,
   resultLine,
 } from './manualZip.js';
+import { errorMessage } from '../errors.js';
 
 /** Знімає ```json … ``` обгортку й вирізає перший JSON-обʼєкт/масив (для ручних вставок). */
 function extractJson(text: string): string {
@@ -292,7 +293,7 @@ export async function runRelevance(
       const raw = await chat([{ role: 'user', content: prompt }], { model: model ?? DEFAULT_MODEL });
       results.push(...parseRelevanceResponse(raw, validIds));
     } catch (err) {
-      errors.push(err instanceof Error ? err.message : String(err));
+      errors.push(errorMessage(err));
     }
   }
 

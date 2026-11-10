@@ -29,13 +29,13 @@ export function useCreateSearch() {
       }
       return api<Search>('/api/searches', {
         method: 'POST',
-        body: JSON.stringify({
+        json: {
           name: input.name,
           query: input.query,
           api_filters: { ranges },
           query_synonyms: input.querySynonyms ?? [],
           project_id: input.projectId,
-        }),
+        },
       });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
@@ -60,7 +60,7 @@ export function useReorderSearches() {
     mutationFn: ({ searchId, direction }: { searchId: number; direction: 'up' | 'down' }) =>
       api<Search>(`/api/searches/${searchId}/move`, {
         method: 'POST',
-        body: JSON.stringify({ direction }),
+        json: { direction },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
   });
@@ -108,7 +108,7 @@ export function useUpdateSearch() {
     }) =>
       api<Search>(`/api/searches/${searchId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name, query, api_filters, query_synonyms }),
+        json: { name, query, api_filters, query_synonyms },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
   });
@@ -121,7 +121,7 @@ export function useArchiveSearch() {
     mutationFn: ({ searchId, archived }: { searchId: number; archived: boolean }) =>
       api<Search>(`/api/searches/${searchId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ archived: archived ? 1 : 0 }),
+        json: { archived: archived ? 1 : 0 },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
   });
@@ -134,7 +134,7 @@ export function useUpdateSearchFilters() {
     mutationFn: ({ searchId, local_filters }: { searchId: number; local_filters: LocalFilters }) =>
       api<SearchPatchResult>(`/api/searches/${searchId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ local_filters }),
+        json: { local_filters },
       }),
     onSuccess: (_data, { searchId }) => {
       qc.invalidateQueries({ queryKey: ['searches'] });

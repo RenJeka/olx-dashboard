@@ -21,6 +21,7 @@ import {
   updateSearch,
   type SearchInput,
 } from '../services/searches.js';
+import { errorMessage } from '../errors.js';
 
 // Помилки сервісу (404/400) відповідає глобальний обробник (routes/errorHandler.ts). Скан-роути
 // мають власний catch: збій скану вже записано в журнал у withScanRun — без подвійного запису.
@@ -55,7 +56,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         const result = await runScan(id, { deep });
         return result;
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorMessage(err);
         app.log.error({ err }, 'Помилка сканування');
         return reply.code(500).send({ error: message });
       }
@@ -73,7 +74,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         const plan = await analyzeScan(id, { deep: req.query.deep === 'true' });
         return plan;
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorMessage(err);
         app.log.error({ err }, 'Помилка аналітичної фази глибокого скану');
         return reply.code(500).send({ error: message });
       }
@@ -91,7 +92,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
         const result = await runDeepScanFromPlan(id, planToken);
         return result;
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = errorMessage(err);
         const isStale = message.includes('застарів');
         app.log.error({ err }, 'Помилка запуску скану за планом');
         return reply.code(isStale ? 410 : 500).send({ error: message });
@@ -115,7 +116,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
       const result = await runVerify(id);
       return result;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = errorMessage(err);
       app.log.error({ err }, 'Помилка verify-проходу');
       return reply.code(500).send({ error: message });
     }
