@@ -40,10 +40,10 @@
 - **Чому це проблема:** новий AI-ендпойнт копіює п'ять шматків; зміна тексту помилки чи формату ZIP — правка в кількох
   файлах; маршрут на 200 рядків, де суть (що саме робить крок) губиться серед однакової обв'язки.
 - **Пропоную** (механізм униз, політика лишається в маршруті):
-  - `server/src/analysis/guards.ts`: `requireSearch(id): Promise<SearchRow>` (кидає `NotFoundError`),
+  - `src/analysis/guards.ts` (сервер): `requireSearch(id): Promise<SearchRow>` (кидає `NotFoundError`),
     `requireApiKey(): void` (кидає `ConflictError`). Глобальний обробник уже відповідає `{ error }` з тим самим кодом.
   - `server/src/errors.ts`: `errorMessage(err: unknown): string`.
-  - `server/src/routes/http.ts`: `parseIds(raw: unknown): number[]`,
+  - `src/routes/http.ts` (сервер): `parseIds(raw: unknown): number[]`,
     `sendZip(req, reply, filename, entries: { name: string; content: string | Buffer }[])`,
     `numberedName(prefix, index, ext)` → `descriptions/chunk-001.json`.
   - Маршрут складає свій ZIP списком файлів: `sendZip(req, reply, name, [{ name: 'prompt.txt', content }, …])`.
@@ -92,7 +92,7 @@
   (`pages/ListingsTable.tsx`), ліміт чипів у клітинці (`ProsConsCell.tsx`), розмір порції деталей
   (`api/listings.ts`), «три дні» (`utils/searchStats.ts`), локаль і часовий пояс (`utils/format.ts`), сегменти
   прогресу (`ScanProgressPanel.tsx`).
-- **Сервер** → новий `server/src/constants.ts`: ліміти журналу й оголошень (`services/logs.ts`,
+- **Сервер** → новий `src/constants.ts` (сервер): ліміти журналу й оголошень (`services/logs.ts`,
   `services/listings.ts`), зберігання журналу (`logger.ts`), таймаути Redis (`cache/redis.ts`), ширини Excel
   (`export/xlsx.ts`).
 - Значення не змінюються, лише місце оголошення.
@@ -115,9 +115,9 @@
 
 ### Порція 1 — низький ризик: обсяг AI-кроків (знахідка 3)
 
-- [ ] 1.1 `useWizard` → `useAiScope`; підпис обсягу рахується в `useWizard`
-- [ ] 1.2 Видалити `useAnalysisScope.ts`, `computeDefaultScope`, обгортку `buildScopeLabel`, псевдонім `AnalysisScope`
-- [ ] 1.3 Прибрати прапорець `preferCandidates`; «AI Вибір» ставить `'candidates'` сам
+- [x] 1.1 `useWizard` → `useAiScope`; підпис обсягу рахується в `useWizard`
+- [x] 1.2 Видалити `useAnalysisScope.ts`, `computeDefaultScope`, обгортку `buildScopeLabel`, псевдонім `AnalysisScope`
+- [x] 1.3 Прибрати прапорець `preferCandidates`; «AI Вибір» ставить `'candidates'` сам
 
 ### Порція 2 — низький ризик: HTTP-клієнт фронтенду (знахідка 2)
 
@@ -136,7 +136,7 @@
 ### Порція 4 — низький ризик: конфігурація (знахідка 4)
 
 - [ ] 4.1 Фронтенд: числа → `web/src/constants.ts`
-- [ ] 4.2 Сервер: числа → `server/src/constants.ts`
+- [ ] 4.2 Сервер: числа → `src/constants.ts` (сервер)
 
 ### Завершення
 
@@ -162,6 +162,6 @@
 
 ## Відкриті питання
 
-- Скіл пропонує окремий `docs/MODULE-DESIGN.md`; у плані — розділ у `docs/development.md` (одне джерело про процес).
+- Скіл пропонує окремий файл MODULE-DESIGN у `docs/`; у плані — розділ у `docs/development.md` (одне джерело про процес).
 - Порція 4.2: константа, яку читає один файл, після переносу лежить далі від коду. Якщо це не бажано — лишити
   серверну частину як є.

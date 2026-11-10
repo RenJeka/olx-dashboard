@@ -413,7 +413,7 @@ flowchart LR
 - `stores/listingsUiStore.ts` — Zustand-стор `useListingsUiStore`: `statusFilter: ListingStatus | 'all' | 'ai_picks'`
   (дефолт `'all'`), `showFilteredOut`, `showIrrelevant` + сетери. Спільний in-memory стан фільтрів
   списку, що читається і в `ListingsTable` (видимі рядки), і в `ListingsFilterBar` (`SegmentGroup` +
-  перемикачі шуму), і в `useAnalysisScope` (обсяг AI-аналізу). Жодного persist (in-memory).
+  перемикачі шуму), і в `useAiScope` (обсяг AI-кроків). Жодного persist (in-memory).
 - `utils/listingVisibility.ts` — ЄДИНЕ джерело правди видимості рядка: `passesNoiseFilters` (перемикачі
   відфільтрованих/нерелевантних), `isAiPickCandidate` (предикат вкладки «Найкращі кандидати»),
   `isListingVisible` (вкладка + шум), `previewHideReason` (прев'ю незбережених локальних фільтрів у

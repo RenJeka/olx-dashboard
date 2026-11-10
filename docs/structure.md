@@ -334,7 +334,6 @@ olx-dashboard/
         │   ├── analysis/          # AI-аналіз логіка (кроки майстра)
         │   │   ├── useWizard.ts        # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
         │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
-        │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (чипи = категорії, позначка «в аналізі», поглинання синонімів)
         │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»; useCriteriaCandidates — вибір згенерованого (і для базових наборів)
         │   │   ├── useCriteriaManager.ts # логіка вікна «Плюси та мінуси» (лічильники з кешу, PUT/remap)
@@ -372,7 +371,7 @@ olx-dashboard/
             ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
             ├── relevance.ts      # чисті функції для AI-фільтра (getEffectiveRelevanceIds, getRelevanceStats)
             ├── searchStats.ts    # computeListingStats() — клієнтський аналог агрегату /stats (in_db/stale/verify) з масиву listings, щоб не робити 408-рядковий прохід на сервері (docs/plans/old/turso-stats-clientside.md)
-            └── analysis.ts       # чисті функції для AI-аналізу (isIncludedFn, computeDefaultScope, buildScopeLabel)
+            └── analysis.ts       # чисті функції кроку перегляду AI-аналізу (criterionKey, isIncludedFn)
 ```
 
 ## Орієнтири «куди дивитись»
