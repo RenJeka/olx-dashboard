@@ -192,7 +192,7 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401; ApiError зі статусом)
+        │   ├── base.ts       # HTTP-клієнт: спільний request (credentials: 'include', VITE_API_BASE-префікс, тіло з `json`, подія auth:unauthorized на 401, ApiError зі статусом) → api<T> (JSON) і apiBlob (файл)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/old/projects.md)
         │   ├── listings.ts   # оголошення, фільтри

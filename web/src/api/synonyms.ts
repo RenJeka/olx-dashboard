@@ -6,7 +6,7 @@ import type { Search } from '../types';
 export function fetchSynonymsPrompt(query: string): Promise<{ prompt: string }> {
   return api<{ prompt: string }>('/api/search-synonyms/prompt', {
     method: 'POST',
-    body: JSON.stringify({ query }),
+    json: { query },
   });
 }
 
@@ -16,7 +16,7 @@ export function useGenerateSynonyms() {
     mutationFn: ({ query, model }: { query: string; model?: string }) =>
       api<{ synonyms: string[] }>('/api/search-synonyms/generate', {
         method: 'POST',
-        body: JSON.stringify({ query, model }),
+        json: { query, model },
       }),
   });
 }
@@ -27,7 +27,7 @@ export function useImportSynonyms() {
     mutationFn: ({ raw }: { raw: string }) =>
       api<{ synonyms: string[] }>('/api/search-synonyms/import', {
         method: 'POST',
-        body: JSON.stringify({ raw }),
+        json: { raw },
       }),
   });
 }
@@ -39,7 +39,7 @@ export function useUpdateSearchSynonyms() {
     mutationFn: ({ searchId, querySynonyms }: { searchId: number; querySynonyms: string[] }) =>
       api<Search>(`/api/searches/${searchId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ query_synonyms: querySynonyms }),
+        json: { query_synonyms: querySynonyms },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
   });

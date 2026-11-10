@@ -34,7 +34,7 @@ export function useListingsDetails(searchId: number | null, ids: number[]) {
         chunks.map((chunk) =>
           api<ListingDetails[]>(`/api/searches/${searchId}/listings/details`, {
             method: 'POST',
-            body: JSON.stringify({ ids: chunk }),
+            json: { ids: chunk },
           }),
         ),
       );
@@ -87,7 +87,7 @@ export function useUpdateListing() {
     mutationFn: ({ id, patch }: UpdateListingVars) =>
       api<Listing>(`/api/listings/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(patch),
+        json: patch,
       }),
     onMutate: async ({ id, searchId, patch }: UpdateListingVars) => {
       const queryKey = ['listings', searchId];

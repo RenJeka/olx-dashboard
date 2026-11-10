@@ -15,7 +15,7 @@ export function useCreateProject() {
     mutationFn: (name: string) =>
       api<Project>('/api/projects', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        json: { name },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   });
@@ -27,7 +27,7 @@ export function useUpdateProject() {
     mutationFn: ({ projectId, name }: { projectId: number; name: string }) =>
       api<Project>(`/api/projects/${projectId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name }),
+        json: { name },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   });
@@ -52,7 +52,7 @@ export function useReorderProjects() {
     mutationFn: ({ projectId, direction }: { projectId: number; direction: 'up' | 'down' }) =>
       api<Project>(`/api/projects/${projectId}/move`, {
         method: 'POST',
-        body: JSON.stringify({ direction }),
+        json: { direction },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   });
@@ -65,7 +65,7 @@ export function useAssignSearchToProject() {
     mutationFn: ({ searchId, projectId }: { searchId: number; projectId: number | null }) =>
       api<Search>(`/api/searches/${searchId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ project_id: projectId }),
+        json: { project_id: projectId },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['searches'] }),
   });
