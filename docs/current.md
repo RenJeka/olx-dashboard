@@ -44,10 +44,10 @@
   злито в `main` і задеплоєно 2026-10-23 (`npm run smoke` зелений, логи API чисті); фази 5–6 (сканер, скрейпер)
   і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
 - Рефакторинг «дещо універсальні модулі» ([refactor-general-modules](plans/old/refactor-general-modules.md)) виконано
-  в окремій гілці: чернетка PR чекає рішення людини про злиття (= деплой); ручні test-cases плану людина не проходила.
+  в окремій гілці: чернетка PR чекає рішення людини про злиття (= деплой); ручні test-cases плану пройдено агентом у браузері 2026-11-16 (усі PASS).
   Стан — у [хендофі](handoffs/2026-11-10-refactor-general-modules.md).
 
-Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
+Далі з парковки: решта доробок — [P-019](parking.md), попередження про вкладені кнопки в «AI-інструменти» — [P-022](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
 
 ## Що враховувати
@@ -103,6 +103,7 @@
 
 ## Наступний крок
 
-PR гілки `feat/p003-notes-enter-chips` (P-003 нотатки по Enter і чипи плюсів/мінусів; P-017 аудит OLX; P-002 закрито) — ручні test-cases пройдено
-людиною 2026-10-25, плани в [plans/old/](plans/old/README.md) → зелений CI → злиття з «так» людини → `npm run smoke`.
-Далі — фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка (P-019, P-020, P-018).
+Рішення людини про злиття чернетки PR (гілка `ccr-0b71569c-84hgso`, рефакторинг «дещо універсальні модулі»; ручні перевірки
+пройдено, [хендоф](handoffs/2026-11-16-refactor-general-modules-manual-tests.md)) → зелений CI → злиття з «так» людини →
+`npm run smoke`. Далі — фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка
+(P-019, P-020, P-018, P-022).
