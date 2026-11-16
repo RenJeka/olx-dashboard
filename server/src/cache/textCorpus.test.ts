@@ -3,7 +3,13 @@ import { upsertListings } from '../scraper/normalizer.js';
 import { searchListingIds } from '../services/listings.js';
 import { createSearch, gqlListing, resetDb } from '../test/db.js';
 import { keyPrefix, setCacheStoreForTests, type CacheStore } from './redis.js';
-import { getCorpus, invalidateCorpus, resetCorpusCacheForTests, type TextCorpus } from './textCorpus.js';
+import {
+  flushCacheWritesForTests,
+  getCorpus,
+  invalidateCorpus,
+  resetCorpusCacheForTests,
+  type TextCorpus,
+} from './textCorpus.js';
 
 // Кеш тексту пошуку в описі (docs/plans/redis-description-search-cache.md): L1 → L2 (Redis) → Turso.
 
@@ -43,7 +49,10 @@ beforeEach(async () => {
   await resetDb();
   searchId = await createSearch();
 });
-afterEach(() => setCacheStoreForTests(undefined));
+afterEach(async () => {
+  await flushCacheWritesForTests();
+  setCacheStoreForTests(undefined);
+});
 
 describe('getCorpus', () => {
   it('без Redis: перший запит — Turso, далі L1; скидання → знову Turso', async () => {
@@ -63,6 +72,7 @@ describe('getCorpus', () => {
     const load = vi.fn(async () => CORPUS);
 
     await getCorpus(searchId, load);
+    await flushCacheWritesForTests(); // запис у Redis — фоновий
     resetCorpusCacheForTests();
     const second = await getCorpus(searchId, load);
 
@@ -80,6 +90,37 @@ describe('getCorpus', () => {
     await store.incr(`${keyPrefix()}corpus:${searchId}:v`);
 
     expect((await getCorpus(searchId, load)).source).toBe('turso');
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('паралельні запити одного пошуку ділять одну побудову з Turso', async () => {
+    setCacheStoreForTests(fakeStore().store);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const load = vi.fn(async () => (await gate, CORPUS));
+
+    const first = getCorpus(searchId, load);
+    const second = getCorpus(searchId, load);
+    release();
+
+    expect((await first).source).toBe('turso');
+    expect(await second).toEqual({ corpus: CORPUS, source: 'shared' });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('скидання під час побудови → новий запит не чекає на стару побудову', async () => {
+    setCacheStoreForTests(null);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const load = vi.fn(async () => (await gate, CORPUS));
+
+    const first = getCorpus(searchId, load);
+    await invalidateCorpus(searchId, 'upsert');
+    const second = getCorpus(searchId, load);
+    release();
+
+    expect((await first).source).toBe('turso');
+    expect((await second).source).toBe('turso');
     expect(load).toHaveBeenCalledTimes(2);
   });
 
