@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { deleteAllLogs, getLogs, type LogsQuery } from '../services/logs.js';
+import { clearLogs, getLogs, type LogsQuery } from '../services/logs.js';
 
 /**
  * Технічний журнал застосунку (docs/plans/old/logging-system.md): перегляд і очищення
@@ -8,5 +8,5 @@ import { deleteAllLogs, getLogs, type LogsQuery } from '../services/logs.js';
 export async function logsRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: LogsQuery }>('/api/logs', (req) => getLogs(req.query));
 
-  app.delete('/api/logs', () => deleteAllLogs());
+  app.delete('/api/logs', () => clearLogs());
 }

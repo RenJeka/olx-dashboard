@@ -26,7 +26,7 @@ interface Props {
   isLast: boolean;
 }
 
-/** Акордеон-секція одного проекту: меню (перейменувати/видалити), реордер, список пошуків. */
+/** Акордеон-секція одного проєкту: меню (перейменувати/видалити), реордер, список пошуків. */
 export function ProjectAccordionItem({
   project,
   items,
@@ -49,7 +49,7 @@ export function ProjectAccordionItem({
     deleteProject.mutate(project.id, {
       onSuccess: () => {
         setDeleteOpen(false);
-        toaster.create({ type: 'success', title: 'Проект видалено', description: project.name });
+        toaster.create({ type: 'success', title: 'Проєкт видалено', description: project.name });
       },
       onError: (err) =>
         toaster.create({
@@ -85,7 +85,7 @@ export function ProjectAccordionItem({
 
         <Tooltip content="Пересунути вгору">
           <IconButton
-            aria-label="Пересунути проект вгору"
+            aria-label="Пересунути проєкт вгору"
             size="2xs"
             variant="ghost"
             disabled={isFirst || reorderProject.isPending}
@@ -96,7 +96,7 @@ export function ProjectAccordionItem({
         </Tooltip>
         <Tooltip content="Пересунути вниз">
           <IconButton
-            aria-label="Пересунути проект вниз"
+            aria-label="Пересунути проєкт вниз"
             size="2xs"
             variant="ghost"
             disabled={isLast || reorderProject.isPending}
@@ -108,7 +108,7 @@ export function ProjectAccordionItem({
 
         <Menu.Root positioning={{ placement: 'bottom-end' }}>
           <Menu.Trigger asChild>
-            <IconButton aria-label="Дії з проектом" size="2xs" variant="ghost">
+            <IconButton aria-label="Дії з проєктом" size="2xs" variant="ghost">
               <LuEllipsisVertical />
             </IconButton>
           </Menu.Trigger>
@@ -136,7 +136,7 @@ export function ProjectAccordionItem({
         <Accordion.ItemBody px={2} pt={0} pb={2}>
           {items.length === 0 && (
             <Text textStyle="sm" color="fg.muted" px={2}>
-              Порожньо — перемісти сюди пошук через меню «⋮ → Перемістити в проект».
+              Порожньо — перемісти сюди пошук через меню «⋮ → Перемістити в проєкт».
             </Text>
           )}
           <Stack gap="0.5">

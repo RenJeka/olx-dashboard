@@ -87,7 +87,7 @@ export function CommitStep({ w, onClose }: Props) {
         </Button>
         <HStack gap={2}>
           <Button variant="outline" onClick={onClose}>
-            Відмінити
+            Скасувати
           </Button>
           <Button colorPalette="accent" onClick={() => handleCommitClick(onClose)} loading={commitProgress != null}>
             {mergeMode === 'append'

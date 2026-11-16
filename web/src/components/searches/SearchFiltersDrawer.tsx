@@ -117,10 +117,10 @@ export function SearchFiltersDrawer({ search, open, onOpenChange }: Props) {
   );
 
   function handleSave() {
-    const local_filters = buildLocalFiltersPayload(state);
+    const localFilters = buildLocalFiltersPayload(state);
 
     updateFilters.mutate(
-      { searchId: search.id, local_filters },
+      { searchId: search.id, local_filters: localFilters },
       {
         onSuccess: (result) =>
           toaster.create({

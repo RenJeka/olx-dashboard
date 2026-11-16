@@ -215,7 +215,7 @@ export function SearchVariantsDialog({ open, onOpenChange, query, value, onChang
 
             <HStack justify="flex-end" gap={2}>
               <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
-                Відмінити
+                Скасувати
               </Button>
               <Button size="sm" colorPalette="accent" onClick={handleSave}>
                 Зберегти

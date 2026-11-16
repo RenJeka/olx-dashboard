@@ -13,7 +13,7 @@ function rankColor(rank: number): string {
 }
 
 /** Картка одного AI-обраного оголошення (стиль узгоджено з Box-картками проєкту). */
-export function AiRankCard({ pick, listing }: Props) {
+export function AiPickCard({ pick, listing }: Props) {
   const title = listing?.title ?? `#${pick.id}`;
   const price = listing?.price != null ? `${listing.price.toLocaleString('uk-UA')} грн` : '—';
   const city = listing?.city ?? '';

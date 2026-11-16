@@ -26,7 +26,7 @@ import {
   buildMatchingPrompt,
 } from '../../analysis/prompts.js';
 import { ANALYZE_PY_PATH, chunk, descriptionMap, toPromptListing } from '../../analysis/promptData.js';
-import { loadListings } from '../../db/repos/analysis.js';
+import { listAnalysisListings } from '../../db/repos/analysis.js';
 import { resolveEffectiveCriteria } from '../../analysis/baseCriteria.js';
 import { enabledGroups } from '../../analysis/criteria.js';
 import { stripHtml } from '../../analysis/text.js';
@@ -54,7 +54,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
     const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, mode);
     if (criteria.length === 0) throw new BadRequestError(ANALYSIS_ERRORS.NO_CRITERIA);
 
-    const listings = await loadListings(id, ids);
+    const listings = await listAnalysisListings(id, ids);
     if (req.body.engine === 'jev') {
       const threshold = resolveCriteriaThreshold(req.body.threshold);
       const response = await runJevMatching(criteria, mode, listings.map(toPromptListing), { threshold });
@@ -97,7 +97,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
       const criteria = enabledGroups((await resolveEffectiveCriteria(search)).config, mode);
       if (criteria.length === 0) throw new BadRequestError(ANALYSIS_ERRORS.NO_CRITERIA);
 
-      const listings = await loadListings(id, parseIds(req.body.ids));
+      const listings = await listAnalysisListings(id, parseIds(req.body.ids));
 
       const entries: ZipEntry[] = [
         { name: ZIP_FILES.PROMPT, content: buildManualZipInstructions(criteria, mode) },
@@ -123,7 +123,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
 
     // Усі категорії режиму (базові + власні) — для зведення синонімів до назви (вимкнені теж не шкодять).
     const criteria = (await resolveEffectiveCriteria(search)).config[mode];
-    const listings = await loadListings(search.id, []);
+    const listings = await listAnalysisListings(search.id, []);
     const descriptions = descriptionMap(listings);
 
     let parsed: AnalyzedListing[];
@@ -152,7 +152,7 @@ export async function matchingRoutes(app: FastifyInstance): Promise<void> {
 
     // Підтягуємо назву/опис з БД за id (зберігаючи порядок та критерії з запиту).
     const ids = reqRows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n));
-    const byId = new Map((await loadListings(id, ids)).map((l) => [l.id, l]));
+    const byId = new Map((await listAnalysisListings(id, ids)).map((l) => [l.id, l]));
     const rows = reqRows.map((r) => {
       const l = byId.get(Number(r.id));
       return {

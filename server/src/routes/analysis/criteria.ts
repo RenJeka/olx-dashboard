@@ -22,7 +22,7 @@ import { chat } from '../../analysis/openrouter.js';
 import { excludeOppositeCriteria, parseCriteriaResponse, parseGroupSuggestions } from '../../analysis/parse.js';
 import { remapSearchCriteria } from '../../analysis/criteriaRemap.js';
 import { buildCriteriaPrompt, buildGroupingPrompt, pickSample } from '../../analysis/prompts.js';
-import { loadListings, updateSearchCriteria } from '../../db/repos/analysis.js';
+import { listAnalysisListings, updateSearchCriteria } from '../../db/repos/analysis.js';
 import { BadRequestError, errorMessage } from '../../errors.js';
 
 export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
@@ -43,7 +43,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
     const mode = requireMode(req.body.mode);
     requireApiKey();
 
-    const listings = await loadListings(search.id, []);
+    const listings = await listAnalysisListings(search.id, []);
     const sample = pickSample(listings, req.body.sampleSize ?? DEFAULT_SAMPLE_SIZE);
     const { config } = await resolveEffectiveCriteria(search);
     const opposite = config[OPPOSITE_MODE[mode]];
@@ -103,7 +103,7 @@ export async function criteriaRoutes(app: FastifyInstance): Promise<void> {
       const search = await requireSearch(Number(req.params.id));
       const mode = requireMode(req.query.mode);
 
-      const listings = await loadListings(search.id, []);
+      const listings = await listAnalysisListings(search.id, []);
       const sample = pickSample(listings, DEFAULT_SAMPLE_SIZE);
       const { config } = await resolveEffectiveCriteria(search);
       const prompt = buildCriteriaPrompt(

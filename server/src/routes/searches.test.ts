@@ -194,6 +194,24 @@ describe('POST /api/searches/:id/move', () => {
     expect(await sortOrder(inProject)).toBe(1);
   });
 
+  it('у проєкті — лише серед пошуків цього проєкту; на краю — без змін', async () => {
+    await db.execute("INSERT INTO projects (id, name, sort_order) VALUES (1, 'P', 0), (2, 'Q', 1)");
+    await db.execute({ sql: 'UPDATE searches SET sort_order = 1 WHERE id = ?', args: [searchId] });
+    const own = await addSearch('own', { sort_order: 2, project_id: 1 });
+    const sibling = await addSearch('sibling', { sort_order: 5, project_id: 1 });
+    const other = await addSearch('other', { sort_order: 3, project_id: 2 });
+
+    const res = await app.inject({ method: 'POST', url: `/api/searches/${own}/move`, payload: { direction: 'down' } });
+    expect((res.json() as SearchRow).sort_order).toBe(5);
+    expect(await sortOrder(sibling)).toBe(2);
+    expect(await sortOrder(other)).toBe(3);
+    expect(await sortOrder(searchId)).toBe(1);
+
+    const edge = await app.inject({ method: 'POST', url: `/api/searches/${own}/move`, payload: { direction: 'down' } });
+    expect(edge.statusCode).toBe(200);
+    expect(await sortOrder(own)).toBe(5);
+  });
+
   it('невалідний напрям → 400; невідомий → 404', async () => {
     const bad = await app.inject({ method: 'POST', url: `/api/searches/${searchId}/move`, payload: { direction: 'x' } });
     expect(bad.statusCode).toBe(400);

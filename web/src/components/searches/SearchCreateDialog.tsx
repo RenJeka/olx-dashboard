@@ -91,14 +91,14 @@ export function SearchCreateDialog({ open, onClose, form }: Props) {
                 <LuLayers /> Варіанти пошуку{synonyms.length > 0 ? ` (${synonyms.length})` : ''}
               </Button>
               <Field.Root>
-                <Field.Label>Проект (категорія)</Field.Label>
+                <Field.Label>Проєкт (категорія)</Field.Label>
                 <NativeSelect.Root size="sm">
                   <NativeSelect.Field
                     cursor="pointer"
                     value={projectId ?? ''}
                     onChange={(e) => setProjectId(e.target.value ? Number(e.target.value) : null)}
                   >
-                    <option value="">Без проекту</option>
+                    <option value="">Без проєкту</option>
                     {projects?.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}

@@ -56,7 +56,7 @@ describe('PATCH /api/projects/:id', () => {
   it('невідомий → 404', async () => {
     const res = await app.inject({ method: 'PATCH', url: '/api/projects/999', payload: { name: 'x' } });
     expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: 'Проект не знайдено' });
+    expect(res.json()).toEqual({ error: 'Проєкт не знайдено' });
   });
 });
 

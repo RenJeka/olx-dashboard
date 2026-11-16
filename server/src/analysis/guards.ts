@@ -1,6 +1,6 @@
 // Передумови AI-запитів: кожна або повертає перевірене значення, або кидає `HttpError` з готовим текстом
 // (глобальний обробник відповідає `{ error }` з її кодом). Не знають, який крок AI їх викликає.
-import { getSearch, type SearchRow } from '../db/repos/analysis.js';
+import { getSearchAnalysisRow, type SearchRow } from '../db/repos/analysis.js';
 import { BadRequestError, ConflictError, NotFoundError } from '../errors.js';
 import type { AnalysisMode } from '../types.js';
 import { hasApiKey } from './config.js';
@@ -8,7 +8,7 @@ import { ANALYSIS_ERRORS, isMode } from './constants.js';
 
 /** Пошук за id або 404. */
 export async function requireSearch(id: number): Promise<SearchRow> {
-  const search = await getSearch(id);
+  const search = await getSearchAnalysisRow(id);
   if (!search) throw new NotFoundError(ANALYSIS_ERRORS.SEARCH_NOT_FOUND);
   return search;
 }

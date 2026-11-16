@@ -1,6 +1,6 @@
 // Доменні типи OLX Dashboard. Без `any` у доменному ядрі (scraper/db/logic).
 
-/** Проект — група пошуків (docs/plans/old/projects.md). */
+/** Проєкт — група пошуків (docs/plans/old/projects.md). */
 export interface Project {
   id: number;
   name: string;

@@ -34,6 +34,6 @@ export async function listLogScopes(): Promise<string[]> {
 }
 
 /** Видалити всі записи → кількість видалених. */
-export async function clearLogs(): Promise<number> {
+export async function clearLogRows(): Promise<number> {
   return (await dbRun('DELETE FROM app_logs')).rowsAffected;
 }

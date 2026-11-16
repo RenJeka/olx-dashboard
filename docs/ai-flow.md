@@ -235,7 +235,7 @@ reduce — теж судження, яке агент робить сам, чи�
     `web/src/utils/listingVisibility.ts` (`passesNoiseFilters`/`isAiPickCandidate`/`isListingVisible`),
     спільний хук — `web/src/hooks/analysis/useAiScope.ts`. **Важливо:** «Весь пошук» тепер = ВСІ рядки
     (раніше виключав нерелевантні/відфільтровані) — за рішенням користувача. Кандидати AI Picks
-    (`loadPickCandidates`) виключають `ai_relevant=0` (`ai_relevant IS NOT 0` — лишає 1 та NULL); коли
+    (`listPickCandidates`) виключають `ai_relevant=0` (`ai_relevant IS NOT 0` — лишає 1 та NULL); коли
     обсяг ≠ candidates, фронт шле `ids` обраного обсягу, і ендпойнти AI Picks
     (`prompt`/`package.zip` — **POST**; `rank`/`import`) звужують пул цими `ids` (сортування за ціною
     й ліміт лишаються).

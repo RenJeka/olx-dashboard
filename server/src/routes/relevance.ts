@@ -26,7 +26,7 @@ import {
 import {
   getRelevanceAliases,
   getRelevanceTarget,
-  loadListings,
+  listAnalysisListings,
   setRelevanceTarget,
   commitRelevance,
 } from '../db/repos/analysis.js';
@@ -64,7 +64,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       const { id } = await requireSearch(Number(req.params.id));
       const target = await resolveTarget(id, req.body.target);
       const aliases = await getRelevanceAliases(id);
-      const listings = await loadListings(id, parseIds(req.body.ids));
+      const listings = await listAnalysisListings(id, parseIds(req.body.ids));
       const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
       return { total: listings.length, candidates: candidates.length, autoRejected: rejected.length };
     },
@@ -85,7 +85,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     const ids = parseIds(req.body.ids);
     if (ids.length > MAX_ANALYZE_IDS) throw new BadRequestError(ANALYSIS_ERRORS.TOO_MANY_IDS);
 
-    const listings = await loadListings(id, ids);
+    const listings = await listAnalysisListings(id, ids);
     try {
       if (req.body.engine === 'jev') {
         const result = await runJevRelevance(target, listings.map(toPromptListing), aliases);
@@ -114,7 +114,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       if (!target) throw new BadRequestError(ANALYSIS_ERRORS.NO_TARGET);
       const aliases = await getRelevanceAliases(id);
 
-      const listings = await loadListings(id, parseIds(req.body.ids));
+      const listings = await listAnalysisListings(id, parseIds(req.body.ids));
       // У ZIP кладемо лише кандидатів (відсіяні евристикою додаються при import).
       const { candidates } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
 
@@ -149,7 +149,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
 
     const target = await resolveTarget(id, req.body.target);
     const aliases = await getRelevanceAliases(id);
-    const listings = await loadListings(id, parseIds(req.body.ids));
+    const listings = await listAnalysisListings(id, parseIds(req.body.ids));
     const { rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
     const validIds = listings.map((l) => l.id);
 

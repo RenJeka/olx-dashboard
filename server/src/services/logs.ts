@@ -1,4 +1,4 @@
-import { clearLogs, listLogScopes, listLogs } from '../db/repos/logs.js';
+import { clearLogRows, listLogScopes, listLogs } from '../db/repos/logs.js';
 import { LOGS_LIMIT_DEFAULT, LOGS_LIMIT_MAX } from '../constants.js';
 
 
@@ -21,6 +21,6 @@ export async function getLogs(query: LogsQuery): Promise<{ logs: Record<string, 
   return { logs, scopes };
 }
 
-export async function deleteAllLogs(): Promise<{ deleted: number }> {
-  return { deleted: await clearLogs() };
+export async function clearLogs(): Promise<{ deleted: number }> {
+  return { deleted: await clearLogRows() };
 }

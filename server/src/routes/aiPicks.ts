@@ -17,14 +17,14 @@ import {
 import { requireApiKey, requireSearch } from '../analysis/guards.js';
 import { ZIP_EMPTY_RESULT, ZIP_FILES, numberedFile } from '../analysis/manualZip.js';
 import { chunk } from '../analysis/promptData.js';
-import { commitAiPicks, loadPickCandidates } from '../db/repos/analysis.js';
+import { commitAiPicks, listPickCandidates } from '../db/repos/analysis.js';
 import { BadRequestError, errorMessage } from '../errors.js';
 import type { PickCandidate, PickItem, PickResult } from '../types.js';
 import { sendZip, type ZipEntry } from './http.js';
 
 /** Пул кандидатів обраного обсягу; порожній → 400. */
 async function requireCandidates(searchId: number, ids?: number[]): Promise<PickCandidate[]> {
-  const candidates = await loadPickCandidates(searchId, PICK_CANDIDATES_LIMIT, ids);
+  const candidates = await listPickCandidates(searchId, PICK_CANDIDATES_LIMIT, ids);
   if (candidates.length === 0) throw new BadRequestError(ANALYSIS_ERRORS.NO_CANDIDATES);
   return candidates;
 }
@@ -94,7 +94,7 @@ export async function aiPicksRoutes(app: FastifyInstance): Promise<void> {
       const { id } = await requireSearch(Number(req.params.id));
       if (!req.body.raw) throw new BadRequestError(ANALYSIS_ERRORS.EMPTY_RESPONSE);
 
-      const candidates = await loadPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
+      const candidates = await listPickCandidates(id, PICK_CANDIDATES_LIMIT, req.body.ids);
       const validIds = candidates.map((c) => c.id);
 
       try {
