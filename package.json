@@ -26,7 +26,8 @@
     "layers:check": "node scripts/check-layers.mjs",
     "skills:sync": "node scripts/sync-skills.mjs",
     "skills:check": "node scripts/sync-skills.mjs --check",
-    "test": "npm -w server run test"
+    "test": "npm -w server run test && npm -w web run test",
+    "test:changed": "node scripts/test-changed.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
