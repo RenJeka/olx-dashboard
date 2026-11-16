@@ -4,6 +4,34 @@
 // reduce → `output.json` → користувач вставляє ВМІСТ output.json у застосунок. Нічого в консоль.
 // НЕ дублювати ці рядки в білдерах кроків — компонувати звідси (docs/ai-flow.md).
 
+/**
+ * Файли ZIP-пакета, як їх кладуть маршрути. Ті самі імена названо в текстах інструкцій
+ * (relevance.ts, prompts.ts, aiPicks.ts) — міняти разом.
+ */
+export const ZIP_FILES = {
+  PROMPT: 'prompt.txt',
+  ANALYZE_PY: 'analyze.py',
+  PATTERNS_EXAMPLE: 'patterns.example.json',
+  MERGE_PY: 'merge.py',
+  VERIFY_PY: 'verify.py',
+  /** Префікси нумерованих файлів — див. `numberedFile`. */
+  DESCRIPTIONS: 'descriptions/chunk',
+  CLASSIFICATIONS: 'classifications/result',
+  CANDIDATES: 'candidates/chunk',
+  NOMINEES: 'nominations/nominees',
+} as const;
+
+/** Порожня заготовка проміжного файлу, який агент заповнює сам. */
+export const ZIP_EMPTY_RESULT = '[]\n';
+
+/** Скільки цифр у номері файлу чанка (`001`). */
+const ZIP_NUMBER_DIGITS = 3;
+
+/** Імʼя нумерованого файлу пакета: `numberedFile('descriptions/chunk', 0)` → `descriptions/chunk-001.json`. */
+export function numberedFile(prefix: string, index: number): string {
+  return `${prefix}-${String(index + 1).padStart(ZIP_NUMBER_DIGITS, '0')}.json`;
+}
+
 /** Єдина назва файлу результату для всіх кроків (агент або скрипт пише сюди). */
 export const OUTPUT_FILE = 'output.json';
 

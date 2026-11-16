@@ -15,35 +15,37 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+/** Параметри запиту: як `RequestInit`, але тіло задається значенням `json` — серіалізує клієнт. */
+export type ApiInit = Omit<RequestInit, 'body'> & { json?: unknown };
+
+/**
+ * Один запит до API: сесійна кукі, JSON-тіло, 401-гейт, помилка з HTTP-статусом.
+ * Нічого не знає про формат відповіді — його обирають `api` (JSON) і `apiBlob` (файл).
+ */
+async function request(path: string, init: ApiInit = {}): Promise<Response> {
+  const { json, ...rest } = init;
+  const body = json === undefined ? undefined : JSON.stringify(json);
   // Content-Type ставимо лише коли є тіло — інакше Fastify відхиляє порожнє JSON-тіло.
-  const headers = init?.body ? { 'Content-Type': 'application/json' } : undefined;
+  const headers = body ? { 'Content-Type': 'application/json' } : undefined;
   // credentials: 'include' — браузер шле сесійну кукі (зокрема cross-site у проді).
-  const res = await fetch(`${API_BASE}${path}`, { headers, credentials: 'include', ...init });
+  const res = await fetch(`${API_BASE}${path}`, { headers, credentials: 'include', ...rest, body });
   if (!res.ok) {
     // Сесія відпала/відсутня — сигналимо гейту (крім самих auth-ендпойнтів, які 401 обробляють самі).
     if (res.status === 401 && !path.startsWith('/api/auth/')) {
       window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
     }
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new ApiError(body.error ?? `HTTP ${res.status}`, res.status);
+    const error = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(error.error ?? `HTTP ${res.status}`, res.status);
   }
-  return res.json() as Promise<T>;
+  return res;
 }
 
-/**
- * Як api(), але повертає Blob (для ZIP/xlsx-завантажень). Та сама сесійна кукі
- * (credentials: 'include' — критично для cross-site проду Render) і 401-гейт.
- */
-export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
-  const headers = init?.body ? { 'Content-Type': 'application/json' } : undefined;
-  const res = await fetch(`${API_BASE}${path}`, { headers, credentials: 'include', ...init });
-  if (!res.ok) {
-    if (res.status === 401 && !path.startsWith('/api/auth/')) {
-      window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
-    }
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  return res.blob();
+/** Запит із JSON-відповіддю. */
+export async function api<T>(path: string, init?: ApiInit): Promise<T> {
+  return (await request(path, init)).json() as Promise<T>;
+}
+
+/** Запит із відповіддю-файлом (ZIP/xlsx-завантаження). */
+export async function apiBlob(path: string, init?: ApiInit): Promise<Blob> {
+  return (await request(path, init)).blob();
 }

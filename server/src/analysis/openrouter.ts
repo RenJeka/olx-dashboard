@@ -9,6 +9,7 @@ import {
   OPENROUTER_TITLE,
   OPENROUTER_URL,
 } from './constants.js';
+import { errorMessage } from '../errors.js';
 
 export interface ChatMessage {
   role: 'system' | 'user';
@@ -106,7 +107,7 @@ export async function chatWithUsage(
       logWarn(
         'analysis',
         `openrouter attempt=${attempt + 1}/${OPENROUTER_MAX_ATTEMPTS}`,
-        err instanceof Error ? err.message : String(err),
+        errorMessage(err),
         { model: options.model },
       );
     }

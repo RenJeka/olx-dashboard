@@ -14,13 +14,9 @@ import {
   type LightRowRaw,
 } from '../db/repos/listings.js';
 import { LISTING_STATUSES, type ListingPatch } from '../types.js';
+import { DESCRIPTION_PREVIEW_CHARS, LISTING_DETAILS_MAX_IDS, TEXT_SEARCH_CHUNK } from '../constants.js';
 
 const LISTING_NOT_FOUND = 'Оголошення не знайдено';
-const DESCRIPTION_PREVIEW_CHARS = 240;
-/** Максимум id в одному запиті деталей (AI-майстер просить описи пакетом). */
-const DETAILS_MAX_IDS = 500;
-/** Корпус пошуку в описі читається з Turso порціями (кеш — cache/textCorpus.ts). */
-const SEARCH_CHUNK = 1000;
 const OLX_STATUS_OVERRIDES = ['active', 'inactive', 'removed'];
 
 /** Ліниво: тести з `vi.mock('../logger.js')` без getLogger не падають на імпорті. */
@@ -49,7 +45,7 @@ export async function getDetails(id: number): Promise<Record<string, unknown>> {
 /** Те саме пакетом (крок перегляду AI-майстра) — лише рядки цього пошуку; нечислові id відкидаються. */
 export async function getDetailsBatch(searchId: number, rawIds: unknown): Promise<Record<string, unknown>[]> {
   const ids = Array.isArray(rawIds) ? rawIds.map(Number).filter((n) => Number.isInteger(n)) : [];
-  if (ids.length > DETAILS_MAX_IDS) throw new BadRequestError(`Забагато id (максимум ${DETAILS_MAX_IDS})`);
+  if (ids.length > LISTING_DETAILS_MAX_IDS) throw new BadRequestError(`Забагато id (максимум ${LISTING_DETAILS_MAX_IDS})`);
   if (ids.length === 0) return [];
   return listListingDetails(searchId, ids);
 }
@@ -59,14 +55,14 @@ async function loadTextCorpus(searchId: number): Promise<TextCorpus> {
   const corpus: TextCorpus = { ids: [], titles: [], descriptions: [] };
   let lastId = 0;
   for (;;) {
-    const chunk = await listTextChunk(searchId, lastId, SEARCH_CHUNK);
+    const chunk = await listTextChunk(searchId, lastId, TEXT_SEARCH_CHUNK);
     for (const row of chunk) {
       corpus.ids.push(row.id);
       corpus.titles.push((row.title ?? '').toLowerCase());
       corpus.descriptions.push(stripHtml(row.description).toLowerCase());
     }
     const last = chunk.at(-1);
-    if (!last || chunk.length < SEARCH_CHUNK) break;
+    if (!last || chunk.length < TEXT_SEARCH_CHUNK) break;
     lastId = last.id;
   }
   return corpus;

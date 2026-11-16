@@ -10,15 +10,12 @@ function applyUpdater<T>(prev: T, updaterOrValue: Updater<T>): T {
     : updaterOrValue;
 }
 
-/** Обсяг майстра = спільний `AiScope` (вкл. «candidates»). */
-export type AnalysisScope = AiScope;
-
 interface AnalysisWizardState {
   boundSearchId: number | null;
   criteriaLoadedMode: AnalysisMode | null;
   // Flow state
   mode: AnalysisMode;
-  scope: AnalysisScope;
+  scope: AiScope;
   step: number;
   available: string[];
   selected: Set<string>;
@@ -29,7 +26,7 @@ interface AnalysisWizardState {
   runModel: string | null;
   // Setters
   setMode: (v: AnalysisMode) => void;
-  setScope: (v: AnalysisScope) => void;
+  setScope: (v: AiScope) => void;
   setStep: (v: number) => void;
   setAvailable: (v: Updater<string[]>) => void;
   setSelected: (v: Updater<Set<string>>) => void;

@@ -123,6 +123,8 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 - **Шари сервера:** `routes/` — лише HTTP (без SQL; помилки — `HttpError` з `server/src/errors.ts`) → `services/` і
   доменні модулі → `db/repos/` — єдине місце SQL. Напрям перевіряє `npm run layers:check`; сканер і скрейпер ще
   пишуть SQL самі (фази 5–6 [плану](docs/plans/refactor-clean-architecture.md)) — новий SQL туди не додавати.
+- **Модулі й конфігурація:** спільна механіка не знає про викликача, рішення «що саме» — у викликача; налаштовувані
+  числа й тексти помилок — у `constants.ts` свого шару. Правила й чотири питання — `docs/development.md` §8.
 - Коментарі та UI-текст — українською; код/ідентифікатори — англійською.
 - Git, коміти й PR — `docs/rules.md` → «Git».
 - **Плани:** перед правками коду нової фічі/задачі — ПЕРШИМ кроком файл `docs/plans/<назва>.md`
@@ -150,7 +152,7 @@ smoke API / UI за `docs/development.md` (драбина перевірок, De
 | Як вести задачу, чим перевіряти, коли «готово», як безпечно з OLX і БД? | [`docs/development.md`](docs/development.md) |
 | Кольори/токени UI (світла/темна тема)? | [`docs/styles.md`](docs/styles.md) |
 | Як називати змінні, функції, файли, поняття, кнопки? | [`docs/naming.md`](docs/naming.md) |
-| Як проєктувати інтерфейс модуля (примітиви, механізм і політика)? | [`docs/module-design.md`](docs/module-design.md) |
+| Які примітиви мають перероблені модулі (ручний порядок тощо)? | [`docs/module-design.md`](docs/module-design.md); принципи — `docs/development.md` → «Як проєктувати модуль» |
 | Вимоги продукту (що ✅ / ⏳), етапи, поза скоупом, ризики? | [`docs/olx-monitor-spec.md`](docs/olx-monitor-spec.md) |
 | Деплой, реліз, відкат, бекап Turso / Google OAuth? | [`docs/deploy-render-turso.md`](docs/deploy-render-turso.md), [`docs/google-oauth-setup.md`](docs/google-oauth-setup.md) |
 | Що зараз: мета, стан, відкриті питання, наступний крок? | [`docs/current.md`](docs/current.md) |

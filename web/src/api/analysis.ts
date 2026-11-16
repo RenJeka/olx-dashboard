@@ -53,7 +53,7 @@ export function useGenerateCriteria() {
     }) =>
       api<{ criteria: string[] }>(`/api/searches/${searchId}/criteria/generate`, {
         method: 'POST',
-        body: JSON.stringify({ mode, sampleSize, model, reasoning, extra }),
+        json: { mode, sampleSize, model, reasoning, extra },
       }),
   });
 }
@@ -74,7 +74,7 @@ export function useSuggestGroups() {
     }) =>
       api<{ groups: GroupSuggestion[] }>(`/api/searches/${searchId}/criteria/group-suggest`, {
         method: 'POST',
-        body: JSON.stringify({ mode, model, reasoning }),
+        json: { mode, model, reasoning },
       }),
   });
 }
@@ -92,7 +92,7 @@ export function useImportCriteria() {
     mutationFn: ({ searchId, mode, raw }: { searchId: number; mode: AnalysisMode; raw: string }) =>
       api<{ criteria: string[] }>(`/api/searches/${searchId}/criteria/import`, {
         method: 'POST',
-        body: JSON.stringify({ mode, raw }),
+        json: { mode, raw },
       }),
   });
 }
@@ -104,7 +104,7 @@ export function useSaveCriteria() {
     mutationFn: ({ searchId, cons, pros }: { searchId: number; cons?: CriterionGroup[]; pros?: CriterionGroup[] }) =>
       api<CriteriaResponse>(`/api/searches/${searchId}/criteria`, {
         method: 'PUT',
-        body: JSON.stringify({ cons, pros }),
+        json: { cons, pros },
       }),
     onSuccess: (data, { searchId }) => qc.setQueryData(['criteria', searchId], data),
   });
@@ -135,7 +135,7 @@ export function useRemapCriteria() {
     }) =>
       api<RemapCriteriaResult>(`/api/searches/${searchId}/criteria/remap`, {
         method: 'POST',
-        body: JSON.stringify({ mode, from, to, listings, merges }),
+        json: { mode, from, to, listings, merges },
       }),
     onSuccess: (data, { searchId }) => {
       // Відповідь remap — без `category`: зберегти її з кешу (інакше рядок категорії зникне до перезапиту).
@@ -173,7 +173,7 @@ export function useAnalyze() {
     }) =>
       api<AnalyzeResponse>(`/api/searches/${searchId}/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ mode, ids, model, reasoning, engine, threshold }),
+        json: { mode, ids, model, reasoning, engine, threshold },
       }),
   });
 }
@@ -187,7 +187,7 @@ export async function fetchAnalyzePackageZip(
   // POST (не GET): тисячі ids у query-рядку перевищують ліміт довжини заголовків (431).
   const blob = await apiBlob(`/api/searches/${searchId}/analyze/package.zip`, {
     method: 'POST',
-    body: JSON.stringify({ mode, ids }),
+    json: { mode, ids },
   });
   downloadBlob(blob, `analysis-${mode}-search-${searchId}.zip`);
 }
@@ -208,7 +208,7 @@ export function useImportAnalysis() {
     }) =>
       api<AnalyzeResponse>(`/api/searches/${searchId}/analyze/import`, {
         method: 'POST',
-        body: JSON.stringify({ mode, raw, accumulated }),
+        json: { mode, raw, accumulated },
       }),
   });
 }
@@ -233,7 +233,7 @@ export function useCommitAnalysis() {
     }) =>
       api<{ updated: number }>('/api/listings/analyze/commit', {
         method: 'POST',
-        body: JSON.stringify({ mode, items, model, source, merge }),
+        json: { mode, items, model, source, merge },
       }),
     onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),
@@ -249,7 +249,7 @@ export async function exportPreview(
 ): Promise<void> {
   const blob = await apiBlob(`/api/searches/${searchId}/analyze/export`, {
     method: 'POST',
-    body: JSON.stringify({ format, mode, rows }),
+    json: { format, mode, rows },
   });
   downloadBlob(blob, `analysis-${mode}.${format}`);
 }

@@ -5,7 +5,7 @@ import { useUpdateListing } from '../../api';
 import { Tooltip } from '../ui/tooltip';
 import { formatDate } from '../../utils/format';
 import { joinBullets, parseBullets } from '../../utils/localFilters';
-import { ANALYSIS_SOURCE } from '../../constants';
+import { ANALYSIS_SOURCE, MAX_CELL_CHIPS } from '../../constants';
 import type { Listing } from '../../types';
 
 interface Props {
@@ -13,8 +13,6 @@ interface Props {
   field: 'pros' | 'cons';
 }
 
-/** Скільки чипів показувати в комірці; решта — чипом «+N» (рядок таблиці не розростається). */
-const MAX_CELL_CHIPS = 3;
 
 const CONFIG = {
   pros: {

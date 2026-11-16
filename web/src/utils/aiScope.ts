@@ -56,16 +56,8 @@ export function getScopeCounts(ctx: ScopeContext): ScopeCounts {
   };
 }
 
-/**
- * Дефолтний обсяг. `preferCandidates` (для «AI Picks») завжди → `candidates`;
- * інакше: є виділення → `selected`; конкретна вкладка → `tab`; «Всі» → `all`.
- */
-export function getDefaultScope(
-  selectedIds: number[],
-  statusFilter: StatusFilter,
-  opts?: { preferCandidates?: boolean },
-): AiScope {
-  if (opts?.preferCandidates) return 'candidates';
+/** Дефолтний обсяг: є виділення → `selected`; конкретна вкладка → `tab`; «Всі» → `all`. */
+export function getDefaultScope(selectedIds: number[], statusFilter: StatusFilter): AiScope {
   if (selectedIds.length > 0) return 'selected';
   if (statusFilter !== 'all') return 'tab';
   return 'all';

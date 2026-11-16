@@ -10,7 +10,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { showErrorToast } from '../utils/toast';
 import { toaster } from '../components/ui/toaster';
 import { useAiScope } from './analysis/useAiScope';
-import { getDefaultScope, type AiScope } from '../utils/aiScope';
+import type { AiScope } from '../utils/aiScope';
 import { useZipDownload } from './useZipDownload';
 import { MANUAL_PICKS_ZIP_CHUNK_SIZE, PICK_CANDIDATES_LIMIT, PICK_TOP_N } from '../constants';
 import type { PickItem, PickResult, Search } from '../types';
@@ -36,7 +36,7 @@ export function useAiPicksFlow(search: Search, selectedIds: number[], open: bool
   // При кожному відкритті повертаємо дефолтний обсяг (найкращі кандидати).
   useEffect(() => {
     if (!open) return;
-    setScope(getDefaultScope(selectedIds, statusFilter, { preferCandidates: true }));
+    setScope('candidates');
   }, [open, selectedIds.length, statusFilter]);
 
   const runAiPicks = useRunAiPicks();
