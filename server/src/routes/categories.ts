@@ -22,8 +22,9 @@ import { logError } from '../logger.js';
 import { isAnyScanRunning } from '../scanner/abortControl.js';
 import type { CategoryNode, CriteriaConfig, CriterionGroup } from '../types.js';
 
-const ALREADY_RUNNING = 'Збір дерева категорій уже йде';
-const SCAN_RUNNING = 'Іде скан — зберіть дерево після нього';
+/** Тексти відмов збору дерева (тести маршруту порівнюють відповідь із ними). */
+export const ALREADY_RUNNING = 'Збір дерева категорій уже йде';
+export const SCAN_RUNNING = 'Іде скан — зберіть дерево після нього';
 
 /** Прапорець «збір іде» — in-memory (single-user, один процес). */
 let collecting = false;

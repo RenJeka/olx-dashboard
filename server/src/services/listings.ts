@@ -15,8 +15,9 @@ import {
 } from '../db/repos/listings.js';
 import { LISTING_STATUSES, type ListingPatch } from '../types.js';
 import { DESCRIPTION_PREVIEW_CHARS, LISTING_DETAILS_MAX_IDS, TEXT_SEARCH_CHUNK } from '../constants.js';
+import { SERVICE_ERRORS } from './constants.js';
 
-const LISTING_NOT_FOUND = 'Оголошення не знайдено';
+const { LISTING_NOT_FOUND } = SERVICE_ERRORS;
 const OLX_STATUS_OVERRIDES = ['active', 'inactive', 'removed'];
 
 /** Ліниво: тести з `vi.mock('../logger.js')` без getLogger не падають на імпорті. */

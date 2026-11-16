@@ -6,6 +6,7 @@ import { createSearch, insertListing, resetDb } from '../test/db.js';
 import { analysisRoutes } from './analysis/index.js';
 import { aiPicksRoutes } from './aiPicks.js';
 import { relevanceRoutes } from './relevance.js';
+import { ANALYSIS_ERRORS } from '../analysis/constants.js';
 
 // Характеризаційні тести записів результатів AI (docs/plans/refactor-clean-architecture.md, фаза 4):
 // фіксують поточну поведінку до перенесення SQL у db/repos/. Без LLM — лише commit-ендпойнти.
@@ -64,7 +65,7 @@ describe('POST /api/listings/analyze/commit', () => {
   it('невідомий режим → 400', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/listings/analyze/commit', payload: { mode: 'x', items: [] } });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: 'mode має бути cons|pros' });
+    expect(res.json()).toEqual({ error: ANALYSIS_ERRORS.BAD_MODE });
   });
 });
 
@@ -85,7 +86,7 @@ describe('POST /api/searches/:id/ai-picks/commit', () => {
   it('невідомий пошук → 404', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/searches/999/ai-picks/commit', payload: { picks: [] } });
     expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: 'Пошук не знайдено' });
+    expect(res.json()).toEqual({ error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND });
   });
 });
 

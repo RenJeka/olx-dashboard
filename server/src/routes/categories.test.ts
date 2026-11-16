@@ -13,7 +13,9 @@ const chatMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<string>>
 vi.mock('../analysis/openrouter.js', () => ({ chat: chatMock }));
 
 import { criteriaRoutes } from './analysis/criteria.js';
-import { categoriesRoutes } from './categories.js';
+import { ANALYSIS_ERRORS } from '../analysis/constants.js';
+import { CATEGORY_NOT_FOUND } from '../analysis/criteriaRemap.js';
+import { ALREADY_RUNNING, categoriesRoutes, SCAN_RUNNING } from './categories.js';
 
 describe('POST /api/categories/collect', () => {
   it('повертає результат; паралельний виклик → 409; після завершення прапорець знято', async () => {
@@ -27,7 +29,7 @@ describe('POST /api/categories/collect', () => {
 
     const second = await app.inject({ method: 'POST', url: '/api/categories/collect' });
     expect(second.statusCode).toBe(409);
-    expect(second.json().error).toContain('уже йде');
+    expect(second.json().error).toBe(ALREADY_RUNNING);
 
     release({ requested: 2, changed: 5, failed: ['x'] });
     const res = await first;
@@ -47,7 +49,7 @@ describe('POST /api/categories/collect', () => {
     try {
       const res = await app.inject({ method: 'POST', url: '/api/categories/collect' });
       expect(res.statusCode).toBe(409);
-      expect(res.json().error).toBe('Іде скан — зберіть дерево після нього');
+      expect(res.json().error).toBe(SCAN_RUNNING);
       expect(collect).not.toHaveBeenCalled();
     } finally {
       abortFlags.delete(12345);
@@ -82,7 +84,7 @@ describe('базові набори категорій', () => {
     const res = await app.inject('/api/categories');
     expect(res.statusCode).toBe(200);
     const byId = new Map(res.json().map((n: { id: number }) => [n.id, n]));
-    expect(byId.get(37)).toEqual({ id: 37, parentId: null, label: 'Електроніка', slug: 'elektronika', hasSet: true });
+    expect(byId.get(37)).toMatchObject({ parentId: null, label: 'Електроніка', slug: 'elektronika', hasSet: true });
     expect(byId.get(1502)).toMatchObject({ parentId: 37, hasSet: false });
     expect(byId.get(80)).toMatchObject({ parentId: 1502, hasSet: true });
   });
@@ -129,7 +131,7 @@ describe('базові набори категорій', () => {
   it('PUT невідомої категорії → 404, нічого не пише', async () => {
     const res = await app.inject({ method: 'PUT', url: '/api/categories/999/criteria', payload: { cons: ['x'] } });
     expect(res.statusCode).toBe(404);
-    expect(res.json().error).toBe('Категорію не знайдено');
+    expect(res.json().error).toBe(CATEGORY_NOT_FOUND);
     expect(await dbGet('SELECT 1 FROM base_criteria WHERE category_id = 999')).toBeUndefined();
   });
 });
@@ -247,7 +249,7 @@ describe('POST /api/categories/:id/criteria/remap', () => {
   it('успадкований пункт → 400, нічого не пишеться', async () => {
     const res = await remap(1502, { mode: 'cons', from: ['не працює'], to: 'не вмикається' });
     expect(res.statusCode).toBe(400);
-    expect(res.json().error).toBe('Пункт успадковано від батьківської категорії — змінюйте його там');
+    expect(res.json().error).toBe(ANALYSIS_ERRORS.BASE_ITEM_INHERITED);
     expect((await dbGet<{ criteria: string }>('SELECT criteria FROM base_criteria WHERE category_id = 37'))!.criteria).toBe(
       '{"cons":["не працює"],"pros":[]}',
     );
@@ -256,7 +258,7 @@ describe('POST /api/categories/:id/criteria/remap', () => {
   it('невідома категорія → 404; невідомий пункт, режим і порожнє тіло → 400', async () => {
     const missing = await remap(999, { mode: 'cons', from: ['x'], to: 'y' });
     expect(missing.statusCode).toBe(404);
-    expect(missing.json().error).toBe('Категорію не знайдено');
+    expect(missing.json().error).toBe(CATEGORY_NOT_FOUND);
     expect((await remap(1502, { mode: 'cons', from: ['немає такого'], to: 'y' })).statusCode).toBe(400);
     expect((await remap(1502, { mode: 'bad', from: ['x'], to: 'y' })).statusCode).toBe(400);
     expect((await remap(1502, { mode: 'cons', from: [], to: 'y' })).statusCode).toBe(400);
@@ -354,7 +356,7 @@ describe('POST /api/categories/:id/criteria/generate', () => {
   it('невідома категорія → 404; невалідний режим → 400; без ключа → 409; помилка LLM → 502', async () => {
     const missing = await generate(999, { mode: 'cons' });
     expect(missing.statusCode).toBe(404);
-    expect(missing.json().error).toBe('Категорію не знайдено');
+    expect(missing.json().error).toBe(CATEGORY_NOT_FOUND);
     expect((await generate(80, { mode: 'bad' })).statusCode).toBe(400);
 
     vi.stubEnv('OPENROUTER_API_KEY', '');

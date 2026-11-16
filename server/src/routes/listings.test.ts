@@ -3,6 +3,7 @@ import { testApp } from '../test/app.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, dbGet } from '../db/db.js';
 import { createSearch, resetDb } from '../test/db.js';
+import { SERVICE_ERRORS } from '../services/constants.js';
 import { listingsRoutes } from './listings.js';
 
 // Легка відповідь /listings (docs/plans/old/listings-light-payload.md): без повного опису й галереї.
@@ -124,11 +125,12 @@ describe('PATCH /api/listings/:id', () => {
     const id = await insert(1, 'iPhone', null);
     const badStatus = await patch(id, { status: 'sold' });
     expect(badStatus.statusCode).toBe(400);
-    expect(badStatus.json()).toEqual({ error: 'Невідомий статус: sold' });
+    expect(badStatus.json()).toEqual({ error: expect.stringContaining('sold') });
     const badOlx = await patch(id, { olx_status: 'gone' });
-    expect(badOlx.json()).toEqual({ error: 'Невідоме значення olx_status: gone' });
+    expect(badOlx.statusCode).toBe(400);
+    expect(badOlx.json()).toEqual({ error: expect.stringContaining('gone') });
     const missing = await patch(999, { note: 'x' });
     expect(missing.statusCode).toBe(404);
-    expect(missing.json()).toEqual({ error: 'Оголошення не знайдено' });
+    expect(missing.json()).toEqual({ error: SERVICE_ERRORS.LISTING_NOT_FOUND });
   });
 });

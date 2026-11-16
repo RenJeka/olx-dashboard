@@ -23,6 +23,9 @@ import {
 } from '../services/searches.js';
 import { errorMessage } from '../errors.js';
 
+/** Запуск глибокого скану за планом без токена плану. */
+export const PLAN_TOKEN_REQUIRED = 'planToken обовʼязковий';
+
 // Помилки сервісу (404/400) відповідає глобальний обробник (routes/errorHandler.ts). Скан-роути
 // мають власний catch: збій скану вже записано в журнал у withScanRun — без подвійного запису.
 export async function searchesRoutes(app: FastifyInstance): Promise<void> {
@@ -87,7 +90,7 @@ export async function searchesRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const id = Number(req.params.id);
       const planToken = req.body.planToken;
-      if (!planToken) return reply.code(400).send({ error: 'planToken обовʼязковий' });
+      if (!planToken) return reply.code(400).send({ error: PLAN_TOKEN_REQUIRED });
       try {
         const result = await runDeepScanFromPlan(id, planToken);
         return result;

@@ -17,7 +17,13 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останній реліз — 2026-10-22 зрозумілі лічильники у фільтрі «Категорії» ([category-filter-counts](plans/old/category-filter-counts.md)):
+- Останнє злиття в `main` і деплой — 2026-11-16: рефакторинги «дещо універсальні модулі»
+  ([refactor-general-modules](plans/old/refactor-general-modules.md), ручні перевірки пройдено —
+  [хендоф](handoffs/2026-11-16-refactor-general-modules-manual-tests.md)) і однотипність назв зі спільним модулем
+  ручного порядку ([naming-consistency](plans/old/naming-consistency.md),
+  [manual-order-refactor](plans/old/manual-order-refactor.md)); `npm run smoke` після цього деплою в документах не
+  зафіксовано.
+- Попередній реліз із видимими змінами — 2026-10-22 зрозумілі лічильники у фільтрі «Категорії» ([category-filter-counts](plans/old/category-filter-counts.md)):
   злито й задеплоєно, деталі — у хендофі [2026-10-22 category-filter-counts](handoffs/2026-10-22-category-filter-counts.md).
   Перед тим того ж дня — доробки базових плюсів і мінусів ([base-criteria-polish](plans/old/base-criteria-polish.md),
   частина [P-019](parking.md)); базові набори (правила — [business-rules](business-rules.md) §4) на проді наповнено людиною.
@@ -32,7 +38,8 @@
 - Доступи агента: Render MCP і Turso MCP (OAuth, група `default`); що можна без «так» — [rules](rules.md) →
   «Прод». GitHub — через `gh` на обох ПК ([github-cli](instructions/github-cli.md)); зливати PR після зеленого CI агент
   може, коли людина це дозволила в діалозі.
-- Харнес розробки (CI, тести, перевірки) — `AGENTS.md` → «Перевірка»; харнес сесій — `AGENTS.md` → «Сесія».
+- Харнес розробки (CI, тести, перевірки) — `AGENTS.md` → «Перевірка»; підхід до тестів — [development](development.md) §7;
+  харнес сесій — `AGENTS.md` → «Сесія».
 - Реліз: чекліст, відкат і бекап Turso — [deploy-render-turso](deploy-render-turso.md) → «Реліз, відкат, бекап»;
   після деплою — `npm run smoke`.
 - Dependabot — 1-го і 15-го числа PR з minor/patch (npm) і оновленнями дій CI; злиття = деплой, лише з «так»
@@ -43,11 +50,11 @@
 - [refactor-clean-architecture](plans/refactor-clean-architecture.md) — прагматична чиста архітектура: фази 0–4, 7, 8
   злито в `main` і задеплоєно 2026-10-23 (`npm run smoke` зелений, логи API чисті); фази 5–6 (сканер, скрейпер)
   і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
-- Рефакторинг «дещо універсальні модулі» ([refactor-general-modules](plans/old/refactor-general-modules.md)) виконано
-  в окремій гілці: чернетка PR чекає рішення людини про злиття (= деплой); ручні test-cases плану людина не проходила.
-  Стан — у [хендофі](handoffs/2026-11-10-refactor-general-modules.md).
+- Підхід до тестів ([stable-tests](plans/old/stable-tests.md)) виконано в окремій гілці: правила, тести чистих функцій
+  фронтенду, прохід по крихких тестах сервера; чернетка PR чекає рішення людини про злиття (= деплой). Стан — у
+  [хендофі](handoffs/2026-11-16-stable-tests.md).
 
-Далі з парковки: решта доробок — [P-019](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
+Далі з парковки: решта доробок — [P-019](parking.md), попередження про вкладені кнопки в «AI-інструменти» — [P-022](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
 аналіз «за 1 клік» — [P-018](parking.md).
 
 ## Що враховувати
@@ -76,6 +83,11 @@
   ([api-equivalence-check](instructions/api-equivalence-check.md)); шари й `layers:check` — `AGENTS.md` → «Конвенції».
 - Новий модуль, функція чи константа — за [development](development.md) §8 «Як проєктувати модуль»; залишки дублів у
   сканері, скрейпері й CLI — [P-021](parking.md).
+- Тести — за правилами [development](development.md) §7: дані з фабрик, тексти помилок через константи, підміна
+  лише зовнішнього; під час роботи — `npm run test:changed`. Свої поля оголошення в тестах сервера —
+  [test-insert-listing-title](instructions/test-insert-listing-title.md).
+- Пастку закрито кодом — файл інструкції переписати, не видаляти
+  ([closed-pitfall-keep-file](instructions/closed-pitfall-keep-file.md)).
 - Нові задачі з документацією — правило «жодних кількостей» ([rules](rules.md) п. 2); аудит — скіл `docs-audit`.
 - Моніторинг скану на проді — [prod-scan-monitoring](instructions/prod-scan-monitoring.md).
 - Рядки з прод-БД агенту — лише через Turso MCP або команду людини; читання ключів блокує auto-mode
@@ -103,6 +115,7 @@
 
 ## Наступний крок
 
-PR гілки `feat/p003-notes-enter-chips` (P-003 нотатки по Enter і чипи плюсів/мінусів; P-017 аудит OLX; P-002 закрито) — ручні test-cases пройдено
-людиною 2026-10-25, плани в [plans/old/](plans/old/README.md) → зелений CI → злиття з «так» людини → `npm run smoke`.
-Далі — фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка (P-019, P-020, P-018).
+Рішення людини про злиття чернетки PR гілки `ccr-f2b6e2aa-dqn485` (підхід до тестів; у коді застосунку — лише
+винесення текстів помилок у константи, [хендоф](handoffs/2026-11-16-stable-tests.md)) → зелений CI → злиття з «так»
+людини → `npm run smoke`. Далі — решта тестів за [P-006](parking.md), фази 5–6
+[refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка (P-019, P-020, P-018, P-022).

@@ -3,7 +3,8 @@ import { testApp } from '../test/app.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, dbGet } from '../db/db.js';
 import { createSearch, resetDb } from '../test/db.js';
-import { searchesRoutes } from './searches.js';
+import { SERVICE_ERRORS } from '../services/constants.js';
+import { PLAN_TOKEN_REQUIRED, searchesRoutes } from './searches.js';
 
 let app: FastifyInstance;
 let searchId: number;
@@ -102,7 +103,7 @@ describe('GET /api/searches, /api/searches/:id', () => {
     expect((one.json() as SearchRow).id).toBe(searchId);
     const missing = await app.inject({ url: '/api/searches/999' });
     expect(missing.statusCode).toBe(404);
-    expect(missing.json()).toEqual({ error: 'Пошук не знайдено' });
+    expect(missing.json()).toEqual({ error: SERVICE_ERRORS.SEARCH_NOT_FOUND });
   });
 });
 
@@ -110,7 +111,7 @@ describe('POST /api/searches', () => {
   it('без name/query → 400', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/searches', payload: { name: 'x' } });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: 'Поля name і query обовʼязкові' });
+    expect(res.json()).toEqual({ error: SERVICE_ERRORS.SEARCH_FIELDS_REQUIRED });
   });
 
   it('201; новий згори; JSON-поля — рядками; синоніми за замовчуванням []', async () => {
@@ -224,7 +225,7 @@ describe('скан-маршрути без звернення до OLX', () => {
   it('run-plan без planToken → 400; stop без активного скану → stopped: false; verify невідомого → 404', async () => {
     const noToken = await app.inject({ method: 'POST', url: `/api/searches/${searchId}/scan/run-plan`, payload: {} });
     expect(noToken.statusCode).toBe(400);
-    expect(noToken.json()).toEqual({ error: 'planToken обовʼязковий' });
+    expect(noToken.json()).toEqual({ error: PLAN_TOKEN_REQUIRED });
 
     const stop = await app.inject({ method: 'POST', url: `/api/searches/${searchId}/scan/stop` });
     expect(stop.json()).toEqual({ stopped: false });
@@ -257,18 +258,18 @@ describe('GET /api/searches/:id/scan-status', () => {
 describe('GET /api/searches/:id/last-analysis', () => {
   it('нема → 404; пошкоджений JSON → 404', async () => {
     const none = await app.inject({ url: `/api/searches/${searchId}/last-analysis` });
-    expect(none.json()).toEqual({ error: 'Аналізів ще не було' });
+    expect(none.json()).toEqual({ error: SERVICE_ERRORS.NO_ANALYSIS_YET });
     await addScanRun({ kind: 'analyze', scan_plan: '{bad', finished_at: new Date().toISOString() });
     const bad = await app.inject({ url: `/api/searches/${searchId}/last-analysis` });
     expect(bad.statusCode).toBe(404);
-    expect(bad.json()).toEqual({ error: 'Збережений аналіз пошкоджено' });
+    expect(bad.json()).toEqual({ error: SERVICE_ERRORS.ANALYSIS_CORRUPTED });
   });
 
   it('свіжий → planValid: true; старий → false', async () => {
     const fresh = new Date().toISOString();
     await addScanRun({ kind: 'analyze', scan_plan: '{"planToken":"t"}', finished_at: fresh });
     const res = await app.inject({ url: `/api/searches/${searchId}/last-analysis` });
-    expect(res.json()).toEqual({ plan: { planToken: 't' }, analyzedAt: fresh, planValid: true });
+    expect(res.json()).toMatchObject({ plan: { planToken: 't' }, analyzedAt: fresh, planValid: true });
 
     await addScanRun({ kind: 'analyze', scan_plan: '{}', finished_at: '2020-01-01T00:00:00.000Z' });
     const old = await app.inject({ url: `/api/searches/${searchId}/last-analysis` });

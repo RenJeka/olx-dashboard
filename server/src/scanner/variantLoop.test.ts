@@ -6,14 +6,11 @@ import type { FetchSearchResult, SearchConfig } from '../types.js';
 
 // Характеризаційні тести (docs/plans/refactor-clean-architecture.md, фаза 0, крок 0.3): цикл варіантів запиту
 // (синоніми) у звичайному скані (fetchAllQueries) і в глибокому за планом (runDeepScanFromPlan) — до злиття двох
-// циклів у фазі 5. Мережі немає: фетчери, facet і автокатегорія замокані; паузи між варіантами — миттєві.
+// циклів у фазі 5. Мережі немає: фетчери й facet замокані, автокатегорія рахується на тимчасовій БД; паузи між
+// варіантами — миттєві.
 const logError = vi.hoisted(() => vi.fn());
 vi.mock('../logger.js', () => ({ logError, logWarn: vi.fn() }));
 vi.mock('../scraper/graphql/categories.js', () => ({ fetchCategoryFacet: vi.fn(async () => null) }));
-vi.mock('../categories/tree.js', async (orig) => ({
-  ...(await orig<typeof import('../categories/tree.js')>()),
-  refreshBaseCategory: vi.fn(async () => null),
-}));
 vi.mock('../scraper/utils.js', async (orig) => ({
   ...(await orig<typeof import('../scraper/utils.js')>()),
   interruptibleSleep: vi.fn(async () => undefined),
