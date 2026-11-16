@@ -17,12 +17,12 @@
 
 - **Прод на `main`** (з 2026-09-30) — конфігурація в [deploy-render-turso](deploy-render-turso.md) →
   «Фактичний прод»; історія переведення — [хендоф](handoffs/2026-09-30-render-on-main.md).
-- Останнє злиття в `main` і деплой — 2026-11-16: рефакторинги «дещо універсальні модулі»
+- Останнє злиття в `main` і деплой — 2026-11-16: підхід до тестів ([stable-tests](plans/old/stable-tests.md),
+  [хендоф](handoffs/2026-11-16-stable-tests.md)); того ж дня перед ним — рефакторинги «дещо універсальні модулі»
   ([refactor-general-modules](plans/old/refactor-general-modules.md), ручні перевірки пройдено —
   [хендоф](handoffs/2026-11-16-refactor-general-modules-manual-tests.md)) і однотипність назв зі спільним модулем
   ручного порядку ([naming-consistency](plans/old/naming-consistency.md),
-  [manual-order-refactor](plans/old/manual-order-refactor.md)); `npm run smoke` після цього деплою в документах не
-  зафіксовано.
+  [manual-order-refactor](plans/old/manual-order-refactor.md)).
 - Попередній реліз із видимими змінами — 2026-10-22 зрозумілі лічильники у фільтрі «Категорії» ([category-filter-counts](plans/old/category-filter-counts.md)):
   злито й задеплоєно, деталі — у хендофі [2026-10-22 category-filter-counts](handoffs/2026-10-22-category-filter-counts.md).
   Перед тим того ж дня — доробки базових плюсів і мінусів ([base-criteria-polish](plans/old/base-criteria-polish.md),
@@ -50,12 +50,13 @@
 - [refactor-clean-architecture](plans/refactor-clean-architecture.md) — прагматична чиста архітектура: фази 0–4, 7, 8
   злито в `main` і задеплоєно 2026-10-23 (`npm run smoke` зелений, логи API чисті); фази 5–6 (сканер, скрейпер)
   і 7.4 відкладено рішенням людини. Стан — у [хендофі](handoffs/2026-10-23-refactor-clean-architecture.md).
-- Підхід до тестів ([stable-tests](plans/old/stable-tests.md)) виконано в окремій гілці: правила, тести чистих функцій
-  фронтенду, прохід по крихких тестах сервера; чернетка PR чекає рішення людини про злиття (= деплой). Стан — у
-  [хендофі](handoffs/2026-11-16-stable-tests.md).
+- [one-click-analysis](plans/one-click-analysis.md) — аналіз пошуку за один клік і точніша автокатегорія
+  ([P-018](parking.md), [P-020](parking.md)): є лише план, коду немає; чекає відповідей людини на розділ «Питання до
+  людини» (схема БД, варіант категорії, ліміти вартості). Стан — у [хендофі](handoffs/2026-11-16-one-click-analysis-plan.md).
+- [redis-description-search-cache](plans/redis-description-search-cache.md) — кеш тексту для пошуку в описі
+  ([P-011](parking.md)): стан — у шапці плану.
 
-Далі з парковки: решта доробок — [P-019](parking.md), попередження про вкладені кнопки в «AI-інструменти» — [P-022](parking.md), точніша автокатегорія пошуку — [P-020](parking.md),
-аналіз «за 1 клік» — [P-018](parking.md).
+Далі з парковки: решта доробок — [P-019](parking.md), попередження про вкладені кнопки в «AI-інструменти» — [P-022](parking.md).
 
 ## Що враховувати
 
@@ -72,7 +73,7 @@
 - Браузер агента (wmux): пункти меню «⋮» — лише клавіатурою ([wmux-browser-ark-menu](instructions/wmux-browser-ark-menu.md));
   панель у прихованому workspace — [wmux-browser-hidden-pane](instructions/wmux-browser-hidden-pane.md).
 - Автокатегорія пошуку (базові плюси й мінуси) — категорія OLX з найбільшою кількістю оголошень; засмічена видача хибить
-  («mac mini» → планшети Apple). Обхід — фільтр пошуку «Категорії» (категорія перераховується одразу); покращення — [P-020](parking.md).
+  («mac mini» → планшети Apple). Обхід — фільтр пошуку «Категорії» (категорія перераховується одразу); покращення — [P-020](parking.md), план — [one-click-analysis](plans/one-click-analysis.md).
 - Ручні test-cases для людини — [manual-test-cases](instructions/manual-test-cases.md); людина проходить їх сама,
   агент лише пише (рішення людини 2026-10-18).
 - План агентами з рецензентом без комітів — [sdd-without-commits](instructions/sdd-without-commits.md).
@@ -102,6 +103,8 @@
 
 ## Відкриті питання (чекають людину)
 
+- Відповіді на «Питання до людини» плану [one-click-analysis](plans/one-click-analysis.md) — без них код не починати.
+- Чи прогнано `npm run smoke` після деплоїв 2026-11-16.
 - Ручні перевірки рушія Jev в UI — у примітках архівних планів [jev-model](plans/old/jev-model.md) (крок 2) і
   [jev-threshold-setting](plans/old/jev-threshold-setting.md) (test-case 3, платно).
 - Чи видаляти локальні бекапи `server/data/olx-bak-2026-10-16T12-28-23-237Z.db` (порожній) і
@@ -115,7 +118,6 @@
 
 ## Наступний крок
 
-Рішення людини про злиття чернетки PR гілки `ccr-f2b6e2aa-dqn485` (підхід до тестів; у коді застосунку — лише
-винесення текстів помилок у константи, [хендоф](handoffs/2026-11-16-stable-tests.md)) → зелений CI → злиття з «так»
-людини → `npm run smoke`. Далі — решта тестів за [P-006](parking.md), фази 5–6
-[refactor-clean-architecture](plans/refactor-clean-architecture.md) або парковка (P-019, P-020, P-018, P-022).
+Людина відповідає на «Питання до людини» плану [one-click-analysis](plans/one-click-analysis.md) → фаза 0 (заміри
+коефіцієнтів оцінки, назви) → фаза 1 (точніша категорія, [P-020](parking.md)). Інші напрями — решта тестів за
+[P-006](parking.md), фази 5–6 [refactor-clean-architecture](plans/refactor-clean-architecture.md), парковка (P-019, P-022).
