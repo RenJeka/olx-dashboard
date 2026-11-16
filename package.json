@@ -30,7 +30,7 @@
     "test:changed": "node scripts/test-changed.mjs"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.7"
   },
   "engines": {
     "node": ">=22"
