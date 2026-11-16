@@ -37,7 +37,8 @@
 - **Кеш:** Redis Cloud Free через офіційний клієнт `redis` (`server/src/cache/`) — лише текст для пошуку в описі
   (пам'ять процесу + Redis); порожній `REDIS_URL` → лише пам'ять процесу. Redis best-effort: збій не валить запит.
 - **Notion:** `@notionhq/client` (етап 4).
-- **Тести:** **Vitest** (`server/`, dev), БД-тести — на тимчасовому файлі libSQL (не `server/data/olx.db`).
+- **Тести:** **Vitest** в обох workspace (dev): `server/` — БД-тести на тимчасовому файлі libSQL (не `server/data/olx.db`);
+  `web/` — лише чисті функції в середовищі `node`, без браузера й jsdom. Дані — з фабрик (`server/src/test/`, `web/src/test/`).
 - **НЕ використовувати:** Express, Prisma/ORM, PostgreSQL, Redux, Playwright/браузер для збору.
 - **Turso-економія:** кожен рядок читання/запису коштує квоти — батчити запити, не додавати
   індекси на часто оновлювані колонки, заміряти скілом `turso-reads-playbook`.
@@ -94,7 +95,8 @@ npm run docs:check              # биті посилання в докумен�
 npm run smoke                   # smoke-перевірка проду після деплою (-- <api-url> [web-url])
 npm run db:copy-prod            # копія прод-БД у server/data/olx.db (PROD_DB_URL/PROD_DB_TOKEN; development.md §4)
 npm run typecheck               # tsc --noEmit для server і web
-npm test                        # Vitest (server): доменне ядро на тимчасовій БД
+npm test                        # Vitest: server (тимчасова БД) + web (чисті функції)
+npm run test:changed            # лише тести змінених файлів (-- origin/main — відносно гілки); під час роботи
 npm run check                   # typecheck + test + docs:check + skills:check + layers:check — перед комітом
 npm run layers:check            # напрям залежностей між шарами server/src (поки звіт; --strict — блокує)
 npm run skills:sync             # перегенерувати обгортки скілів після зміни skills/
@@ -111,10 +113,14 @@ npm run skills:sync             # перегенерувати обгортки 
 тоді падає з назвою `таблиця.колонка`. Деталі — `docs/plans/old/db-auto-migrate.md`.
 
 **Перевірка:** CI (GitHub Actions, `.github/workflows/ci.yml`) на кожен push: `npm ci` →
-`npm run check` → `npm run build`; червоний CI = не зливати. Локально мінімум — `npm run check` (включно з Vitest-тестами `server/src/**/*.test.ts`), далі
+`npm run check` → `npm run build`; червоний CI = не зливати. Локально мінімум — `npm run check` (включно з Vitest-тестами `server/` і `web/`), далі
 smoke API / UI за `docs/development.md` (драбина перевірок, Definition of Done). Зміна доменної
 логіки (статуси, upsert, фільтри, AI-парсинг) — разом із тестом. UI/E2E — сабагент
 `playwright-tester`, лише за явним запитом.
+
+**Тести — за правилами [`docs/development.md`](docs/development.md) §7 «Підхід до тестів»** (обов'язково перед тим, як
+писати чи правити тест): дані з фабрик, часткове порівняння, тексти через константи, підміна лише зовнішнього;
+старий тест упав — баг або погоджена зміна поведінки, тест під код не підганяти.
 
 ## Конвенції
 

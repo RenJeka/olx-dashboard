@@ -21,7 +21,8 @@ olx-dashboard/
 │   ├── check-doc-links.mjs   # `npm run docs:check`: биті посилання в .md (plans/old і handoffs — лише лінки на доки, заархівований план валідний)
 │   ├── check-layers.mjs      # `npm run layers:check`: напрям залежностей між шарами server/src (без --strict — лише звіт)
 │   ├── smoke.mjs             # `npm run smoke -- [api-url] [web-url]`: smoke-перевірка деплою (за замовчуванням — прод)
-│   └── sync-skills.mjs       # `npm run skills:sync|skills:check`: обгортки скілів з skills/ у .claude/ і .agents/
+│   ├── sync-skills.mjs       # `npm run skills:sync|skills:check`: обгортки скілів з skills/ у .claude/ і .agents/
+│   └── test-changed.mjs      # `npm run test:changed [-- <гілка>]`: Vitest лише для тестів змінених файлів в обох workspace
 ├── skills/                   # ЄДИНЕ джерело скілів (<name>/SKILL.md + references/), skills.json — цілі, README.md
 ├── .claude/skills/           # згенеровані обгортки для Claude Code (не редагувати)
 ├── .claude/agents/           # сабагент playwright-tester (UI/E2E за запитом)
@@ -69,7 +70,7 @@ olx-dashboard/
 │       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
 │       ├── constants.ts      # налаштовувані числа сервера поза AI і збором з OLX: ліміти відповідей, порції, таймаути Redis, зберігання журналу
 │       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом; errorMessage(err) — текст кинутого значення
-│       ├── services/         # use-cases для роутів: searches, projects, listings, logs (валідація → HttpError, без Fastify)
+│       ├── services/         # use-cases для роутів: searches, projects, listings, logs (валідація → HttpError, без Fastify); constants.ts — SERVICE_ERRORS (тексти помилок)
 │       ├── cache/            # кеш пошуку в описі (docs/plans/redis-description-search-cache.md)
 │       │   ├── redis.ts      # клієнт Redis за REDIS_URL (best-effort, таймаут, префікс ключів, INFO/трафік); setCacheStoreForTests
 │       │   └── textCorpus.ts # корпус пошуку: пам'ять процесу → Redis (gzip) → Turso; invalidateCorpus у upsertListings/видаленні пошуку
@@ -177,10 +178,11 @@ olx-dashboard/
 │               └── commit.ts   # POST /api/listings/analyze/commit (запис cons/pros у БД)
 │
 └── web/                      # workspace "web" (React + Vite), type: module
-    ├── package.json          # deps: react, @tanstack/react-query, @tanstack/react-table,
+    ├── package.json          # test: vitest (чисті функції, без браузера); deps: react, @tanstack/react-query, @tanstack/react-table,
     │                          #   @chakra-ui/react, next-themes, react-icons, zustand
     ├── tsconfig.json         # module: ESNext, moduleResolution: Bundler, jsx
     ├── vite.config.ts        # react plugin, proxy /api → :3001
+    ├── vitest.config.ts      # Vitest фронтенду: середовище node (без jsdom), тести — src/**/*.test.ts
     ├── index.html            # точка входу Vite
     └── src/
         ├── main.tsx          # ReactDOM + GoogleOAuthProvider + ChakraProvider + QueryClientProvider
@@ -324,6 +326,9 @@ olx-dashboard/
         │       ├── switch.tsx
         │       ├── checkbox.tsx
         │       └── close-button.tsx
+        ├── test/
+        │   ├── factories.ts      # фабрики тестових даних: оголошення, пошук, результати AI, категорії, форма фільтрів, попередження скану
+        │   └── table.ts          # runCases(): таблиця випадків модуля («назва, виклик, очікуване») через it.each
         ├── stores/
         │   ├── settingsStore.ts       # useSettingsStore: глобальне сховище UI-налаштувань та опцій AI (Zustand + persist)
         │   ├── listingsUiStore.ts     # useListingsUiStore: statusFilter (вкладка таблиці), showFilteredOut, showIrrelevant — спільний стан між таблицею і AI-майстром
@@ -360,7 +365,7 @@ olx-dashboard/
         │   ├── scan.ts           # статистика скану, результати, план глибокого скану
         │   ├── analysis.ts       # AI аналіз, relevance, aiPicks
         │   └── index.ts          # barrel-файл експорту типів
-        └── utils/
+        └── utils/                # тести чистих функцій — поруч: <модуль>.test.ts (docs/development.md §7)
             ├── format.ts         # хелпери форматування (ціна, дата/відносний час, чистка HTML-опису)
             ├── scanRun.ts        # isUserAbort(), describeScanResult() (тости скану), estimateDeepScan() (оцінка діапазонів/запитів/хвилин)
             ├── status.ts         # STATUS_LABELS, STATUS_COLORS (re-export із theme/palette), isMutedStatus()
