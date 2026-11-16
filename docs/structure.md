@@ -63,7 +63,8 @@ olx-dashboard/
 │       ├── env.ts            # side-effect: process.loadEnvFile(server/.env) — імпортується ПЕРШИМ у db.ts/точках входу
 │       ├── logger.ts         # єдиний сервіс логування (pino): getLogger(scope), logError/logWarn(scope, stage, …) → stdout + app_logs, retention 14 днів
 │       ├── index.ts          # Fastify bootstrap, assertAuthConfigured(), CORS (WEB_ORIGIN + credentials), authPlugin+authRoutes ДО доменних, /health, await initDb(), listen :3001 host 0.0.0.0
-│       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом
+│       ├── constants.ts      # налаштовувані числа сервера поза AI і збором з OLX: ліміти відповідей, порції, таймаути Redis, зберігання журналу
+│       ├── errors.ts         # HttpError + BadRequest/NotFound/Conflict/GoneError — сервіси кидають, routes/errorHandler.ts відповідає {error} з кодом; errorMessage(err) — текст кинутого значення
 │       ├── services/         # use-cases для роутів: searches, projects, listings, logs (валідація → HttpError, без Fastify)
 │       ├── cache/            # кеш пошуку в описі (docs/plans/redis-description-search-cache.md)
 │       │   ├── redis.ts      # клієнт Redis за REDIS_URL (best-effort, таймаут, префікс ключів, INFO/трафік); setCacheStoreForTests
@@ -109,7 +110,7 @@ olx-dashboard/
 │       │   ├── copyDb.ts     # copyDatabase: схема з sqlite_master + дані keyset-пагінацією за rowid в іншу libSQL-БД (Vitest)
 │       │   └── db.ts         # createClient (@libsql/client; file: локально / Turso у проді), dbGet/dbAll/dbRun обгортки, dbBatchChunked (batch порціями), initDb (executeMultiple schema.sql)
 │       ├── analysis/        # LLM-аналіз (план docs/plans/old/llm-analysis.md, доповнено docs/plans/old/analysis-wizard-review-rework.md)
-│       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS) + isMode() type guard
+│       │   ├── constants.ts  # magic-значення (моделі, ліміти, чанки, MIME, ANALYSIS_ERRORS — усі тексти помилок AI-маршрутів) + isMode() type guard
 │       │   ├── config.ts     # завантаження server/.env (process.loadEnvFile) + hasApiKey/getApiKey
 │       │   ├── criteria.ts   # категорії критеріїв (docs/plans/old/criteria-categories.md): парс analysis_criteria, синоніми, planRemap/remapBullets/remapLocalFilters
 │       │   ├── baseCriteria.ts # базові плюси/мінуси категорій (docs/plans/old/base-criteria.md): mergeBaseCriteria/stripBaseCriteria/applyCriteriaBody/retainAbsorbedOwn/getEffectiveCriteria, парс searches.base_disabled
@@ -117,7 +118,8 @@ olx-dashboard/
 │       │   ├── criteriaRemap.ts # use-cases remap критеріїв без AI: remapSearchCriteria (пошук), remapCategoryCriteria (базовий набір категорії)
 │       │   ├── promptData.ts # трансформації для промптів: toPromptListing/descriptionMap/chunk + ANALYZE_PY_PATH
 │       │   ├── prompts.ts    # buildCriteriaPrompt/buildMatchingPrompt/pickSample/buildManualZipInstructions/buildChunkListings/buildSynonymsPrompt/PATTERNS_EXAMPLE_JSON — ЄДИНЕ джерело промптів
-│       │   ├── manualZip.ts  # спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
+│       │   ├── guards.ts     # передумови AI-запитів: requireSearch (404) / requireApiKey (409) / requireMode (400) — кидають HttpError
+│       │   ├── manualZip.ts  # імена файлів ZIP-пакета (ZIP_FILES, numberedFile) + спільні фрагменти ручних (ZIP) промптів усіх 3 AI-кроків: mechanicalIntro/packageContents/forbidden(+FORBID_*)/resultLine/fallbackBlock/OUTPUT_FILE (уніфікація map→файли→reduce→output.json, docs/ai-flow.md)
 │       │   ├── analyze.py     # готовий детермінований Python-движок для ZIP-пакета ручного режиму (regex-матчинг, клауза-скоуп заперечення, морфологічні стеми, evidence з опису, без stdout); кладеться в ZIP
 │       │   ├── openrouter.ts # chat()/chatWithUsage() — POST /chat/completions (json_object, ретрай, зняття code-fence; usage.cost для замірів)
 │       │   ├── jev.ts        # Jev через OpenRouter Decisions API (docs/jev.md): decide (ретраї, спільна пауза на 429), runPool, listingState, relevanceQuestion/criteriaQuestions/criteriaAbove
@@ -155,6 +157,7 @@ olx-dashboard/
 │       │   └── verifier.ts     # probeListingPage(): проба сторінки оголошення, детект мертвих/живих (Етап 2, A3)
 │       └── routes/
 │           ├── errorHandler.ts # httpErrorHandler: глобальний обробник помилок (index.ts і тести через test/app.ts)
+│           ├── http.ts       # спільна HTTP-механіка маршрутів: parseIds (ids із тіла), sendZip (відповідь ZIP-архівом зі списку файлів)
 │           ├── searches.ts   # CRUD /api/searches (каскадний DELETE) + POST /scan(+deep)/scan/analyze/scan/run-plan/verify + scan-status + move (у межах project_id) + param-keys + filter-options + stats (лише last_scan; агрегати рахує клієнт — docs/plans/old/turso-stats-clientside.md) + PATCH (filters, query_synonyms, project_id)
 │           ├── projects.ts   # CRUD /api/projects (проекти — групи пошуків, docs/plans/old/projects.md): GET/POST/PATCH/DELETE(відв'язує пошуки) + move
 │           ├── logs.ts       # GET /api/logs (журнал app_logs: фільтри level/scope) + DELETE /api/logs (очистити)
@@ -183,7 +186,7 @@ olx-dashboard/
         ├── auth/             # Google OAuth «ворота» (docs/plans/old/google-oauth-gate.md)
         │   ├── useAuth.ts    # useSession (GET /api/auth/me, слухає подію 401) + useLogin + useLogout
         │   └── AuthGate.tsx  # гейт-екран із <GoogleLogin> (рендериться поки немає сесії)
-        ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу)
+        ├── constants.ts      # magic-значення фронту (ключі localStorage, дефолти, константи LLM-аналізу, паузи й ліміти таблиці та скану, локаль дат)
         ├── theme/            # система стилів Chakra: єдина точка керування кольорами/розмірами
         │   ├── palette.ts    # ACCENT_BASE, FEEDBACK_BASE (success/warning/danger/info), THEME_PALETTES, STATUS_PALETTE
         │   ├── tokens.ts     # defineConfig: для кожної палітри (accent/success/warning/danger/info) числова шкала + семантичні аліаси на базу
@@ -192,7 +195,7 @@ olx-dashboard/
         │   └── index.ts      # barrel
         ├── api/
         │   ├── index.ts      # барель-експорт усіх API хуків
-        │   ├── base.ts       # fetch-обгортка api<T> (credentials: 'include', VITE_API_BASE-префікс, подія auth:unauthorized на 401; ApiError зі статусом)
+        │   ├── base.ts       # HTTP-клієнт: спільний request (credentials: 'include', VITE_API_BASE-префікс, тіло з `json`, подія auth:unauthorized на 401, ApiError зі статусом) → api<T> (JSON) і apiBlob (файл)
         │   ├── searches.ts   # CRUD пошуків, статистика
         │   ├── projects.ts   # CRUD проектів + useAssignSearchToProject (docs/plans/old/projects.md)
         │   ├── listings.ts   # оголошення, фільтри
@@ -334,7 +337,6 @@ olx-dashboard/
         │   ├── analysis/          # AI-аналіз логіка (кроки майстра)
         │   │   ├── useWizard.ts        # тонкий оркестратор логіки AI-аналізу (об'єднує useAnalysis*)
         │   │   ├── useAiScope.ts       # спільний хук обсягу (counts/effectiveIds) — релевантність + майстер + AI Picks
-        │   │   ├── useAnalysisScope.ts # обсяг майстра поверх useAiScope (allIds, tabIds, effectiveIds, counts, scopeLabel)
         │   │   ├── useAnalysisCriteria.ts # логіка кроку 1 (чипи = категорії, позначка «в аналізі», поглинання синонімів)
         │   │   ├── useCriteriaGeneration.ts # генерація/ручний імпорт критеріїв — спільне для кроку 1 і вікна «Плюси та мінуси»; useCriteriaCandidates — вибір згенерованого (і для базових наборів)
         │   │   ├── useCriteriaManager.ts # логіка вікна «Плюси та мінуси» (лічильники з кешу, PUT/remap)
@@ -372,7 +374,7 @@ olx-dashboard/
             ├── searchSynonyms.ts # parseSearchSynonyms() — парсинг searches.query_synonyms (SearchRow, SearchEditDialog)
             ├── relevance.ts      # чисті функції для AI-фільтра (getEffectiveRelevanceIds, getRelevanceStats)
             ├── searchStats.ts    # computeListingStats() — клієнтський аналог агрегату /stats (in_db/stale/verify) з масиву listings, щоб не робити 408-рядковий прохід на сервері (docs/plans/old/turso-stats-clientside.md)
-            └── analysis.ts       # чисті функції для AI-аналізу (isIncludedFn, computeDefaultScope, buildScopeLabel)
+            └── analysis.ts       # чисті функції кроку перегляду AI-аналізу (criterionKey, isIncludedFn)
 ```
 
 ## Орієнтири «куди дивитись»

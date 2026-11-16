@@ -1,12 +1,12 @@
 import { useAnalysisWizardStore } from '../../stores/analysisWizardStore';
 import { useAnalysisStatus, useSavedCriteria } from '../../api';
-import { useAnalysisScope } from './useAnalysisScope';
+import { useAiScope } from './useAiScope';
 import { useAnalysisCriteria } from './useAnalysisCriteria';
 import { useAnalysisMatching } from './useAnalysisMatching';
 import { useAnalysisReview } from './useAnalysisReview';
 import { useAnalysisCommit } from './useAnalysisCommit';
 import { MODE_LABELS } from '../../constants';
-import { computeDefaultScope } from '../../utils/analysis';
+import { buildScopeLabel, getDefaultScope } from '../../utils/aiScope';
 import type { Search } from '../../types';
 
 /**
@@ -24,7 +24,7 @@ export function useWizard(search: Search, selectedIds: number[], open: boolean) 
   const modeLabel = MODE_LABELS[mode];
 
   // Compose sub-hooks
-  const scopeHook = useAnalysisScope(search.id, selectedIds, open, store.scope);
+  const scopeHook = useAiScope(search.id, selectedIds, open, store.scope);
   const criteriaHook = useAnalysisCriteria(search.id, savedCriteria);
   const matchingHook = useAnalysisMatching(search.id, scopeHook.effectiveIds);
   const reviewHook = useAnalysisReview(search.id, scopeHook.listingById);
@@ -47,7 +47,8 @@ export function useWizard(search: Search, selectedIds: number[], open: boolean) 
     
     // Global/Computed computed from top-level
     apiAvailable, modeLabel, savedCriteria,
-    computeDefaultScope: () => computeDefaultScope(selectedIds, scopeHook.statusFilter),
+    computeDefaultScope: () => getDefaultScope(selectedIds, scopeHook.statusFilter),
+    scopeLabel: buildScopeLabel(store.scope, scopeHook.statusFilter),
     
     // Extracted from hooks
     ...scopeHook,

@@ -27,11 +27,10 @@ import { isListingVisible } from '../utils/listingVisibility';
 import type { SearchScope } from '../components/table';
 import type { Listing } from '../types';
 import { CONTENT_PAD_X, CONTENT_PAD_Y, EMPTY_STATE_PAD } from '../theme';
+import { SEARCH_DEBOUNCE_MS } from '../constants';
 
 export { TOGGLEABLE_COLUMNS } from '../components/table';
 
-/** Пауза після набору перед серверним пошуком в описі (мс). */
-const SEARCH_DEBOUNCE_MS = 400;
 
 export function ListingsTable() {
   const searchId = useSettingsStore((s) => s.selectedSearchId);

@@ -17,12 +17,9 @@
 import { createRequire } from 'node:module';
 import { pino, type Logger, type LoggerOptions } from 'pino';
 import { dbRun } from './db/db.js';
+import { errorMessage } from './errors.js';
+import { LOG_RETENTION_DAYS, LOG_STACK_MAX_CHARS } from './constants.js';
 
-/** Скільки днів зберігати записи журналу (чистка на старті сервера). */
-const LOG_RETENTION_DAYS = 14;
-
-/** Обрізка stack у details — довгі стеки не роздувають рядок БД. */
-const STACK_MAX_CHARS = 3000;
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -58,7 +55,7 @@ const INSERT_LOG_SQL =
 function reportLoggerFailure(action: string, err: unknown): void {
   rootLogger.warn(
     { scope: 'logger' },
-    `${action} не вдалося: ${err instanceof Error ? err.message : String(err)}`,
+    `${action} не вдалося: ${errorMessage(err)}`,
   );
 }
 
@@ -85,8 +82,8 @@ export function logError(
   err: unknown,
   details?: Record<string, unknown>,
 ): void {
-  const message = err instanceof Error ? err.message : String(err);
-  const stack = err instanceof Error && err.stack ? err.stack.slice(0, STACK_MAX_CHARS) : undefined;
+  const message = errorMessage(err);
+  const stack = err instanceof Error && err.stack ? err.stack.slice(0, LOG_STACK_MAX_CHARS) : undefined;
   const merged = { ...(details ?? {}), ...(stack ? { stack } : {}) };
   rootLogger.error({ scope, stage, ...merged }, message);
   persist('error', scope, stage, message, merged);

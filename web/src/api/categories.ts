@@ -67,7 +67,7 @@ export function useSaveCategoryCriteria() {
     }) =>
       api<CriteriaConfig>(`/api/categories/${categoryId}/criteria`, {
         method: 'PUT',
-        body: JSON.stringify({ cons, pros }),
+        json: { cons, pros },
       }),
     onSuccess: (own, { categoryId }) => applyOwnSet(qc, categoryId, own),
   });
@@ -93,7 +93,7 @@ export function useRemapCategoryCriteria() {
     }) =>
       api<CategoryRemapResult>(`/api/categories/${categoryId}/criteria/remap`, {
         method: 'POST',
-        body: JSON.stringify({ mode, from, to }),
+        json: { mode, from, to },
       }),
     onSuccess: (res, { categoryId, to }) => {
       applyOwnSet(qc, categoryId, res.criteria);
@@ -124,7 +124,7 @@ export function useGenerateCategoryCriteria() {
     }) =>
       api<{ criteria: string[] }>(`/api/categories/${categoryId}/criteria/generate`, {
         method: 'POST',
-        body: JSON.stringify({ mode, model, reasoning }),
+        json: { mode, model, reasoning },
       }),
   });
 }

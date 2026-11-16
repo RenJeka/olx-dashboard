@@ -1,14 +1,14 @@
 import { readFileSync } from 'node:fs';
-import { ZipArchive } from 'archiver';
 import type { FastifyInstance } from 'fastify';
-import { hasApiKey } from '../analysis/config.js';
 import {
+  ANALYSIS_ERRORS,
   DEFAULT_MODEL,
   JSON_EXPORT_INDENT,
   MANUAL_ZIP_CHUNK_SIZE,
   MAX_ANALYZE_IDS,
-  MIME_ZIP,
 } from '../analysis/constants.js';
+import { requireApiKey, requireSearch } from '../analysis/guards.js';
+import { ZIP_EMPTY_RESULT, ZIP_FILES, numberedFile } from '../analysis/manualZip.js';
 import {
   buildRelevanceZipInstructions,
   parseRelevanceResponse,
@@ -26,18 +26,14 @@ import {
 import {
   getRelevanceAliases,
   getRelevanceTarget,
-  getSearch,
   loadListings,
   setRelevanceTarget,
   commitRelevance,
 } from '../db/repos/analysis.js';
+import { BadRequestError, errorMessage } from '../errors.js';
 import { getLogger } from '../logger.js';
 import type { RelevanceItem, RelevanceResponse } from '../types.js';
-
-const SEARCH_NOT_FOUND = 'Пошук не знайдено';
-const NO_API_KEY = 'Авто-режим недоступний: немає OPENROUTER_API_KEY';
-const EMPTY_RESPONSE = 'Порожня відповідь';
-const NO_TARGET = 'Вкажіть цільовий товар';
+import { parseIds, sendZip, type ZipEntry } from './http.js';
 
 /** Цільовий товар із тіла запиту (з фолбеком на збережений/query). */
 async function resolveTarget(searchId: number, raw?: string): Promise<string> {
@@ -47,17 +43,15 @@ async function resolveTarget(searchId: number, raw?: string): Promise<string> {
 
 export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   // Цільовий товар (передзаповнюється query, якщо ще не збережений).
-  app.get<{ Params: { id: string } }>('/api/searches/:id/relevance/target', async (req, reply) => {
-    const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+  app.get<{ Params: { id: string } }>('/api/searches/:id/relevance/target', async (req) => {
+    const { id } = await requireSearch(Number(req.params.id));
     return { target: await getRelevanceTarget(id) };
   });
 
   app.put<{ Params: { id: string }; Body: { target?: string } }>(
     '/api/searches/:id/relevance/target',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    async (req) => {
+      const { id } = await requireSearch(Number(req.params.id));
       await setRelevanceTarget(id, (req.body.target ?? '').trim());
       return { target: await getRelevanceTarget(id) };
     },
@@ -66,13 +60,11 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   // Превʼю розбивки пре-фільтра (для UI): скільки піде в ШІ, скільки авто-відсіється. НЕ пише в БД.
   app.post<{ Params: { id: string }; Body: { target?: string; ids?: number[] } }>(
     '/api/searches/:id/relevance/preview',
-    async (req, reply) => {
-      const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+    async (req) => {
+      const { id } = await requireSearch(Number(req.params.id));
       const target = await resolveTarget(id, req.body.target);
       const aliases = await getRelevanceAliases(id);
-      const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-      const listings = await loadListings(id, ids);
+      const listings = await loadListings(id, parseIds(req.body.ids));
       const { candidates, rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
       return { total: listings.length, candidates: candidates.length, autoRejected: rejected.length };
     },
@@ -83,18 +75,15 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: { target?: string; ids?: number[]; model?: string; engine?: string };
   }>('/api/searches/:id/relevance/analyze', async (req, reply) => {
-    const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
-    if (!hasApiKey()) return reply.code(409).send({ error: NO_API_KEY });
+    const { id } = await requireSearch(Number(req.params.id));
+    requireApiKey();
 
     const target = await resolveTarget(id, req.body.target);
-    if (!target) return reply.code(400).send({ error: NO_TARGET });
+    if (!target) throw new BadRequestError(ANALYSIS_ERRORS.NO_TARGET);
     const aliases = await getRelevanceAliases(id);
 
-    const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-    if (ids.length > MAX_ANALYZE_IDS) {
-      return reply.code(400).send({ error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` });
-    }
+    const ids = parseIds(req.body.ids);
+    if (ids.length > MAX_ANALYZE_IDS) throw new BadRequestError(ANALYSIS_ERRORS.TOO_MANY_IDS);
 
     const listings = await loadListings(id, ids);
     try {
@@ -111,7 +100,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
       );
       return result satisfies RelevanceResponse;
     } catch (err) {
-      return reply.code(500).send({ error: err instanceof Error ? err.message : String(err) });
+      return reply.code(500).send({ error: errorMessage(err) });
     }
   });
 
@@ -119,38 +108,32 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: string }; Body: { target?: string; ids?: number[] } }>(
     '/api/searches/:id/relevance/package.zip',
     async (req, reply) => {
-      const id = Number(req.params.id);
-      if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+      const { id } = await requireSearch(Number(req.params.id));
 
       const target = await resolveTarget(id, req.body.target);
-      if (!target) return reply.code(400).send({ error: NO_TARGET });
+      if (!target) throw new BadRequestError(ANALYSIS_ERRORS.NO_TARGET);
       const aliases = await getRelevanceAliases(id);
 
-      const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-      const listings = await loadListings(id, ids);
+      const listings = await loadListings(id, parseIds(req.body.ids));
       // У ZIP кладемо лише кандидатів (відсіяні евристикою додаються при import).
       const { candidates } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
 
-      const archive = new ZipArchive();
-      archive.on('error', (err: Error) => req.log.error(err));
-
-      archive.append(buildRelevanceZipInstructions(target, aliases), { name: 'prompt.txt' });
-      archive.append(readFileSync(RELEVANCE_MERGE_PY_PATH), { name: 'merge.py' });
-      archive.append(readFileSync(RELEVANCE_VERIFY_PY_PATH), { name: 'verify.py' });
+      const entries: ZipEntry[] = [
+        { name: ZIP_FILES.PROMPT, content: buildRelevanceZipInstructions(target, aliases) },
+        { name: ZIP_FILES.MERGE_PY, content: readFileSync(RELEVANCE_MERGE_PY_PATH) },
+        { name: ZIP_FILES.VERIFY_PY, content: readFileSync(RELEVANCE_VERIFY_PY_PATH) },
+      ];
       chunk(candidates, MANUAL_ZIP_CHUNK_SIZE).forEach((group, idx) => {
-        const nnn = String(idx + 1).padStart(3, '0');
-        const content = JSON.stringify(buildChunkListings(group), null, JSON_EXPORT_INDENT);
-        archive.append(content, { name: `descriptions/chunk-${nnn}.json` });
+        entries.push({
+          name: numberedFile(ZIP_FILES.DESCRIPTIONS, idx),
+          content: JSON.stringify(buildChunkListings(group), null, JSON_EXPORT_INDENT),
+        });
         // Порожня заготовка проміжного файлу-класифікації на КОЖЕН чанк: слабкій моделі легше
         // заповнити наявний файл (гарантована назва/шлях, видно чек-лист), ніж створювати з нуля;
         // незаповнені (`[]`) спіймає verify.py як БРАКУЄ id (як у AI Вибір, docs/ai-flow.md).
-        archive.append('[]\n', { name: `classifications/result-${nnn}.json` });
+        entries.push({ name: numberedFile(ZIP_FILES.CLASSIFICATIONS, idx), content: ZIP_EMPTY_RESULT });
       });
-      void archive.finalize();
-
-      reply.header('Content-Disposition', `attachment; filename="relevance-search-${id}.zip"`);
-      reply.type(MIME_ZIP);
-      return reply.send(archive);
+      return sendZip(req, reply, `relevance-search-${id}.zip`, entries);
     },
   );
 
@@ -161,14 +144,12 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     Params: { id: string };
     Body: { raw?: string; accumulated?: RelevanceItem[]; ids?: number[]; target?: string };
   }>('/api/searches/:id/relevance/import', async (req, reply) => {
-    const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
-    if (!req.body.raw) return reply.code(400).send({ error: EMPTY_RESPONSE });
+    const { id } = await requireSearch(Number(req.params.id));
+    if (!req.body.raw) throw new BadRequestError(ANALYSIS_ERRORS.EMPTY_RESPONSE);
 
     const target = await resolveTarget(id, req.body.target);
     const aliases = await getRelevanceAliases(id);
-    const scopeIds = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : [];
-    const listings = await loadListings(id, scopeIds);
+    const listings = await loadListings(id, parseIds(req.body.ids));
     const { rejected } = prefilterCandidates(target, listings.map(toPromptListing), aliases);
     const validIds = listings.map((l) => l.id);
 
@@ -176,7 +157,7 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
     try {
       parsed = parseRelevanceResponse(req.body.raw, validIds);
     } catch (err) {
-      return reply.code(400).send({ error: err instanceof Error ? err.message : String(err) });
+      return reply.code(400).send({ error: errorMessage(err) });
     }
 
     // Порядок мержу: накопичене → евристичні відсіяні → вердикти ШІ (останні перемагають).
@@ -195,9 +176,8 @@ export async function relevanceRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
     Params: { id: string };
     Body: { items?: RelevanceItem[]; source?: string };
-  }>('/api/searches/:id/relevance/commit', async (req, reply) => {
-    const id = Number(req.params.id);
-    if (!(await getSearch(id))) return reply.code(404).send({ error: SEARCH_NOT_FOUND });
+  }>('/api/searches/:id/relevance/commit', async (req) => {
+    const { id } = await requireSearch(Number(req.params.id));
 
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const source = req.body.source === 'import' ? 'import' : 'api';

@@ -1,8 +1,6 @@
 import { clearLogs, listLogScopes, listLogs } from '../db/repos/logs.js';
+import { LOGS_LIMIT_DEFAULT, LOGS_LIMIT_MAX } from '../constants.js';
 
-/** Максимум записів за один запит (UI показує останні; глибше — фільтрами). */
-const LOGS_LIMIT_MAX = 1000;
-const LOGS_LIMIT_DEFAULT = 300;
 
 export interface LogsQuery {
   /** warn | error — без фільтра віддаються обидва рівні. */

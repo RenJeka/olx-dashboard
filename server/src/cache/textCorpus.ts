@@ -13,6 +13,7 @@ import { promisify } from 'node:util';
 import { gunzip, gzip } from 'node:zlib';
 import { getLogger, logWarn } from '../logger.js';
 import { getCacheStore, keyPrefix, type CacheStore } from './redis.js';
+import { errorMessage } from '../errors.js';
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -43,7 +44,7 @@ const localGens = new Map<number, number>();
 
 const versionKey = (searchId: number) => `${keyPrefix()}corpus:${searchId}:v`;
 const blobKey = (searchId: number) => `${keyPrefix()}corpus:${searchId}`;
-const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const errorText = (err: unknown) => (errorMessage(err));
 const elapsed = (from: number) => Math.round(performance.now() - from);
 
 /** Redis-виклик, що не валить пошук: помилка → журнал і null. */

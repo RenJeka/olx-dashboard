@@ -19,7 +19,7 @@ export function useSaveRelevanceTarget() {
     mutationFn: ({ searchId, target }: { searchId: number; target: string }) =>
       api<{ target: string }>(`/api/searches/${searchId}/relevance/target`, {
         method: 'PUT',
-        body: JSON.stringify({ target }),
+        json: { target },
       }),
     onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['relevance-target', searchId] }),
@@ -39,7 +39,7 @@ export function useRelevancePreview(
     queryFn: () =>
       api<{ total: number; candidates: number; autoRejected: number }>(
         `/api/searches/${searchId}/relevance/preview`,
-        { method: 'POST', body: JSON.stringify({ target, ids }) },
+        { method: 'POST', json: { target, ids } },
       ),
     enabled: enabled && target.trim().length > 0 && ids.length > 0,
   });
@@ -63,7 +63,7 @@ export function useRunRelevance() {
     }) =>
       api<RelevanceResponse>(`/api/searches/${searchId}/relevance/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ target, ids, model, engine }),
+        json: { target, ids, model, engine },
       }),
   });
 }
@@ -86,7 +86,7 @@ export function useImportRelevance() {
     }) =>
       api<RelevanceResponse>(`/api/searches/${searchId}/relevance/import`, {
         method: 'POST',
-        body: JSON.stringify({ raw, accumulated, ids, target }),
+        json: { raw, accumulated, ids, target },
       }),
   });
 }
@@ -106,7 +106,7 @@ export function useCommitRelevance() {
     }) =>
       api<{ committed: number }>(`/api/searches/${searchId}/relevance/commit`, {
         method: 'POST',
-        body: JSON.stringify({ items, source }),
+        json: { items, source },
       }),
     onSuccess: (_data, { searchId }) =>
       qc.invalidateQueries({ queryKey: ['listings', searchId] }),
@@ -121,7 +121,7 @@ export async function fetchRelevancePackageZip(
 ): Promise<void> {
   const blob = await apiBlob(`/api/searches/${searchId}/relevance/package.zip`, {
     method: 'POST',
-    body: JSON.stringify({ target, ids }),
+    json: { target, ids },
   });
   downloadBlob(blob, `relevance-search-${searchId}.zip`);
 }

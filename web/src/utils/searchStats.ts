@@ -1,6 +1,6 @@
 import type { Listing } from '../types';
+import { STALE_LISTING_MS } from '../constants';
 
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
  * Парсинг SQLite-таймстемпа `YYYY-MM-DD HH:MM:SS` (зберігається як `datetime('now')` — UTC,
@@ -30,7 +30,7 @@ export interface ListingStats {
 export function computeListingStats(listings: Listing[] | undefined): ListingStats {
   if (!listings) return { in_db: 0, stale_count: 0, verify_candidates: 0 };
 
-  const staleThreshold = Date.now() - THREE_DAYS_MS;
+  const staleThreshold = Date.now() - STALE_LISTING_MS;
   let stale_count = 0;
   let verify_candidates = 0;
 

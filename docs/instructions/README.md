@@ -22,6 +22,7 @@ AI) сюди не дублюється — вона в документах із
 | [prod-scan-monitoring](prod-scan-monitoring.md) | Людина запустила довгий скан на проді, треба стежити, чи доживає і чим закінчився |
 | [github-cli](github-cli.md) | Треба відкрити PR, подивитись CI чи логи впалого прогону; перелогінити `gh` |
 | [docs-check-untracked-files](docs-check-untracked-files.md) | Пишеш у доках шлях до незакоміченого файлу; `docs:check` зелений локально, червоний у CI |
+| [docs-check-future-files](docs-check-future-files.md) | Пишеш у плані шлях до файлу, який ще не створено; `docs:check` упав одразу після створення плану |
 | [docs-audit](docs-audit.md) | Треба перевірити документацію чи парковку на актуальність і прибрати застаріле (скіл `docs-audit`) |
 | [node-e-escaping](node-e-escaping.md) | Правиш файл однорядковим node -e, а в новому коді є бектики чи перенос рядка в літералах |
 | [curl-cyrillic-body](curl-cyrillic-body.md) | Smoke API через curl у Git Bash із кирилицею в тілі дає 400 Content-Length |
@@ -40,3 +41,4 @@ AI) сюди не дублюється — вона в документах із
 | [turso-mcp-scope-403](turso-mcp-scope-403.md) | Turso MCP: список БД читається, а SQL-запит — `403 missing required scope "db:mint-token"` |
 | [plan-archive-links](plan-archive-links.md) | Переносиш завершений план в `docs/plans/old/` і правиш посилання на нього |
 | [olx-api-audit](olx-api-audit.md) | Треба перевірити, чи OLX щось змінив у запитах застосунку (скіл `olx-api-audit`, `npm run olx:audit`) |
+| [test-insert-listing-title](test-insert-listing-title.md) | Тест на тимчасовій БД потребує оголошення зі своїм заголовком, а в рядку `item <olx_id>` |

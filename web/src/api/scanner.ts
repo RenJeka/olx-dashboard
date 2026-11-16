@@ -53,7 +53,7 @@ export function useRunScanPlan() {
     mutationFn: ({ searchId, planToken }: { searchId: number; planToken: string }) =>
       api<ScanResult>(`/api/searches/${searchId}/scan/run-plan`, {
         method: 'POST',
-        body: JSON.stringify({ planToken }),
+        json: { planToken },
       }),
     onSuccess: (_data, { searchId }) => {
       qc.invalidateQueries({ queryKey: ['listings', searchId] });

@@ -103,3 +103,25 @@ export const DEEP_SCAN_PAGE_LIMIT = 40;
 export const DEEP_SCAN_MAX_PAGES = 26;
 /** Поріг розбиття по ціні (= вікно пагінації OLX) — дзеркалить SPLIT_THRESHOLD у graphqlOlxFetcher.ts. */
 export const DEEP_SCAN_SPLIT_THRESHOLD = 1000;
+
+// ── Таблиця оголошень ────────────────────────────────────────────────────────
+/** Пауза після набору перед серверним пошуком в описі (мс). */
+export const SEARCH_DEBOUNCE_MS = 400;
+/** Скільки чипів показувати в комірці «Плюси» / «Мінуси»; решта — чипом «+N» (рядок таблиці не розростається). */
+export const MAX_CELL_CHIPS = 3;
+/** Скільки id в одному запиті деталей оголошень (ліміт сервера — LISTING_DETAILS_MAX_IDS). */
+export const LISTING_DETAILS_CHUNK = 500;
+/** Оголошення, якого скан не бачив довше за цей час, рахується застарілим (дзеркало сервера). */
+export const STALE_LISTING_MS = 3 * 24 * 60 * 60 * 1000;
+
+// ── Дати й час ───────────────────────────────────────────────────────────────
+/** Локаль і часовий пояс показу дат — завжди київські, незалежно від браузера. */
+export const DISPLAY_LOCALE = 'uk-UA';
+export const DISPLAY_TIME_ZONE = 'Europe/Kyiv';
+
+// ── Скан: автооновлення й прогрес ────────────────────────────────────────────
+/** Пауза між пошуками під час автооновлення (мс) — випадкова в цих межах. */
+export const AUTO_REFRESH_PAUSE_MIN_MS = 5000;
+export const AUTO_REFRESH_PAUSE_MAX_MS = 10000;
+/** Сегменти прогресу показуємо лише до цієї кількості — більше (напр. десятки цінових бакетів) злилося б у кашу. */
+export const SCAN_PROGRESS_MAX_SEGMENTS = 16;
