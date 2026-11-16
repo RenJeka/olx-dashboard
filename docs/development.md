@@ -102,7 +102,7 @@ claude -p "Invoke the project skill refactor-plan via the Skill tool. Do NOT cha
 
 ## 7. Підхід до тестів
 
-Правила — рішення людини 2026-11-16 ([stable-tests](plans/stable-tests.md)). Мета — тести, які падають від зміни
+Правила — рішення людини 2026-11-16 ([stable-tests](plans/old/stable-tests.md)). Мета — тести, які падають від зміни
 поведінки, а не від правок, що її не міняють.
 
 ### Правила

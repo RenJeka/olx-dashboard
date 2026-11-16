@@ -42,3 +42,4 @@ AI) сюди не дублюється — вона в документах із
 | [plan-archive-links](plan-archive-links.md) | Переносиш завершений план в `docs/plans/old/` і правиш посилання на нього |
 | [olx-api-audit](olx-api-audit.md) | Треба перевірити, чи OLX щось змінив у запитах застосунку (скіл `olx-api-audit`, `npm run olx:audit`) |
 | [test-insert-listing-title](test-insert-listing-title.md) | Тест на тимчасовій БД потребує оголошення зі своїм заголовком чи іншими полями |
+| [closed-pitfall-keep-file](closed-pitfall-keep-file.md) | Пастку виправлено в коді, і хочеться видалити файл інструкції |
