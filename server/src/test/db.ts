@@ -16,11 +16,18 @@ export async function resetDb(): Promise<void> {
   );
 }
 
-/** Створити пошук і повернути його id. */
-export async function createSearch(localFilters: object = {}): Promise<number> {
+/** Поля пошуку, які тест може задати сам; решта — типові значення фабрики. */
+export interface SearchFields {
+  name?: string;
+  query?: string;
+}
+
+/** Створити пошук (типовий: «test», запит «iphone 13», без фільтрів) і повернути його id. */
+export async function createSearch(localFilters: object = {}, fields: SearchFields = {}): Promise<number> {
+  const row = { name: 'test', query: 'iphone 13', ...fields };
   const res = await db.execute({
     sql: 'INSERT INTO searches (name, query, local_filters) VALUES (?, ?, ?)',
-    args: ['test', 'iphone 13', JSON.stringify(localFilters)],
+    args: [row.name, row.query, JSON.stringify(localFilters)],
   });
   return Number(res.lastInsertRowid);
 }
@@ -36,6 +43,7 @@ export interface ListingRow {
   filtered_out: number;
   price: number | null;
   city: string | null;
+  category_id: number | null;
   title: string | null;
   description: string | null;
   last_refresh_at: string | null;
@@ -47,15 +55,18 @@ export const getListing = (olxId: number) =>
 
 export const allListings = () => dbAll<ListingRow>('SELECT * FROM listings ORDER BY olx_id');
 
-/** Вставити рядок оголошення напряму (стан «до скану»). */
+/**
+ * Вставити рядок оголошення напряму (стан «до скану»). Типове: нове, авто-статус, заголовок `item <olx_id>`;
+ * тест задає лише важливі для нього поля (зокрема свій `title`).
+ */
 export async function insertListing(
   searchId: number,
   olxId: number,
   fields: Partial<Omit<ListingRow, 'id' | 'olx_id'>> = {},
 ): Promise<void> {
-  const row = { status: 'new', status_source: 'auto', miss_count: 0, note: '', ...fields };
-  const cols = ['olx_id', 'search_id', 'title', ...Object.keys(row)];
-  const vals = [olxId, searchId, `item ${olxId}`, ...Object.values(row)];
+  const row = { title: `item ${olxId}`, status: 'new', status_source: 'auto', miss_count: 0, note: '', ...fields };
+  const cols = ['olx_id', 'search_id', ...Object.keys(row)];
+  const vals = [olxId, searchId, ...Object.values(row)];
   await db.execute({
     sql: `INSERT INTO listings (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
     args: vals as (string | number | null)[],

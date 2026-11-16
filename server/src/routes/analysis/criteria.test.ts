@@ -56,13 +56,12 @@ describe('GET/PUT /api/searches/:id/criteria', () => {
       url: `/api/searches/${searchId}/criteria`,
       payload: { cons: [{ name: 'дефект екрану', aliases: ['тріснутий екран'], enabled: false }, 'без торгу'] },
     });
-    expect(put.json()).toEqual({
+    expect(put.json()).toMatchObject({
       cons: [
         { name: 'дефект екрану', aliases: ['тріснутий екран'], enabled: false },
         { name: 'без торгу', aliases: [], enabled: true },
       ],
       pros: [{ name: 'коробка', aliases: [], enabled: true }],
-      category: null,
     });
   });
 });

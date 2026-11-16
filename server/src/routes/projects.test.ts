@@ -3,6 +3,7 @@ import { testApp } from '../test/app.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, dbAll, dbGet } from '../db/db.js';
 import { createSearch, resetDb } from '../test/db.js';
+import { SERVICE_ERRORS } from '../services/constants.js';
 import { projectsRoutes } from './projects.js';
 
 // Характеризаційні тести (docs/plans/refactor-clean-architecture.md, фаза 0): фіксують поточну поведінку.
@@ -40,7 +41,7 @@ describe('POST /api/projects', () => {
   it('порожня назва → 400', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/projects', payload: { name: '  ' } });
     expect(res.statusCode).toBe(400);
-    expect(res.json()).toEqual({ error: 'Поле name обовʼязкове' });
+    expect(res.json()).toEqual({ error: SERVICE_ERRORS.PROJECT_NAME_REQUIRED });
   });
 });
 
@@ -56,7 +57,7 @@ describe('PATCH /api/projects/:id', () => {
   it('невідомий → 404', async () => {
     const res = await app.inject({ method: 'PATCH', url: '/api/projects/999', payload: { name: 'x' } });
     expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: 'Проєкт не знайдено' });
+    expect(res.json()).toEqual({ error: SERVICE_ERRORS.PROJECT_NOT_FOUND });
   });
 });
 
@@ -93,7 +94,7 @@ describe('POST /api/projects/:id/move', () => {
     const p = await create('A');
     const bad = await app.inject({ method: 'POST', url: `/api/projects/${p.id}/move`, payload: { direction: 'left' } });
     expect(bad.statusCode).toBe(400);
-    expect(bad.json()).toEqual({ error: 'direction має бути "up" або "down"' });
+    expect(bad.json()).toEqual({ error: SERVICE_ERRORS.BAD_DIRECTION });
     const missing = await app.inject({ method: 'POST', url: '/api/projects/999/move', payload: { direction: 'up' } });
     expect(missing.statusCode).toBe(404);
   });

@@ -1,18 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, dbGet } from '../db/db.js';
-import { createSearch, resetDb } from '../test/db.js';
+import { createSearch, insertListing, resetDb } from '../test/db.js';
 import type { SearchConfig } from '../types.js';
 
-// Хвіст скану: facet категорій і автокатегорія — best-effort; мережі немає (facet замокано).
+// Хвіст скану: facet категорій і автокатегорія — best-effort; мережі немає (facet замокано). Автокатегорію рахує
+// справжній categories/tree на тимчасовій БД — перевіряємо результат у searches.base_category_id.
 const logWarn = vi.hoisted(() => vi.fn());
 vi.mock('../logger.js', () => ({ logWarn, logError: vi.fn() }));
 const facetMock = vi.hoisted(() => vi.fn());
 vi.mock('../scraper/graphql/categories.js', () => ({ fetchCategoryFacet: facetMock }));
-const refreshBase = vi.hoisted(() => vi.fn(async () => null));
-vi.mock('../categories/tree.js', async (orig) => ({
-  ...(await orig<typeof import('../categories/tree.js')>()),
-  refreshBaseCategory: refreshBase,
-}));
 
 import { finalizeScanResult, refreshCategoryFacet } from './scanFinalize.js';
 
@@ -24,7 +20,6 @@ beforeEach(async () => {
   searchId = await createSearch();
   await db.execute({ sql: 'UPDATE searches SET category_facet = ? WHERE id = ?', args: [FACET_BEFORE, searchId] });
   facetMock.mockReset();
-  refreshBase.mockClear();
   logWarn.mockClear();
 });
 
@@ -72,13 +67,20 @@ describe('finalizeScanResult — автокатегорія', () => {
     baseCategoryId,
   });
 
+  /** Категорія єдиного оголошення пошуку: перерахунок, якщо відбувся, запише саме її. */
+  const LISTING_CATEGORY = 37;
+  const baseCategoryOf = async () =>
+    (await dbGet<{ base_category_id: number | null }>('SELECT base_category_id FROM searches WHERE id = ?', [searchId]))
+      ?.base_category_id;
+  beforeEach(() => insertListing(searchId, 1, { category_id: LISTING_CATEGORY }));
+
   it('без нових оголошень і з уже визначеною автокатегорією — перерахунок пропущено', async () => {
     await finalize(config(80));
-    expect(refreshBase).not.toHaveBeenCalled();
+    expect(await baseCategoryOf()).toBeNull();
   });
 
   it('автокатегорії ще немає — перераховується навіть без нових оголошень', async () => {
     await finalize(config(null));
-    expect(refreshBase).toHaveBeenCalledWith(searchId);
+    expect(await baseCategoryOf()).toBe(LISTING_CATEGORY);
   });
 });

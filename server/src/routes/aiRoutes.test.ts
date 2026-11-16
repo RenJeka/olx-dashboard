@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MAX_ANALYZE_IDS } from '../analysis/constants.js';
+import { ANALYSIS_ERRORS, MAX_ANALYZE_IDS } from '../analysis/constants.js';
 import { db, dbGet } from '../db/db.js';
 import { testApp } from '../test/app.js';
 import { createSearch, insertListing, resetDb } from '../test/db.js';
@@ -16,19 +16,17 @@ let app: FastifyInstance;
 let searchId: number;
 const savedKey = process.env.OPENROUTER_API_KEY;
 
-const NOT_FOUND = { error: 'Пошук не знайдено' };
-const NO_KEY = { error: 'Авто-режим недоступний: немає OPENROUTER_API_KEY' };
-const EMPTY = { error: 'Порожня відповідь' };
-const TOO_MANY = { error: `Максимум ${MAX_ANALYZE_IDS} id за виклик` };
+const NOT_FOUND = { error: ANALYSIS_ERRORS.SEARCH_NOT_FOUND };
+const NO_KEY = { error: ANALYSIS_ERRORS.NO_API_KEY };
+const EMPTY = { error: ANALYSIS_ERRORS.EMPTY_RESPONSE };
+const TOO_MANY = { error: ANALYSIS_ERRORS.TOO_MANY_IDS };
 
 const post = (url: string, payload: object = {}) => app.inject({ method: 'POST', url, payload });
 const idOf = async (olxId: number) =>
   (await dbGet<{ id: number }>('SELECT id FROM listings WHERE olx_id = ?', [olxId]))!.id;
-/** Оголошення зі своїм заголовком (`insertListing` ставить заголовок сам). */
-async function addListing(olxId: number, title: string, description: string, price: number): Promise<void> {
-  await insertListing(searchId, olxId, { description, price });
-  await db.execute({ sql: 'UPDATE listings SET title = ? WHERE olx_id = ?', args: [title, olxId] });
-}
+/** Оголошення зі своїм заголовком, описом і ціною. */
+const addListing = (olxId: number, title: string, description: string, price: number): Promise<void> =>
+  insertListing(searchId, olxId, { title, description, price });
 const manyIds = Array.from({ length: MAX_ANALYZE_IDS + 1 }, (_, i) => i + 1);
 
 beforeAll(async () => {
@@ -154,7 +152,7 @@ describe('фільтр релевантності', () => {
 
 describe('AI Вибір', () => {
   const url = (path: string) => `/api/searches/${searchId}/ai-picks/${path}`;
-  const NO_CANDIDATES = { error: 'Немає кандидатів для ранжування (додайте оголошення без мінусів)' };
+  const NO_CANDIDATES = { error: ANALYSIS_ERRORS.NO_CANDIDATES };
 
   it('немає кандидатів → 400 (prompt, package.zip, rank)', async () => {
     await db.execute('UPDATE listings SET filtered_out = 1');
@@ -196,8 +194,8 @@ describe('AI Вибір', () => {
 
 describe('мінуси / плюси', () => {
   const url = (path = '') => `/api/searches/${searchId}/analyze${path}`;
-  const BAD_MODE = { error: 'mode має бути cons|pros' };
-  const NO_CRITERIA = { error: 'Спершу збережіть критерії пошуку' };
+  const BAD_MODE = { error: ANALYSIS_ERRORS.BAD_MODE };
+  const NO_CRITERIA = { error: ANALYSIS_ERRORS.NO_CRITERIA };
   const saveCriteria = () =>
     db.execute({
       sql: 'UPDATE searches SET analysis_criteria = ? WHERE id = ?',
@@ -263,7 +261,7 @@ describe('мінуси / плюси', () => {
 
 describe('синоніми запиту', () => {
   it('порожній query — 400; без ключа — 409; import порожній — 400, список — 200', async () => {
-    const EMPTY_QUERY = { error: 'Поле query обовʼязкове' };
+    const EMPTY_QUERY = { error: ANALYSIS_ERRORS.EMPTY_QUERY };
     const prompt = await post('/api/search-synonyms/prompt', { query: '  ' });
     expect(prompt.statusCode).toBe(400);
     expect(prompt.json()).toEqual(EMPTY_QUERY);

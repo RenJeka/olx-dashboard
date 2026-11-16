@@ -22,8 +22,9 @@ import { isDirection, moveOneStep, nextTopSortOrder } from '../db/repos/manualOr
 import { getLastScanSummary, getLastAnalysisRun, getLastScanStatus } from '../db/repos/scanRuns.js';
 import { listFilterSourceRows, listListingParams } from '../db/repos/listings.js';
 import type { CategoryOption, FilterOptions, LastScanResponse, ParamKeyInfo, ScanPlan } from '../types.js';
+import { SERVICE_ERRORS } from './constants.js';
 
-export const SEARCH_NOT_FOUND = 'Пошук не знайдено';
+const { SEARCH_NOT_FOUND } = SERVICE_ERRORS;
 
 /** Тіло POST/PATCH /api/searches. */
 export interface SearchInput {
@@ -65,7 +66,7 @@ export const listAllSearches = listSearches;
 
 export async function createSearch(input: SearchInput): Promise<SearchRecord> {
   const { name, query } = input;
-  if (!name || !query) throw new BadRequestError('Поля name і query обовʼязкові');
+  if (!name || !query) throw new BadRequestError(SERVICE_ERRORS.SEARCH_FIELDS_REQUIRED);
 
   // Новий пошук з'являється згори списку.
   const sortOrder = await nextTopSortOrder(SEARCH_ORDER);
@@ -133,7 +134,7 @@ export async function deleteSearch(id: number): Promise<{ deleted: true }> {
 
 /** Ручне сортування (стрілки ↑/↓): міняє sort_order із сусідом у межах групи-проєкту. */
 export async function moveSearch(id: number, direction: unknown): Promise<SearchRecord | undefined> {
-  if (!isDirection(direction)) throw new BadRequestError('direction має бути "up" або "down"');
+  if (!isDirection(direction)) throw new BadRequestError(SERVICE_ERRORS.BAD_DIRECTION);
   if (!(await moveOneStep(SEARCH_ORDER, id, direction))) throw new NotFoundError(SEARCH_NOT_FOUND);
   return getSearchRecord(id);
 }
@@ -155,13 +156,13 @@ export async function getLastAnalysis(
   searchId: number,
 ): Promise<{ plan: ScanPlan; analyzedAt: string | null; planValid: boolean }> {
   const row = await getLastAnalysisRun(searchId);
-  if (!row) throw new NotFoundError('Аналізів ще не було');
+  if (!row) throw new NotFoundError(SERVICE_ERRORS.NO_ANALYSIS_YET);
 
   let plan: ScanPlan;
   try {
     plan = JSON.parse(row.scan_plan) as ScanPlan;
   } catch {
-    throw new NotFoundError('Збережений аналіз пошкоджено');
+    throw new NotFoundError(SERVICE_ERRORS.ANALYSIS_CORRUPTED);
   }
 
   return {
